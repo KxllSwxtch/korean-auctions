@@ -1,0 +1,52 @@
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+import os
+
+
+class Settings(BaseSettings):
+    """Настройки приложения"""
+
+    # Основные настройки
+    app_name: str = "AutoBaza Parser API"
+    app_version: str = "1.0.0"
+    debug: bool = False
+
+    # Настройки для парсинга
+    request_timeout: int = 30
+    max_retries: int = 3
+    retry_delay: float = 1.0
+
+    # Настройки для Autohub
+    autohub_base_url: str = "https://www.autohubauction.co.kr"
+    autohub_list_url: str = (
+        "https://www.autohubauction.co.kr/newfront/receive/rc/receive_rc_list.do"
+    )
+    autohub_login_url: str = (
+        "https://www.autohubauction.co.kr/newfront/user/login/user_login_ajax.do"
+    )
+
+    # Учётные данные для Autohub
+    autohub_username: str = "785701"
+    autohub_password: str = "782312"
+
+    # User Agent для запросов
+    user_agent: str = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    # Настройки логирования
+    log_level: str = "INFO"
+    log_file: str = "logs/app.log"
+
+    # Настройки для cache (если понадобится)
+    cache_ttl: int = 300  # 5 минут
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """Получить настройки приложения (кэшированные)"""
+    return Settings()
