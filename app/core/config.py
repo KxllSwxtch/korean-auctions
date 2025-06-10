@@ -50,3 +50,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Получить настройки приложения (кэшированные)"""
     return Settings()
+
+
+# Глобальный экземпляр настроек для удобства импорта
+settings = get_settings()

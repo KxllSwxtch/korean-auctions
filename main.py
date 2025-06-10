@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from app.routes import autohub, autohub_demo
+from app.routes import autohub, autohub_demo, lotte
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 
@@ -35,6 +35,7 @@ app.include_router(autohub.router, prefix="/api/v1/autohub", tags=["Autohub"])
 app.include_router(
     autohub_demo.router, prefix="/api/v1/autohub/cars", tags=["Autohub Demo"]
 )
+app.include_router(lotte.router, tags=["Lotte Auction"])
 
 
 @app.get("/")

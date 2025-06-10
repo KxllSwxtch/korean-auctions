@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<!--[if IE 7]><html dir="ltr" lang="ko" class="ie7"><![endif]-->
+<!--[if IE 8]><html dir="ltr" lang="ko" class="ie8"><![endif]-->
+<!--[if IE 9]><html dir="ltr" lang="ko" class="ie9"><![endif]-->
+<html dir="ltr" lang="ko">
+  <head>
+    <title>로그인 | 롯데오토옥션</title>
+    <meta
+      name="description"
+      content="롯데오토옥션 경매회원전용 로그인 페이지입니다."
+    />
+    <meta
+      name="keywords"
+      content="롯데렌탈, 롯데오토옥션, 중고차경매, 경매대행, 홈페이지, 로그인"
+    />
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <!-- publisher [s]-->
+    <link rel="stylesheet" href="/css/hp/common.css?version=1.1" />
+    <script src="/js/hp/jquery-1.12.4.min.js"></script>
+
+    <link rel="stylesheet" href="/css/hp/ui-member.css?ver=20240227" />
+    <script src="/js/hp/ui-member.js"></script>
+
+    <link rel="stylesheet" href="/css/hp/swiper.min.css" />
+
+    <script src="/js/hp/swiper.min.js"></script>
+    <script src="/js/hp/jquery.bxslider.min.js"></script>
+    <!-- publisher [e]-->
+
+    <script
+      type="text/javascript"
+      src="/js/cm/validengine/jquery.validationEngine-kr.js"
+    ></script>
+    <!-- 유효성검사 -->
+    <script
+      type="text/javascript"
+      src="/js/cm/validengine/jquery.validationEngine.js"
+    ></script>
+    <!-- 유효성검사 -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/validengine/validationEngine.jquery.css"
+    />
+    <!-- 유효성검사 -->
+
+    <script src="/js/cm/jquery.bxslider.js"></script>
+    <!-- 차량이미지슬라이딩 -->
+    <link rel="stylesheet" type="text/css" href="/css/hp/niceDndFile.css" />
+    <!-- 첨부파일 -->
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.niceDndFileUploader-1.1.js"
+    ></script>
+    <!-- 첨부파일 -->
+
+    <!-- plug-in [s]-->
+    <script src="/js/cm/jquery-ui.js"></script>
+    <link rel="stylesheet" href="/css/hp/jquery-ui.css" />
+    <!-- fancyBox[s] & BoxSlide -->
+    <script type="text/javascript" src="/js/cm/jquery.fancybox.js"></script>
+    <script type="text/javascript" src="/js/cm/jquery.bxslider.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/hp/jquery.fancybox.css" />
+    <link rel="stylesheet" type="text/css" href="/css/hp/jquery.bxslider.css" />
+    <link
+      rel="shortcut icon"
+      type="image/x-icon"
+      href="/img/hp/ico/favicon_lotterentacar.ico"
+    />
+    <link rel="shortcut icon" type="image/png" href="/img/hp/ico/favi.png" />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.mousewheel.pack.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/jquery.fancybox-buttons.css"
+    />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.fancybox-buttons.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/jquery.fancybox-thumbs.css"
+    />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.fancybox-thumbs.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.drag-drop.plugin.js"
+    ></script>
+    <!-- fancyBox[e] -->
+    <!-- clipboard[s] -->
+    <script type="text/javascript" src="/js/cm/clipboard.js"></script>
+    <script type="text/javascript" src="/js/cm/clipboard.min.js"></script>
+    <!-- clipboard[e] -->
+    <!-- plug-in [e]-->
+
+    <!-- dev custom[s] -->
+    <script src="/js/hp/dev.js?version=1.1"></script>
+    <link rel="stylesheet" href="/css/hp/dev.css" />
+    <!-- dev custom[e] -->
+
+    <script src="/js/cm/jquery.fileDownload.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=UA-118654321-1"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag("js", new Date())
+
+      gtag("config", "UA-118654321-1")
+    </script>
+
+    <!-- 롯데렌탈 SSO  고도화 sj.kim 혹시 멤버스 로그인 상태에서 경매회원으로 넘어 온 경우 SSO 로그아웃 처리 하기 위함-->
+    <script
+      type="text/javascript"
+      src="https://members.lpoint.com/api/js/serialize.object.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="https://members.lpoint.com/api/js/json2.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="https://members.lpoint.com/api/js/lotte.sso.api.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="/js/cm/moment.js?cd=7cb33b9d-1e1c-457f-8399-8270a68ff147"
+    ></script>
+    <script
+      type="text/javascript"
+      src="/js/cm/sso.rental.js?cd=7cb33b9d-1e1c-457f-8399-8270a68ff147"
+    ></script>
+    <script
+      type="text/javascript"
+      src="/js/cm/sso.autoauction.js?cd=7cb33b9d-1e1c-457f-8399-8270a68ff147"
+    ></script>
+    <script>
+      $(document).ready(function () {
+        members.init({
+          clientAkInfo:
+            '{"clntEncKey":"sA5J9iTybdIeaXIC","domain":"https://members.lpoint.com","flwNo":"sH1n9hE7Rk"}' ||
+            "",
+          accessToken: "" || "",
+          siteNo: "1551",
+          channelCd: "0",
+          loginStatus: "" == "" ? false : true,
+          process: "invalidateSSOLogin", // 옥션 로그인페이지에만 있는 값임.(특수처리)
+        })
+      })
+    </script>
+
+    <script type="text/javascript">
+      var commNoticMsgOntimeMsg = ""
+
+      $(window).load(function () {
+        //공통메시지 처리
+        var msg = ""
+        if (commNoticMsgOntimeMsg != null && commNoticMsgOntimeMsg != "") {
+          if ("fail_noAuthority" == commNoticMsgOntimeMsg) {
+            msg = "회원님께서는 해당 메뉴의 접근 권한이 없습니다."
+            alert(msg)
+          }
+        }
+      })
+      if ($.datepicker != null) {
+        $.datepicker.setDefaults({
+          buttonImage: "/img/hp/btn/btn-date.png",
+        })
+      }
+      function actionLogout(ggbn) {
+        if (ggbn == null) ggbn = "pub"
+        document.location.href = "/hp/" + ggbn + "/cmm/actionLogout.do"
+      }
+      //isReturnCurrentPage true:로그인 이후 현재 페이지 유지, false or Null:로그인 이후 메인페이지 이동
+      function actionLogin(isReturnCurrentPage) {
+        var contextDiv = "pub"
+        var currentGetUrl =
+          "%2Fhp%2Fauct%2Fcmm%2FviewLoginUsr.do%3FloginMode%3Dredirect%26"
+        if ("auct" == "auct") contextDiv = "auct"
+
+        if (isReturnCurrentPage != null && isReturnCurrentPage) {
+          if (contextDiv == "pub") {
+            document.location.href =
+              "/hp/" +
+              contextDiv +
+              "/cmm/viewLoginLpointUsr.do?returnUrl=" +
+              currentGetUrl
+          } else {
+            document.location.href =
+              "/hp/" +
+              contextDiv +
+              "/cmm/viewLoginUsr.do?returnUrl=" +
+              currentGetUrl
+          }
+        } else {
+          if (contextDiv == "pub") {
+            document.location.href =
+              "/hp/" + contextDiv + "/cmm/viewLoginLpointUsr.do"
+          } else {
+            document.location.href =
+              "/hp/" + contextDiv + "/cmm/viewLoginUsr.do"
+          }
+        }
+      }
+
+      function fn_MoveLinkPage(menuNo, link) {
+        var selectedBaseMenuNo
+        var selectedSubMenuNo
+        var selectedLink
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var menuNo_ = $(this).val().split("|", -1)[0]
+            var upperMenuId_ = $(this).val().split("|", -1)[1]
+            var menuNm_ = $(this).val().split("|", -1)[2]
+            var chkURL_ = $(this).val().split("|", -1)[5]
+            if (menuNo == menuNo_) {
+              selectedLink = chkURL_
+              if (upperMenuId_ == "0") {
+                $('form[name="menuListForm"]')
+                  .find("input[name=tmp_menuNm]")
+                  .each(function () {
+                    if (menuNo == $(this).val().split("|", -1)[1]) {
+                      selectedBaseMenuNo = menuNo_
+                      selectedSubMenuNo = $(this).val().split("|", -1)[0]
+                      return false
+                    }
+                  })
+              } else {
+                $('form[name="menuListForm"]')
+                  .find("input[name=tmp_menuNm]")
+                  .each(function () {
+                    if (
+                      upperMenuId_ == $(this).val().split("|", -1)[0] &&
+                      $(this).val().split("|", -1)[1] == "0"
+                    ) {
+                      selectedBaseMenuNo = $(this).val().split("|", -1)[0]
+                      selectedSubMenuNo = menuNo_
+                      return false
+                    }
+                  })
+              }
+            }
+          })
+        if (selectedBaseMenuNo == null || selectedLink == null) {
+          alert("메뉴 ID가 존재 하지 않습니다.")
+          return false
+        }
+        document.menuListForm.baseMenuNo.value = selectedBaseMenuNo
+        document.menuListForm.subMenuNo.value = selectedSubMenuNo
+        document.menuListForm.subSubMenuNo.value = null
+        document.menuListForm.link.value = "forward:" + link
+        document.menuListForm.action = "/hp/cmm/actionMenuLinkPage.do"
+        document.menuListForm.submit()
+      }
+
+      //세션 TimeOut이 걸렸는지 확인
+      //true:세션 문제 없음, false:세션 타임 아웃
+      function fnCheckSessionTimeOutConfirm(authUrl) {
+        var isSessionTimeOut = false
+        var reqUrl = "/hp/cmm/checkSessionTimeOutAjax.do"
+        if (authUrl != null) reqUrl += "?authUrl=" + authUrl
+        $.ajax({
+          type: "POST",
+          url: reqUrl,
+          dataType: "json",
+          async: false,
+          success: function (json) {
+            if (json.result == "fail") {
+              if (
+                confirm(
+                  "일정시간 화면 이동이 없어 로그아웃 처리되었습니다.\n로그인 페이지로 이동하시겠습니까?"
+                )
+              ) {
+                actionLogin()
+              }
+              isSessionTimeOut = false
+            } else {
+              isSessionTimeOut = true
+            }
+          },
+          error: function (error) {
+            alert("요청처리를 실패하였습니다.(세션타임아웃 체크 요청 실패)")
+          },
+        })
+        return isSessionTimeOut
+      }
+      //파일 업로드 중인지 여부 확인
+      //true:파일업로드 완료, false:파일업로드 중
+      function fnCheckFileUploadingAlter() {
+        if ($.ndFileUploader.isNdFileUploading())
+          alert("파일 업로드 중입니다. 업로드 완료 후 등록해 주세요.")
+        //isUploading_ 플래그는 niceDndFile.js에 정의 되어있음
+        return !$.ndFileUploader.isNdFileUploading()
+      }
+
+      //selectedLink : 검사 URL
+      function fnCheckAuthUrl(selectedLink) {
+        var msg = ""
+        var result = new Object()
+        result.cd = "success"
+        //권한여부 확인
+        $.ajax({
+          type: "POST",
+          url: "/hp/cmm/checkAuthAjax.do",
+          data: { authUrl: selectedLink },
+          dataType: "json",
+          async: false,
+          success: function (json) {
+            if (json.result == "fail_noAuthority") {
+              result.msg = "회원님께서는 해당 메뉴의 접근 권한이 없습니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notPubUser") {
+              result.msg =
+                "경매회원은 이용할 수 없는 서비스입니다.\nL.POINT 통합회원이나 일반회원으로 로그인 해주세요."
+              result.cd = json.result
+            } else if (json.result == "fail_noAuctUser") {
+              result.msg = "경매회원전용 메뉴입니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notAuctLogin") {
+              result.msg = "경매회원 아이디로 로그인이 후 이용 가능합니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notPubLogin") {
+              result.msg =
+                "L.POINT 통합회원/일반회원 아이디로 로그인 후 이용 가능합니다."
+              result.cd = json.result
+            }
+            return result
+          },
+          error: function (error) {
+            alert("요청처리를 실패하였습니다.(" + error + ")")
+          },
+        })
+
+        return result
+      }
+      function getFirstChildNodeNo(menuNo) {
+        var nodeValues
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var upperMenuNo = $(this).val().split("|", -1)[1]
+            var menuOrder = $(this).val().split("|", -1)[3]
+            if (upperMenuNo == menuNo && menuOrder == "1") {
+              nodeValues = $(this).val().split("|", -1)[0]
+              return nodeValues
+            }
+          })
+
+        if (nodeValues == null) return ""
+
+        return nodeValues
+      }
+      function getParentNodeCnt(baseMenuNo, cnt) {
+        var tNode = new Array()
+        var prentNode
+        var check_cnt = 0
+        for (var i = 0; i < document.menuListForm.tmp_menuNm.length; i++) {
+          tNode[i] = document.menuListForm.tmp_menuNm[i].value
+          var nValue = tNode[i].split("|")
+          if (nValue[0] == baseMenuNo) {
+            check_cnt++
+            prentNode = nValue[1]
+          }
+        }
+        if (check_cnt > 0) {
+          cnt++
+          return getParentNodeCnt(prentNode, cnt)
+        } else {
+          return cnt
+        }
+      }
+      //옵션
+      function fn_MovePage(nodeNum, link, target, prevBack) {
+        // 비밀번호가 숫자일경우 비밀번호 변경하라는 alert 창 by 양재환 2024-10-17
+        var pwd = ""
+        var regex = /^[0-9]+$/
+
+        // 페이지가 메인인지 비밀번호 변경 페이지 인지 확인 후 조건 추가 해야 할듯
+        if (regex.test(pwd) && prevBack == undefined) {
+          alert("비밀번호를 변경하세요.")
+          return false
+        }
+
+        var nodeValues
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var menuNo_ = $(this).val().split("|", -1)[0]
+            if (nodeNum == menuNo_) {
+              nodeValues = $(this).val().split("|")
+            }
+          })
+        //권한 확인
+        console.log(nodeValues)
+        var result = fnCheckAuthUrl(nodeValues[5])
+
+        //회원사가 통합회원 로그인 메뉴를 접근하였을 경우만
+        if (result.cd == "fail_notPubUser" || result.cd == "fail_noAuctUser") {
+          if (!confirm(result.msg + "\n로그인 페이지로 이동하시겠습니까?")) {
+            return
+          }
+        }
+        if (getParentNodeCnt(nodeValues[0], 0) == 2) {
+          document.menuListForm.baseMenuNo.value = nodeValues[1]
+          document.menuListForm.subMenuNo.value = nodeValues[0]
+          document.menuListForm.subSubMenuNo.value = getFirstChildNodeNo(
+            nodeValues[0]
+          )
+        } else if (getParentNodeCnt(nodeValues[0], 0) == 3) {
+          $('form[name="menuListForm"]')
+            .find("input[name=tmp_menuNm]")
+            .each(function () {
+              var menoNo_ = $(this).val().split("|", -1)[0]
+              if (nodeValues[1] == menoNo_) {
+                document.menuListForm.baseMenuNo.value = $(this)
+                  .val()
+                  .split("|")[1]
+              }
+            })
+          document.menuListForm.subMenuNo.value = nodeValues[1]
+          document.menuListForm.subSubMenuNo.value = nodeValues[0]
+        } else {
+          document.menuListForm.baseMenuNo.value = nodeValues[0]
+          document.menuListForm.subMenuNo.value = getFirstChildNodeNo(
+            nodeValues[0]
+          )
+          document.menuListForm.subSubMenuNo.value = getFirstChildNodeNo(
+            getFirstChildNodeNo(nodeValues[0])
+          )
+        }
+
+        var conSymbol = "?"
+        if (link != null && link != "") {
+          if (prevBack) {
+            if (link.indexOf("?") != -1) conSymbol = "&"
+            document.menuListForm.link.value =
+              "forward:" + encodeURIComponent(link + conSymbol + "prevBack=Y")
+          } else {
+            document.menuListForm.link.value =
+              "forward:" + encodeURIComponent(link)
+          }
+        } else {
+          if (prevBack) {
+            if (nodeValues[5].indexOf("?") != -1) conSymbol = "&"
+            document.menuListForm.link.value =
+              "forward:" + nodeValues[5] + conSymbol + "prevBack=Y"
+          } else {
+            document.menuListForm.link.value = "forward:" + nodeValues[5]
+          }
+        }
+
+        if (target != null && target != "") {
+          document.menuListForm.target = target
+        }
+        document.menuListForm.action = "/hp/cmm/actionMenuLinkPage.do"
+        document.menuListForm.submit()
+        if (target != null && target != "") {
+          document.menuListForm.target = "_self"
+        }
+      }
+
+      /* ********************************************************
+       * 바로사기 상품 미리보기
+       ******************************************************** */
+      function fnDircCarPreview(formId, type) {
+        var url = "/hp/cmm/buy/dirc/viewAuctDircPreview.do?viewMode=" + type //?searchMngDivCd="+mngDivCd+"&searchMngNo="+mngNo+"&searchExhiRegiSeq="+ExhiRegiSeq;
+        var w = 1285
+        var h = 800
+        var winWidth = window.screen.width //해상도가로
+        var winHeight = window.screen.height //해상도세로
+        var left, top
+        left = parseInt((winWidth - w) / 2)
+        top = parseInt((winHeight - h) / 2)
+        var auctDircPreviewPop = window.open(
+          "",
+          "auctDircPreviewPop",
+          "width=" +
+            w +
+            ",height=" +
+            h +
+            ",left=" +
+            left +
+            ",top=" +
+            top +
+            " toolbar=0, directories=0, status=0, menubar=0, scrollbars=yes, resizable=0"
+        )
+
+        //Cd가 들어가는 콤보박스, 라디오, 체크박스가 있으면 Nm으로 치환하고 Hidden을 만들어서 Form에 Set함
+
+        $("#" + formId + " input[type=radio]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            if (
+              !$("#" + formId + " input[name=sameConfirmCd]") &&
+              !$("#" + formId + " input[name=assurTypeCd]")
+            ) {
+              $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+              $("#" + formId).append(
+                $(
+                  "<input type='hidden' id='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' name='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' value='" +
+                    $(this).next().text() +
+                    "'/>"
+                )
+              )
+            }
+          }
+        })
+        $("#" + formId + " input[name=sameConfirmCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[name=assurTypeCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[type=cheackBox]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " select").each(function () {
+          if ($(this).attr("name").indexOf("Cd") != -1 && $(this).val() != "") {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).find("option:selected").text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#sigunguNm").remove()
+        if (
+          $("#sido_sigunguCd").val() != "" &&
+          $("#signgu_sigunguCd").val() != ""
+        ) {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='" +
+                $("#sido_sigunguNm").val() +
+                " " +
+                $("#signgu_sigunguNm").val() +
+                "'/>"
+            )
+          )
+        } else if ($("#sido_sigunguCd").val() == "361100") {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='세종'/>"
+            )
+          )
+        }
+        $("#" + formId)
+          .attr("action", url)
+          .attr("method", "POST")
+          .attr("target", "auctDircPreviewPop")
+          .submit()
+        auctDircPreviewPop.focus()
+
+        $("#" + formId).attr("target", "")
+      }
+
+      /* ********************************************************
+       * 바로사기 상품 미리보기(인증중고차, R2B 상품)
+       ******************************************************** */
+      function fnCertCarPreview(formId, type) {
+        var url = "/hp/cmm/buy/cert/viewAuctCertPreview.do?viewMode=" + type //?searchMngDivCd="+mngDivCd+"&searchMngNo="+mngNo+"&searchExhiRegiSeq="+ExhiRegiSeq;
+        var w = 1285
+        var h = 800
+        var winWidth = window.screen.width //해상도가로
+        var winHeight = window.screen.height //해상도세로
+        var left, top
+        left = parseInt((winWidth - w) / 2)
+        top = parseInt((winHeight - h) / 2)
+        var auctCertPreviewPop = window.open(
+          "",
+          "auctCertPreviewPop",
+          "width=" +
+            w +
+            ",height=" +
+            h +
+            ",left=" +
+            left +
+            ",top=" +
+            top +
+            " toolbar=0, directories=0, status=0, menubar=0, scrollbars=yes, resizable=0"
+        )
+
+        //Cd가 들어가는 콤보박스, 라디오, 체크박스가 있으면 Nm으로 치환하고 Hidden을 만들어서 Form에 Set함
+
+        $("#" + formId + " input[type=radio]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            if (
+              !$("#" + formId + " input[name=sameConfirmCd]") &&
+              !$("#" + formId + " input[name=assurTypeCd]")
+            ) {
+              $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+              $("#" + formId).append(
+                $(
+                  "<input type='hidden' id='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' name='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' value='" +
+                    $(this).next().text() +
+                    "'/>"
+                )
+              )
+            }
+          }
+        })
+        $("#" + formId + " input[name=sameConfirmCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[name=assurTypeCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[type=cheackBox]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " select").each(function () {
+          if ($(this).attr("name").indexOf("Cd") != -1 && $(this).val() != "") {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).find("option:selected").text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#sigunguNm").remove()
+        if (
+          $("#sido_sigunguCd").val() != "" &&
+          $("#signgu_sigunguCd").val() != ""
+        ) {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='" +
+                $("#sido_sigunguNm").val() +
+                " " +
+                $("#signgu_sigunguNm").val() +
+                "'/>"
+            )
+          )
+        } else if ($("#sido_sigunguCd").val() == "361100") {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='세종'/>"
+            )
+          )
+        }
+        $("#" + formId)
+          .attr("action", url)
+          .attr("method", "POST")
+          .attr("target", "auctCertPreviewPop")
+          .submit()
+        auctCertPreviewPop.focus()
+
+        $("#" + formId).attr("target", "")
+      }
+
+      //파일 다운로드
+      function fn_cmm_FileDownload(ggbn, sgbn, ssgbn, sysFileNm, orgFileNm) {
+        var activeProfile = "pro"
+        $.ajax({
+          type: "POST",
+          url: "/cm/cmm/" + ggbn + "/" + sgbn + "Down.do",
+          data: {
+            ssgbn: ssgbn,
+            sysFileNm: sysFileNm,
+            orgFileNm: orgFileNm,
+            mode: "check",
+          },
+          dataType: "json",
+          success: function (json) {
+            if (json.result == "failed") {
+              alert(json.msg)
+            } else {
+              ajax_download("/cm/cmm/" + ggbn + "/" + sgbn + "Down.do", {
+                ssgbn: ssgbn,
+                sysFileNm: sysFileNm,
+                orgFileNm: orgFileNm,
+                mode: "down",
+              })
+            }
+          },
+          error: function (e) {
+            alert(e.responseText)
+          },
+        })
+      }
+
+      //레이어 팝업 닫기
+      function fnPopClose() {
+        $(".btn-close-layer").trigger("click")
+      }
+
+      /* ********************************************************
+       * L포인트 회원가입
+       ******************************************************** */
+      function fnGoMainRegLpoint() {
+        /*$.ajax({
+			type: "POST",
+			url : "/hp/pub/cmm/selectPubMemLPointGbnUrl.do",
+			data : {"urlGbn": "01"},
+			dataType:"json",
+			success:function(json){
+				$("#menuListForm").attr("action", json.result);
+				$("#menuListForm").attr("method", "post");
+				$("#menuListForm").submit();
+				$("#menuListForm").attr("action", "");
+				$("#menuListForm").attr("method", "get");
+			},
+			error : function(error,exception) {
+				alert("요청처리를 실패하였습니다.("+eval(error.status)+", "+exception+")");
+		    }
+		});*/
+
+        var message = ""
+
+        message =
+          "롯데렌터카 홈페이지에서 회원가입이 가능합니다. 롯데렌터카 홈페이지로 이동하시겠습니까?"
+
+        if (confirm(message)) {
+          var url =
+            "https://www.lotterentacar.net/hp/kor/member/lpoint/join.do" /* 운영 */
+          //var url = "https://t.lotterentacar.net/hp/kor/member/lpoint/join.do"; /* 개발 */
+
+          window.open(url)
+        }
+      }
+    </script>
+    <script type="text/javascript">
+      var worker
+
+      $(document).ready(function () {
+        $("#membId").on("keyup", function () {
+          var inputVal = $(this).val()
+          $(this).val(inputVal.replace(/[^a-z0-9]/gi, ""))
+        })
+
+        $("#cellNo1").on("keyup", function () {
+          var mch = $(this).val().match(/[0-9]/g)
+          if (mch != null && mch.length == 3) {
+            $("#cellNo2").focus()
+          }
+        })
+
+        $("#cellNo2").on("keyup", function () {
+          var mch = $(this).val().match(/[0-9]/g)
+          if (mch != null && mch.length == 4) {
+            $("#cellNo3").focus()
+          }
+        })
+        $("input[name=pwdSmscertNo]").keydown(function (key) {
+          if (key.keyCode == 13) {
+            //키가 13이면 실행 (엔터는 13)
+            fnCheckSms()
+          }
+        })
+      })
+
+      /* ********************************************************
+       * 엔터 키 처리
+       ******************************************************** */
+      $("input[name=passwd]").keydown(function (event) {
+        if (event.which === 13) {
+          actionLogin()
+        }
+      })
+      function getid() {
+        if (
+          getCookie("hpAuctSaveid") != null &&
+          getCookie("hpAuctSaveid") != ""
+        ) {
+          $("#userId").val(getCookie("hpAuctSaveid"))
+          $("#checkId").prop("checked", true)
+          $("#checkId").parent().find("a").addClass("checked")
+        } else {
+          $("#checkId").prop("checked", false)
+        }
+      }
+      function EnterCheck() {
+        if (event.keyCode == 13) {
+          actionLogin()
+        }
+      }
+
+      function actionLogin() {
+        if ($("#loginForm").validationEngine("validate") == true) {
+          /* if($("#userId").val() == null || $("#userId").val() == ''){
+				alert("아이디를 입력하세요");
+				return;
+			}
+			
+			if($("#userPwd").val() == null || $("#userPwd").val() == ''){
+				alert("비밀번호를 입력하세요");
+				return;
+			} */
+          $.ajax({
+            type: "POST",
+            url: "/hp/auct/cmm/selectAuctMemLoginCheckAjax.do",
+            data: $("#loginForm").serialize(),
+            dataType: "json",
+            success: function (json) {
+              if (json.resultCd == null || json.resultCd == "") {
+                if (json.auPswdUptEndYn == "Y") {
+                  fnSetAuPwdChangeCookie()
+                }
+                // 연회비 만료 조건
+                if (json.feeEndDtType == "isIncluded") {
+                  alert(
+                    json.feeEndDt +
+                      " 연회비가 만료되었습니다.\n만료 1개월 이후 접속이 불가하오니 속히 경매 연회비 납부 후 이용하시기 바랍니다."
+                  )
+                }
+                saveid(document.loginForm)
+                document.loginForm.action = "/hp/auct/cmm/actionLogin.do"
+                document.loginForm.submit()
+              }
+              // 연회비 만료 및 로그인 불가 조건
+              else if (json.resultCd == "feeInactive") {
+                alert(
+                  "연회비 납부상태를 확인하세요.\n만료일 : " + json.feeEndDt
+                )
+              } else if (json.resultCd == "errOverPassCnt") {
+                //var msg = "비밀번호 입력 오류 횟수를 초과하였습니다.\n\n경매장 담당자에게 문의하세요.\n($$loginErrCnt$$회 이상 오류 시 로그인 불가 )";
+                //msg = msg.replace("$$loginErrCnt$$",json.loginVO.loginErrCnt);
+                //msg = msg.replace("$$loginErrCnt$$",10);//(10회 이상 오류 시 로그인 불가)
+                alert(
+                  "비밀번호가 10회 오류로 잠금 처리됐습니다.\n비밀번호 찾기를 통해 임시 비밀번호를 발급받으세요."
+                )
+                //}else if(json.resultCd == "noUser"){
+                //	alert("로그인 정보가 맞지 않습니다.");
+              } else if (json.resultCd == "errUserAuth") {
+                alert("로그인 정보가 맞지 않습니다.")
+              } else if (json.resultCd == "passExpiry") {
+                var msg =
+                  "유효기간이 지난 임시 비밀번호입니다. \n비밀번호 찾기를 통해 임시 비밀번호를 재발급받으세요."
+                alert(msg)
+              }
+            },
+          })
+        }
+      }
+
+      /* ********************************************************
+       * 비밀번호 3개월 변경 쿠키 set
+       ******************************************************** */
+      function fnSetAuPwdChangeCookie() {
+        var todayDate = new Date()
+        todayDate.setDate(todayDate.getDate() + 1)
+        document.cookie =
+          "auPswdUptEndYn" +
+          "=" +
+          "Y" +
+          "; path=/; expires=" +
+          todayDate.toGMTString()
+      }
+
+      function setCookie_(name, value, expiredays) {
+        var todayDate = new Date()
+        todayDate.setDate(todayDate.getDate() + expiredays)
+        document.cookie =
+          name +
+          "=" +
+          escape(value) +
+          "; path=/; expires=" +
+          todayDate.toGMTString()
+      }
+
+      function getCookie(name) {
+        var nameOfCookie = name + "="
+        var x = 0
+        while (x <= document.cookie.length) {
+          var y = x + nameOfCookie.length
+          if (document.cookie.substring(x, y) == nameOfCookie) {
+            if ((endOfCookie = document.cookie.indexOf(";", y)) == -1)
+              endOfCookie = document.cookie.length
+            return unescape(document.cookie.substring(y, endOfCookie))
+          }
+          x = document.cookie.indexOf(" ", x) + 1
+          if (x == 0) break
+        }
+        return ""
+      }
+
+      function saveid(form) {
+        var expdate
+        // 기본적으로 30일동안 기억하게 함. 일수를 조절하려면 * 30에서 숫자를 조절하면 됨
+        if ($("#checkId").prop("checked")) {
+          expdate = 1 // 1일
+        } else {
+          expdate = -1 // 쿠키 삭제조건
+        }
+        setCookie_("hpAuctSaveid", $("#userId").val(), expdate)
+      }
+
+      $(window).load(function () {
+        if ($("#resultCd").val() != null && $("#resultCd").val() != "") {
+          alert($("#resultCd").val())
+        }
+        getid()
+        EnterCheck()
+      })
+
+      //비밀번호찾기 레이어팝업
+      function fnSearchPwdPop() {
+        fnRegFormClear()
+        $(".layer-find-pw").show()
+        $(".dim").show()
+      }
+
+      /* ********************************************************
+       * 비밀번호 찾기
+       ******************************************************** */
+      function fnSearchPwd() {
+        if ($("#regForm").validationEngine("validate") == true) {
+          $("#cellNo").val(
+            $("#cellNo1").val() +
+              "-" +
+              $("#cellNo2").val() +
+              "-" +
+              $("#cellNo3").val()
+          )
+          var trans_num = $("#cellNo").val().replace(/-/gi, "")
+          if (trans_num.length == 11 || trans_num.length == 10) {
+            var regExp_ctn =
+              /^(01[016789]{1}|02|0[3-9]{1}[0-9]{1})([0-9]{3,4})([0-9]{4})$/
+            // 기존 번호에서 - 를 삭제합니다.
+            if (regExp_ctn.test(trans_num)) {
+              $.ajax({
+                type: "POST",
+                url: "/hp/auct/cmm/selectMemSearchPasswordAjax.do",
+                data: $("#regForm").serialize(),
+                dataType: "json",
+                success: function (json) {
+                  if (json.result.check == "success") {
+                    //해당회원이 있을때
+                    if (json.result.newYn == "Y") {
+                      // 기존에 인증번호를 받지 않았을 때
+                      $("#setTime").val("180")
+                      if (window.Worker) {
+                        if (worker) {
+                          worker.terminate()
+                        }
+                        worker = new Worker("/js/hp/setTimer.js")
+                        worker.postMessage($("#setTime").val())
+                        worker.onmessage = function (event) {
+                          var setTimeArray = event.data.split("||")
+                          $("#setTime").val(setTimeArray[0])
+                          $("#smsTime").html(setTimeArray[1])
+                        }
+                      } else {
+                        tid = setInterval("fnTimer()", 1000)
+                      }
+                      $("#btnSearchPwd").trigger("click")
+                      $(".layer-find-pw").hide()
+
+                      //alert("인증번호 : " + json.result.certKey);
+                    } else {
+                      // 기존에 인증번호를 받았으며 해당하는 인증기간이 지나지 않았을때
+                      $("#setTime").val(json.result.pswdSmsCertTime)
+                      if (window.Worker) {
+                        if (worker) {
+                          worker.terminate()
+                        }
+                        worker = new Worker("/js/hp/setTimer.js")
+                        worker.postMessage($("#setTime").val())
+                        worker.onmessage = function (event) {
+                          var setTimeArray = event.data.split("||")
+                          $("#setTime").val(setTimeArray[0])
+                          $("#smsTime").html(setTimeArray[1])
+                        }
+                      } else {
+                        tid = setInterval("fnTimer()", 1000)
+                      }
+                      $("#btnSearchPwd").trigger("click")
+                      $(".layer-find-pw").hide()
+
+                      //alert("인증번호 : " + json.result.certKey);
+                    }
+                  } else {
+                    //alert("일치하는 정보를 찾을 수 없습니다.");
+                    alert("일치하는 정보를 찾을 수 없습니다.")
+                  }
+                },
+                error: function (error, exception) {
+                  alert(
+                    "요청처리를 실패하였습니다.(" +
+                      eval(error.status) +
+                      ", " +
+                      exception +
+                      ")"
+                  )
+                },
+              })
+            } else {
+              // 해당회원이 없을때
+              alert("입력한 휴대전화번호를 다시 한번 확인해 주세요.")
+              return false
+            }
+          } else {
+            alert("입력한 휴대전화번호를 다시 한번 확인해 주세요.")
+            return false
+          }
+        }
+      }
+
+      /* ********************************************************
+       * 인증번호 타이머
+       ******************************************************** */
+      function fnTimer() {
+        var setTime = $("#setTime").val()
+        var m = Math.floor(setTime / 60) //분
+        var s = setTime % 60 //초
+        var time
+        if (s < 10) {
+          time = m + ":" + "0" + s
+        } else {
+          time = m + ":" + s
+        }
+        $("#smsTime").html(time)
+        setTime--
+        $("#setTime").val(setTime)
+        if (setTime < 0) {
+          clearInterval(tid)
+        }
+      }
+
+      /* ********************************************************
+       * 인증번호 확인
+       ******************************************************** */
+      function fnCheckSms() {
+        if ($("#smsForm").validationEngine("validate") == true) {
+          var pwdSmscertNo = $("input[name=pwdSmscertNo]").val()
+          /* if(pwdSmscertNo == "" || pwdSmscertNo == null){
+				alert("인증번호를 입력해주세요.");
+				return;
+			} */
+          $("input[name=pswdSmscertNo]").val(pwdSmscertNo)
+          $.ajax({
+            type: "POST",
+            url: "/hp/auct/cmm/selectMemSearchPasswordChkCertAjax.do",
+            data: $("#regForm").serialize(),
+            dataType: "json",
+            success: function (json) {
+              if (json.result.check == "success") {
+                //alert("임시 비밀번호 : " + json.result.pswd); //추가개발 필요 바뀐 비밀번호 추후 삭제
+
+                alert(
+                  "등록하신 휴대전화로 임시비밀번호를 발송했습니다.\n로그인 후 비밀번호 변경이 필요합니다."
+                )
+                $(".layer-sms-confirm").hide()
+                $(".dim").hide()
+              } else if (json.result.check == "fail") {
+                if (json.result.pswdSmscertErrNum == "3") {
+                  alert(
+                    "인증번호 3회 이상 오입력으로 창을 닫고 메인 페이지로 이동합니다."
+                  ) //추가개발 필요 메인 이동
+                  $("#regForm").attr("action", "/hp/pub/cmm/viewMain.do")
+                  $("#regForm").submit()
+                } else {
+                  alert(
+                    "인증번호가 일치하지 않습니다. 다시 입력해 주세요. 재시도 " +
+                      json.result.pswdSmscertErrNum +
+                      "회, 3회이상 오입력 할 경우 메인으로 이동합니다."
+                  )
+                }
+              } else if (json.result.check == "pswdSmsCertErrEnd") {
+                alert(
+                  "인증번호 3회 이상 오입력으로 창을 닫고 메인 페이지로 이동합니다."
+                ) //추가개발 필요 메인 이동
+                $("#regForm").attr("action", "/hp/auct/cmm/viewLoginUsr.do")
+                $("#regForm").submit()
+              } else if (json.result.check == "timeOut") {
+                alert(
+                  "인증 제한시간을 초과했습니다. 인증번호 재발송 버튼을 눌러 새로운 인증번호를 받아 주세요."
+                )
+              } else {
+                alert(
+                  "인증번호 재발송 버튼을 눌러 새로운 인증번호를 받아주세요."
+                )
+              }
+            },
+            error: function (error, exception) {
+              alert(
+                "요청처리를 실패하였습니다.(" +
+                  eval(error.status) +
+                  ", " +
+                  exception +
+                  ")"
+              )
+            },
+          })
+        } else {
+          return false
+        }
+      }
+
+      /* ********************************************************
+       * 인증번호 재발송
+       ******************************************************** */
+      function fnReSendSms() {
+        $("input[name=pwdSmscertNo]").val("")
+
+        $.ajax({
+          type: "POST",
+          url: "/hp/auct/cmm/updateMemSearchPasswordSmsReSendAjax.do",
+          data: $("#regForm").serialize(),
+          dataType: "json",
+          success: function (json) {
+            if (json.result.check == "success") {
+              alert("인증번호를 재발송했습니다.")
+
+              //alert("인증번호 : " + json.result.certKey);
+              $("#setTime").val("180")
+              if (window.Worker) {
+                if (worker) {
+                  worker.terminate()
+                }
+                worker = new Worker("/js/hp/setTimer.js")
+                worker.postMessage($("#setTime").val())
+                worker.onmessage = function (event) {
+                  var setTimeArray = event.data.split("||")
+                  $("#setTime").val(setTimeArray[0])
+                  $("#smsTime").html(setTimeArray[1])
+                }
+              } else {
+                tid = setInterval("fnTimer()", 1000)
+              }
+            } else {
+              alert("오류발생, 확인조치필요")
+            }
+          },
+          error: function (error, exception) {
+            alert(
+              "요청처리를 실패하였습니다.(" +
+                eval(error.status) +
+                ", " +
+                exception +
+                ")"
+            )
+          },
+        })
+      }
+      //레이어 팝업 닫기
+      function fnClose() {
+        $("#layer-sms-confirm").hide()
+        document.regForm.reset()
+        document.smsForm.reset()
+        $("#smsForm").validationEngine("hide")
+        $("#regForm").validationEngine("hide")
+      }
+
+      function fnRegFormClear() {
+        document.regForm.reset()
+        document.smsForm.reset()
+        $("#regForm").validationEngine("hide")
+        $("#smsForm").validationEngine("hide")
+      }
+      //경매회원 비밀번호 변경 안내
+      $(document).ready(function () {
+        // 		var obj = $('.layer-password-change-info2')
+        // 		obj.show();
+        // 		layerPositionFixed(obj);
+        // 		$('.layer-src > .dim').show().addClass('zindex100');
+        //      $('body').addClass('sitefix');
+      })
+      //레이어팝업닫기
+      function fnPopupClose() {
+        $(".layer").hide()
+        $(".dim").hide()
+      }
+    </script>
+  </head>
+  <body>
+    <div class="layout-login-wrap">
+      <div class="layout-member-login">
+        <h1 class="login-tit">경매회원전용 <em>로그인</em></h1>
+        <div class="member-login-area">
+          <div class="member-login-info">
+            <p class="member-login-text">
+              안녕하세요. 롯데오토옥션 경매회원전용 페이지 입니다.<br />
+              경매회원 계정으로 로그인 후 이용 가능합니다.
+            </p>
+            <div class="member-login-input">
+              <form name="loginForm" id="loginForm" method="post">
+                <div class="input-area">
+                  <input
+                    type="text"
+                    placeholder="아이디"
+                    id="userId"
+                    name="userId"
+                    class="validate[required]"
+                    onkeydown="EnterCheck();"
+                  />
+                  <input
+                    type="password"
+                    placeholder="비밀번호"
+                    id="userPwd"
+                    name="userPwd"
+                    class="validate[required]"
+                    onkeydown="EnterCheck();"
+                    style="margin-top: 10px"
+                  />
+                  <input type="hidden" id="resultCd" name="resultCd" value="" />
+                  <button onclick="javascript:actionLogin();" type="button">
+                    로그인
+                  </button>
+                </div>
+                <input type="checkbox" id="checkId" name="checkId" /><label
+                  for="checkId"
+                  >아이디 저장</label
+                >
+              </form>
+            </div>
+            <div class="member-login-util">
+              <a href="javascript:;" onclick="fnSearchPwdPop();"
+                >비밀번호 찾기</a
+              >
+              <p>아이디 찾기는 <em>대표번호(1899-4751)</em>로 문의해 주세요.</p>
+            </div>
+          </div>
+          <div
+            class="member-join-box"
+            onclick="location.href='/hp/pub/cmm/viewInfoJoinGuide.do';"
+            style="cursor: pointer"
+          >
+            <strong>경매회원 가입안내</strong>
+            <p>경매회원 가입을 통해 다양한 혜택을 누려보세요.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="layer-src">
+      <!--LAYER POP[s]-->
+      <div class="dim"></div>
+      <!-- 비밀번호 찾기 :s -->
+      <div
+        class="layer layer-find-pw"
+        style="display: none; margin-left: -283px; margin-top: -130px"
+      >
+        <strong class="tit-layer">비밀번호 찾기</strong>
+        <button
+          type="button"
+          class="btn-close-layer"
+          onclick="fnRegFormClear();"
+        >
+          닫기
+        </button>
+        <div class="layer-content">
+          <form id="regForm" name="regForm" method="post">
+            <input type="hidden" id="cellNo" name="cellNo" />
+            <input type="hidden" id="setTime" name="setTime" />
+            <input type="hidden" id="pswdSmscertNo" name="pswdSmscertNo" />
+            <p class="infoTxt">
+              찾고자 하는 비밀번호 정보에 등록된 아이디, 휴대전화번호를 입력해
+              주세요.
+            </p>
+            <div class="id-find-wrap">
+              <div class="find-input-wrap">
+                <div class="find-input-area">
+                  <p>
+                    <input
+                      type="text"
+                      placeholder="아이디"
+                      title="아이디"
+                      class="validate[required]"
+                      id="membId"
+                      name="membId"
+                    />
+                  </p>
+                  <p class="phone-num">
+                    <input
+                      type="text"
+                      placeholder="휴대전화번호"
+                      title="휴대전화번호1"
+                      maxlength="3"
+                      class="validate[required, custom[number]]"
+                      id="cellNo1"
+                      name="cellNo1"
+                    /><span>-</span
+                    ><input
+                      type="text"
+                      name="휴대전화번호"
+                      maxlength="4"
+                      title="휴대전화번호2"
+                      class="validate[required, custom[number]]"
+                      id="cellNo2"
+                      name="cellNo2"
+                    /><span>-</span
+                    ><input
+                      type="text"
+                      maxlength="4"
+                      title="휴대전화번호3"
+                      class="validate[required, custom[number]]"
+                      id="cellNo3"
+                      name="cellNo3"
+                    />
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="btn-open-layer"
+                  data-layer="layer-pw-info"
+                  onclick="fnSearchPwd(); return false;"
+                >
+                  비밀번호 찾기
+                </button>
+                <div
+                  class="btn-open-layer"
+                  data-layer="layer-sms-confirm"
+                  id="btnSearchPwd"
+                ></div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+      <!-- 비밀번호 찾기 :e -->
+
+      <!-- sms :s -->
+      <div
+        class="layer layer-sms-confirm"
+        style="display: none; margin-left: -222px; margin-top: -125px"
+      >
+        <strong class="tit-layer">SMS 인증하기</strong>
+        <button
+          type="button"
+          class="btn-close-layer"
+          onclick="fnClose(); return false;"
+        >
+          닫기
+        </button>
+        <div class="layer-content">
+          <form id="smsForm" name="smsForm">
+            <div class="pw-info-text">
+              고객님의 개인정보 보호를 위해 비밀번호를 입력해 주세요.
+            </div>
+            <div class="sms-authentication">
+              <p>
+                <input
+                  type="text"
+                  placeholder="인증번호 입력"
+                  id="pwdSmscertNo"
+                  name="pwdSmscertNo"
+                  class="validate[required, custom[number]]"
+                />
+                <span class="time" id="smsTime"></span>
+              </p>
+              <button
+                class="btn-confirm btn-open-layer"
+                onclick="fnCheckSms(); return false;"
+                type="button"
+              >
+                확인
+              </button>
+            </div>
+            <p>
+              <a
+                href="javascript;"
+                class="resend-num"
+                onclick="fnReSendSms(); return false;"
+                >인증번호 재발송</a
+              >
+            </p>
+          </form>
+        </div>
+      </div>
+      <!-- sms :e -->
+      <!-- 3개월 비밀번호 변경 안내 :s -->
+      <div class="layer layer-password-change-info2">
+        <strong class="tit-layer">경매회원 비밀번호 변경 안내</strong>
+        <button type="button" class="btn-close-layer" id="pswdChangeClose">
+          닫기
+        </button>
+        <div class="layer-content">
+          <p class="change-text">
+            롯데오토옥션에서 회원의 개인정보 보안 강화를 위해 7월 10일 시스템
+            변경 작업이 진행되었습니다.
+          </p>
+          <dl class="change-notice">
+            <dt>
+              시스템 변경 이후 경매회원의 비밀번호가 변경되었으며, 변경된
+              비밀번호는 SMS를 통해 발송되었습니다.
+            </dt>
+            <dt>발송된 비밀번호를 확인 후 로그인해주시기 바랍니다.</dt>
+          </dl>
+          <div class="btn-area">
+            <button
+              type="button"
+              class="btn-gray"
+              onclick="fnPopupClose(); return false;"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- 3개월 비밀번호 변경 안내 :e -->
+      <!--LAYER POP[e]-->
+    </div>
+  </body>
+</html>
