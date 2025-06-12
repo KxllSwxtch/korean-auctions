@@ -9,3 +9,7 @@ Lotte
 Glovis
 логин 7552
 пароль for7721@
+
+KCar
+логин autobaza
+пароль for1657721@
