@@ -80,6 +80,7 @@ class KCarCar(BaseModel):
     auction_place_name: Optional[str] = Field(
         None, alias="AUC_PLC_NM", description="Название места аукциона"
     )
+    lane_type: Optional[str] = Field(None, description="Тип лейна (A или B)")
 
     # Дополнительная информация
     exhibit_seq: Optional[str] = Field(

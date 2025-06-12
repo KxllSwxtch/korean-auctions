@@ -115,13 +115,11 @@ class KCarParser:
             prices = []
 
             for car in cars:
-                # Подсчет типов аукционов
-                if car.auction_type_desc and "DAILY" in car.auction_type_desc.upper():
-                    daily_auctions += 1
-                elif (
-                    car.auction_type_desc and "WEEKLY" in car.auction_type_desc.upper()
-                ):
+                # Подсчет типов аукционов (теперь только weekly)
+                if car.auction_type_desc and "WEEKLY" in car.auction_type_desc.upper():
                     weekly_auctions += 1
+                elif car.auction_type_desc and "DAILY" in car.auction_type_desc.upper():
+                    daily_auctions += 1
 
                 # Сбор локаций
                 if car.car_location:
@@ -183,33 +181,48 @@ class KCarParser:
                     "CAR_NM": "현대 소나타 하이브리드 {} 모델",
                     "CNO": "{}서{:04d}",
                     "AUC_STRT_PRC": "{}000000",
-                    "AUC_STAT_NM": "데일리 시작",
+                    "AUC_STAT_NM": "위클리 대기",
                     "FORM_YR": "{}",
                     "EXTERIOR_COLOR_NM": "진주색",
                     "CAR_LOCT": "서울경매장",
-                    "AUC_TYPE_DESC": "DAILY",
+                    "AUC_TYPE_DESC": "WEEKLY",
+                    "lane_type": "A",
                 },
                 {
                     "CAR_ID": "KCA2025{:04d}",
                     "CAR_NM": "기아 K5 {} 모델",
                     "CNO": "{}부{:04d}",
                     "AUC_STRT_PRC": "{}500000",
-                    "AUC_STAT_NM": "위클리 대기",
+                    "AUC_STAT_NM": "위클리 진행중",
                     "FORM_YR": "{}",
                     "EXTERIOR_COLOR_NM": "검정색",
                     "CAR_LOCT": "부산경매장",
                     "AUC_TYPE_DESC": "WEEKLY",
+                    "lane_type": "B",
                 },
                 {
                     "CAR_ID": "KCA2025{:04d}",
                     "CAR_NM": "삼성르노 QM6 {} 모델",
                     "CNO": "{}경{:04d}",
                     "AUC_STRT_PRC": "{}200000",
-                    "AUC_STAT_NM": "데일리 진행중",
+                    "AUC_STAT_NM": "위클리 시작",
                     "FORM_YR": "{}",
                     "EXTERIOR_COLOR_NM": "흰색",
                     "CAR_LOCT": "경기경매장",
-                    "AUC_TYPE_DESC": "DAILY",
+                    "AUC_TYPE_DESC": "WEEKLY",
+                    "lane_type": "A",
+                },
+                {
+                    "CAR_ID": "KCA2025{:04d}",
+                    "CAR_NM": "BMW 320i {} 모델",
+                    "CNO": "{}인{:04d}",
+                    "AUC_STRT_PRC": "{}800000",
+                    "AUC_STAT_NM": "위클리 완료",
+                    "FORM_YR": "{}",
+                    "EXTERIOR_COLOR_NM": "은색",
+                    "CAR_LOCT": "인천경매장",
+                    "AUC_TYPE_DESC": "WEEKLY",
+                    "lane_type": "B",
                 },
             ]
 

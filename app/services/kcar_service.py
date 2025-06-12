@@ -17,7 +17,7 @@ disable_warnings(InsecureRequestWarning)
 
 
 class KCarService:
-    """Сервис для работы с KCar API"""
+    """Сервис для работы с KCar API - только weekly аукционы"""
 
     def __init__(self):
         self.settings = get_settings()
@@ -31,7 +31,7 @@ class KCarService:
         self.username = "autobaza"
         self.password = "for1657721@"
 
-        logger.info("🔧 KCar Service инициализирован")
+        logger.info("🔧 KCar Service инициализирован (только weekly аукционы)")
         self._initialize_session()
 
     def _initialize_session(self):
@@ -220,7 +220,7 @@ class KCarService:
     )
     def get_cars(self, params: Optional[Dict[str, Any]] = None) -> KCarResponse:
         """
-        Получение списка автомобилей с KCar
+        Получение списка автомобилей с KCar - только weekly аукционы
 
         Args:
             params: Параметры запроса
@@ -229,7 +229,9 @@ class KCarService:
             KCarResponse: Ответ с автомобилями
         """
         try:
-            logger.info("🚗 Получаю список автомобилей с KCar...")
+            logger.info(
+                "🚗 Получаю список автомобилей с KCar (только weekly аукционы)..."
+            )
 
             # Проверяем авторизацию
             if not self.authenticated:
@@ -237,15 +239,44 @@ class KCarService:
                 if not self._authenticate():
                     raise Exception("Не удалось авторизоваться")
 
-            # Подготавливаем параметры запроса
-            today = datetime.now().strftime("%Y-%m-%d")
+            # Сначала проверим доступность weekly аукционов
+            logger.info("🔍 Проверяю доступность weekly аукционов...")
 
+            # Попробуем загрузить страницу weekly аукционов
+            weekly_page_url = f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm"
+
+            try:
+                page_response = self.session.get(weekly_page_url, timeout=30)
+                if page_response.status_code == 200:
+                    logger.info("✅ Страница weekly аукционов доступна")
+
+                    # Проверим содержимое страницы на наличие информации о weekly аукционах
+                    page_content = page_response.text
+                    if "weekly" in page_content.lower() or "위클리" in page_content:
+                        logger.info(
+                            "✅ Найдены упоминания weekly аукционов на странице"
+                        )
+                    else:
+                        logger.warning(
+                            "⚠️ Не найдены упоминания weekly аукционов на странице"
+                        )
+
+                else:
+                    logger.warning(
+                        f"⚠️ Страница weekly аукционов недоступна: HTTP {page_response.status_code}"
+                    )
+
+            except Exception as e:
+                logger.warning(f"⚠️ Ошибка загрузки страницы weekly аукционов: {e}")
+
+            # Точно копируем параметры из примеров payload
+            # Пример для Line A: AUC_TYPE=weekly&MNUFTR_CD=&MODEL_GRP_CD=&MODEL_CD=&PAGE_CNT=18&START_RNUM=1&ORDER=&OPTION_CD=&FORM_YR_ST=&FORM_YR_ED=&AUC_START_PRC_ST=&AUC_START_PRC_ED=&MILG_ST=&MILG_ED=&CNO=&FUEL_CD=&GBOX_DCD=&COLOR_CD=&SRC_OPT=weekly&CAR_TYPE=&CARMD_CD=&PAGE_TYPE=wCfm&LANE_TYPE=A&TO_DATE=&FROM_DATE=&CAR_STAT_CD=&AUC_SEQ=&TODAY=&IPTCAR_DCD=&AUC_PLC_CD=
             default_params = {
-                "AUC_TYPE": "daily",
+                "AUC_TYPE": "weekly",
                 "MNUFTR_CD": "",
                 "MODEL_GRP_CD": "",
                 "MODEL_CD": "",
-                "PAGE_CNT": "50",  # Увеличиваем количество результатов
+                "PAGE_CNT": "100",
                 "START_RNUM": "1",
                 "ORDER": "",
                 "OPTION_CD": "",
@@ -259,19 +290,17 @@ class KCarService:
                 "FUEL_CD": "",
                 "GBOX_DCD": "",
                 "COLOR_CD": "",
-                "SRC_OPT": "daily",
+                "SRC_OPT": "weekly",
                 "CAR_TYPE": "",
                 "CARMD_CD": "",
-                "PAGE_TYPE": "dCfm",
-                "LANE_TYPE": "A",
+                "PAGE_TYPE": "wCfm",
+                "LANE_TYPE": "A",  # Будем менять на A и B
                 "TO_DATE": "",
                 "FROM_DATE": "",
                 "CAR_STAT_CD": "",
                 "AUC_SEQ": "",
                 "TODAY": "",
                 "IPTCAR_DCD": "",
-                "START_DATE": today,
-                "END_DATE": today,
                 "AUC_PLC_CD": "",
             }
 
@@ -282,57 +311,414 @@ class KCarService:
             # URL для получения списка автомобилей
             cars_url = f"{self.base_url}/kcar/auction/getAuctionCarList_ajax.do"
 
-            # Заголовки для AJAX запроса
+            # Заголовки для AJAX запроса - точно как в примере с дополнительными заголовками
             ajax_headers = {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/kcar/auction/daily_auction/colAuction.do?PAGE_TYPE=dCfm",
+                "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm",
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
             }
 
-            logger.info(f"📡 Отправляю запрос к: {cars_url}")
-            logger.debug(f"🔍 Параметры: {default_params}")
-
-            # Выполняем запрос
-            response = self.session.post(
-                cars_url, data=default_params, headers=ajax_headers
+            logger.info(
+                f"📡 Получаю данные из обоих лейнов (A и B) для weekly аукционов"
             )
 
-            if response.status_code != 200:
-                raise Exception(f"HTTP {response.status_code}: {response.text}")
+            all_cars = []
+            total_count = 0
 
-            # Парсим JSON ответ
-            try:
-                json_data = response.json()
-                logger.info("✅ Получен JSON ответ от KCar")
+            # Получаем данные из LANE_TYPE A и B
+            for lane_type in ["A", "B"]:
+                logger.info(f"🛣️ Обрабатываю LANE_TYPE: {lane_type}")
 
-                # Обрабатываем данные через парсер
-                result = self.parser.parse_cars_json(json_data)
+                # Копируем параметры и устанавливаем тип лейна
+                lane_params = default_params.copy()
+                lane_params["LANE_TYPE"] = lane_type
 
-                if result.success and result.car_list:
-                    logger.success(
-                        f"✅ Успешно получено {len(result.car_list)} автомобилей KCar"
+                logger.info(f"🔍 Отправляю POST запрос к: {cars_url}")
+                logger.info(f"🔍 Параметры для {lane_type}:")
+                for key, value in lane_params.items():
+                    logger.debug(f"  {key}={value}")
+
+                # Попробуем несколько способов отправки данных
+                success = False
+
+                # Способ 1: Стандартный POST с form data
+                try:
+                    logger.info(
+                        f"🔄 Попытка 1: Стандартный POST для LANE_TYPE {lane_type}"
                     )
-                else:
-                    logger.warning("⚠️ Получен пустой список автомобилей")
+                    response = self.session.post(
+                        cars_url, data=lane_params, headers=ajax_headers, timeout=30
+                    )
 
+                    if response.status_code == 200:
+                        json_data = response.json()
+                        if (
+                            json_data.get("auctionReqVo", {}).get("AUC_TYPE")
+                            == "weekly"
+                        ):
+                            logger.success(
+                                f"✅ Способ 1 успешен для LANE_TYPE {lane_type}"
+                            )
+                            success = True
+                        else:
+                            logger.warning(
+                                f"⚠️ Способ 1: сервер вернул AUC_TYPE={json_data.get('auctionReqVo', {}).get('AUC_TYPE')}"
+                            )
+                    else:
+                        logger.warning(f"⚠️ Способ 1: HTTP {response.status_code}")
+
+                except Exception as e:
+                    logger.warning(f"⚠️ Способ 1 не удался: {e}")
+
+                # Способ 2: POST с URL-encoded строкой
+                if not success:
+                    try:
+                        logger.info(
+                            f"🔄 Попытка 2: URL-encoded строка для LANE_TYPE {lane_type}"
+                        )
+
+                        # Создаем URL-encoded строку вручную
+                        params_str = "&".join(
+                            [f"{k}={v}" for k, v in lane_params.items()]
+                        )
+
+                        # Специальные заголовки для этого способа
+                        special_headers = ajax_headers.copy()
+                        special_headers["Content-Length"] = str(len(params_str))
+
+                        response = self.session.post(
+                            cars_url,
+                            data=params_str,
+                            headers=special_headers,
+                            timeout=30,
+                        )
+
+                        if response.status_code == 200:
+                            json_data = response.json()
+                            if (
+                                json_data.get("auctionReqVo", {}).get("AUC_TYPE")
+                                == "weekly"
+                            ):
+                                logger.success(
+                                    f"✅ Способ 2 успешен для LANE_TYPE {lane_type}"
+                                )
+                                success = True
+                            else:
+                                logger.warning(
+                                    f"⚠️ Способ 2: сервер вернул AUC_TYPE={json_data.get('auctionReqVo', {}).get('AUC_TYPE')}"
+                                )
+                        else:
+                            logger.warning(f"⚠️ Способ 2: HTTP {response.status_code}")
+
+                    except Exception as e:
+                        logger.warning(f"⚠️ Способ 2 не удался: {e}")
+
+                # Способ 3: Попробуем с дополнительными параметрами из примера
+                if not success:
+                    try:
+                        logger.info(
+                            f"🔄 Попытка 3: С дополнительными параметрами для LANE_TYPE {lane_type}"
+                        )
+
+                        # Добавляем дополнительные параметры из успешного примера
+                        enhanced_params = lane_params.copy()
+                        enhanced_params.update(
+                            {
+                                "ORDER2": "T.EXBIT_SEQ ASC",
+                                "SPECIAL_YN": "",
+                                "s_USER_ID": "autobaza",
+                                "s_USER_IP": "",
+                                "searchChannel": "",
+                                "setSearch": "",
+                                "CAR_STATUS_CD_LIST": "C020",
+                            }
+                        )
+
+                        response = self.session.post(
+                            cars_url,
+                            data=enhanced_params,
+                            headers=ajax_headers,
+                            timeout=30,
+                        )
+
+                        if response.status_code == 200:
+                            json_data = response.json()
+                            if (
+                                json_data.get("auctionReqVo", {}).get("AUC_TYPE")
+                                == "weekly"
+                            ):
+                                logger.success(
+                                    f"✅ Способ 3 успешен для LANE_TYPE {lane_type}"
+                                )
+                                success = True
+                            else:
+                                logger.warning(
+                                    f"⚠️ Способ 3: сервер вернул AUC_TYPE={json_data.get('auctionReqVo', {}).get('AUC_TYPE')}"
+                                )
+                        else:
+                            logger.warning(f"⚠️ Способ 3: HTTP {response.status_code}")
+
+                    except Exception as e:
+                        logger.warning(f"⚠️ Способ 3 не удался: {e}")
+
+                # Способ 4: Попробуем использовать данные из успешного примера
+                if not success:
+                    try:
+                        logger.info(
+                            f"🔄 Попытка 4: Точная копия успешного примера для LANE_TYPE {lane_type}"
+                        )
+
+                        # Используем точные данные из kcar-linea-response.json
+                        exact_params = {
+                            "AUC_TYPE": "weekly",
+                            "MNUFTR_CD": "",
+                            "MODEL_GRP_CD": "",
+                            "MODEL_CD": "",
+                            "PAGE_CNT": "100",
+                            "START_RNUM": "1",
+                            "ORDER": "",
+                            "OPTION_CD": "",
+                            "FORM_YR_ST": "",
+                            "FORM_YR_ED": "",
+                            "AUC_START_PRC_ST": "",
+                            "AUC_START_PRC_ED": "",
+                            "MILG_ST": "",
+                            "MILG_ED": "",
+                            "CNO": "",
+                            "FUEL_CD": "",
+                            "GBOX_DCD": "",
+                            "COLOR_CD": "",
+                            "SRC_OPT": "weekly",
+                            "CAR_TYPE": "",
+                            "CARMD_CD": "",
+                            "PAGE_TYPE": "wCfm",
+                            "LANE_TYPE": lane_type,
+                            "TO_DATE": "",
+                            "FROM_DATE": "",
+                            "CAR_STAT_CD": "",
+                            "AUC_SEQ": "",
+                            "TODAY": "",
+                            "IPTCAR_DCD": "",
+                            "AUC_PLC_CD": "",
+                            # Дополнительные поля из успешного примера
+                            "ALARM_YN": "",
+                            "AUC_CD": "",
+                            "AUC_DIV_CD": "",
+                            "BID_CRT_SEQ": "",
+                            "BID_DCD": "",
+                            "BID_PRC": "",
+                            "CAR_ID": "",
+                            "CAR_ID_CNT": "0",
+                            "CHECK_AUC": "",
+                            "CHNG_USR_ID": "",
+                            "CMN_BAS_CD": "",
+                            "CMN_CD": "",
+                            "CMN_CD_NM": "",
+                            "CRT_USR_ID": "",
+                            "DEL_YN": "",
+                            "END_DATE": "",
+                            "EXBIT_SEQ": "",
+                            "EXPECT_PRC": "",
+                            "MOBILE": "",
+                            "SN_SEQ": "",
+                            "SPECIAL_COMPANY_TYPE_NM": "",
+                            "SPECIAL_YN": "",
+                            "START_DATE": "",
+                            "STAT_DCD": "",
+                            "TITLE": "",
+                            "TRCK_YN": "",
+                            "TYPE_DCD": "",
+                            "USR_ID": "",
+                            "s_USER_ID": "",
+                            "s_USER_IP": "",
+                            "searchChannel": "",
+                            "setSearch": "",
+                        }
+
+                        response = self.session.post(
+                            cars_url,
+                            data=exact_params,
+                            headers=ajax_headers,
+                            timeout=30,
+                        )
+
+                        if response.status_code == 200:
+                            json_data = response.json()
+                            if (
+                                json_data.get("auctionReqVo", {}).get("AUC_TYPE")
+                                == "weekly"
+                            ):
+                                logger.success(
+                                    f"✅ Способ 4 успешен для LANE_TYPE {lane_type}"
+                                )
+                                success = True
+                            else:
+                                logger.warning(
+                                    f"⚠️ Способ 4: сервер вернул AUC_TYPE={json_data.get('auctionReqVo', {}).get('AUC_TYPE')}"
+                                )
+                        else:
+                            logger.warning(f"⚠️ Способ 4: HTTP {response.status_code}")
+
+                    except Exception as e:
+                        logger.warning(f"⚠️ Способ 4 не удался: {e}")
+
+                # Если ни один способ не сработал, используем последний ответ
+                if not success:
+                    logger.error(
+                        f"❌ Все способы не удались для LANE_TYPE {lane_type}, используем последний ответ"
+                    )
+
+                logger.info(
+                    f"📊 HTTP статус для LANE_TYPE {lane_type}: {response.status_code}"
+                )
+
+                if response.status_code != 200:
+                    logger.error(
+                        f"❌ Ошибка HTTP {response.status_code} для LANE_TYPE {lane_type}"
+                    )
+                    logger.debug(f"Response text: {response.text[:500]}...")
+                    continue
+
+                # Парсим JSON ответ
+                try:
+                    json_data = response.json()
+                    logger.info(
+                        f"✅ Получен JSON ответ от KCar для LANE_TYPE {lane_type}"
+                    )
+
+                    # Детальная диагностика ответа
+                    if "CAR_LIST" in json_data:
+                        car_count = len(json_data["CAR_LIST"])
+                        logger.info(
+                            f"🔍 Найдено {car_count} автомобилей в CAR_LIST для LANE_TYPE {lane_type}"
+                        )
+
+                        # Показываем информацию о запросе
+                        if "auctionReqVo" in json_data:
+                            req_vo = json_data["auctionReqVo"]
+                            logger.info(
+                                f"📋 Информация о запросе для LANE_TYPE {lane_type}:"
+                            )
+                            logger.info(
+                                f"  AUC_TYPE: {req_vo.get('AUC_TYPE', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  AUC_STAT: {req_vo.get('AUC_STAT', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  LANE_TYPE: {req_vo.get('LANE_TYPE', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  PAGE_CNT: {req_vo.get('PAGE_CNT', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  START_RNUM: {req_vo.get('START_RNUM', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  END_RNUM: {req_vo.get('END_RNUM', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  SRC_OPT: {req_vo.get('SRC_OPT', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  PAGE_TYPE: {req_vo.get('PAGE_TYPE', 'не найден')}"
+                            )
+                            logger.info(
+                                f"  ORDER2: {req_vo.get('ORDER2', 'не найден')}"
+                            )
+
+                        # Если нет автомобилей, сохраняем полный ответ для анализа
+                        if car_count == 0:
+                            debug_file = f"debug_kcar_weekly_{lane_type}_empty.json"
+                            import json as json_lib
+
+                            with open(debug_file, "w", encoding="utf-8") as f:
+                                json_lib.dump(
+                                    json_data, f, ensure_ascii=False, indent=2
+                                )
+                            logger.warning(
+                                f"💾 Пустой ответ сохранен в {debug_file} для анализа"
+                            )
+                        else:
+                            # Сохраняем успешный ответ для сравнения
+                            debug_file = f"debug_kcar_weekly_{lane_type}_success.json"
+                            import json as json_lib
+
+                            with open(debug_file, "w", encoding="utf-8") as f:
+                                json_lib.dump(
+                                    json_data, f, ensure_ascii=False, indent=2
+                                )
+                            logger.info(f"💾 Успешный ответ сохранен в {debug_file}")
+                    else:
+                        logger.error(
+                            f"❌ CAR_LIST не найден в ответе для LANE_TYPE {lane_type}"
+                        )
+                        logger.debug(f"🔍 Ключи в ответе: {list(json_data.keys())}")
+
+                    # Обрабатываем данные через парсер
+                    lane_result = self.parser.parse_cars_json(json_data)
+
+                    if lane_result.success and lane_result.car_list:
+                        # Добавляем информацию о лейне к каждому автомобилю
+                        for car in lane_result.car_list:
+                            # Добавляем lane_type напрямую к объекту
+                            car.lane_type = lane_type
+                            all_cars.append(car)
+
+                        logger.success(
+                            f"✅ Получено {len(lane_result.car_list)} автомобилей из LANE_TYPE {lane_type}"
+                        )
+                        total_count += len(lane_result.car_list)
+                    else:
+                        logger.warning(f"⚠️ Пустой список для LANE_TYPE {lane_type}")
+                        if not lane_result.success:
+                            logger.error(f"❌ Ошибка парсера: {lane_result.message}")
+
+                except json.JSONDecodeError as e:
+                    logger.error(
+                        f"❌ Ошибка парсинга JSON для LANE_TYPE {lane_type}: {e}"
+                    )
+                    logger.debug(f"Response text: {response.text[:500]}...")
+                    continue
+
+            # Создаем результат
+            if all_cars:
+                result = KCarResponse(
+                    car_list=all_cars,
+                    total_count=total_count,
+                    success=True,
+                    message=f"Успешно получено {total_count} автомобилей из weekly аукционов (LANE A+B)",
+                )
+
+                logger.success(
+                    f"✅ Объединено {total_count} автомобилей из обоих лейнов"
+                )
                 return result
+            else:
+                logger.error("❌ Не получено автомобилей из weekly аукционов")
 
-            except json.JSONDecodeError as e:
-                logger.error(f"❌ Ошибка парсинга JSON: {e}")
-                logger.debug(f"Response content: {response.text[:500]}...")
+                # Дополнительная диагностика
+                logger.info("🔍 Дополнительная диагностика:")
+                logger.info(
+                    "  - Возможно, weekly аукционы проводятся только в определенные дни"
+                )
+                logger.info(
+                    "  - Возможно, нет активных weekly аукционов в данный момент"
+                )
+                logger.info(
+                    "  - Возможно, требуются дополнительные параметры авторизации"
+                )
 
-                # Сохраняем ответ для отладки
-                debug_file = "debug_kcar_response.html"
-                with open(debug_file, "w", encoding="utf-8") as f:
-                    f.write(response.text)
-                logger.info(f"💾 Ответ сохранен в {debug_file} для анализа")
-
-                # Возвращаем ошибку парсинга
                 return KCarResponse(
                     car_list=[],
                     total_count=0,
                     success=False,
-                    message=f"Ошибка парсинга JSON ответа: {str(e)}",
+                    message="Не найдено автомобилей в weekly аукционах. Возможно, weekly аукционы не проводятся в данный момент или требуются дополнительные параметры.",
                 )
 
         except Exception as e:
@@ -346,7 +732,7 @@ class KCarService:
 
     def get_test_cars(self, count: int = 10) -> KCarResponse:
         """
-        Получение тестовых данных автомобилей
+        Получение тестовых данных автомобилей (только weekly)
 
         Args:
             count: Количество тестовых автомобилей
@@ -354,12 +740,12 @@ class KCarService:
         Returns:
             KCarResponse: Тестовые данные
         """
-        logger.info(f"🧪 Генерация {count} тестовых автомобилей KCar")
+        logger.info(f"🧪 Генерация {count} тестовых weekly автомобилей KCar")
         return self.parser.generate_test_data(count)
 
     def get_car_count(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Получение количества автомобилей
+        Получение количества автомобилей (только weekly)
 
         Args:
             params: Параметры запроса
@@ -368,22 +754,20 @@ class KCarService:
             Dict с информацией о количестве
         """
         try:
-            logger.info("📊 Получаю количество автомобилей KCar...")
+            logger.info("📊 Получаю количество weekly автомобилей KCar...")
 
             if not self.authenticated:
                 if not self._authenticate():
                     raise Exception("Не удалось авторизоваться")
 
-            # Подготавливаем параметры
-            today = datetime.now().strftime("%Y-%m-%d")
-
+            # Параметры для weekly аукционов
             count_params = {
+                "AUC_TYPE": "weekly",
                 "MNUFTR_CD": "",
                 "MODEL_GRP_CD": "",
                 "MODEL_CD": "",
-                "AUC_TYPE": "daily",
-                "SRC_OPT": "daily",
-                "PAGE_TYPE": "dCfm",
+                "SRC_OPT": "weekly",
+                "PAGE_TYPE": "wCfm",
                 "LANE_TYPE": "A",
                 "TO_DATE": "",
                 "FROM_DATE": "",
@@ -393,8 +777,6 @@ class KCarService:
                 "CAR_TYPE": "",
                 "CARMD_CD": "",
                 "IPTCAR_DCD": "",
-                "START_DATE": today,
-                "END_DATE": today,
                 "AUC_PLC_CD": "",
             }
 
@@ -414,15 +796,25 @@ class KCarService:
 
             if response.status_code == 200:
                 try:
-                    return response.json()
+                    result = response.json()
+                    result["auction_type"] = "weekly"
+                    return result
                 except:
-                    return {"count": 0, "message": "Не удалось получить количество"}
+                    return {
+                        "count": 0,
+                        "message": "Не удалось получить количество",
+                        "auction_type": "weekly",
+                    }
             else:
-                return {"count": 0, "message": f"HTTP {response.status_code}"}
+                return {
+                    "count": 0,
+                    "message": f"HTTP {response.status_code}",
+                    "auction_type": "weekly",
+                }
 
         except Exception as e:
             logger.error(f"❌ Ошибка получения количества: {e}")
-            return {"count": 0, "message": str(e)}
+            return {"count": 0, "message": str(e), "auction_type": "weekly"}
 
     def close(self):
         """Закрытие сессии"""

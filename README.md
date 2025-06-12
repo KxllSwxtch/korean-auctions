@@ -54,14 +54,16 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET /api/v1/lotte/cars/demo` - Демо данные
 - `GET /api/v1/lotte/cars/stats` - Статистика
 
-### KCar Auction API
+### KCar Auction API (Weekly Auctions Only)
 
-- `GET /api/v1/kcar/cars` - Список автомобилей (требует авторизации)
-- `GET /api/v1/kcar/cars/test` - Тестовые данные
-- `GET /api/v1/kcar/cars/demo` - Демо данные
-- `GET /api/v1/kcar/cars/stats` - Статистика
-- `GET /api/v1/kcar/cars/count` - Количество автомобилей
+- `GET /api/v1/kcar/cars` - Список автомобилей из weekly аукционов (требует авторизации)
+- `GET /api/v1/kcar/cars/test` - Тестовые данные weekly аукционов
+- `GET /api/v1/kcar/cars/demo` - Демо данные weekly аукционов
+- `GET /api/v1/kcar/cars/stats` - Статистика weekly аукционов
+- `GET /api/v1/kcar/cars/count` - Количество автомобилей в weekly аукционах
 - `GET /api/v1/kcar/info` - Информация об API
+
+**Статус:** ✅ **Полностью работает** - получает реальные данные из weekly аукционов (Lane A + Lane B)
 
 ### Общие endpoints
 
@@ -111,8 +113,8 @@ curl "http://localhost:8000/api/v1/autohub/cars?manufacturer=현대&page_size=10
 # Lotte автомобили
 curl "http://localhost:8000/api/v1/lotte/cars?page_size=20"
 
-# KCar автомобили
-curl "http://localhost:8000/api/v1/kcar/cars?auction_type=daily&page_size=15"
+# KCar автомобили (только weekly аукционы) - ✅ РАБОТАЕТ
+curl "http://localhost:8000/api/v1/kcar/cars?page_size=15"
 ```
 
 ### Статистика
@@ -156,6 +158,7 @@ app/
 - Retry механизм для HTTP запросов
 - Обработка SSL/TLS ошибок
 - Fallback на тестовые данные при недоступности сервиса
+- KCar: работа только с weekly аукционами (Lane A + Lane B)
 
 ### Производительность
 

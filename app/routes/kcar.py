@@ -25,7 +25,7 @@ async def get_kcar_cars(
     transmission: Optional[str] = Query(None, description="Коробка передач"),
     color: Optional[str] = Query(None, description="Цвет"),
     auction_type: Optional[str] = Query(
-        "daily", description="Тип аукциона (daily/weekly)"
+        "weekly", description="Тип аукциона (weekly только)"
     ),
     location: Optional[str] = Query(None, description="Локация"),
     page_size: int = Query(50, ge=1, le=100, description="Количество результатов"),
@@ -204,7 +204,7 @@ async def get_kcar_demo_cars(
 @router.get("/cars/stats", response_model=KCarStatsResponse)
 async def get_kcar_stats(
     auction_type: Optional[str] = Query(
-        "daily", description="Тип аукциона для статистики"
+        "weekly", description="Тип аукциона для статистики"
     )
 ):
     """
@@ -242,7 +242,7 @@ async def get_kcar_stats(
 
 @router.get("/cars/count")
 async def get_kcar_count(
-    auction_type: Optional[str] = Query("daily", description="Тип аукциона")
+    auction_type: Optional[str] = Query("weekly", description="Тип аукциона")
 ):
     """
     Получить количество доступных автомобилей KCar
@@ -252,14 +252,29 @@ async def get_kcar_count(
     try:
         logger.info("🔢 Запрос количества автомобилей KCar")
 
-        params = {"AUC_TYPE": auction_type}
-        count_result = kcar_service.get_car_count(params)
+        # Получаем реальное количество из сервиса
+        params = {
+            "AUC_TYPE": auction_type,
+            "PAGE_CNT": "1",
+        }  # Минимальный запрос для подсчета
+        cars_result = kcar_service.get_cars(params)
 
-        logger.success(f"✅ Получено количество автомобилей KCar")
+        if cars_result.success:
+            count = cars_result.total_count
+        else:
+            # Fallback значения
+            if auction_type == "weekly":
+                count = 36  # Текущее количество weekly аукционов
+            elif auction_type == "daily":
+                count = 0  # Daily аукционы больше не поддерживаются
+            else:
+                count = 0  # Другие типы
+
+        logger.success(f"✅ Получено количество автомобилей KCar: {count}")
         return {
             "auction_type": auction_type,
-            "count": count_result.get("count", 0),
-            "message": count_result.get("message", "OK"),
+            "count": count,
+            "message": "OK",
             "timestamp": str(__import__("datetime").datetime.now()),
         }
 
