@@ -79,10 +79,26 @@ class KCarParser:
             # Pydantic автоматически обработает алиасы полей
             car = KCarCar(**car_data)
 
+            # Обрабатываем URL изображений - формируем полные пути
+            if car.thumbnail:
+                # Добавляем базовый URL для изображений KCar
+                base_image_url = "https://www.kcarauction.com/attachment/CAR_IMG"
+                car.thumbnail = f"{base_image_url}/{car.thumbnail.lstrip('/')}"
+
+            if car.thumbnail_mobile:
+                # Добавляем базовый URL для мобильных изображений KCar
+                base_image_url = "https://www.kcarauction.com/attachment/CAR_IMG"
+                car.thumbnail_mobile = (
+                    f"{base_image_url}/{car.thumbnail_mobile.lstrip('/')}"
+                )
+
             # Логируем основную информацию об автомобиле
             car_info = (
                 f"ID: {car.car_id}, Название: {car.car_name}, Номер: {car.car_number}"
             )
+            if car.thumbnail:
+                car_info += f", Фото: {car.thumbnail}"
+
             logger.debug(f"🚗 Обработан автомобиль: {car_info}")
 
             return car
@@ -263,6 +279,8 @@ class KCarParser:
                         "GBOX_DCD": "A" if i % 3 == 0 else "M",
                         "CAR_USE_NM": "자가" if i % 4 == 0 else "영업용",
                         "ACCIDENT_YN": "N" if i % 5 != 0 else "Y",
+                        "THUMBNAIL": f"https://www.kcarauction.com/attachment/CAR_IMG/2032/CA2032{3000 + i}/CA2032{3000 + i}test{i:04d}_370.JPG",
+                        "THUMBNAIL_MOBILE": f"https://www.kcarauction.com/attachment/CAR_IMG/2032/CA2032{3000 + i}/CA2032{3000 + i}test{i:04d}_640.JPG",
                     }
                 )
 

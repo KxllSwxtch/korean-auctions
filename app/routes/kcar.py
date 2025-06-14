@@ -79,17 +79,35 @@ async def get_kcar_cars(
         result = kcar_service.get_cars(params)
 
         if not result.success:
+            # Только если это реальная ошибка (не пустой список), показываем fallback
             logger.warning(f"⚠️ KCar API вернул ошибку: {result.message}")
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Ошибка получения данных KCar",
-                    "message": result.message,
-                    "suggestion": "Проверьте параметры запроса или попробуйте позже",
-                },
-            )
+            logger.info("🎭 Переключаюсь на демо данные вместо ошибки")
 
-        logger.success(f"✅ Возвращаю {len(result.car_list)} автомобилей KCar")
+            # Вместо ошибки возвращаем демо данные
+            demo_result = kcar_service.get_test_cars(page_size)
+            if demo_result.success:
+                # Добавляем информацию о том, что это демо данные
+                demo_result.message = f"Произошла ошибка API. Показаны демо данные ({len(demo_result.car_list)} автомобилей)"
+                logger.info("✅ Возвращаю демо данные из-за ошибки API")
+                return demo_result
+            else:
+                # Если даже демо данные не работают, тогда ошибка
+                logger.error("❌ Не удалось получить даже демо данные")
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "Ошибка получения данных KCar",
+                        "message": result.message,
+                        "suggestion": "Попробуйте позже или используйте /cars/demo для тестовых данных",
+                    },
+                )
+
+        # Успешный ответ (даже если список пустой)
+        if len(result.car_list) == 0:
+            logger.info("ℹ️ Возвращаю пустой список - торги завершены или не активны")
+        else:
+            logger.success(f"✅ Возвращаю {len(result.car_list)} автомобилей KCar")
+
         return result
 
     except HTTPException:

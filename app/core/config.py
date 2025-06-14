@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     autohub_username: str = "785701"
     autohub_password: str = "782312"
 
+    # Настройки для Glovis
+    glovis_base_url: str = "https://auction.autobell.co.kr"
+    glovis_list_url: str = (
+        "https://auction.autobell.co.kr/auction/exhibitListInclude.do"
+    )
+    glovis_main_url: str = "https://auction.autobell.co.kr/auction/exhibitList.do"
+
+    # Учётные данные для Glovis
+    glovis_username: str = "7552"
+    glovis_password: str = "for7721@"
+
     # User Agent для запросов
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

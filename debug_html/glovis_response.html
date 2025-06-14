@@ -1,0 +1,235 @@
+<script>location.href='/login.do';</script>
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+<head>
+    
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta http-equiv="Content-Script-Type" content="text/javascript" />
+<meta http-equiv="Content-Style-Type" content="text/css" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta http-equiv="imagetoolbar" content="no" />
+<title>현대글로비스</title>
+<meta name="viewport" content="width=1200, user-scalable=yes" />
+<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+<!--
+<link rel="stylesheet" href="/resource/autoauction/css/style.css"/>
+ -->
+<script src="/resource/autoauction/js/jquery/jquery-1.12.4.min.js"></script>
+<script src="/resource/autoauction/js/jquery/jquery-1.11.4.ui.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/jquery/jquery-migrate-1.2.1.min.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/jquery/jquery.form.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/jquery/jquery-submit.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/jquery.json-2.4.min.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/json2.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/jquery/jquery-ajax-options.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/common-user.js"></script>
+<script type="text/javascript" src="/resource/autoauction/js/common-util.js?ver=250417"></script>
+<script src="/resource/autoauction/js/ui.js"></script>
+
+<link rel="stylesheet" href="/resource/autoauction_2023/css/common.css"/>
+<link rel="stylesheet" href="/resource/autoauction_2023/css/font.css"/>
+<link rel="stylesheet" href="/resource/autoauction_2023/css/ui.css"/>
+<link rel="stylesheet" href="/resource/autoauction_2023/css/popup.css?ver=240909"/>
+
+<link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+
+<script src="/resource/autoauction_2023/js/swiper.min.js"></script>
+<script src="/resource/autoauction_2023/js/ui.js"></script>
+<!--[if lte IE 9]>
+    <link rel="stylesheet" href="/resource/autoauction/css/iestyle.css" />
+<![endif]-->
+<script>
+</script>
+
+
+
+
+
+    <div id="confirm_box" class="confirm-layer" style="display: none;">
+        <div class="confirm-conts">
+            <p class="msg"></p>
+            <div class="btnArea">
+                <a href="javascript:;" class="layer-btn confirm_box_close confirm_ok">확인</a><a href="javascript:;" class="layer-btn confirm_box_close confirm_cancel">취소</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert_box" class="confirm-layer" style="display: none;">
+        <div class="confirm-conts">
+            <p class="msg"></p>
+            <div class="btnArea">
+                <a href="javascript:;" class="layer-btn alert_box_close">확인</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-layer" style="display: none;">
+        <div class="loading-conts">
+            <img src="/resource/autoauction/images/sub/logo_send.png" style="padding-bottom: 30px;width: 200px;"/>
+            <p class="msg">페이지 로딩중입니다.<br/>잠시만 기다려주세요.</p>
+        </div>
+    </div>
+
+    <!-- loading -->
+    <div class="loading-wrap" style="display: none;">
+        <p class="text">로딩 중입니다.</p>
+    </div>
+    <!-- // loading -->
+
+    <div id="alert_box_v2" class="popup-wrap popup-alert" style="display:none;">
+        <div class="popup-container">
+            <div class="popup-content">
+                <p class="popup-text"></p>
+                <div class="popup-btn-wrap">
+                    <button type="button" class="btn-primary regular alert-close alert_close">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert_box_v3" class="popup-wrap popup-alert" style="display:none;">
+        <div class="popup-container">
+            <div class="popup-content">
+                <p class="popup-text"></p>
+                <div class="popup-btn-wrap">
+                    <button type="button" class="btn-primary regular alert-close btn_reload">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm_box_v2" class="popup-wrap popup-alert" style="display:none;">
+        <div class="popup-container">
+            <div class="popup-content">
+                <p class="popup-text"></p>
+                <div class="popup-btn-wrap">
+                    <button type="button" class="btn-primary regular alert-close confirm_ok">확인</button>
+                    <button type="button" class="btn-cancel regular alert-close confirm_cancel">취소</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm_box_v3" class="popup-wrap popup-alert" style="display:none;">
+        <div class="popup-container popup-alert-plus">
+            <div class="popup-content">
+                <p class="popup-text2"></p>
+                <div class="popup-btn-wrap">
+                    <button type="button" class="btn-primary regular alert-close confirm_ok">확인</button>
+                    <button type="button" class="btn-cancel regular alert-close confirm_cancel">취소</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</head>
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="ko">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Script-Type" content="text/javascript" />
+    <meta http-equiv="Content-Style-Type" content="text/css" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta http-equiv="imagetoolbar" content="no" />
+    
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Content-Script-Type" content="text/javascript" />
+    <meta http-equiv="Content-Style-Type" content="text/css" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta http-equiv="imagetoolbar" content="no" />
+    <title>현대글로비스</title>
+    <meta name="viewport" content="width=1200, user-scalable=yes" />
+    <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+    
+    <link rel="stylesheet" href="/resource/autoauction_2023/css/common.css"/>
+    <link rel="stylesheet" href="/resource/autoauction_2023/css/font.css"/>
+    <link rel="stylesheet" href="/resource/autoauction_2023/css/ui.css"/>
+    
+    <script src="/resource/autoauction/js/jquery/jquery-1.12.4.min.js"></script>
+    <script src="/resource/autoauction/js/jquery/jquery-1.11.4.ui.js"></script>
+    <script src="/resource/autoauction_2023/js/ui.js"></script>
+</head>
+<body>
+    <div id="wrap">
+        <!-- container -->
+        <div id="container"
+            <!-- contents -->
+            <div id="contents">
+                <div class="error-wrap">
+                    <h1 class="logo"><span class="blind">오토벨 스마트 옥션</span></h1>
+                    <p class="text">서비스 이용에 불편을 드려 죄송합니다.</p>
+                    <p class="desc">방문하시려는 페이지의 주소를 잘못 입력하셨거나 페이지가 주소가 변경 또는 삭제되어 해당 페이지를 찾을 수 없습니다.<br>또는 예기치 못한 에러가 발생하여 해당 페이지로 접근이 불가능할 수 있으니 새로 고침(F5)을 하시거나<br>페이지 주소 확인 후 다시 접속해 주시기 바랍니다.</p>
+                    <div class="btn-wrap">
+                        <a href="javascript:history.back();" class="btn-primary large">이전 페이지로 바로가기</a>
+                    </div>
+                </div>
+            </div>
+            <!-- // contents -->
+        </div>
+        <!-- // container -->
+        
+        <!-- footer -->
+        <footer>
+            <div class="inner-section">
+                <div class="inner">
+                    <div class="info-area">
+                        <div class="menu">
+                            <span><a href="#">경매규약</a></span>
+                            <span><a href="#">개인정보처리방침</a></span>
+                        </div>
+                        <div class="company-info">
+                            <span>현대글로비스㈜</span>
+                            <span>서울특별시 성동구 왕십리로 83-21</span>
+                            <span>대표자 : 이규복</span>
+                            <span>사업자등록번호 : 106-81-97118</span>
+                            <span>개인정보보호책임자 : 이상엽(국내오토비즈사업실) COPYRIGHT ⓒ HYUNDAI GLOVIS CO., LTD. All RIGHTS RESERVED</span>
+                        </div>
+                    </div>
+                    <div class="customer-service">
+                        <div class="info">
+                            <em class="title">고객센터</em><span class="time">평일 08:00~18:00</span>
+                        </div>
+                        <span class="number">1588-0567</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+        <!-- // footer -->
+        
+        <!--<button type="button" class="page-close">닫기</button>-->
+    </div>
+
+    <script type="text/javascript">
+    $(document).ready(function(){
+        $(".leftmenu").remove();
+    });
+    </script>
+</body>
+</html>

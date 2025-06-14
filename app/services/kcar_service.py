@@ -22,6 +22,7 @@ class KCarService:
     def __init__(self):
         self.settings = get_settings()
         self.base_url = "https://www.kcarauction.com"
+        self.image_base_url = "https://www.kcarauction.com/attachment/CAR_IMG"  # Базовый URL для изображений
         self.parser = KCarParser()
         self.session = requests.Session()
         self.ua = UserAgent()
@@ -700,25 +701,18 @@ class KCarService:
                 )
                 return result
             else:
-                logger.error("❌ Не получено автомобилей из weekly аукционов")
-
-                # Дополнительная диагностика
-                logger.info("🔍 Дополнительная диагностика:")
-                logger.info(
-                    "  - Возможно, weekly аукционы проводятся только в определенные дни"
-                )
-                logger.info(
-                    "  - Возможно, нет активных weekly аукционов в данный момент"
-                )
-                logger.info(
-                    "  - Возможно, требуются дополнительные параметры авторизации"
-                )
+                # Пустой список - это нормально (торги закончились или нет активных аукционов)
+                logger.info("ℹ️ Получен пустой список автомобилей из weekly аукционов")
+                logger.info("💡 Возможные причины:")
+                logger.info("  - Weekly аукционы уже завершились")
+                logger.info("  - Нет активных weekly аукционов в данный момент")
+                logger.info("  - Все автомобили были проданы")
 
                 return KCarResponse(
                     car_list=[],
                     total_count=0,
-                    success=False,
-                    message="Не найдено автомобилей в weekly аукционах. Возможно, weekly аукционы не проводятся в данный момент или требуются дополнительные параметры.",
+                    success=True,  # Изменено на True - пустой список это успех
+                    message="В данный момент нет доступных автомобилей в weekly аукционах. Торги могли завершиться или еще не начаться.",
                 )
 
         except Exception as e:
@@ -821,3 +815,25 @@ class KCarService:
         if self.session:
             self.session.close()
             logger.info("🔒 KCar сессия закрыта")
+
+    def get_image_url(self, thumbnail_path: Optional[str]) -> Optional[str]:
+        """
+        Формирует полный URL для изображения автомобиля
+
+        Args:
+            thumbnail_path: Относительный путь к изображению (например: "2032/CA20322763/CA203227638y022098_370.JPG")
+
+        Returns:
+            Полный URL изображения или None
+        """
+        if not thumbnail_path:
+            return None
+
+        # Убираем начальный слеш если есть
+        thumbnail_path = thumbnail_path.lstrip("/")
+
+        # Формируем полный URL
+        full_url = f"{self.image_base_url}/{thumbnail_path}"
+
+        logger.debug(f"🖼️ Сформирован URL изображения: {full_url}")
+        return full_url

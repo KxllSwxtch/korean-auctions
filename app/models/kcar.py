@@ -12,6 +12,18 @@ class KCarCar(BaseModel):
     )
     car_number: Optional[str] = Field(None, alias="CNO", description="Номер автомобиля")
 
+    # Изображения автомобиля
+    thumbnail: Optional[str] = Field(
+        None,
+        alias="THUMBNAIL",
+        description="URL миниатюры фотографии автомобиля (370px)",
+    )
+    thumbnail_mobile: Optional[str] = Field(
+        None,
+        alias="THUMBNAIL_MOBILE",
+        description="URL мобильной фотографии автомобиля (640px)",
+    )
+
     # Цена и аукцион
     auction_start_price: Optional[str] = Field(
         None, alias="AUC_STRT_PRC", description="Стартовая цена аукциона"
