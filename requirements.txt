@@ -31,8 +31,8 @@ gunicorn==21.2.0
 aiohttp==3.9.1
 aiofiles==24.1.0
 
-# Улучшенная работа с HTML (быстрее BeautifulSoup)
-selectolax==0.3.21
+# Улучшенная работа с HTML (быстрее BeautifulSoup) - удалено из-за несовместимости с Python 3.13
+# selectolax==0.3.21
 
 # Дополнительные утилиты для парсинга
 python-dateutil==2.8.2

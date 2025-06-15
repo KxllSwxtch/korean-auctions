@@ -61,7 +61,7 @@ async def get_service_info():
         ],
         "capabilities": {
             "authentication": "Two-step authentication with AJAX",
-            "parsing": "BeautifulSoup4 + selectolax optimization",
+            "parsing": "BeautifulSoup4 + lxml optimization",
             "caching": "In-memory + persistent file cache",
             "concurrency": "Async parallel requests",
             "monitoring": "Detailed stats and health checks",
