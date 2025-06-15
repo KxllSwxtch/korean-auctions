@@ -4,19 +4,18 @@ cookies = {
     "SCOUTER": "z6d9hgnq5i09ho",
     "_gcl_au": "1.1.469301602.1749863933",
     "_fwb": "191nmCARVubatjoH72cRPm8.1749863933091",
-    "_gid": "GA1.3.448482619.1749863933",
     "_fbp": "fb.2.1749863933206.396345519817813213",
     "_gcl_aw": "GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
     "_gcl_gs": "2.1.k1$i1749867755$u107600402",
     "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
     "_ga": "GA1.1.1367887267.1749863933",
     "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-    "JSESSIONID": "rfrLu3sj9IRm4MoFMcfDvqaqAI9sxZAoHTvftMaVu4b54U82lm5TOqlZJSdsT1JI.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-    "_ga_H9G80S9QWN": "GS2.1.s1749948942$o5$g1$t1749949790$j39$l0$h0",
+    "JSESSIONID": "uwd2WExV2VHUd72e9f23DvE6y5XlYxL8epcInKAtuW8qYVrGlLRwj7BYarfX1KdR.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+    "_ga_H9G80S9QWN": "GS2.1.s1750030729$o7$g1$t1750030786$j3$l0$h0",
 }
 
 headers = {
-    "Accept": "application/json, text/javascript, */*; q=0.01",
+    "Accept": "text/html, */*; q=0.01",
     "Accept-Language": "en-US,en;q=0.9",
     "Connection": "keep-alive",
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
@@ -30,7 +29,7 @@ headers = {
     "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"Windows"',
-    # 'Cookie': 'SCOUTER=z6d9hgnq5i09ho; _gcl_au=1.1.469301602.1749863933; _fwb=191nmCARVubatjoH72cRPm8.1749863933091; _gid=GA1.3.448482619.1749863933; _fbp=fb.2.1749863933206.396345519817813213; _gcl_aw=GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _gcl_gs=2.1.k1$i1749867755$u107600402; _gac_UA-163217058-4=1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _ga=GA1.1.1367887267.1749863933; _ga_WBXP3Q01TE=GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0; JSESSIONID=rfrLu3sj9IRm4MoFMcfDvqaqAI9sxZAoHTvftMaVu4b54U82lm5TOqlZJSdsT1JI.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x; _ga_H9G80S9QWN=GS2.1.s1749948942$o5$g1$t1749949790$j39$l0$h0',
+    # 'Cookie': 'SCOUTER=z6d9hgnq5i09ho; _gcl_au=1.1.469301602.1749863933; _fwb=191nmCARVubatjoH72cRPm8.1749863933091; _fbp=fb.2.1749863933206.396345519817813213; _gcl_aw=GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _gcl_gs=2.1.k1$i1749867755$u107600402; _gac_UA-163217058-4=1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _ga=GA1.1.1367887267.1749863933; _ga_WBXP3Q01TE=GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0; JSESSIONID=uwd2WExV2VHUd72e9f23DvE6y5XlYxL8epcInKAtuW8qYVrGlLRwj7BYarfX1KdR.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x; _ga_H9G80S9QWN=GS2.1.s1750030729$o7$g1$t1750030786$j3$l0$h0',
 }
 
 data = {
@@ -51,8 +50,8 @@ data = {
     "edistancecd": "",
     "missioncd": "",
     "carcd": "",
-    "prodmancd": "2",
-    "prodmannm": "기아",
+    "prodmancd": "",
+    "prodmannm": "",
     "cargradcd": "",
     "cargradnm": "",
     "reprcarcd": "",
@@ -71,7 +70,6 @@ data = {
     "primeauctionAlertMessage": "",
     "searchInput": "",
     "exceptEmptYn": "Y",
-    "arrProdmancd": "2",
     "sprice": "",
     "eprice": "",
     "syearcd": "",
@@ -84,11 +82,10 @@ data = {
     "publicauctioneday": "월",
     "rowLimit": "18",
     "searchorder": "01",
-    "searchArray": "2",
 }
 
 response = requests.post(
-    "https://auction.autobell.co.kr/cmm/carCorpModelList.do",
+    "https://auction.autobell.co.kr/auction/exhibitListInclude.do",
     cookies=cookies,
     headers=headers,
     data=data,

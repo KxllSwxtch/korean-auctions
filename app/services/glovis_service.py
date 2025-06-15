@@ -5,6 +5,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from fake_useragent import UserAgent
+from datetime import datetime, timedelta
 
 from app.models.glovis import GlovisCar, GlovisResponse, GlovisError
 from app.models.glovis_filters import (
@@ -34,11 +35,52 @@ class GlovisService:
         self.ua = UserAgent()
         self._session = None
         self._authenticated = False
+        self._session_created_at = None
+        self._session_ttl = timedelta(minutes=30)  # TTL сессии 30 минут
+        self._last_cookie_update = None
+
+    def _get_fresh_cookies(self) -> Dict[str, str]:
+        """Возвращает свежие cookies для Glovis"""
+        # Здесь можно реализовать логику получения свежих cookies
+        # В будущем можно добавить автоматическое получение cookies из браузера
+        return {
+            "SCOUTER": "z6d9hgnq5i09ho",
+            "_gcl_au": "1.1.469301602.1749863933",
+            "_fwb": "191nmCARVubatjoH72cRPm8.1749863933091",
+            "_fbp": "fb.2.1749863933206.396345519817813213",
+            "_gcl_aw": "GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
+            "_gcl_gs": "2.1.k1$i1749867755$u107600402",
+            "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
+            "_ga": "GA1.1.1367887267.1749863933",
+            "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
+            "JSESSIONID": "uwd2WExV2VHUd72e9f23DvE6y5XlYxL8epcInKAtuW8qYVrGlLRwj7BYarfX1KdR.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+            "_ga_H9G80S9QWN": "GS2.1.s1750030729$o7$g1$t1750030786$j3$l0$h0",
+        }
+
+    def _is_session_expired(self) -> bool:
+        """Проверяет, истекла ли сессия по времени"""
+        if not self._session_created_at:
+            return True
+        return datetime.now() - self._session_created_at > self._session_ttl
+
+    def update_cookies(self, new_cookies: Dict[str, str]) -> None:
+        """Обновляет cookies в текущей сессии"""
+        if self._session:
+            logger.info("🔄 Обновляю cookies в текущей сессии")
+            for name, value in new_cookies.items():
+                self._session.cookies.set(name, value)
+            self._last_cookie_update = datetime.now()
+            logger.info("✅ Cookies успешно обновлены")
+        else:
+            logger.warning("⚠️ Сессия не инициализирована, cookies не обновлены")
 
     @property
     def session(self) -> requests.Session:
         """Получить настроенную сессию для HTTP запросов"""
-        if self._session is None:
+        if self._session is None or self._is_session_expired():
+            if self._session:
+                logger.info("⏰ Сессия истекла по времени, создаю новую")
+                self._session.close()
             self._session = self._create_session()
         return self._session
 
@@ -71,21 +113,8 @@ class GlovisService:
             }
         )
 
-        # Обновленные cookies из рабочего примера (необходимы для авторизации)
-        cookies = {
-            "SCOUTER": "z6d9hgnq5i09ho",
-            "_gcl_au": "1.1.469301602.1749863933",
-            "_fwb": "191nmCARVubatjoH72cRPm8.1749863933091",
-            "_gid": "GA1.3.448482619.1749863933",
-            "_fbp": "fb.2.1749863933206.396345519817813213",
-            "_gcl_aw": "GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
-            "_gcl_gs": "2.1.k1$i1749867755$u107600402",
-            "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
-            "_ga": "GA1.1.1367887267.1749863933",
-            "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-            "JSESSIONID": "rfrLu3sj9IRm4MoFMcfDvqaqAI9sxZAoHTvftMaVu4b54U82lm5TOqlZJSdsT1JI.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-            "_ga_H9G80S9QWN": "GS2.1.s1749948942$o5$g1$t1749948990$j12$l0$h0",
-        }
+        # Обновленные cookies из рабочего примера (обновлено 2025-06-16)
+        cookies = self._get_fresh_cookies()
 
         # Устанавливаем cookies
         for name, value in cookies.items():
@@ -99,6 +128,8 @@ class GlovisService:
 
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+        self._session_created_at = datetime.now()
+        self._authenticated = True
         return session
 
     async def get_car_list(
@@ -477,14 +508,19 @@ class GlovisService:
                 "issues": [f"Ошибка запроса: {str(e)}"],
             }
 
-    def refresh_session(self):
+    def refresh_session(self, force_new_cookies: bool = False):
         """Принудительно обновляет сессию и cookies"""
         logger.info("🔄 Принудительное обновление сессии Glovis")
+
+        if force_new_cookies:
+            logger.info("🆕 Запрошено принудительное обновление cookies")
+
         if self._session:
             self._session.close()
         self._session = None
         self._authenticated = False
-        # При следующем обращении сессия будет создана заново
+        self._session_created_at = None
+        # При следующем обращении сессия будет создана заново с новыми cookies
 
     async def get_manufacturers(self) -> GlovisManufacturersResponse:
         """
