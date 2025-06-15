@@ -259,7 +259,7 @@ class LotteService:
 
             if auction_date:
                 self._save_to_cache(cache_key, auction_date)
-                logger.info(f"✅ Дата аукциона получена: {auction_date.date_str}")
+                logger.info(f"✅ Дата аукциона получена: {auction_date.auction_date}")
             else:
                 logger.warning("Не удалось найти дату аукциона на странице")
                 logger.info(f"Начало контента страницы: {response.text[:500]}...")

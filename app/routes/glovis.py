@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from typing import Optional, Dict, Any
+from datetime import datetime
 from loguru import logger
 
 from app.models.glovis import GlovisResponse, GlovisError
@@ -268,6 +269,80 @@ async def get_glovis_status() -> Dict[str, Any]:
 
     except Exception as e:
         glovis_logger.error(f"❌ Ошибка при проверке статуса Glovis: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/check-session", response_model=Dict[str, Any])
+async def check_glovis_session() -> Dict[str, Any]:
+    """
+    Проверить валидность сессии Glovis
+
+    Проверяет работоспособность JSESSIONID и других cookies.
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/check-session
+    ```
+    """
+    try:
+        glovis_logger.info("🔍 Запрос на проверку сессии Glovis")
+
+        # Проверяем сессию
+        session_status = await glovis_service.check_session_validity()
+
+        return {
+            "success": session_status.get("is_valid", False),
+            "message": (
+                "Сессия валидна"
+                if session_status.get("is_valid", False)
+                else "Сессия требует обновления"
+            ),
+            "data": session_status,
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Ошибка при проверке сессии Glovis: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.post("/refresh-session", response_model=Dict[str, Any])
+async def refresh_glovis_session() -> Dict[str, Any]:
+    """
+    Принудительно обновить сессию Glovis
+
+    Полезно при получении ошибок 401 или проблемах с аутентификацией.
+
+    **Пример использования:**
+    ```
+    POST /api/v1/glovis/refresh-session
+    ```
+    """
+    try:
+        glovis_logger.info("🔄 Запрос на обновление сессии Glovis")
+
+        # Обновляем сессию
+        glovis_service.refresh_session()
+
+        # Проверяем новую сессию
+        session_status = await glovis_service.check_session_validity()
+
+        return {
+            "success": True,
+            "message": "Сессия Glovis успешно обновлена",
+            "data": {
+                "timestamp": datetime.now().isoformat(),
+                "action": "session_refreshed",
+                "new_session_status": session_status,
+            },
+        }
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Ошибка при обновлении сессии Glovis: {e}")
         raise HTTPException(
             status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
         )

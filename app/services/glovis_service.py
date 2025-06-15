@@ -61,7 +61,7 @@ class GlovisService:
             }
         )
 
-        # Добавляем cookies из примера (они необходимы для авторизации)
+        # Обновленные cookies из рабочего примера (необходимы для авторизации)
         cookies = {
             "SCOUTER": "z6d9hgnq5i09ho",
             "_gcl_au": "1.1.469301602.1749863933",
@@ -73,8 +73,8 @@ class GlovisService:
             "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
             "_ga": "GA1.1.1367887267.1749863933",
             "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-            "JSESSIONID": "NdPgk57bazPJlaomopbX3xyC9IG3oIYIZ514rPlhzR2qBLXKlGjCM1cGB7i4BeX0.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24y",
-            "_ga_H9G80S9QWN": "GS2.1.s1749872843$o4$g1$t1749873569$j60$l0$h0",
+            "JSESSIONID": "rfrLu3sj9IRm4MoFMcfDvqaqAI9sxZAoHTvftMaVu4b54U82lm5TOqlZJSdsT1JI.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+            "_ga_H9G80S9QWN": "GS2.1.s1749948942$o5$g1$t1749948990$j12$l0$h0",
         }
 
         # Устанавливаем cookies
@@ -142,6 +142,17 @@ class GlovisService:
         try:
             url = f"{self.base_url}/auction/exhibitListInclude.do"
 
+            # Проверяем валидность сессии перед запросом
+            session_check = await self.check_session_validity()
+            if not session_check.get("is_valid", False):
+                logger.warning("⚠️ Сессия невалидна, обновляем...")
+                self.refresh_session()
+                # Повторная проверка после обновления
+                session_check = await self.check_session_validity()
+                if not session_check.get("is_valid", False):
+                    logger.error("❌ Не удалось восстановить валидную сессию")
+                    return None
+
             # Подготавливаем данные для POST запроса на основе примера
             row_from = str((page - 1) * 18 + 1)  # 18 автомобилей на страницу
 
@@ -154,8 +165,8 @@ class GlovisService:
                 "bidcd": "",
                 "exportAuctionYn": "N",
                 "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-                "atn": "944",
-                "acc": "20",
+                "atn": "747",
+                "acc": "30",
                 "rc": "",
                 "gn": "",
                 "searchRc": "",
@@ -176,10 +187,10 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": "20250617130000",
-                "auctenddt": "",
+                "auctstardt": "20250614090000",
+                "auctenddt": "20250616120000",
                 "primeAuctionChk": "",
-                "primeauctionyn": "",
+                "primeauctionyn": "N",
                 "primeauctionAlertMessage": "",
                 "searchInput": "",
                 "exceptEmptYn": "Y",
@@ -187,10 +198,12 @@ class GlovisService:
                 "eprice": "",
                 "syearcd": "",
                 "eyearcd": "",
-                "searchAuctno": "944",
+                "searchAuctno": "747",
                 "auctroomcd": "",
-                "searchLanecd": "",
-                "auctListStat": "",
+                "publicauctionsdt": "20250614090000",
+                "publicauctionedt": "20250616120000",
+                "publicauctionsday": "토",
+                "publicauctioneday": "월",
                 "rowLimit": "18",
                 "searchorder": "01",
             }
@@ -213,7 +226,7 @@ class GlovisService:
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/auction/exhibitList.do?acc=20&atn=&flag=Y",
+                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=747&acc=30&auctListStat=&flag=Y",
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
@@ -228,6 +241,35 @@ class GlovisService:
             )
 
             if response.status_code == 200:
+                # Дополнительная проверка на скрытые редиректы
+                if "<script>location.href='/login.do';</script>" in response.text:
+                    logger.error(
+                        "❌ Получен JavaScript редирект на логин, сессия истекла"
+                    )
+                    # Попытка автоматического восстановления
+                    logger.info("🔄 Попытка автоматического восстановления сессии...")
+                    self.refresh_session()
+
+                    # Повторный запрос после обновления сессии
+                    response = self.session.post(
+                        url,
+                        data=data,
+                        headers=headers,
+                        timeout=30,
+                        allow_redirects=True,
+                    )
+
+                    if (
+                        response.status_code == 200
+                        and "<script>location.href='/login.do';</script>"
+                        not in response.text
+                    ):
+                        logger.info("✅ Сессия успешно восстановлена")
+                        return response.text
+                    else:
+                        logger.error("❌ Не удалось восстановить сессию")
+                        return None
+
                 logger.info(
                     f"✅ Успешно получили HTML (размер: {len(response.text)} символов)"
                 )
@@ -235,6 +277,12 @@ class GlovisService:
             else:
                 logger.error(f"❌ HTTP ошибка: {response.status_code}")
                 logger.error(f"Ответ: {response.text[:1000]}...")
+
+                # Если ошибка 401 - проблема с аутентификацией
+                if response.status_code == 401:
+                    logger.info("🔄 Ошибка 401, обновляем сессию...")
+                    self.refresh_session()
+
                 return None
 
         except Exception as e:
@@ -341,6 +389,92 @@ class GlovisService:
             has_next_page=False,
             has_prev_page=False,
         )
+
+    async def check_session_validity(self) -> Dict[str, Any]:
+        """Проверяет валидность текущей сессии"""
+        try:
+            logger.info("🔍 Проверка валидности сессии Glovis")
+
+            # Делаем простой запрос для проверки сессии
+            session = self.session
+            test_url = f"{self.base_url}/auction/exhibitList.do?atn=747&acc=30&flag=Y"
+
+            response = session.get(test_url, timeout=10, allow_redirects=False)
+
+            # Проверяем различные сценарии
+            is_valid = True
+            issues = []
+
+            if response.status_code == 401:
+                is_valid = False
+                issues.append("HTTP 401 - Неавторизован")
+            elif response.status_code == 302 and "/login.do" in response.headers.get(
+                "Location", ""
+            ):
+                is_valid = False
+                issues.append("Редирект на страницу логина")
+            elif response.status_code != 200:
+                is_valid = False
+                issues.append(f"HTTP {response.status_code}")
+            elif "<script>location.href='/login.do';</script>" in response.text:
+                is_valid = False
+                issues.append("JavaScript редирект на логин")
+            elif "login" in response.text.lower() and len(response.text) < 1000:
+                is_valid = False
+                issues.append("Страница содержит форму логина")
+
+            # Получаем информацию о cookies
+            cookies_info = {}
+            for cookie in session.cookies:
+                if cookie.name == "JSESSIONID":
+                    cookies_info["JSESSIONID"] = {
+                        "value": (
+                            cookie.value[:20] + "..."
+                            if len(cookie.value) > 20
+                            else cookie.value
+                        ),
+                        "domain": cookie.domain,
+                        "path": cookie.path,
+                        "expires": cookie.expires,
+                    }
+
+            result = {
+                "is_valid": is_valid,
+                "status_code": response.status_code,
+                "response_size": len(response.text),
+                "cookies_info": cookies_info,
+                "issues": issues,
+                "redirect_location": response.headers.get("Location"),
+                "content_preview": (
+                    response.text[:200] + "..."
+                    if len(response.text) > 200
+                    else response.text
+                ),
+            }
+
+            if is_valid:
+                logger.info("✅ Сессия Glovis валидна")
+            else:
+                logger.warning(f"⚠️ Проблемы с сессией Glovis: {', '.join(issues)}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при проверке сессии: {e}")
+            return {
+                "is_valid": False,
+                "error": str(e),
+                "issues": [f"Ошибка запроса: {str(e)}"],
+            }
+
+    def refresh_session(self):
+        """Принудительно обновляет сессию и cookies"""
+        logger.info("🔄 Принудительное обновление сессии Glovis")
+        if self._session:
+            self._session.close()
+        self._session = None
+        self._authenticated = False
+        # При следующем обращении сессия будет создана заново
 
     def close(self):
         """Закрывает сессию"""

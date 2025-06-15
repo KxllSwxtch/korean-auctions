@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from app.routes import autohub, autohub_demo, lotte, kcar, glovis
+from app.routes import autohub, autohub_demo, lotte, kcar, glovis, enhanced_lotte
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 
@@ -38,6 +38,9 @@ app.include_router(
 app.include_router(lotte.router, tags=["Lotte Auction"])
 app.include_router(kcar.router, tags=["KCar Auction"])
 app.include_router(glovis.router, tags=["Glovis Auction"])
+
+# Новые улучшенные маршруты
+app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
 
 
 @app.get("/")
