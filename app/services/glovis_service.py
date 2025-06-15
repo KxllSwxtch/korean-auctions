@@ -7,6 +7,16 @@ from urllib3.util.retry import Retry
 from fake_useragent import UserAgent
 
 from app.models.glovis import GlovisCar, GlovisResponse, GlovisError
+from app.models.glovis_filters import (
+    GlovisFilterOptions,
+    GlovisManufacturer,
+    GlovisModel,
+    GlovisDetailModel,
+    GlovisManufacturersResponse,
+    GlovisModelsResponse,
+    GlovisDetailModelsResponse,
+    GlovisFilteredCarsResponse,
+)
 from app.parsers.glovis_parser import GlovisParser
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -475,6 +485,483 @@ class GlovisService:
         self._session = None
         self._authenticated = False
         # При следующем обращении сессия будет создана заново
+
+    async def get_manufacturers(self) -> GlovisManufacturersResponse:
+        """
+        Получает список производителей автомобилей
+
+        Returns:
+            GlovisManufacturersResponse: Список производителей с количеством доступных автомобилей
+        """
+        try:
+            logger.info("🏭 Получение списка производителей Glovis")
+            start_time = time.time()
+
+            # Получаем страницу с фильтрами
+            url = f"{self.base_url}/auction/exhibitList.do"
+            params = {"atn": "747", "acc": "30", "auctListStat": "", "flag": "Y"}
+
+            response = self.session.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                logger.error(f"❌ Ошибка HTTP: {response.status_code}")
+                return GlovisManufacturersResponse(
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                )
+
+            # Парсим список производителей из HTML
+            manufacturers = self.parser.parse_manufacturers(response.text)
+
+            duration = time.time() - start_time
+            logger.info(
+                f"✅ Получено {len(manufacturers)} производителей за {duration:.2f}с"
+            )
+
+            return GlovisManufacturersResponse(
+                success=True,
+                message=f"Получено {len(manufacturers)} производителей",
+                manufacturers=manufacturers,
+                total_count=len(manufacturers),
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении производителей: {e}")
+            return GlovisManufacturersResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+    async def get_models(self, manufacturer_code: str) -> GlovisModelsResponse:
+        """
+        Получает список моделей для выбранного производителя
+
+        Args:
+            manufacturer_code: Код производителя
+
+        Returns:
+            GlovisModelsResponse: Список моделей для производителя
+        """
+        try:
+            logger.info(f"🚗 Получение моделей для производителя {manufacturer_code}")
+            start_time = time.time()
+
+            # Проверяем валидность сессии
+            session_check = await self.check_session_validity()
+            if not session_check.get("is_valid", False):
+                logger.warning("⚠️ Обновляем сессию...")
+                self.refresh_session()
+
+            url = f"{self.base_url}/cmm/carCorpModelList.do"
+
+            # Подготавливаем данные на основе примера
+            data = {
+                "rowFrom": "1",
+                "page": "1",
+                "nowexhino": "",
+                "flagHouse": "W",
+                "flag": "Y",
+                "bidcd": "",
+                "exportAuctionYn": "N",
+                "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
+                "atn": "747",
+                "acc": "30",
+                "rc": "",
+                "gn": "",
+                "searchRc": "",
+                "sdistancecd": "",
+                "edistancecd": "",
+                "missioncd": "",
+                "carcd": "",
+                "prodmancd": manufacturer_code,
+                "prodmannm": "",
+                "cargradcd": "",
+                "cargradnm": "",
+                "reprcarcd": "",
+                "reprcarnm": "",
+                "detacarcd": "",
+                "detacarnm": "",
+                "carPrice": "",
+                "menuCd": "MCUA",
+                "searchtype": "",
+                "searchtext": "",
+                "deviceType": "",
+                "auctstardt": "20250614090000",
+                "auctenddt": "20250616120000",
+                "primeAuctionChk": "",
+                "primeauctionyn": "N",
+                "primeauctionAlertMessage": "",
+                "searchInput": "",
+                "exceptEmptYn": "Y",
+                "arrProdmancd": manufacturer_code,
+                "sprice": "",
+                "eprice": "",
+                "syearcd": "",
+                "eyearcd": "",
+                "searchAuctno": "747",
+                "auctroomcd": "",
+                "publicauctionsdt": "20250614090000",
+                "publicauctionedt": "20250616120000",
+                "publicauctionsday": "토",
+                "publicauctioneday": "월",
+                "rowLimit": "18",
+                "searchorder": "01",
+                "searchArray": manufacturer_code,
+            }
+
+            # Устанавливаем правильные headers для AJAX запроса
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://auction.autobell.co.kr",
+                "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do?atn=747&acc=30&auctListStat=&flag=Y",
+                "X-Requested-With": "XMLHttpRequest",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+
+            response = self.session.post(url, data=data, headers=headers, timeout=30)
+            if response.status_code != 200:
+                logger.error(f"❌ Ошибка HTTP: {response.status_code}")
+                return GlovisModelsResponse(
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                )
+
+            # Парсим JSON ответ
+            models = self.parser.parse_models(response.json())
+
+            duration = time.time() - start_time
+            logger.info(f"✅ Получено {len(models)} моделей за {duration:.2f}с")
+
+            return GlovisModelsResponse(
+                success=True,
+                message=f"Получено {len(models)} моделей",
+                models=models,
+                total_count=len(models),
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении моделей: {e}")
+            return GlovisModelsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+    async def get_detail_models(
+        self, manufacturer_code: str, model_codes: List[str]
+    ) -> GlovisDetailModelsResponse:
+        """
+        Получает детальные модели для выбранных базовых моделей
+
+        Args:
+            manufacturer_code: Код производителя
+            model_codes: Список кодов базовых моделей
+
+        Returns:
+            GlovisDetailModelsResponse: Список детальных моделей
+        """
+        try:
+            logger.info(f"🔍 Получение детальных моделей для {model_codes}")
+            start_time = time.time()
+
+            # Проверяем валидность сессии
+            session_check = await self.check_session_validity()
+            if not session_check.get("is_valid", False):
+                logger.warning("⚠️ Обновляем сессию...")
+                self.refresh_session()
+
+            url = f"{self.base_url}/cmm/carModelDetailList.do"
+
+            # Подготавливаем массив для searchArray
+            search_arrays = []
+            for model_code in model_codes:
+                search_arrays.append(f"{manufacturer_code}_{model_code}")
+
+            # Подготавливаем данные формы
+            data = [
+                ("rowFrom", "1"),
+                ("page", "1"),
+                ("nowexhino", ""),
+                ("flagHouse", "W"),
+                ("flag", "Y"),
+                ("bidcd", ""),
+                ("exportAuctionYn", "N"),
+                ("ac", "TQhYt3GD6GvgPdVw1QX+Wg=="),
+                ("atn", "747"),
+                ("acc", "30"),
+                ("rc", ""),
+                ("gn", ""),
+                ("searchRc", ""),
+                ("sdistancecd", ""),
+                ("edistancecd", ""),
+                ("missioncd", ""),
+                ("carcd", ""),
+                ("prodmancd", manufacturer_code),
+                ("prodmannm", ""),
+                ("cargradcd", ""),
+                ("cargradnm", ""),
+                ("reprcarcd", ""),
+                ("reprcarnm", ""),
+                ("detacarcd", ""),
+                ("detacarnm", ""),
+                ("carPrice", ""),
+                ("menuCd", "MCUA"),
+                ("searchtype", ""),
+                ("searchtext", ""),
+                ("deviceType", ""),
+                ("auctstardt", "20250614090000"),
+                ("auctenddt", "20250616120000"),
+                ("primeAuctionChk", ""),
+                ("primeauctionyn", "N"),
+                ("primeauctionAlertMessage", ""),
+                ("searchInput", ""),
+                ("exceptEmptYn", "Y"),
+                ("arrProdmancd", manufacturer_code),
+                ("sprice", ""),
+                ("eprice", ""),
+                ("syearcd", ""),
+                ("eyearcd", ""),
+                ("searchAuctno", "747"),
+                ("auctroomcd", ""),
+                ("publicauctionsdt", "20250614090000"),
+                ("publicauctionedt", "20250616120000"),
+                ("publicauctionsday", "토"),
+                ("publicauctioneday", "월"),
+                ("rowLimit", "18"),
+                ("searchorder", "01"),
+            ]
+
+            # Добавляем reprcarcd для каждой модели
+            for model_code in model_codes:
+                data.append(("arrReprcarcd", model_code))
+
+            # Добавляем searchArray для каждой модели
+            for search_array in search_arrays:
+                data.append(("searchArray", search_array))
+
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://auction.autobell.co.kr",
+                "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do?atn=747&acc=30&auctListStat=&flag=Y",
+                "X-Requested-With": "XMLHttpRequest",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+
+            response = self.session.post(url, data=data, headers=headers, timeout=30)
+            if response.status_code != 200:
+                logger.error(f"❌ Ошибка HTTP: {response.status_code}")
+                return GlovisDetailModelsResponse(
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                )
+
+            # Парсим JSON ответ
+            detail_models = self.parser.parse_detail_models(response.json())
+
+            duration = time.time() - start_time
+            logger.info(
+                f"✅ Получено {len(detail_models)} детальных моделей за {duration:.2f}с"
+            )
+
+            return GlovisDetailModelsResponse(
+                success=True,
+                message=f"Получено {len(detail_models)} детальных моделей",
+                detail_models=detail_models,
+                total_count=len(detail_models),
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении детальных моделей: {e}")
+            return GlovisDetailModelsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
+
+    async def search_cars_with_filters(
+        self, filters: GlovisFilterOptions
+    ) -> GlovisFilteredCarsResponse:
+        """
+        Поиск автомобилей с применением фильтров
+
+        Args:
+            filters: Параметры фильтрации
+
+        Returns:
+            GlovisFilteredCarsResponse: Результаты поиска с применёнными фильтрами
+        """
+        try:
+            logger.info(f"🔍 Поиск автомобилей с фильтрами: {filters.dict()}")
+            start_time = time.time()
+
+            # Проверяем валидность сессии
+            session_check = await self.check_session_validity()
+            if not session_check.get("is_valid", False):
+                logger.warning("⚠️ Обновляем сессию...")
+                self.refresh_session()
+
+            url = f"{self.base_url}/auction/exhibitListInclude.do"
+
+            # Подготавливаем данные для фильтрации
+            row_from = str((filters.page - 1) * filters.page_size + 1)
+
+            data = {
+                "rowFrom": row_from,
+                "page": str(filters.page),
+                "nowexhino": "",
+                "flagHouse": "W",
+                "flag": "Y",
+                "bidcd": "",
+                "exportAuctionYn": "N",
+                "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
+                "atn": "747",
+                "acc": "30",
+                "rc": filters.location or "",
+                "gn": "",
+                "searchRc": "",
+                "sdistancecd": filters.min_mileage or "",
+                "edistancecd": filters.max_mileage or "",
+                "missioncd": filters.transmission or "",
+                "carcd": "",
+                "prodmancd": "",
+                "prodmannm": "",
+                "cargradcd": filters.car_grade or "",
+                "cargradnm": "",
+                "reprcarcd": "",
+                "reprcarnm": "",
+                "detacarcd": "",
+                "detacarnm": "",
+                "carPrice": "",
+                "menuCd": "MCUA",
+                "searchtype": filters.search_type or "",
+                "searchtext": filters.search_text or "",
+                "deviceType": "",
+                "auctstardt": "20250614090000",
+                "auctenddt": "20250616120000",
+                "primeAuctionChk": "",
+                "primeauctionyn": "N",
+                "primeauctionAlertMessage": "",
+                "searchInput": "",
+                "exceptEmptYn": "Y",
+                "sprice": str(filters.min_price) if filters.min_price else "",
+                "eprice": str(filters.max_price) if filters.max_price else "",
+                "syearcd": str(filters.min_year) if filters.min_year else "",
+                "eyearcd": str(filters.max_year) if filters.max_year else "",
+                "searchAuctno": "747",
+                "auctroomcd": "",
+                "publicauctionsdt": "20250614090000",
+                "publicauctionedt": "20250616120000",
+                "publicauctionsday": "토",
+                "publicauctioneday": "월",
+                "rowLimit": str(filters.page_size),
+                "searchorder": filters.sort_order or "01",
+            }
+
+            # Добавляем фильтры производителей
+            if filters.manufacturers:
+                for manufacturer in filters.manufacturers:
+                    data["arrProdmancd"] = manufacturer
+
+            # Добавляем фильтры моделей
+            if filters.models:
+                for model in filters.models:
+                    data["arrReprcarcd"] = model
+
+            # Добавляем фильтры детальных моделей
+            if filters.detail_models:
+                for detail_model in filters.detail_models:
+                    data["arrDetacarcd"] = detail_model
+
+            # Формируем searchArray
+            search_arrays = []
+            if filters.manufacturers:
+                for manufacturer in filters.manufacturers:
+                    if filters.models:
+                        for model in filters.models:
+                            if filters.detail_models:
+                                for detail_model in filters.detail_models:
+                                    search_arrays.append(
+                                        f"{manufacturer}_{model}_{detail_model}"
+                                    )
+                            else:
+                                search_arrays.append(f"{manufacturer}_{model}")
+                    else:
+                        search_arrays.append(manufacturer)
+
+            if search_arrays:
+                data["searchArray"] = "_".join(search_arrays)
+
+            headers = {
+                "Accept": "text/html, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://auction.autobell.co.kr",
+                "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do?atn=747&acc=30&auctListStat=&flag=Y",
+                "X-Requested-With": "XMLHttpRequest",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
+
+            response = self.session.post(url, data=data, headers=headers, timeout=30)
+            if response.status_code != 200:
+                logger.error(f"❌ Ошибка HTTP: {response.status_code}")
+                return GlovisFilteredCarsResponse(
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                    applied_filters=filters,
+                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                )
+
+            # Парсим результаты
+            result = self.parser.parse_car_list(response.text, filters.page)
+
+            # Вычисляем пагинацию
+            total_pages = (
+                result.total_count + filters.page_size - 1
+            ) // filters.page_size
+            has_next_page = filters.page < total_pages
+            has_prev_page = filters.page > 1
+
+            duration = time.time() - start_time
+            logger.info(
+                f"✅ Найдено {result.total_count} автомобилей за {duration:.2f}с"
+            )
+
+            return GlovisFilteredCarsResponse(
+                success=True,
+                message=f"Найдено {result.total_count} автомобилей",
+                applied_filters=filters,
+                cars=result.cars,
+                total_count=result.total_count,
+                current_page=filters.page,
+                page_size=filters.page_size,
+                total_pages=total_pages,
+                has_next_page=has_next_page,
+                has_prev_page=has_prev_page,
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+                request_duration=duration,
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при поиске с фильтрами: {e}")
+            return GlovisFilteredCarsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                applied_filters=filters,
+                timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
     def close(self):
         """Закрывает сессию"""

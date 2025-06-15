@@ -8,6 +8,7 @@ from app.models.glovis import (
     GlovisLocation,
     GlovisCarCondition,
 )
+from app.models.glovis_filters import GlovisManufacturer, GlovisModel, GlovisDetailModel
 from app.core.logging import get_logger
 
 logger = get_logger("glovis_parser")
@@ -276,3 +277,168 @@ class GlovisParser:
         except Exception as e:
             logger.error(f"Ошибка при парсинге пагинации: {e}")
             return {"current_page": 1, "total_pages": 1}
+
+    def parse_manufacturers(self, html_content: str) -> List[GlovisManufacturer]:
+        """
+        Парсит список производителей из HTML страницы фильтров
+
+        Args:
+            html_content: HTML содержимое страницы с фильтрами
+
+        Returns:
+            List[GlovisManufacturer]: Список производителей
+        """
+        manufacturers = []
+
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+
+            # Ищем все блоки производителей с классом "model-box"
+            model_boxes = soup.find_all("div", class_="model-box")
+
+            for box in model_boxes:
+                try:
+                    # Ищем checkbox с именем "arrProdmancd"
+                    checkbox = box.find("input", {"name": "arrProdmancd"})
+                    if not checkbox:
+                        continue
+
+                    # Извлекаем код производителя
+                    prodmancd = checkbox.get("value", "")
+                    if not prodmancd:
+                        continue
+
+                    # Извлекаем название производителя
+                    name_span = box.find("span", id=f"corp_nm_{prodmancd}")
+                    name = name_span.get_text().strip() if name_span else ""
+
+                    # Извлекаем количество доступных автомобилей
+                    count_span = box.find("span", id=f"corp_cnt_{prodmancd}")
+                    count_text = count_span.get_text().strip() if count_span else "0"
+                    count = int(count_text) if count_text.isdigit() else 0
+
+                    # Проверяем, доступен ли производитель (не disabled)
+                    enabled = not checkbox.get("disabled", False)
+
+                    # Создаем объект производителя
+                    manufacturer = GlovisManufacturer(
+                        prodmancd=prodmancd, name=name, count=count, enabled=enabled
+                    )
+
+                    manufacturers.append(manufacturer)
+
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге производителя: {e}")
+                    continue
+
+            logger.info(f"✅ Парсинг производителей: найдено {len(manufacturers)}")
+            return manufacturers
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при парсинге производителей: {e}")
+            return []
+
+    def parse_models(self, json_response: Dict[str, Any]) -> List[GlovisModel]:
+        """
+        Парсит список моделей из JSON ответа API
+
+        Args:
+            json_response: JSON ответ от API carCorpModelList.do
+
+        Returns:
+            List[GlovisModel]: Список моделей
+        """
+        models = []
+
+        try:
+            # Извлекаем список из JSON структуры
+            result = json_response.get("result", {})
+            model_list = result.get("list", [])
+
+            for item in model_list:
+                try:
+                    # Извлекаем данные модели
+                    makeid = str(item.get("makeid", ""))
+                    makenm = item.get("makenm", "")
+                    targetcnt = item.get("targetcnt", 0)
+                    prodmancd = result.get("prodmancd", "")
+
+                    # Создаем код модели из makeid для совместимости
+                    reprcarcd = makeid
+
+                    model = GlovisModel(
+                        makeid=makeid,
+                        makenm=makenm,
+                        reprcarcd=reprcarcd,
+                        prodmancd=prodmancd,
+                        targetcnt=targetcnt,
+                    )
+
+                    models.append(model)
+
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге модели: {e}")
+                    continue
+
+            logger.info(f"✅ Парсинг моделей: найдено {len(models)}")
+            return models
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при парсинге моделей: {e}")
+            return []
+
+    def parse_detail_models(
+        self, json_response: Dict[str, Any]
+    ) -> List[GlovisDetailModel]:
+        """
+        Парсит список детальных моделей из JSON ответа API
+
+        Args:
+            json_response: JSON ответ от API carModelDetailList.do
+
+        Returns:
+            List[GlovisDetailModel]: Список детальных моделей
+        """
+        detail_models = []
+
+        try:
+            # Извлекаем список из JSON структуры
+            result = json_response.get("result", {})
+            model_list = result.get("list", [])
+
+            for item in model_list:
+                try:
+                    # Извлекаем данные детальной модели
+                    makeid = str(item.get("makeid", ""))
+                    makenm = item.get("makenm", "")
+                    targetcnt = item.get("targetcnt", 0)
+
+                    # Для детальных моделей используем makeid как detacarcd
+                    detacarcd = makeid
+
+                    # reprcarcd и prodmancd могут отсутствовать в детальных моделях
+                    # Нужно будет передавать их из контекста запроса
+                    reprcarcd = ""  # Будет заполнено из контекста
+                    prodmancd = ""  # Будет заполнено из контекста
+
+                    detail_model = GlovisDetailModel(
+                        makeid=makeid,
+                        makenm=makenm,
+                        detacarcd=detacarcd,
+                        reprcarcd=reprcarcd,
+                        prodmancd=prodmancd,
+                        targetcnt=targetcnt,
+                    )
+
+                    detail_models.append(detail_model)
+
+                except Exception as e:
+                    logger.error(f"Ошибка при парсинге детальной модели: {e}")
+                    continue
+
+            logger.info(f"✅ Парсинг детальных моделей: найдено {len(detail_models)}")
+            return detail_models
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при парсинге детальных моделей: {e}")
+            return []

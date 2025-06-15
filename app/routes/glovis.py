@@ -1,9 +1,16 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
-from typing import Optional, Dict, Any
+from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks, Body
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from loguru import logger
 
 from app.models.glovis import GlovisResponse, GlovisError
+from app.models.glovis_filters import (
+    GlovisFilterOptions,
+    GlovisManufacturersResponse,
+    GlovisModelsResponse,
+    GlovisDetailModelsResponse,
+    GlovisFilteredCarsResponse,
+)
 from app.services.glovis_service import GlovisService
 from app.core.logging import get_logger
 
@@ -343,6 +350,225 @@ async def refresh_glovis_session() -> Dict[str, Any]:
 
     except Exception as e:
         glovis_logger.error(f"❌ Ошибка при обновлении сессии Glovis: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/filters/manufacturers", response_model=GlovisManufacturersResponse)
+async def get_glovis_manufacturers() -> GlovisManufacturersResponse:
+    """
+    Получить список производителей автомобилей для фильтрации
+
+    Возвращает список доступных производителей с количеством автомобилей.
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/filters/manufacturers
+    ```
+
+    **Ответ включает:**
+    - Код производителя (prodmancd)
+    - Название производителя
+    - Количество доступных автомобилей
+    - Статус доступности
+    """
+    try:
+        glovis_logger.info("🏭 Запрос списка производителей Glovis")
+
+        result = await glovis_service.get_manufacturers()
+
+        if result.success:
+            glovis_logger.info(f"✅ Получено {result.total_count} производителей")
+        else:
+            glovis_logger.error(f"❌ Ошибка получения производителей: {result.message}")
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Неожиданная ошибка при получении производителей: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/filters/models/{manufacturer_code}", response_model=GlovisModelsResponse)
+async def get_glovis_models(manufacturer_code: str) -> GlovisModelsResponse:
+    """
+    Получить список моделей для выбранного производителя
+
+    **Параметры:**
+    - **manufacturer_code**: Код производителя (prodmancd)
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/filters/models/2  # Получить модели KIA
+    GET /api/v1/glovis/filters/models/5  # Получить модели Hyundai
+    ```
+
+    **Ответ включает:**
+    - ID модели (makeid)
+    - Название модели
+    - Код модели (reprcarcd)
+    - Количество доступных автомобилей
+    """
+    try:
+        glovis_logger.info(f"🚗 Запрос моделей для производителя {manufacturer_code}")
+
+        result = await glovis_service.get_models(manufacturer_code)
+
+        if result.success:
+            glovis_logger.info(f"✅ Получено {result.total_count} моделей")
+        else:
+            glovis_logger.error(f"❌ Ошибка получения моделей: {result.message}")
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Неожиданная ошибка при получении моделей: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.post("/filters/detail-models", response_model=GlovisDetailModelsResponse)
+async def get_glovis_detail_models(
+    manufacturer_code: str = Body(..., description="Код производителя"),
+    model_codes: List[str] = Body(..., description="Список кодов моделей"),
+) -> GlovisDetailModelsResponse:
+    """
+    Получить детальные модели для выбранных базовых моделей
+
+    **Тело запроса:**
+    ```json
+    {
+        "manufacturer_code": "2",
+        "model_codes": ["38", "1420"]
+    }
+    ```
+
+    **Пример использования:**
+    ```
+    POST /api/v1/glovis/filters/detail-models
+    Content-Type: application/json
+
+    {
+        "manufacturer_code": "2",
+        "model_codes": ["38"]
+    }
+    ```
+
+    **Ответ включает:**
+    - ID детальной модели
+    - Название детальной модели
+    - Код детальной модели (detacarcd)
+    - Количество доступных автомобилей
+    """
+    try:
+        glovis_logger.info(f"🔍 Запрос детальных моделей для {model_codes}")
+
+        if not model_codes:
+            raise HTTPException(
+                status_code=400, detail="Необходимо указать хотя бы один код модели"
+            )
+
+        result = await glovis_service.get_detail_models(manufacturer_code, model_codes)
+
+        if result.success:
+            glovis_logger.info(f"✅ Получено {result.total_count} детальных моделей")
+        else:
+            glovis_logger.error(
+                f"❌ Ошибка получения детальных моделей: {result.message}"
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        glovis_logger.error(
+            f"❌ Неожиданная ошибка при получении детальных моделей: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.post("/search", response_model=GlovisFilteredCarsResponse)
+async def search_glovis_cars_with_filters(
+    filters: GlovisFilterOptions,
+) -> GlovisFilteredCarsResponse:
+    """
+    Поиск автомобилей с расширенными фильтрами
+
+    **Тело запроса:**
+    ```json
+    {
+        "manufacturers": ["2", "5"],
+        "models": ["38", "64"],
+        "detail_models": ["2828", "2829"],
+        "min_price": 1000,
+        "max_price": 50000,
+        "min_year": 2020,
+        "max_year": 2024,
+        "min_mileage": "10000",
+        "max_mileage": "100000",
+        "transmission": "자동",
+        "location": "1100",
+        "car_grade": "A",
+        "search_text": "K5",
+        "search_type": "exhino",
+        "page": 1,
+        "page_size": 18,
+        "sort_order": "01"
+    }
+    ```
+
+    **Поддерживаемые фильтры:**
+    - **manufacturers**: Список кодов производителей
+    - **models**: Список кодов моделей
+    - **detail_models**: Список кодов детальных моделей
+    - **min_price/max_price**: Диапазон стартовой цены (в тысячах вон)
+    - **min_year/max_year**: Диапазон годов выпуска
+    - **min_mileage/max_mileage**: Диапазон пробега
+    - **transmission**: Тип трансмиссии
+    - **location**: Код локации (1100=분당, 2100=시화, и т.д.)
+    - **car_grade**: Оценка состояния
+    - **search_text**: Текст для поиска
+    - **search_type**: Тип поиска (exhino, carno)
+    - **page**: Номер страницы
+    - **page_size**: Размер страницы (1-100)
+    - **sort_order**: Порядок сортировки
+
+    **Пример использования:**
+    ```
+    POST /api/v1/glovis/search
+    Content-Type: application/json
+
+    {
+        "manufacturers": ["2"],
+        "min_year": 2020,
+        "page": 1
+    }
+    ```
+    """
+    try:
+        glovis_logger.info(f"🔍 Поиск автомобилей с фильтрами")
+
+        result = await glovis_service.search_cars_with_filters(filters)
+
+        if result.success:
+            glovis_logger.info(
+                f"✅ Найдено {result.total_count} автомобилей "
+                f"(страница {result.current_page}/{result.total_pages})"
+            )
+        else:
+            glovis_logger.error(f"❌ Ошибка поиска: {result.message}")
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Неожиданная ошибка при поиске с фильтрами: {e}")
         raise HTTPException(
             status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
         )
