@@ -192,11 +192,14 @@ class GlovisParser:
             license_plate = ""
 
             if filter_option:
-                badges = filter_option.find_all("span", class_="tag-badge small type04")
-                if len(badges) >= 3:
+                badges = filter_option.find_all("span", class_="tag-badge")
+                if len(badges) >= 2:
+                    # Первый badge - номер аукциона (например "747회")
                     auction_number = badges[0].get_text().strip().replace("회", "")
-                    lane = badges[1].get_text().strip()
-                    license_plate = badges[2].get_text().strip()
+                    # Второй badge - номер автомобиля (например "339머6489")
+                    license_plate = badges[1].get_text().strip()
+                    # Полоса может быть в других местах или отсутствовать
+                    lane = badges[2].get_text().strip() if len(badges) > 2 else ""
 
             # Извлекаем стартовую цену
             price_box = btn_view.find("div", class_="price-box")

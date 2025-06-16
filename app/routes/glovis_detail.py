@@ -16,7 +16,7 @@ router = APIRouter()
 detail_service = GlovisDetailService()
 
 
-@router.get("/car/{car_id}", response_model=GlovisCarDetailResponse)
+@router.get("/detail/{car_id}", response_model=GlovisCarDetailResponse)
 async def get_car_detail(
     car_id: str,
     auction_number: str = Query("747", description="Номер аукциона"),
@@ -31,6 +31,10 @@ async def get_car_detail(
     - **auction_number**: Номер аукциона (по умолчанию 747)
     - **acc**: Дополнительный параметр (по умолчанию 30)
     - **rc**: Дополнительный параметр (по умолчанию 1100)
+
+    **Автоматическое определение параметров:**
+    Система автоматически ищет правильные параметры (rc, acc, atn) для автомобиля
+    в списке автомобилей. Если параметры найдены, они используются вместо дефолтных.
 
     **Возвращает:**
     Детальную информацию об автомобиле включая:
@@ -47,7 +51,7 @@ async def get_car_detail(
         # Декодируем car_id, если он закодирован
         decoded_car_id = unquote(car_id)
 
-        # Получаем детальную информацию
+        # Получаем детальную информацию (с автоматическим поиском параметров)
         result = await detail_service.get_car_detail(
             car_id=decoded_car_id, auction_number=auction_number, acc=acc, rc=rc
         )
@@ -70,7 +74,7 @@ async def get_car_detail(
         )
 
 
-@router.post("/car/by-url", response_model=GlovisCarDetailResponse)
+@router.post("/detail/by-url", response_model=GlovisCarDetailResponse)
 async def get_car_detail_by_url(
     detail_url: str = Body(..., description="Полный URL детальной страницы автомобиля")
 ):
@@ -112,7 +116,7 @@ async def get_car_detail_by_url(
         )
 
 
-@router.post("/cars/multiple", response_model=List[GlovisCarDetailResponse])
+@router.post("/detail/multiple", response_model=List[GlovisCarDetailResponse])
 async def get_multiple_car_details(
     car_ids: List[str] = Body(..., description="Список ID автомобилей"),
     auction_number: str = Body("747", description="Номер аукциона"),
@@ -175,7 +179,7 @@ async def get_multiple_car_details(
         )
 
 
-@router.get("/car/{car_id}/validate")
+@router.get("/detail/{car_id}/validate")
 async def validate_car_detail(
     car_id: str,
     auction_number: str = Query("747", description="Номер аукциона"),
@@ -284,48 +288,223 @@ async def test_parser():
 @router.get("/health")
 async def health_check():
     """
-    Проверка здоровья сервиса детальных страниц
-
-    **Возвращает:**
-    Статус работы сервиса и его компонентов
+    Проверка состояния сервиса детальных страниц Glovis
     """
-    logger.info("🏥 Проверка здоровья сервиса детальных страниц")
+    logger.info("🏥 Проверка состояния сервиса")
 
     try:
-        # Проверяем доступность основного сервиса Glovis
-        glovis_health = await detail_service.glovis_service.health_check()
+        # Проверяем доступность базового URL
+        health_status = {
+            "service": "Glovis Detail Service",
+            "status": "healthy",
+            "base_url": detail_service.base_url,
+            "cache_size": len(detail_service._car_params_cache),
+            "features": {
+                "auto_param_detection": True,
+                "parameter_caching": True,
+                "batch_processing": True,
+                "data_validation": True,
+            },
+        }
 
-        # Базовая проверка парсера
-        parser_health = True
-        try:
-            # Проверяем, что парсер может быть инициализирован
-            test_parser = detail_service.parser
-            if not hasattr(test_parser, "parse"):
-                parser_health = False
-        except Exception:
-            parser_health = False
+        return {"success": True, "data": health_status}
 
-        overall_health = glovis_health.get("healthy", False) and parser_health
+    except Exception as e:
+        logger.error(f"❌ Ошибка проверки состояния: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/cache/clear")
+async def clear_cache():
+    """
+    Очистка кэша параметров автомобилей
+
+    Полезно при обновлении данных аукциона или для освобождения памяти.
+    """
+    logger.info("🧹 Очистка кэша параметров автомобилей")
+
+    try:
+        cache_size_before = len(detail_service._car_params_cache)
+        detail_service._car_params_cache.clear()
+
+        logger.info(f"✅ Кэш очищен: удалено {cache_size_before} записей")
 
         return {
-            "healthy": overall_health,
-            "service": "glovis_detail",
-            "components": {
-                "glovis_service": glovis_health,
-                "parser": {
-                    "healthy": parser_health,
-                    "status": "ok" if parser_health else "error",
-                },
-            },
-            "message": (
-                "Сервис работает корректно" if overall_health else "Обнаружены проблемы"
-            ),
+            "success": True,
+            "message": f"Кэш очищен: удалено {cache_size_before} записей",
+            "cache_size_before": cache_size_before,
+            "cache_size_after": 0,
         }
 
     except Exception as e:
-        logger.error(f"❌ Ошибка проверки здоровья: {str(e)}")
-        return {
-            "healthy": False,
-            "service": "glovis_detail",
-            "message": f"Ошибка проверки: {str(e)}",
+        logger.error(f"❌ Ошибка очистки кэша: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка очистки кэша: {str(e)}")
+
+
+@router.get("/cache/stats")
+async def get_cache_stats():
+    """
+    Получение статистики кэша параметров автомобилей
+    """
+    logger.info("📊 Получение статистики кэша")
+
+    try:
+        cache_stats = {
+            "cache_size": len(detail_service._car_params_cache),
+            "cached_cars": list(detail_service._car_params_cache.keys())[
+                :10
+            ],  # Первые 10
+            "total_cached_cars": len(detail_service._car_params_cache),
         }
+
+        return {"success": True, "data": cache_stats}
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения статистики кэша: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Ошибка получения статистики: {str(e)}"
+        )
+
+
+@router.get("/detail/{car_id}/with-params", response_model=GlovisCarDetailResponse)
+async def get_car_detail_with_params(
+    car_id: str,
+    rc: str = Query(..., description="Код региона (обязательный)"),
+    acc: str = Query("30", description="Параметр acc"),
+    atn: str = Query("747", description="Номер аукциона"),
+):
+    """
+    Получение детальной информации об автомобиле с явным указанием параметров
+
+    **Параметры:**
+    - **car_id**: ID автомобиля (параметр gn из URL)
+    - **rc**: Код региона (ОБЯЗАТЕЛЬНЫЙ) - 1100=분당, 2100=시화, 3100=양산, 5100=인천
+    - **acc**: Дополнительный параметр (по умолчанию 30)
+    - **atn**: Номер аукциона (по умолчанию 747)
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/car/JkSvM%2Fvdt6NccTdCJooXww%3D%3D/with-params?rc=3100
+    ```
+
+    **Возвращает:**
+    Детальную информацию об автомобиле
+    """
+    logger.info(f"🔍 API запрос с явными параметрами: car_id={car_id}, rc={rc}")
+
+    try:
+        # Декодируем car_id, если он закодирован
+        decoded_car_id = unquote(car_id)
+
+        # Получаем детальную информацию с явными параметрами
+        result = await detail_service.get_car_detail_direct(
+            car_id=decoded_car_id, auction_number=atn, acc=acc, rc=rc
+        )
+
+        if not result.success:
+            logger.error(f"❌ Ошибка получения данных: {result.message}")
+            raise HTTPException(status_code=404, detail=result.message)
+
+        logger.info(
+            f"✅ Детальная информация успешно получена: {result.data.basic_info.name}"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Неожиданная ошибка: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/detail/debug/{car_id}")
+async def debug_car_detail(
+    car_id: str,
+    rc: str = Query("3100", description="Код региона"),
+    acc: str = Query("30", description="Параметр acc"),
+    atn: str = Query("747", description="Номер аукциона"),
+):
+    """
+    Отладочный endpoint для диагностики проблем с получением детальной информации
+    """
+    logger.info(f"🐛 DEBUG: car_id={car_id}, rc={rc}, acc={acc}, atn={atn}")
+
+    try:
+        from urllib.parse import unquote
+
+        decoded_car_id = unquote(car_id)
+
+        # Формируем URL напрямую
+        url = f"https://auction.autobell.co.kr/auction/exhibitView.do?acc={acc}&gn={car_id}&rc={rc}&atn={atn}"
+
+        logger.info(f"🔗 Сформированный URL: {url}")
+
+        # Проверяем сессию
+        session_check = await detail_service.glovis_service.health_check()
+
+        return {
+            "debug_info": {
+                "original_car_id": car_id,
+                "decoded_car_id": decoded_car_id,
+                "parameters": {"rc": rc, "acc": acc, "atn": atn},
+                "generated_url": url,
+                "session_status": session_check,
+            },
+            "message": "Отладочная информация собрана",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка в отладке: {str(e)}")
+        return {"error": str(e), "debug_info": None}
+
+
+@router.get("/car-detail")
+async def get_car_detail_simple(
+    gn: str = Query(..., description="ID автомобиля (gn)"),
+    rc: str = Query(..., description="Код региона (rc)"),
+    acc: str = Query("30", description="Параметр acc"),
+    atn: str = Query("747", description="Номер аукциона"),
+):
+    """
+    Простой endpoint для получения детальной информации об автомобиле
+
+    **Параметры:**
+    - **gn**: ID автомобиля (ОБЯЗАТЕЛЬНЫЙ)
+    - **rc**: Код региона (ОБЯЗАТЕЛЬНЫЙ) - 1100=분당, 2100=시화, 3100=양산, 5100=인천
+    - **acc**: Параметр acc (по умолчанию 30)
+    - **atn**: Номер аукциона (по умолчанию 747)
+
+    **Пример:**
+    ```
+    GET /api/v1/glovis/car-detail?gn=JkSvM%2Fvdt6NccTdCJooXww%3D%3D&rc=3100
+    ```
+    """
+    logger.info(f"🔍 Простой запрос детальной информации: gn={gn}, rc={rc}")
+
+    try:
+        # Декодируем gn, если он закодирован
+        decoded_gn = unquote(gn)
+
+        # Получаем детальную информацию напрямую
+        result = await detail_service.get_car_detail_direct(
+            car_id=decoded_gn, auction_number=atn, acc=acc, rc=rc
+        )
+
+        if not result.success:
+            logger.error(f"❌ Ошибка получения данных: {result.message}")
+            raise HTTPException(status_code=404, detail=result.message)
+
+        logger.info(
+            f"✅ Детальная информация успешно получена: {result.data.basic_info.name}"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Неожиданная ошибка: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )

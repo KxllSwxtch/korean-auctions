@@ -27,25 +27,21 @@ class GlovisDetailService:
         self.parser = GlovisDetailParser()
         self.session = AsyncHttpClient()
 
+        # Кэш параметров автомобилей
+        self._car_params_cache: Dict[str, Dict[str, str]] = {}
+
         # Базовый URL для детальных страниц
         self.base_url = "https://auction.autobell.co.kr/auction/exhibitView.do"
 
         # Заголовки для запросов
         self.headers = {
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Cache-Control": "max-age=0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+            "Accept-Encoding": "gzip, deflate, br",
+            "DNT": "1",
             "Connection": "keep-alive",
-            "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do",
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "same-origin",
-            "Sec-Fetch-User": "?1",
             "Upgrade-Insecure-Requests": "1",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
         }
 
     async def get_car_detail(
@@ -72,6 +68,16 @@ class GlovisDetailService:
         try:
             # Получаем актуальную сессию
             await self.glovis_service.ensure_valid_session()
+
+            # Сначала пытаемся найти автомобиль в списке для получения правильных параметров
+            car_params = await self._find_car_params(car_id)
+            if car_params:
+                logger.info(
+                    f"✅ Найдены параметры автомобиля: rc={car_params['rc']}, acc={car_params['acc']}, atn={car_params['atn']}"
+                )
+                rc = car_params["rc"]
+                acc = car_params["acc"]
+                auction_number = car_params["atn"]
 
             # Формируем URL с параметрами
             url = self._build_detail_url(car_id, auction_number, acc, rc)
@@ -371,3 +377,128 @@ class GlovisDetailService:
                 asyncio.create_task(self.session.close())
         except:
             pass
+
+    async def _find_car_params(self, car_id: str) -> Optional[Dict[str, str]]:
+        """
+        Поиск параметров автомобиля по его gn в списке автомобилей
+
+        Args:
+            car_id: ID автомобиля (gn)
+
+        Returns:
+            Optional[Dict[str, str]]: Словарь с параметрами rc, acc, atn или None
+        """
+        logger.debug(f"🔍 Поиск параметров для автомобиля: {car_id}")
+
+        try:
+            # Декодируем car_id для поиска
+            from urllib.parse import unquote
+
+            decoded_car_id = unquote(car_id)
+
+            # Проверяем кэш
+            cache_key = decoded_car_id
+            if cache_key in self._car_params_cache:
+                logger.debug(f"✅ Параметры найдены в кэше")
+                return self._car_params_cache[cache_key]
+
+            # Список регионов для поиска
+            regions = [
+                "1100",
+                "2100",
+                "3100",
+                "5100",
+            ]  # Bundang, Siheung, Yangsan, Incheon
+
+            # Ищем автомобиль в разных регионах и на нескольких страницах
+            for region in regions:
+                logger.debug(f"🔍 Поиск в регионе {region}")
+
+                for page in range(1, 4):  # Проверяем первые 3 страницы в каждом регионе
+                    logger.debug(f"🔍 Поиск на странице {page} в регионе {region}")
+
+                    # Параметры поиска с указанием региона
+                    search_params = {"page": page, "search_rc": region}
+                    car_list = await self.glovis_service.get_car_list(search_params)
+
+                    if not car_list.success or not car_list.cars:
+                        continue
+
+                    # Ищем автомобиль с нужным gn
+                    for car in car_list.cars:
+                        if car.gn == car_id or car.gn == decoded_car_id:
+                            logger.info(
+                                f"✅ Найден автомобиль: {car.car_name} в регионе {region}"
+                            )
+                            params = {
+                                "rc": car.rc,
+                                "acc": car.acc,
+                                "atn": car.atn,
+                            }
+
+                            # Сохраняем в кэш
+                            self._car_params_cache[cache_key] = params
+
+                            return params
+
+            logger.warning(f"⚠️ Автомобиль с gn={car_id} не найден в списке")
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при поиске параметров автомобиля: {str(e)}")
+            return None
+
+    async def get_car_detail_direct(
+        self,
+        car_id: str,
+        auction_number: str = "747",
+        acc: str = "30",
+        rc: str = "1100",
+    ) -> GlovisCarDetailResponse:
+        """
+        Получение детальной информации об автомобиле БЕЗ автоматического поиска параметров
+
+        Args:
+            car_id: ID автомобиля (параметр gn)
+            auction_number: Номер аукциона (параметр atn)
+            acc: Параметр acc
+            rc: Параметр rc
+
+        Returns:
+            GlovisCarDetailResponse: Детальная информация об автомобиле
+        """
+        logger.info(f"🔍 Прямое получение детальной информации: {car_id} (rc={rc})")
+
+        try:
+            # Получаем актуальную сессию
+            await self.glovis_service.ensure_valid_session()
+
+            # Формируем URL с параметрами (БЕЗ автоматического поиска)
+            url = self._build_detail_url(car_id, auction_number, acc, rc)
+
+            # Выполняем запрос
+            response = await self._fetch_car_detail(url)
+
+            if not response:
+                return GlovisCarDetailResponse(
+                    success=False, message="Не удалось получить данные автомобиля"
+                )
+
+            # Парсим полученные данные
+            car_detail = self.parser.parse(response, url)
+
+            logger.info(
+                f"✅ Детальная информация получена: {car_detail.basic_info.name}"
+            )
+
+            return GlovisCarDetailResponse(
+                success=True,
+                message="Детальная информация успешно получена",
+                data=car_detail,
+            )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении детальной информации: {str(e)}")
+            return GlovisCarDetailResponse(
+                success=False, message=f"Ошибка при получении данных: {str(e)}"
+            )

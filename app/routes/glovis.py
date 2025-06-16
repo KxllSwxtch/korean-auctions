@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks, B
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from loguru import logger
+from urllib.parse import unquote
 
 from app.models.glovis import GlovisResponse, GlovisError
 from app.models.glovis_filters import (
@@ -615,3 +616,93 @@ async def search_glovis_cars_with_filters(
         raise HTTPException(
             status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
         )
+
+
+@router.get("/find-car")
+async def find_car_by_license_plate(
+    license_plate: str = Query(..., description="Номер автомобиля для поиска"),
+    max_pages: int = Query(
+        3, ge=1, le=10, description="Максимальное количество страниц для поиска"
+    ),
+):
+    """
+    Простой поиск автомобиля по номеру (для frontend)
+
+    **Параметры:**
+    - **license_plate**: Номер автомобиля (поддерживает URL-кодирование)
+    - **max_pages**: Максимальное количество страниц для поиска
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/find-car?license_plate=244다7548
+    GET /api/v1/glovis/find-car?license_plate=244%EB%8B%A47548
+    ```
+    """
+    try:
+        # Декодируем номер если он URL-кодирован
+        decoded_license_plate = unquote(license_plate)
+
+        glovis_logger.info(
+            f"🔍 Поиск автомобиля: {license_plate} -> {decoded_license_plate}"
+        )
+
+        # Проверяем только регион 1100 сначала (там большинство автомобилей)
+        regions = ["1100", "2100", "3100", "5100"]
+        total_checked = 0
+
+        for region in regions:
+            # Просматриваем страницы в регионе
+            for page in range(1, max_pages + 1):
+                try:
+                    params = {"page": page, "search_rc": region}
+                    result = await glovis_service.get_car_list(params)
+
+                    if not result.success or not result.cars:
+                        break
+
+                    total_checked += len(result.cars)
+
+                    # Ищем точное совпадение
+                    for car in result.cars:
+                        if car.license_plate == decoded_license_plate:
+                            return {
+                                "success": True,
+                                "message": "Автомобиль найден",
+                                "found": True,
+                                "car": {
+                                    "license_plate": car.license_plate,
+                                    "car_name": car.car_name,
+                                    "gn": car.gn,
+                                    "rc": car.rc,
+                                    "acc": car.acc,
+                                    "atn": car.atn,
+                                    "entry_number": car.entry_number,
+                                    "year": car.year,
+                                    "mileage": car.mileage,
+                                    "starting_price": car.starting_price,
+                                    "location": car.location.value,
+                                    "main_image_url": (
+                                        str(car.main_image_url)
+                                        if car.main_image_url
+                                        else None
+                                    ),
+                                    "region": region,
+                                    "page": page,
+                                },
+                            }
+
+                except Exception as e:
+                    glovis_logger.error(f"❌ Ошибка при поиске: {e}")
+                    continue
+
+        return {
+            "success": True,
+            "message": f"Автомобиль с номером {decoded_license_plate} не найден",
+            "found": False,
+            "total_checked": total_checked,
+            "searched_regions": regions,
+        }
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Ошибка при поиске: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
