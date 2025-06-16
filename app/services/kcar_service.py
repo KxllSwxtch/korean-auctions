@@ -946,6 +946,110 @@ class KCarService:
             return KCarDetailResponse(car=None, success=False, message=error_msg)
 
     def close(self):
-        """Закрытие сессии"""
+        """Закрытие сервиса"""
         if self.session:
             self.session.close()
+            logger.info("🔒 KCar Service закрыт")
+
+    def find_car_id_by_number(self, car_number: str, auction_code: str = None) -> dict:
+        """
+        Поиск car_id по номеру автомобиля
+
+        Args:
+            car_number: Номер автомобиля (например: "20머3749")
+            auction_code: Код аукциона (опционально)
+
+        Returns:
+            dict с car_id или сообщением об ошибке
+        """
+        try:
+            logger.info(f"🔍 Поиск car_id для номера автомобиля: {car_number}")
+
+            # Получаем список автомобилей
+            params = {
+                "AUC_TYPE": "weekly",
+                "PAGE_CNT": "100",  # Больше результатов для поиска
+                "START_RNUM": "1",
+            }
+
+            cars_result = self.get_cars(params)
+
+            if not cars_result.success or not cars_result.car_list:
+                return {
+                    "success": False,
+                    "message": "Не удалось получить список автомобилей для поиска",
+                    "car_id": None,
+                }
+
+            # Ищем автомобиль по номеру
+            found_cars = []
+            for car in cars_result.car_list:
+                # Проверяем различные варианты совпадений
+                car_num = car.car_number or ""
+                car_id_num = car.car_id or ""
+
+                # Точное совпадение
+                if car_number == car_num:
+                    found_cars.append(
+                        {
+                            "car_id": car.car_id,
+                            "car_number": car.car_number,
+                            "match_type": "exact",
+                            "confidence": 100,
+                        }
+                    )
+                # Частичное совпадение (номер содержится в записи)
+                elif car_number in car_num:
+                    found_cars.append(
+                        {
+                            "car_id": car.car_id,
+                            "car_number": car.car_number,
+                            "match_type": "partial",
+                            "confidence": 80,
+                        }
+                    )
+                # Совпадение в car_id
+                elif car_number in car_id_num:
+                    found_cars.append(
+                        {
+                            "car_id": car.car_id,
+                            "car_number": car.car_number,
+                            "match_type": "car_id_partial",
+                            "confidence": 60,
+                        }
+                    )
+
+            if not found_cars:
+                logger.warning(f"❌ Автомобиль с номером {car_number} не найден")
+                return {
+                    "success": False,
+                    "message": f"Автомобиль с номером {car_number} не найден в текущих аукционах",
+                    "car_id": None,
+                    "searched_count": len(cars_result.car_list),
+                }
+
+            # Сортируем по уверенности
+            found_cars.sort(key=lambda x: x["confidence"], reverse=True)
+            best_match = found_cars[0]
+
+            logger.success(
+                f"✅ Найден car_id {best_match['car_id']} для номера {car_number}"
+            )
+
+            return {
+                "success": True,
+                "message": f"Найден автомобиль с номером {car_number}",
+                "car_id": best_match["car_id"],
+                "car_number": best_match["car_number"],
+                "match_type": best_match["match_type"],
+                "confidence": best_match["confidence"],
+                "all_matches": found_cars[:5],  # Топ 5 совпадений
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка поиска car_id по номеру {car_number}: {e}")
+            return {
+                "success": False,
+                "message": f"Ошибка поиска: {str(e)}",
+                "car_id": None,
+            }

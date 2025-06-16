@@ -364,6 +364,80 @@ async def get_kcar_car_detail(
         )
 
 
+@router.get("/cars/search/by-number")
+async def search_car_by_number(
+    car_number: str = Query(..., description="Номер автомобиля"),
+    auction_code: str = Query(None, description="Код аукциона (опционально)"),
+):
+    """
+    Поиск car_id по номеру автомобиля
+
+    Возвращает car_id для автомобиля по его номеру.
+    Полезно когда фронтенд знает только номер автомобиля (например: "20머3749"),
+    но для получения детальной информации нужен car_id (например: "CA20324182").
+
+    Параметры:
+    - car_number: Номер автомобиля (например: "20머3749")
+    - auction_code: Код аукциона (опционально, для более точного поиска)
+
+    Пример использования:
+    1. Поиск car_id: GET /cars/search/by-number?car_number=20머3749
+    2. Получение детальной информации: GET /cars/{car_id}/detail?auction_code=AC20250604
+    """
+    try:
+        logger.info(f"🔍 Поиск car_id по номеру автомобиля: {car_number}")
+
+        # Валидация параметров
+        if not car_number:
+            raise HTTPException(
+                status_code=400, detail="car_number является обязательным параметром"
+            )
+
+        # Поиск автомобиля
+        search_result = kcar_service.find_car_id_by_number(car_number, auction_code)
+
+        if not search_result["success"]:
+            logger.warning(f"⚠️ Автомобиль с номером {car_number} не найден")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "Автомобиль не найден",
+                    "message": search_result["message"],
+                    "car_number": car_number,
+                    "searched_count": search_result.get("searched_count", 0),
+                },
+            )
+
+        logger.success(
+            f"✅ Найден car_id {search_result['car_id']} для номера {car_number}"
+        )
+
+        return {
+            "success": True,
+            "car_number": car_number,
+            "car_id": search_result["car_id"],
+            "found_car_number": search_result["car_number"],
+            "match_type": search_result["match_type"],
+            "confidence": search_result["confidence"],
+            "message": search_result["message"],
+            "all_matches": search_result.get("all_matches", []),
+            "detail_url": f"/api/v1/kcar/cars/{search_result['car_id']}/detail",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка поиска автомобиля по номеру: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Внутренняя ошибка сервера",
+                "message": str(e),
+                "car_number": car_number,
+            },
+        )
+
+
 @router.get("/info")
 async def get_kcar_info():
     """
@@ -399,6 +473,11 @@ async def get_kcar_info():
                 "method": "GET",
                 "description": "Детальная информация",
             },
+            {
+                "path": "/cars/search/by-number",
+                "method": "GET",
+                "description": "Поиск car_id по номеру автомобиля",
+            },
             {"path": "/info", "method": "GET", "description": "Информация о API"},
         ],
         "auth_required": {
@@ -408,5 +487,6 @@ async def get_kcar_info():
             "/cars/stats": True,
             "/cars/count": True,
             "/cars/{car_id}/detail": True,
+            "/cars/search/by-number": True,
         },
     }
