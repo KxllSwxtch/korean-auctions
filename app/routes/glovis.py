@@ -355,6 +355,49 @@ async def refresh_glovis_session() -> Dict[str, Any]:
         )
 
 
+@router.post("/update-cookies", response_model=Dict[str, Any])
+async def update_glovis_cookies(cookies: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Обновить cookies для сессии Glovis
+
+    Полезно для ручного обновления JSESSIONID и других cookies.
+
+    **Пример использования:**
+    ```json
+    POST /api/v1/glovis/update-cookies
+    {
+      "JSESSIONID": "новый_jsessionid_здесь",
+      "_ga_H9G80S9QWN": "новое_значение_здесь"
+    }
+    ```
+    """
+    try:
+        glovis_logger.info("🍪 Запрос на обновление cookies Glovis")
+
+        # Обновляем cookies
+        glovis_service.update_cookies(cookies)
+
+        # Проверяем новую сессию
+        session_status = await glovis_service.check_session_validity()
+
+        return {
+            "success": True,
+            "message": f"Cookies успешно обновлены ({len(cookies)} штук)",
+            "data": {
+                "timestamp": datetime.now().isoformat(),
+                "action": "cookies_updated",
+                "updated_cookies": list(cookies.keys()),
+                "new_session_status": session_status,
+            },
+        }
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Ошибка при обновлении cookies Glovis: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
 @router.get("/filters/manufacturers", response_model=GlovisManufacturersResponse)
 async def get_glovis_manufacturers() -> GlovisManufacturersResponse:
     """

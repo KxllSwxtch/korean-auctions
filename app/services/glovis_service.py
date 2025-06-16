@@ -522,6 +522,137 @@ class GlovisService:
         self._session_created_at = None
         # При следующем обращении сессия будет создана заново с новыми cookies
 
+    async def ensure_valid_session(self) -> bool:
+        """
+        Убеждается, что сессия валидна и готова к использованию
+
+        Returns:
+            bool: True если сессия валидна, False в противном случае
+        """
+        try:
+            # Проверяем валидность текущей сессии
+            session_check = await self.check_session_validity()
+
+            if session_check.get("is_valid", False):
+                logger.debug("✅ Сессия валидна")
+                return True
+
+            # Если сессия невалидна, пытаемся её восстановить
+            logger.info("🔄 Сессия невалидна, пытаемся восстановить...")
+            self.refresh_session()
+
+            # Проверяем после восстановления
+            session_check = await self.check_session_validity()
+
+            if session_check.get("is_valid", False):
+                logger.info("✅ Сессия успешно восстановлена")
+                return True
+            else:
+                logger.error("❌ Не удалось восстановить валидную сессию")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при проверке валидности сессии: {str(e)}")
+            return False
+
+    def get_current_cookies(self) -> Dict[str, str]:
+        """
+        Возвращает текущие cookies из сессии
+
+        Returns:
+            Dict[str, str]: Словарь с cookies
+        """
+        try:
+            if self._session and self._session.cookies:
+                cookies_dict = {}
+                for cookie in self._session.cookies:
+                    cookies_dict[cookie.name] = cookie.value
+                logger.debug(f"📋 Получены cookies: {list(cookies_dict.keys())}")
+                return cookies_dict
+            else:
+                logger.warning(
+                    "⚠️ Сессия не инициализирована, возвращаю базовые cookies"
+                )
+                return self._get_fresh_cookies()
+        except Exception as e:
+            logger.error(f"❌ Ошибка при получении cookies: {str(e)}")
+            return self._get_fresh_cookies()
+
+    async def health_check(self) -> Dict[str, Any]:
+        """
+        Проверка состояния сервиса Glovis
+
+        Returns:
+            Dict[str, Any]: Результат проверки состояния
+        """
+        try:
+            logger.debug("🏥 Проверка состояния сервиса Glovis")
+
+            # Проверяем валидность сессии
+            session_valid = await self.check_session_validity()
+
+            # Проверяем базовую доступность сайта
+            try:
+                response = self.session.get(
+                    f"{self.base_url}/auction/exhibitList.do", timeout=10
+                )
+                site_accessible = response.status_code == 200
+            except Exception:
+                site_accessible = False
+
+            # Проверяем актуальность cookies
+            cookies_fresh = True
+            if self._last_cookie_update:
+                cookies_age = datetime.now() - self._last_cookie_update
+                cookies_fresh = cookies_age < timedelta(hours=1)
+
+            overall_health = (
+                session_valid.get("is_valid", False)
+                and site_accessible
+                and cookies_fresh
+            )
+
+            return {
+                "healthy": overall_health,
+                "components": {
+                    "session": {
+                        "valid": session_valid.get("is_valid", False),
+                        "jsessionid_present": session_valid.get(
+                            "jsessionid_present", False
+                        ),
+                        "created_at": (
+                            self._session_created_at.isoformat()
+                            if self._session_created_at
+                            else None
+                        ),
+                        "age_minutes": (
+                            (datetime.now() - self._session_created_at).total_seconds()
+                            / 60
+                            if self._session_created_at
+                            else None
+                        ),
+                    },
+                    "site_access": {"accessible": site_accessible},
+                    "cookies": {
+                        "fresh": cookies_fresh,
+                        "last_update": (
+                            self._last_cookie_update.isoformat()
+                            if self._last_cookie_update
+                            else None
+                        ),
+                    },
+                },
+                "message": (
+                    "Сервис работает корректно"
+                    if overall_health
+                    else "Обнаружены проблемы с сервисом"
+                ),
+            }
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при проверке состояния: {str(e)}")
+            return {"healthy": False, "message": f"Ошибка проверки: {str(e)}"}
+
     async def get_manufacturers(self) -> GlovisManufacturersResponse:
         """
         Получает список производителей автомобилей

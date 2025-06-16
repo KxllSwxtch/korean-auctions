@@ -1,0 +1,398 @@
+{
+  "basic_info": {
+    "name": "[기아] K8 2.5 GDI 노블레스",
+    "manufacturer": "기아",
+    "model": "K8",
+    "grade": "2.5 GDI 노블레스",
+    "year": "2021",
+    "first_registration_date": "2021년 04월 29일",
+    "fuel_type": "휘발유",
+    "mileage": "101",
+    "transmission": "A/T",
+    "color": "검정 입니다.\n\n해당 차량은 미경매 차량입니다.",
+    "auction_status": "미경매 차량입니다."
+  },
+  "pricing": {
+    "new_car_price": "3,695만원",
+    "starting_price": null,
+    "current_price": null,
+    "estimated_price": "3,695만원",
+    "bid_increment": null
+  },
+  "detailed_specs": {
+    "product_category": "자사",
+    "fuel_type": "휘발유",
+    "engine_displacement": "2497cc",
+    "seating_capacity": "5인승",
+    "usage_purpose": "렌트/법인상품용",
+    "engine_type": "G4KN",
+    "accessories": "없음",
+    "inspection_date": "2026년 03월 08일",
+    "complete_documents": "차량등록증(원본) 자동차세납입증명서 (법인)개인인감증명서 법인등기부등본 사업자등록증사본 양도행위위임장 자동차관리사업증 구비서류 안내",
+    "car_number": "339머6489 차량번호 복사하기",
+    "chassis_number": "KNAM241BBNA002211 차대번호 복사하기",
+    "model_year": "2022형",
+    "first_registration": "2021년 04월 29일",
+    "mileage": "101,000km",
+    "color_full": "ABP)오로라 블랙 펄",
+    "transmission": "A/T",
+    "lot_number": "TC7",
+    "missing_documents": ""
+  },
+  "performance_check": {
+    "engine": "정비요",
+    "braking": "보통",
+    "steering": "보통",
+    "electrical": "양호",
+    "transmission": "정비요",
+    "air_conditioning": "보통",
+    "power": "보통",
+    "interior": "정비요",
+    "lighting": "양호",
+    "rating": null,
+    "special_notes": "",
+    "changes": "",
+    "evaluation_opinion": "앞펜더(우)교환,앞도어(우)교환,뒷도어(우)교환,리어펜더(우)판금/용접,스텝(우)판금/용접,A필러(우)판금/용접,B필러(우)판금/용접,인사이드패널(우)판금/용접"
+  },
+  "options": {
+    "standard_options": [
+      "가죽시트",
+      "네비게이션",
+      "스마트키",
+      "어라운드뷰",
+      "전자식 파킹",
+      "차선이탈경보",
+      "크루즈컨트롤",
+      "통풍시트(동승석)",
+      "통풍시트(운전석)"
+    ],
+    "additional_options": [],
+    "all_options_text": "가죽시트 , 네비게이션 , 스마트키 , 어라운드뷰 , 전자식 파킹 , 차선이탈경보 , 크루즈컨트롤 , 통풍시트(동승석) , 통풍시트(운전석)"
+  },
+  "images": [
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_03.jpg%3F20250602192349&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_02.jpg%3F20250602192349&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_04.jpg%3F20250602192350&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_05.jpg%3F20250602192350&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_06.jpg%3F20250602192351&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_07.jpg%3F20250602192351&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_08.jpg%3F20250602192352&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_09.jpg%3F20250602192352&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_10.jpg%3F20250602192352&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_11.jpg%3F20250602192353&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_12.jpg%3F20250602192353&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_13.jpg%3F20250602192353&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_14.jpg%3F20250602192353&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_15.jpg%3F20250602192354&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_16.jpg%3F20250602192354&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_17.jpg%3F20250602192354&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_18.jpg%3F20250602192354&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_19.jpg%3F20250602192354&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_20.jpg%3F20250602192355&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_21.jpg%3F20250602192355&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_22.jpg%3F20250602192349&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_23.jpg%3F20250602192349&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_24.jpg%3F20250602192349&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_25.jpg%3F20250602192350&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_26.jpg%3F20250602192350&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_27.jpg%3F20250602192351&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_28.jpg%3F20250602192351&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_29.jpg%3F20250602192351&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_30.jpg%3F20250602192352&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_31.jpg%3F20250602192352&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_32.jpg%3F20250602192353&type=m&w=800&h=500&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_03.jpg%3F20250602192349&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_02.jpg%3F20250602192349&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_04.jpg%3F20250602192350&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_05.jpg%3F20250602192350&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_06.jpg%3F20250602192351&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_07.jpg%3F20250602192351&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_08.jpg%3F20250602192352&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_09.jpg%3F20250602192352&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_10.jpg%3F20250602192352&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_11.jpg%3F20250602192353&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_12.jpg%3F20250602192353&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_13.jpg%3F20250602192353&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_14.jpg%3F20250602192353&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_15.jpg%3F20250602192354&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_16.jpg%3F20250602192354&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_17.jpg%3F20250602192354&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_18.jpg%3F20250602192354&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_19.jpg%3F20250602192354&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_20.jpg%3F20250602192355&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_21.jpg%3F20250602192355&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_22.jpg%3F20250602192349&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_23.jpg%3F20250602192349&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_24.jpg%3F20250602192349&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_25.jpg%3F20250602192350&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_26.jpg%3F20250602192350&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_27.jpg%3F20250602192351&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_28.jpg%3F20250602192351&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_29.jpg%3F20250602192351&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_30.jpg%3F20250602192352&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_31.jpg%3F20250602192352&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    },
+    {
+      "url": "https://img-auction.autobell.co.kr/OBmZCjL58I?src=https%3A%2F%2Fauction.autobell.co.kr%2FFileUpDown%2F1100%2Fcarimg%2F2505%2FA250502987%2FA250502987_02_32.jpg%3F20250602192353&type=m&w=1280&h=800&quality=90&ttype=jpg",
+      "thumbnail_url": null,
+      "alt_text": ""
+    }
+  ],
+  "additional_info": {
+    "auction_location": null,
+    "auction_date": null,
+    "auction_time": null,
+    "seller_info": null,
+    "special_conditions": null,
+    "warranty_info": null
+  },
+  "accident_history": null,
+  "inspection_details": null,
+  "parsed_at": "2025-06-16 09:06:48.656262",
+  "source_url": "https://auction.autobell.co.kr/auction/exhibitView.do?acc=30&gn=v2DlTk1F5%2BMckBC3dGOf2g%3D%3D&rc=1100&atn=747",
+  "car_id": "v2DlTk1F5%2BMckBC3dGOf2g%3D%3D",
+  "auction_number": "747"
+}

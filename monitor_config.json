@@ -1,0 +1,23 @@
+{
+  "email_enabled": false,
+  "email_smtp_server": "smtp.gmail.com",
+  "email_smtp_port": 587,
+  "email_username": "your-email@gmail.com",
+  "email_password": "your-app-password",
+  "email_to": ["admin@yourcompany.com", "dev@yourcompany.com"],
+
+  "webhook_enabled": false,
+  "webhook_url": "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK",
+
+  "console_alerts": true,
+  "failure_threshold": 3,
+  "recovery_notification": true,
+
+  "comments": {
+    "email_enabled": "Включить/выключить email уведомления",
+    "email_password": "Для Gmail используйте App Password, не основной пароль",
+    "webhook_url": "URL для Slack, Discord, Teams или другого webhook",
+    "failure_threshold": "Количество неудач подряд для отправки уведомления",
+    "recovery_notification": "Отправлять ли уведомление о восстановлении системы"
+  }
+}
