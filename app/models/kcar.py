@@ -181,3 +181,113 @@ class KCarStatsResponse(BaseModel):
     manufacturers: List[str] = Field(default_factory=list, description="Производители")
     average_price: Optional[float] = Field(None, description="Средняя цена")
     success: bool = Field(True, description="Статус ответа")
+
+
+class KCarDetailedCar(BaseModel):
+    """Детальная модель автомобиля KCar с полной информацией"""
+
+    # Основные идентификаторы
+    car_id: Optional[str] = Field(None, description="ID автомобиля")
+    auction_code: Optional[str] = Field(None, description="Код аукциона")
+    car_number: Optional[str] = Field(None, description="Номер автомобиля")
+    lot_number: Optional[str] = Field(None, description="Номер лота")
+
+    # Основная информация
+    car_name: Optional[str] = Field(None, description="Полное название автомобиля")
+    manufacturer: Optional[str] = Field(None, description="Производитель")
+    model: Optional[str] = Field(None, description="Модель")
+
+    # Технические характеристики
+    year: Optional[str] = Field(None, description="Год выпуска")
+    registration_date: Optional[str] = Field(
+        None, description="Дата первой регистрации"
+    )
+    mileage: Optional[str] = Field(None, description="Пробег")
+    fuel_type: Optional[str] = Field(None, description="Тип топлива")
+    transmission: Optional[str] = Field(None, description="Коробка передач")
+    exterior_color: Optional[str] = Field(None, description="Цвет кузова")
+    displacement: Optional[str] = Field(None, description="Объем двигателя")
+    car_type: Optional[str] = Field(None, description="Тип кузова")
+    doors: Optional[str] = Field(None, description="Количество дверей")
+    vin: Optional[str] = Field(None, description="VIN номер")
+    engine_type: Optional[str] = Field(None, description="Тип двигателя")
+
+    # Аукционная информация
+    auction_date: Optional[str] = Field(None, description="Дата аукциона")
+    auction_round: Optional[str] = Field(None, description="Номер аукциона")
+    start_price: Optional[str] = Field(None, description="Стартовая цена")
+    auction_place: Optional[str] = Field(None, description="Место проведения аукциона")
+    auction_type: Optional[str] = Field(None, description="Тип аукциона")
+
+    # Состояние и оценка
+    grade: Optional[str] = Field(None, description="Оценка состояния")
+    seizure_mortgage: Optional[str] = Field(None, description="Арест/залог")
+    flood_damage: Optional[str] = Field(None, description="Повреждение от наводнения")
+    accident_history: Optional[str] = Field(None, description="История аварий")
+
+    # Местоположение
+    location: Optional[str] = Field(None, description="Расположение автомобиля")
+    address: Optional[str] = Field(None, description="Подробный адрес")
+
+    # Владелец (зашифрованные данные)
+    owner_name: Optional[str] = Field(None, description="Имя владельца (зашифрованное)")
+    owner_company: Optional[str] = Field(None, description="Компания владельца")
+    owner_id: Optional[str] = Field(None, description="ID владельца (зашифрованное)")
+
+    # Технический осмотр
+    inspection_valid_until: Optional[str] = Field(
+        None, description="Техосмотр действителен до"
+    )
+    inspection_number: Optional[str] = Field(
+        None, description="Номер инспекционного документа"
+    )
+
+    # Изображения
+    main_image: Optional[str] = Field(None, description="Основное изображение")
+    all_images: List[str] = Field(
+        default_factory=list, description="Все изображения автомобиля"
+    )
+    thumbnail_images: List[str] = Field(
+        default_factory=list, description="Миниатюры изображений"
+    )
+
+    # Опции и оборудование
+    options: List[str] = Field(
+        default_factory=list, description="Список опций и оборудования"
+    )
+
+    # Дополнительная информация
+    usage_type: Optional[str] = Field(None, description="Тип использования")
+    created_at: Optional[str] = Field(None, description="Время создания записи")
+    updated_at: Optional[str] = Field(None, description="Время последнего обновления")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = True
+
+
+class KCarDetailResponse(BaseModel):
+    """Ответ API для детальной информации об автомобиле KCar"""
+
+    car: Optional[KCarDetailedCar] = Field(
+        None, description="Детальная информация об автомобиле"
+    )
+    success: bool = Field(True, description="Статус успешности")
+    message: Optional[str] = Field(None, description="Сообщение об ошибке или успехе")
+    source_url: Optional[str] = Field(None, description="URL источника данных")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = True
+
+
+class KCarDetailRequest(BaseModel):
+    """Модель запроса детальной информации об автомобиле"""
+
+    car_id: str = Field(..., description="ID автомобиля")
+    auction_code: str = Field(..., description="Код аукциона")
+    page_type: str = Field(default="wCfm", description="Тип страницы")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = True

@@ -9,7 +9,7 @@ from fake_useragent import UserAgent
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
-from app.models.kcar import KCarResponse
+from app.models.kcar import KCarResponse, KCarDetailResponse
 from app.parsers.kcar_parser import KCarParser
 
 # Отключаем предупреждения SSL
@@ -810,18 +810,12 @@ class KCarService:
             logger.error(f"❌ Ошибка получения количества: {e}")
             return {"count": 0, "message": str(e), "auction_type": "weekly"}
 
-    def close(self):
-        """Закрытие сессии"""
-        if self.session:
-            self.session.close()
-            logger.info("🔒 KCar сессия закрыта")
-
     def get_image_url(self, thumbnail_path: Optional[str]) -> Optional[str]:
         """
-        Формирует полный URL для изображения автомобиля
+        Формирует полный URL изображения из относительного пути
 
         Args:
-            thumbnail_path: Относительный путь к изображению (например: "2032/CA20322763/CA203227638y022098_370.JPG")
+            thumbnail_path: Относительный путь к изображению
 
         Returns:
             Полный URL изображения или None
@@ -829,11 +823,129 @@ class KCarService:
         if not thumbnail_path:
             return None
 
-        # Убираем начальный слеш если есть
-        thumbnail_path = thumbnail_path.lstrip("/")
+        # Если путь уже содержит полный URL
+        if thumbnail_path.startswith("http"):
+            return thumbnail_path
 
         # Формируем полный URL
-        full_url = f"{self.image_base_url}/{thumbnail_path}"
+        if thumbnail_path.startswith("/"):
+            return f"{self.image_base_url}{thumbnail_path}"
+        else:
+            return f"{self.image_base_url}/{thumbnail_path}"
 
-        logger.debug(f"🖼️ Сформирован URL изображения: {full_url}")
-        return full_url
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def get_car_detail(
+        self, car_id: str, auction_code: str, page_type: str = "wCfm"
+    ) -> "KCarDetailResponse":
+        """
+        Получение детальной информации об автомобиле
+
+        Args:
+            car_id: ID автомобиля
+            auction_code: Код аукциона
+            page_type: Тип страницы (по умолчанию wCfm)
+
+        Returns:
+            KCarDetailResponse с детальной информацией об автомобиле
+        """
+        from app.models.kcar import KCarDetailResponse
+
+        try:
+            logger.info(f"🔍 Получение детальной информации для автомобиля {car_id}")
+
+            if not self.authenticated:
+                logger.warning("⚠️ Не авторизован, пытаюсь авторизоваться...")
+                if not self._authenticate():
+                    return KCarDetailResponse(
+                        car=None, success=False, message="Ошибка авторизации"
+                    )
+
+            # URL для получения детальной информации
+            detail_url = (
+                f"{self.base_url}/kcar/auction/weekly_detail/auction_detail_view.do"
+            )
+
+            # Параметры запроса
+            params = {
+                "PAGE_TYPE": page_type,
+                "CAR_ID": car_id,
+                "AUC_CD": auction_code,
+            }
+
+            # Данные для POST запроса
+            data = {
+                "setSearch": "",
+            }
+
+            # Заголовки для запроса детальной страницы
+            detail_headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": self.ua.random,
+                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+            }
+
+            logger.info(f"📡 Отправляю запрос детальной информации: {detail_url}")
+            logger.debug(f"🔍 Параметры: {params}")
+
+            response = self.session.post(
+                detail_url, params=params, data=data, headers=detail_headers, timeout=30
+            )
+
+            if response.status_code == 200:
+                logger.info(f"✅ Получена детальная страница автомобиля {car_id}")
+
+                # Парсим HTML страницу
+                detail_response = self.parser.parse_car_detail_html(
+                    response.text, car_id, auction_code
+                )
+
+                if detail_response.success:
+                    logger.success(
+                        f"✅ Детальная информация успешно извлечена для {car_id}"
+                    )
+                    return detail_response
+                else:
+                    logger.error(
+                        f"❌ Ошибка парсинга детальной информации: {detail_response.message}"
+                    )
+                    return detail_response
+
+            else:
+                error_msg = f"HTTP ошибка получения детальной информации: {response.status_code}"
+                logger.error(f"❌ {error_msg}")
+                return KCarDetailResponse(car=None, success=False, message=error_msg)
+
+        except requests.exceptions.Timeout:
+            error_msg = "Таймаут получения детальной информации"
+            logger.error(f"⏱️ {error_msg}")
+            return KCarDetailResponse(car=None, success=False, message=error_msg)
+
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Ошибка запроса детальной информации: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            return KCarDetailResponse(car=None, success=False, message=error_msg)
+
+        except Exception as e:
+            error_msg = f"Неожиданная ошибка получения детальной информации: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            return KCarDetailResponse(car=None, success=False, message=error_msg)
+
+    def close(self):
+        """Закрытие сессии"""
+        if self.session:
+            self.session.close()

@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional, Dict, Any
 from loguru import logger
 
-from app.models.kcar import KCarResponse, KCarCar, KCarStatsResponse
+from app.models.kcar import KCarResponse, KCarCar, KCarStatsResponse, KCarDetailResponse
 from app.services.kcar_service import KCarService
 
 router = APIRouter(prefix="/api/v1/kcar", tags=["KCar"])
@@ -263,44 +263,104 @@ async def get_kcar_count(
     auction_type: Optional[str] = Query("weekly", description="Тип аукциона")
 ):
     """
-    Получить количество доступных автомобилей KCar
+    Получить количество автомобилей KCar
 
-    Возвращает общее количество автомобилей без полной загрузки данных.
+    Возвращает общее количество автомобилей в указанном типе аукциона.
     """
     try:
-        logger.info("🔢 Запрос количества автомобилей KCar")
+        logger.info(f"📊 Запрос количества автомобилей KCar (тип: {auction_type})")
 
-        # Получаем реальное количество из сервиса
-        params = {
-            "AUC_TYPE": auction_type,
-            "PAGE_CNT": "1",
-        }  # Минимальный запрос для подсчета
-        cars_result = kcar_service.get_cars(params)
+        params = {"AUC_TYPE": auction_type}
+        result = kcar_service.get_car_count(params)
 
-        if cars_result.success:
-            count = cars_result.total_count
-        else:
-            # Fallback значения
-            if auction_type == "weekly":
-                count = 36  # Текущее количество weekly аукционов
-            elif auction_type == "daily":
-                count = 0  # Daily аукционы больше не поддерживаются
-            else:
-                count = 0  # Другие типы
+        if result.get("count", 0) == 0:
+            logger.info("ℹ️ Торги завершены или не активны, показываю демо значение")
+            return {
+                "count": 150,  # Демо значение
+                "auction_type": auction_type,
+                "message": "Торги завершены. Показано демонстрационное значение.",
+                "demo": True,
+            }
 
-        logger.success(f"✅ Получено количество автомобилей KCar: {count}")
-        return {
-            "auction_type": auction_type,
-            "count": count,
-            "message": "OK",
-            "timestamp": str(__import__("datetime").datetime.now()),
-        }
+        logger.success(f"✅ Количество автомобилей: {result['count']}")
+        return result
 
     except Exception as e:
-        logger.error(f"❌ Ошибка получения количества KCar: {e}")
+        logger.error(f"❌ Ошибка получения количества автомобилей: {e}")
+        # Возвращаем демо данные вместо ошибки
+        return {
+            "count": 150,
+            "auction_type": auction_type or "weekly",
+            "message": f"Ошибка API: {str(e)}. Показано демонстрационное значение.",
+            "demo": True,
+        }
+
+
+@router.get("/cars/{car_id}/detail", response_model=KCarDetailResponse)
+async def get_kcar_car_detail(
+    car_id: str,
+    auction_code: str = Query(..., description="Код аукциона"),
+    page_type: str = Query("wCfm", description="Тип страницы"),
+):
+    """
+    Получить детальную информацию об автомобиле KCar
+
+    Возвращает подробную информацию о конкретном автомобиле включая:
+    - Полные технические характеристики
+    - Детальную информацию об аукционе
+    - Список всех изображений
+    - Информацию о состоянии и оценке
+    - Сведения о владельце (анонимизированные)
+    - Результаты технического осмотра
+
+    Параметры:
+    - car_id: Идентификатор автомобиля (например: CA20324182)
+    - auction_code: Код аукциона (например: AC20250604)
+    - page_type: Тип страницы (по умолчанию: wCfm)
+    """
+    try:
+        logger.info(f"🔍 Запрос детальной информации для автомобиля {car_id}")
+
+        # Валидация параметров
+        if not car_id:
+            raise HTTPException(
+                status_code=400, detail="car_id является обязательным параметром"
+            )
+
+        if not auction_code:
+            raise HTTPException(
+                status_code=400, detail="auction_code является обязательным параметром"
+            )
+
+        # Получаем детальную информацию
+        result = kcar_service.get_car_detail(car_id, auction_code, page_type)
+
+        if not result.success:
+            logger.error(f"❌ Ошибка получения детальной информации: {result.message}")
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "Не удалось получить детальную информацию об автомобиле",
+                    "message": result.message,
+                    "car_id": car_id,
+                    "auction_code": auction_code,
+                },
+            )
+
+        logger.success(f"✅ Детальная информация получена для автомобиля {car_id}")
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка в endpoint детальной информации: {e}")
         raise HTTPException(
             status_code=500,
-            detail={"error": "Ошибка получения количества", "message": str(e)},
+            detail={
+                "error": "Внутренняя ошибка сервера",
+                "message": str(e),
+                "car_id": car_id,
+            },
         )
 
 
@@ -334,6 +394,11 @@ async def get_kcar_info():
             {"path": "/cars/demo", "method": "GET", "description": "Демо данные"},
             {"path": "/cars/stats", "method": "GET", "description": "Статистика"},
             {"path": "/cars/count", "method": "GET", "description": "Количество"},
+            {
+                "path": "/cars/{car_id}/detail",
+                "method": "GET",
+                "description": "Детальная информация",
+            },
             {"path": "/info", "method": "GET", "description": "Информация о API"},
         ],
         "auth_required": {
@@ -342,5 +407,6 @@ async def get_kcar_info():
             "/cars/demo": False,
             "/cars/stats": True,
             "/cars/count": True,
+            "/cars/{car_id}/detail": True,
         },
     }
