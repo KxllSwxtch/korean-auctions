@@ -87,16 +87,28 @@ class KCarParser:
 
             # Обрабатываем URL изображений - формируем полные пути
             if car.thumbnail:
-                # Добавляем базовый URL для изображений KCar
-                base_image_url = "https://www.kcarauction.com/attachment/CAR_IMG"
-                car.thumbnail = f"{base_image_url}/{car.thumbnail.lstrip('/')}"
+                # Проверяем, если уже есть полный URL
+                if car.thumbnail.startswith("http"):
+                    pass  # Оставляем как есть
+                elif car.thumbnail.startswith("/FILE_UPLOAD"):
+                    # Уже полный путь, добавляем только домен
+                    car.thumbnail = f"https://www.kcarauction.com{car.thumbnail}"
+                else:
+                    # Формируем полный путь через FILE_UPLOAD/IMAGE_UPLOAD/CAR
+                    car.thumbnail = f"https://www.kcarauction.com/FILE_UPLOAD/IMAGE_UPLOAD/CAR/{car.thumbnail.lstrip('/')}"
 
             if car.thumbnail_mobile:
-                # Добавляем базовый URL для мобильных изображений KCar
-                base_image_url = "https://www.kcarauction.com/attachment/CAR_IMG"
-                car.thumbnail_mobile = (
-                    f"{base_image_url}/{car.thumbnail_mobile.lstrip('/')}"
-                )
+                # Проверяем, если уже есть полный URL
+                if car.thumbnail_mobile.startswith("http"):
+                    pass  # Оставляем как есть
+                elif car.thumbnail_mobile.startswith("/FILE_UPLOAD"):
+                    # Уже полный путь, добавляем только домен
+                    car.thumbnail_mobile = (
+                        f"https://www.kcarauction.com{car.thumbnail_mobile}"
+                    )
+                else:
+                    # Формируем полный путь через FILE_UPLOAD/IMAGE_UPLOAD/CAR
+                    car.thumbnail_mobile = f"https://www.kcarauction.com/FILE_UPLOAD/IMAGE_UPLOAD/CAR/{car.thumbnail_mobile.lstrip('/')}"
 
             # Логируем основную информацию об автомобиле
             car_info = (
@@ -307,6 +319,41 @@ class KCarParser:
             car.car_id = car_id
             car.auction_code = auction_code
 
+            # Извлекаем название автомобиля из блока carname
+            carname_div = soup.find("div", class_="carname")
+            if carname_div:
+                carname_p = carname_div.find("p")
+                if carname_p:
+                    # Извлекаем текст, исключая комментарии и вложенные элементы
+                    car_name_text = ""
+                    for content in carname_p.contents:
+                        if isinstance(content, str):
+                            text = content.strip()
+                            # Исключаем комментарии вида "<!--...-->" и "하드코딩" записи
+                            if not text.startswith("<!--") and "하드코딩" not in text:
+                                car_name_text += text
+
+                    # Очищаем название от лишних пробелов и переносов
+                    if car_name_text:
+                        car.car_name = car_name_text.strip()
+                        logger.info(f"🏷️ Извлечено название: {car.car_name}")
+
+                    # Если основной способ не сработал, пробуем альтернативный
+                    if not car.car_name:
+                        # Ищем текст после комментария
+                        full_text = carname_p.get_text(strip=True)
+                        if "하드코딩" in full_text:
+                            # Берем часть после "하드코딩 ... -->"
+                            parts = full_text.split("-->")
+                            if len(parts) > 1:
+                                car.car_name = parts[-1].strip()
+                                logger.info(
+                                    f"🏷️ Альтернативный способ - название: {car.car_name}"
+                                )
+                        else:
+                            car.car_name = full_text
+                            logger.info(f"🏷️ Полный текст - название: {car.car_name}")
+
             # Извлекаем основную информацию из блока carinfo
             carinfo_div = soup.find("div", class_="carinfo")
             if carinfo_div:
@@ -460,7 +507,7 @@ class KCarParser:
             image_patterns = [
                 {
                     "tag": "img",
-                    "attrs": {"src": lambda x: x and "CA20324182" in str(x)},
+                    "attrs": {"src": lambda x: x and car_id in str(x)},
                 },
                 {
                     "tag": "img",
@@ -487,8 +534,48 @@ class KCarParser:
                         elif full_url not in all_images:
                             all_images.append(full_url)
 
+            # Если не нашли изображения по car_id, попробуем более широкий поиск
+            if not all_images and not thumbnail_images:
+                logger.info(
+                    f"🔍 Не найдены изображения по car_id {car_id}, пробую более широкий поиск..."
+                )
+
+                # Поиск всех изображений автомобилей
+                all_car_images = soup.find_all(
+                    "img", src=lambda x: x and "FILE_UPLOAD/IMAGE_UPLOAD/CAR" in str(x)
+                )
+
+                for img in all_car_images:
+                    src = img.get("src")
+                    if src:
+                        if src.startswith("/"):
+                            full_url = f"https://www.kcarauction.com{src}"
+                        else:
+                            full_url = src
+
+                        # Проверяем, относится ли изображение к текущему автомобилю
+                        # по пути в URL (например, /2032/CA20324182/...)
+                        if car_id in src:
+                            if "_1180" in src.lower():
+                                all_images.append(full_url)
+                            elif "_180" in src.lower() or "_162" in src.lower():
+                                thumbnail_images.append(full_url)
+                            elif "_370" in src.lower() or "_640" in src.lower():
+                                all_images.append(full_url)
+                            else:
+                                all_images.append(full_url)
+
             car.all_images = list(set(all_images))  # Убираем дубликаты
             car.thumbnail_images = list(set(thumbnail_images))
+
+            # Логируем найденные изображения
+            logger.info(
+                f"📸 Найдено изображений для {car_id}: всего {len(car.all_images)}, миниатюр {len(car.thumbnail_images)}"
+            )
+            if car.all_images:
+                logger.debug(
+                    f"🖼️ Примеры изображений: {car.all_images[:3]}"
+                )  # Показываем первые 3
 
             # Извлекаем информацию о производителе из названия
             if car.car_name:
