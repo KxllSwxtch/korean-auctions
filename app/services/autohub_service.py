@@ -572,6 +572,7 @@ class AutohubService:
             )
 
             # Подготовка данных запроса на основе параметров
+            # Используем формат данных из рабочего примера
             data = {
                 "i_iNowPageNo": str(request_params.page_number),
                 "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
@@ -622,13 +623,36 @@ class AutohubService:
                 "i_iPageSize": str(request_params.page_size),
             }
 
+            # Добавляем необходимые headers для корректной работы
+            headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://www.autohubauction.co.kr",
+                "Referer": "https://www.autohubauction.co.kr/newfront/receive/rc/receive_rc_list.do",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+            }
+
             logger.info(f"POST запрос к Autohub detail: {url}")
             logger.debug(f"Параметры запроса: {data}")
 
             response = self.session.post(
-                url, data=data, timeout=self.settings.request_timeout
+                url, data=data, headers=headers, timeout=self.settings.request_timeout
             )
             response.raise_for_status()
+
+            # Сохраняем HTML для отладки
+            with open("debug_car_detail_response.html", "w", encoding="utf-8") as f:
+                f.write(response.text)
+            logger.info(
+                f"HTML ответ сохранён в debug_car_detail_response.html для анализа"
+            )
 
             # Парсинг детальной информации
             car_detail = parse_car_detail(response.text)
