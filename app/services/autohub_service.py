@@ -232,10 +232,10 @@ class AutohubService:
                     success=False, message="Не удалось получить HTML контент", cars=[]
                 )
 
-            # Парсим HTML
-            cars = self.parser.parse_car_list(html_content)
+            # Парсим HTML (временная заглушка - парсер списка не реализован)
+            cars = []  # TODO: Реализовать парсинг списка автомобилей
 
-            logger.info(f"Успешно получено {len(cars)} автомобилей")
+            logger.info(f"Успешно получено {len(cars)} автомобилей (заглушка)")
 
             # Если автомобили не найдены, проверяем причину
             if len(cars) == 0:
