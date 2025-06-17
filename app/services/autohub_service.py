@@ -31,6 +31,11 @@ class AutohubService:
         self._session = None
         self.base_url = "https://www.autohubauction.co.kr"
 
+        # Инициализируем парсер
+        from app.parsers.autohub_parser import AutohubParser
+
+        self.parser = AutohubParser(self.base_url)
+
     @property
     def session(self) -> requests.Session:
         """Получить настроенную сессию для HTTP запросов"""
@@ -218,8 +223,8 @@ class AutohubService:
             if not session_initialized:
                 return AutohubResponse(
                     success=False,
-                    message="Не удалось инициализировать сессию с Autohub",
-                    cars=[],
+                    error="Не удалось инициализировать сессию с Autohub",
+                    data=[],
                 )
 
             # Выполняем HTTP запрос
@@ -229,13 +234,13 @@ class AutohubService:
 
             if not html_content:
                 return AutohubResponse(
-                    success=False, message="Не удалось получить HTML контент", cars=[]
+                    success=False, error="Не удалось получить HTML контент", data=[]
                 )
 
-            # Парсим HTML (временная заглушка - парсер списка не реализован)
-            cars = []  # TODO: Реализовать парсинг списка автомобилей
+            # Парсим HTML
+            cars = self.parser.parse_car_list(html_content)
 
-            logger.info(f"Успешно получено {len(cars)} автомобилей (заглушка)")
+            logger.info(f"Успешно получено {len(cars)} автомобилей")
 
             # Если автомобили не найдены, проверяем причину
             if len(cars) == 0:
@@ -243,9 +248,9 @@ class AutohubService:
                 if "loginFlag" in html_content and "login.do" in html_content:
                     return AutohubResponse(
                         success=False,
-                        message="Для доступа к списку автомобилей требуется авторизация на сайте Autohub. Используйте endpoint /cars/test для демонстрации функциональности парсера.",
+                        error="Для доступа к списку автомобилей требуется авторизация на сайте Autohub. Используйте endpoint /cars/test для демонстрации функциональности парсера.",
                         total_count=0,
-                        cars=[],
+                        data=[],
                     )
 
             # Формируем информацию о пагинации
@@ -294,21 +299,17 @@ class AutohubService:
 
             return AutohubResponse(
                 success=True,
-                message=message,
+                data=cars,
                 total_count=total_cars_from_page or len(cars),
-                cars=cars,
-                current_page=current_page,
-                page_size=autohub_page_size,  # Используем фактический размер страницы Autohub
-                total_pages=total_pages,
-                has_next_page=has_next_page,
-                has_prev_page=has_prev_page,
+                page=current_page,
+                limit=autohub_page_size,  # Используем фактический размер страницы Autohub
             )
 
         except Exception as e:
             error_msg = f"Ошибка при получении списка автомобилей: {str(e)}"
             logger.error(error_msg)
 
-            return AutohubResponse(success=False, message=error_msg, cars=[])
+            return AutohubResponse(success=False, error=error_msg, data=[])
 
     async def _fetch_html(
         self, url: str, params: Optional[Dict[str, Any]] = None

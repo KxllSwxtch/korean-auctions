@@ -291,7 +291,11 @@ class AutohubParser:
         try:
             img_element = car_block.find("img", class_="img-fluid")
             if img_element and img_element.get("src"):
-                return img_element["src"]
+                src = img_element["src"]
+                # Если URL относительный, делаем его абсолютным
+                if src.startswith("/"):
+                    return f"{self.base_url}{src}"
+                return src
         except Exception as e:
             logger.error(f"Ошибка при извлечении main_image: {e}")
         return None
