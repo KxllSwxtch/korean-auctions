@@ -82,6 +82,10 @@ class AutohubCar(BaseModel):
     additional_images: List[HttpUrl] = Field(
         default_factory=list, description="Дополнительные изображения"
     )
+    has_additional_images: bool = Field(
+        default=True,
+        description="Есть ли дополнительные изображения (доступны через car-detail endpoint)",
+    )
 
     # Метаданные
     parsed_at: datetime = Field(
