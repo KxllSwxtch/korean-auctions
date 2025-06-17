@@ -10,7 +10,7 @@ from app.models.autohub import (
     AutohubCarDetailRequest,
     AutohubCarDetailResponse,
 )
-from app.services.autohub_service import AutohubService
+from app.services.autohub_service import autohub_service, AutohubService
 from app.core.logging import get_logger
 
 logger = get_logger("autohub_routes")
@@ -19,13 +19,10 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# Создаем экземпляр сервиса
-autohub_service = AutohubService()
-
 
 # Dependency для получения сервиса
 def get_autohub_service() -> AutohubService:
-    return AutohubService()
+    return autohub_service
 
 
 @router.get(

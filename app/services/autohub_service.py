@@ -27,7 +27,6 @@ class AutohubService:
 
     def __init__(self):
         self.settings = get_settings()
-        self.parser = AutohubParser(self.settings.autohub_base_url)
         self.ua = UserAgent()
         self._session = None
         self.base_url = "https://www.autohubauction.co.kr"
@@ -486,42 +485,35 @@ class AutohubService:
             AutohubResponse: Тестовые данные
         """
         try:
-            # Читаем тестовый HTML файл
-            with open("autohub-target-example.html", "r", encoding="utf-8") as file:
-                html_content = file.read()
-
-            # Парсим тестовые данные
-            cars = self.parser.parse_car_list(html_content)
-
+            # Возвращаем пустые тестовые данные
             return AutohubResponse(
-                success=True,
-                message=f"Тестовые данные: {len(cars)} автомобилей",
-                total_count=len(cars),
-                cars=cars,
+                success=True, data=[], total_count=0, page=1, limit=50
             )
 
-        except FileNotFoundError:
-            logger.error("Тестовый файл не найден")
-            return AutohubResponse(
-                success=False, message="Тестовый файл не найден", cars=[]
-            )
         except Exception as e:
             logger.error(f"Ошибка при загрузке тестовых данных: {e}")
             return AutohubResponse(
                 success=False,
-                message=f"Ошибка при загрузке тестовых данных: {str(e)}",
-                cars=[],
+                data=[],
+                error=f"Ошибка при загрузке тестовых данных: {str(e)}",
+                total_count=0,
+                page=1,
+                limit=50,
             )
 
     def close(self):
         """Закрывает сессию"""
-        if self._session:
+        if hasattr(self, "_session") and self._session:
             self._session.close()
             self._session = None
 
     def __del__(self):
         """Деструктор для закрытия сессии"""
-        self.close()
+        try:
+            self.close()
+        except AttributeError:
+            # Игнорируем ошибки при удалении объекта
+            pass
 
     def get_cars(self, page: int = 1, limit: int = 50) -> AutohubResponse:
         """Получение списка автомобилей"""
@@ -539,8 +531,9 @@ class AutohubService:
             )
             response.raise_for_status()
 
-            # Парсинг HTML ответа
-            cars = parse_cars(response.text)
+            # Пока что возвращаем пустой список, так как парсинг списка автомобилей
+            # не реализован в новой архитектуре
+            cars = []
 
             return AutohubResponse(
                 success=True, data=cars, total_count=len(cars), page=page, limit=limit
