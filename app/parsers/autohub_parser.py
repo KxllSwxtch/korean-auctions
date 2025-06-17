@@ -2,11 +2,23 @@ import re
 from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup, Tag
 from urllib.parse import urljoin
+from datetime import datetime
+import logging
 
-from app.models.autohub import AutohubCar, CarStatus, TransmissionType, FuelType
+from app.models.autohub import (
+    AutohubCar,
+    CarStatus,
+    TransmissionType,
+    FuelType,
+    AutohubAuctionDate,
+    AutohubCarDetail,
+    AutohubPerformanceInfo,
+    AutohubOptionInfo,
+    AutohubImage,
+)
 from app.core.logging import get_logger
 
-logger = get_logger("autohub_parser")
+logger = logging.getLogger(__name__)
 
 
 class AutohubParser:
@@ -317,3 +329,411 @@ class AutohubParser:
         elif "취하" in text:
             return CarStatus.WITHDRAWN
         return CarStatus.REGISTERED
+
+
+def parse_auction_date(html: str) -> Optional[AutohubAuctionDate]:
+    """Парсинг даты аукциона из HTML"""
+    soup = BeautifulSoup(html, "html.parser")
+
+    try:
+        # Поиск даты аукциона на странице
+        date_elements = soup.find_all(
+            ["span", "div", "td"], string=re.compile(r"\d{4}\.\d{2}\.\d{2}")
+        )
+
+        if date_elements:
+            date_text = date_elements[0].get_text().strip()
+            return AutohubAuctionDate(date_str=date_text)
+
+        return None
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге даты аукциона: {e}")
+        return None
+
+
+def parse_car_detail(html: str) -> Optional[AutohubCarDetail]:
+    """Парсинг детальной информации об автомобиле"""
+    soup = BeautifulSoup(html, "html.parser")
+
+    try:
+        # Парсинг основной информации
+        title = parse_car_title(soup)
+        starting_price = parse_starting_price(soup)
+        auction_info = parse_auction_info(soup)
+
+        # Парсинг детальной информации об автомобиле
+        car_info = parse_car_info(soup)
+
+        # Парсинг информации о производительности
+        performance_info = parse_performance_info(soup)
+
+        # Парсинг опций
+        options = parse_options(soup)
+
+        # Парсинг изображений
+        images = parse_images(soup)
+
+        return AutohubCarDetail(
+            title=title,
+            starting_price=starting_price,
+            auction_number=auction_info.get("auction_number", ""),
+            auction_date=auction_info.get("auction_date", ""),
+            auction_title=auction_info.get("auction_title", ""),
+            auction_code=auction_info.get("auction_code", ""),
+            car_info=car_info,
+            performance_info=performance_info,
+            options=options,
+            images=images,
+            parsed_at=datetime.now(),
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге детальной информации: {e}")
+        return None
+
+
+def parse_car_title(soup: BeautifulSoup) -> str:
+    """Парсинг заголовка автомобиля"""
+    try:
+        title_element = soup.find("h2", class_="tit_style2")
+        if title_element:
+            return title_element.get_text().strip()
+        return ""
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге заголовка: {e}")
+        return ""
+
+
+def parse_starting_price(soup: BeautifulSoup) -> str:
+    """Парсинг стартовой цены"""
+    try:
+        price_element = soup.find("strong", class_="i_comm_main_txt2")
+        if price_element:
+            return price_element.get_text().strip()
+        return "0"
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге цены: {e}")
+        return "0"
+
+
+def parse_auction_info(soup: BeautifulSoup) -> Dict[str, str]:
+    """Парсинг информации об аукционе"""
+    auction_info = {
+        "auction_number": "",
+        "auction_date": "",
+        "auction_title": "",
+        "auction_code": "",
+    }
+
+    try:
+        # Поиск скрытых полей с информацией об аукционе
+        hidden_inputs = soup.find_all("input", type="hidden")
+
+        for input_elem in hidden_inputs:
+            name = input_elem.get("name", "")
+            value = input_elem.get("value", "")
+
+            if "AucNo" in name:
+                auction_info["auction_number"] = value
+            elif "StartDt" in name:
+                auction_info["auction_date"] = value
+            elif "AucTitle" in name:
+                auction_info["auction_title"] = value
+            elif "AucCode" in name:
+                auction_info["auction_code"] = value
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге информации об аукционе: {e}")
+
+    return auction_info
+
+
+def parse_car_info(soup: BeautifulSoup) -> AutohubCar:
+    """Парсинг детальной информации об автомобиле"""
+    car_info = {}
+
+    try:
+        # Поиск блока с информацией об автомобиле
+        details_block = soup.find("div", class_="details-block")
+        if not details_block:
+            raise ValueError("Блок с деталями автомобиля не найден")
+
+        # Парсинг всех строк с информацией
+        list_items = details_block.find_all("li")
+
+        for item in list_items:
+            span = item.find("span")
+            strong = item.find("strong")
+
+            if span and strong:
+                label = span.get_text().strip()
+                value = strong.get_text().strip()
+
+                # Обработка специальных случаев
+                if "출품번호" in label:
+                    car_info["entry_number"] = value
+                elif "주차번호" in label:
+                    car_info["parking_number"] = value
+                elif "차량번호" in label:
+                    car_info["car_number"] = value
+                elif "차대번호" in label:
+                    car_info["vin_number"] = value
+                elif "연식" in label:
+                    # Парсинг года и даты первой регистрации
+                    year_match = re.search(r"(\d{4})", value)
+                    reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", value)
+
+                    car_info["year"] = year_match.group(1) if year_match else value
+                    if reg_match:
+                        car_info["first_registration"] = reg_match.group(1)
+                elif "원동기형식" in label:
+                    car_info["engine_type"] = value
+                elif "연료" in label:
+                    car_info["fuel_type"] = value
+                elif "주행거리" in label:
+                    # Проверка на неопределенность пробега
+                    mileage_unclear = "불분명" in value
+                    mileage = re.sub(r"[^\d,]", "", value.split("(")[0])
+
+                    car_info["mileage"] = mileage
+                    car_info["mileage_unclear"] = mileage_unclear
+                elif "배기량" in label:
+                    car_info["displacement"] = value
+                elif "경력" in label:
+                    car_info["history"] = value
+                elif "변속기" in label:
+                    car_info["transmission"] = value
+                elif "색상" in label:
+                    # Проверка на изменение цвета
+                    color_changed = "색상변경" in value
+                    color = value.split("(")[0].strip()
+
+                    car_info["color"] = color
+                    car_info["color_changed"] = color_changed
+                elif "차종" in label:
+                    car_info["vehicle_type"] = value
+                elif "사고이력" in label:
+                    car_info["accident_history"] = value
+                elif "과세구분" in label:
+                    car_info["tax_type"] = value
+                elif "전기차 인증서" in label:
+                    car_info["electric_certificate"] = value
+
+        # Установка значений по умолчанию для обязательных полей
+        required_fields = {
+            "entry_number": "",
+            "parking_number": "",
+            "car_number": "",
+            "vin_number": "",
+            "year": "",
+            "engine_type": "",
+            "fuel_type": "",
+            "mileage": "",
+            "displacement": "",
+            "history": "",
+            "transmission": "",
+            "color": "",
+            "vehicle_type": "",
+            "tax_type": "",
+        }
+
+        for field, default_value in required_fields.items():
+            if field not in car_info:
+                car_info[field] = default_value
+
+        # Добавляем обязательные поля для модели AutohubCar
+        car_info["car_id"] = car_info.get("entry_number", "") or "unknown"
+        car_info["auction_number"] = car_info.get("entry_number", "") or "unknown"
+        car_info["title"] = (
+            f"{car_info.get('year', '')} {car_info.get('engine_type', '')} {car_info.get('fuel_type', '')}"
+        )
+
+        # Обработка года
+        year_str = car_info.get("year", "2000")
+        try:
+            car_info["year"] = int(year_str) if year_str.isdigit() else 2000
+        except (ValueError, AttributeError):
+            car_info["year"] = 2000
+
+        # Обработка трансмиссии
+        transmission = car_info.get("transmission", "").strip()
+        if transmission in ["오토", "자동"]:
+            car_info["transmission"] = TransmissionType.AUTO
+        elif transmission in ["수동", "매뉴얼"]:
+            car_info["transmission"] = TransmissionType.MANUAL
+        else:
+            car_info["transmission"] = TransmissionType.AUTO  # default
+
+        # Обработка топлива
+        fuel = car_info.get("fuel_type", "").strip()
+        if "휘발유" in fuel or "가솔린" in fuel:
+            car_info["fuel_type"] = FuelType.GASOLINE
+        elif "경유" in fuel or "디젤" in fuel:
+            car_info["fuel_type"] = FuelType.DIESEL
+        elif "전기" in fuel:
+            car_info["fuel_type"] = FuelType.ELECTRIC
+        elif "하이브리드" in fuel:
+            car_info["fuel_type"] = FuelType.HYBRID
+        else:
+            car_info["fuel_type"] = FuelType.GASOLINE  # default
+
+        # Статус по умолчанию
+        car_info["status"] = CarStatus.REGISTERED
+
+        return AutohubCar(**car_info)
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге информации об автомобиле: {e}")
+        # Возвращаем объект с пустыми значениями
+        return AutohubCar(
+            car_id="unknown",
+            auction_number="unknown",
+            car_number="",
+            parking_number="",
+            lane=None,
+            title="Unknown Car",
+            year=2000,
+            mileage="0",
+            transmission=TransmissionType.AUTO,
+            fuel_type=FuelType.GASOLINE,
+            status=CarStatus.REGISTERED,
+            entry_number="",
+            vin_number="",
+            engine_type="",
+            displacement="",
+            history="",
+            color="",
+            vehicle_type="",
+            tax_type="",
+        )
+
+
+def parse_performance_info(soup: BeautifulSoup) -> AutohubPerformanceInfo:
+    """Парсинг информации о производительности"""
+    try:
+        # Поиск таблицы с информацией о производительности
+        perf_table = soup.find("table", class_="tabl_3")
+        if not perf_table:
+            raise ValueError("Таблица с оценкой производительности не найдена")
+
+        rating = ""
+        inspector = ""
+        stored_items = []
+        stored_items_present = ""
+        notes = ""
+
+        rows = perf_table.find_all("tr")
+
+        for row in rows:
+            th = row.find("th")
+            td = row.find("td")
+
+            if th and td:
+                label = th.get_text().strip()
+                value = td.get_text().strip()
+
+                if "평가점" in label:
+                    rating = value
+                elif "점검원" in label:
+                    inspector = value
+                elif "보관물품" in label:
+                    # Парсинг отмеченных предметов
+                    checkboxes = td.find_all("input", {"type": "checkbox"})
+                    for checkbox in checkboxes:
+                        if checkbox.get("checked"):
+                            title = checkbox.get("title", "")
+                            if title:
+                                stored_items.append(title)
+                elif "보관품 여부" in label:
+                    stored_items_present = value
+                elif "비고" in label:
+                    notes = value
+
+        return AutohubPerformanceInfo(
+            rating=rating,
+            inspector=inspector,
+            stored_items=stored_items,
+            stored_items_present=stored_items_present,
+            notes=notes,
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге информации о производительности: {e}")
+        return AutohubPerformanceInfo(
+            rating="", inspector="", stored_items=[], stored_items_present="", notes=""
+        )
+
+
+def parse_options(soup: BeautifulSoup) -> AutohubOptionInfo:
+    """Парсинг опций автомобиля"""
+    try:
+        # Поиск таблицы с опциями
+        option_table = soup.find("table", class_="tabl_3 tabl_3_tb_th keepStuff")
+        if not option_table:
+            raise ValueError("Таблица с опциями не найдена")
+
+        convenience = []
+        safety = []
+        exterior = []
+        interior = []
+
+        rows = option_table.find_all("tr")
+
+        for row in rows:
+            th = row.find("th")
+            td = row.find("td")
+
+            if th and td:
+                category = th.get_text().strip()
+
+                # Парсинг отмеченных опций
+                checkboxes = td.find_all("input", {"type": "checkbox"})
+                options_list = []
+
+                for checkbox in checkboxes:
+                    if checkbox.get("checked"):
+                        title = checkbox.get("title", "")
+                        if title:
+                            options_list.append(title)
+
+                # Распределение по категориям
+                if "편의" in category:
+                    convenience = options_list
+                elif "안전" in category:
+                    safety = options_list
+                elif "외관" in category:
+                    exterior = options_list
+                elif "내장" in category:
+                    interior = options_list
+
+        return AutohubOptionInfo(
+            convenience=convenience, safety=safety, exterior=exterior, interior=interior
+        )
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге опций: {e}")
+        return AutohubOptionInfo(convenience=[], safety=[], exterior=[], interior=[])
+
+
+def parse_images(soup: BeautifulSoup) -> List[AutohubImage]:
+    """Парсинг изображений автомобиля"""
+    images = []
+
+    try:
+        # Поиск больших изображений
+        large_images = soup.find_all("img", class_="carImg")
+
+        for i, img in enumerate(large_images):
+            large_url = img.get("src", "")
+            if large_url:
+                # Получение URL маленького изображения
+                small_url = large_url.replace("_L.jpg", "_S.jpg")
+
+                images.append(
+                    AutohubImage(large_url=large_url, small_url=small_url, sequence=i)
+                )
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге изображений: {e}")
+
+    return images

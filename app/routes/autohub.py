@@ -1,14 +1,26 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, status
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import asyncio
 
-from app.models.autohub import AutohubResponse, AutohubError
+from app.models.autohub import (
+    AutohubResponse,
+    AutohubError,
+    AutohubCar,
+    AutohubCarDetail,
+    AutohubCarDetailRequest,
+    AutohubCarDetailResponse,
+)
 from app.services.autohub_service import AutohubService
 from app.core.logging import get_logger
 
 logger = get_logger("autohub_routes")
 
-router = APIRouter()
+router = APIRouter(
+    responses={404: {"description": "Not found"}},
+)
+
+# Создаем экземпляр сервиса
+autohub_service = AutohubService()
 
 
 # Dependency для получения сервиса
@@ -353,3 +365,116 @@ async def pagination_demo(
     finally:
         # Закрываем сервис
         service.close()
+
+
+@router.post("/car-detail", response_model=AutohubCarDetailResponse)
+async def get_car_detail(request: AutohubCarDetailRequest):
+    """
+    Получение детальной информации об автомобиле
+
+    Требуемые параметры:
+    - **auction_number**: Номер аукциона
+    - **auction_date**: Дата аукциона в формате YYYY-MM-DD
+    - **auction_title**: Название аукциона
+    - **auction_code**: Код аукциона
+    - **receive_code**: Код получения
+
+    Опциональные параметры:
+    - **page_number**: Номер страницы (по умолчанию 1)
+    - **page_size**: Размер страницы (по умолчанию 10)
+    - **sort_flag**: Флаг сортировки (по умолчанию "entry")
+    """
+    try:
+        result = autohub_service.get_car_detail(request)
+
+        if not result.success:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                    if "не найден" in (result.error or "")
+                    else status.HTTP_503_SERVICE_UNAVAILABLE
+                ),
+                detail=result.error or "Не удалось получить информацию об автомобиле",
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+
+
+@router.get("/car-detail/{auction_number}", response_model=AutohubCarDetailResponse)
+async def get_car_detail_by_params(
+    auction_number: str,
+    auction_date: str = Query(..., description="Дата аукциона в формате YYYY-MM-DD"),
+    auction_title: str = Query(..., description="Название аукциона"),
+    auction_code: str = Query(..., description="Код аукциона"),
+    receive_code: str = Query(..., description="Код получения"),
+    page_number: int = Query(1, description="Номер страницы", ge=1),
+    page_size: int = Query(10, description="Размер страницы", ge=1, le=100),
+    sort_flag: str = Query("entry", description="Флаг сортировки"),
+):
+    """
+    Альтернативный способ получения детальной информации об автомобиле через GET запрос
+
+    - **auction_number**: Номер аукциона
+    - **auction_date**: Дата аукциона в формате YYYY-MM-DD
+    - **auction_title**: Название аукциона
+    - **auction_code**: Код аукциона
+    - **receive_code**: Код получения
+    - **page_number**: Номер страницы (по умолчанию 1)
+    - **page_size**: Размер страницы (по умолчанию 10)
+    - **sort_flag**: Флаг сортировки (по умолчанию "entry")
+    """
+
+    # Создаем объект запроса
+    request = AutohubCarDetailRequest(
+        auction_number=auction_number,
+        auction_date=auction_date,
+        auction_title=auction_title,
+        auction_code=auction_code,
+        receive_code=receive_code,
+        page_number=page_number,
+        page_size=page_size,
+        sort_flag=sort_flag,
+    )
+
+    # Используем тот же обработчик
+    return await get_car_detail(request)
+
+
+@router.post("/auth/set-cookies")
+async def set_auth_cookies(cookies: dict):
+    """
+    Установка cookies для аутентификации
+
+    Передайте словарь с cookies в теле запроса:
+    ```json
+    {
+        "WMONID": "your_wmonid",
+        "gubun": "on",
+        "userid": "your_userid",
+        "JSESSIONID": "your_jsessionid"
+    }
+    ```
+    """
+    try:
+        autohub_service.set_auth_cookies(cookies)
+        return {"message": "Cookies успешно установлены"}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка при установке cookies: {str(e)}",
+        )
+
+
+@router.get("/health")
+async def health_check():
+    """Проверка здоровья сервиса Autohub"""
+    return {"status": "healthy", "service": "autohub", "version": "1.0.0"}

@@ -5,9 +5,17 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from fake_useragent import UserAgent
+from urllib.parse import urljoin
 
-from app.models.autohub import AutohubCar, AutohubResponse, AutohubError
-from app.parsers.autohub_parser import AutohubParser
+from app.models.autohub import (
+    AutohubCar,
+    AutohubResponse,
+    AutohubError,
+    AutohubCarDetail,
+    AutohubCarDetailRequest,
+    AutohubCarDetailResponse,
+)
+from app.parsers.autohub_parser import parse_car_detail
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -22,6 +30,7 @@ class AutohubService:
         self.parser = AutohubParser(self.settings.autohub_base_url)
         self.ua = UserAgent()
         self._session = None
+        self.base_url = "https://www.autohubauction.co.kr"
 
     @property
     def session(self) -> requests.Session:
@@ -513,3 +522,154 @@ class AutohubService:
     def __del__(self):
         """Деструктор для закрытия сессии"""
         self.close()
+
+    def get_cars(self, page: int = 1, limit: int = 50) -> AutohubResponse:
+        """Получение списка автомобилей"""
+        try:
+            # URL для получения списка автомобилей
+            url = urljoin(self.base_url, "/newfront/receive/rc/receive_rc_list.do")
+
+            # Базовые параметры запроса
+            data = {"page": page, "limit": limit, "sort": "entry_date desc"}
+
+            logger.info(f"Запрос к Autohub: {url} с параметрами {data}")
+
+            response = self.session.get(
+                url, params=data, timeout=self.settings.request_timeout
+            )
+            response.raise_for_status()
+
+            # Парсинг HTML ответа
+            cars = parse_cars(response.text)
+
+            return AutohubResponse(
+                success=True, data=cars, total_count=len(cars), page=page, limit=limit
+            )
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ошибка HTTP запроса к Autohub: {e}")
+            return AutohubResponse(
+                success=False,
+                data=[],
+                error=f"Ошибка подключения к серверу: {str(e)}",
+                total_count=0,
+                page=page,
+                limit=limit,
+            )
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка в get_cars: {e}")
+            return AutohubResponse(
+                success=False,
+                data=[],
+                error=f"Внутренняя ошибка сервера: {str(e)}",
+                total_count=0,
+                page=page,
+                limit=limit,
+            )
+
+    def get_car_detail(
+        self, request_params: AutohubCarDetailRequest
+    ) -> AutohubCarDetailResponse:
+        """Получение детальной информации об автомобиле"""
+        try:
+            # URL для получения детальной информации
+            url = urljoin(
+                self.base_url, "/newfront/onlineAuc/on/onlineAuc_on_detail.do"
+            )
+
+            # Подготовка данных запроса на основе параметров
+            data = {
+                "i_iNowPageNo": str(request_params.page_number),
+                "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
+                "i_sReturnParam": "",
+                "i_sActionFlag": "",
+                "i_sReceiveCd": "",
+                "pageFlag": "Y",
+                "i_sAucNo": request_params.auction_number,
+                "i_sStartDt": request_params.auction_date,
+                "i_sAucTitle": request_params.auction_title,
+                "i_sAucCode": request_params.auction_code,
+                "i_sSortFlag": request_params.sort_flag,
+                "i_sMainModel": "",
+                "i_sMakerCodeD": "",
+                "i_sCarName1CodeD": "",
+                "tabActiveIdx": "",
+                "listTabActiveIdx": "",
+                "receivecd": request_params.receive_code,
+                "i_sAucNoTempStr": "",
+                "i_sMakerCodeD1": "",
+                "i_sCarName1CodeD1": "",
+                "i_sAucNoTemp1": f"{request_params.auction_number}@@{request_params.auction_date}@@{request_params.auction_code}",
+                "i_entryNoYn": "ALL",
+                "i_parkingNoYn": "Y",
+                "noSelect": "E",
+                "i_sNo": "",
+                "i_sMakerCode": "",
+                "i_sCarName1Code": "",
+                "i_sCarName2Code": "",
+                "i_sCarName3Code": "",
+                "i_sFueltypecode": "",
+                "i_bojeongYn": "ALL",
+                "i_sCarYearStr": "",
+                "i_sCarYearEnd": "",
+                "i_sDriveKmShortDescStr": "",
+                "i_sDriveKmShortDescEnd": "",
+                "i_sPricecStr": "",
+                "i_sPricecEnd": "",
+                "i_sAucResult": "",
+                "i_sAucLane": "",
+                "i_sEntryNo": "",
+                "i_sParkingNo": "",
+                "i_entryNoYn0": "ALL",
+                "i_parkingNoYn0": "Y",
+                "i_sAucNoTemp2": f"{request_params.auction_number}@@{request_params.auction_date}@@{request_params.auction_code}",
+                "i_sohYn": "ALL",
+                "entrySort": request_params.sort_flag,
+                "i_iPageSize": str(request_params.page_size),
+            }
+
+            logger.info(f"POST запрос к Autohub detail: {url}")
+            logger.debug(f"Параметры запроса: {data}")
+
+            response = self.session.post(
+                url, data=data, timeout=self.settings.request_timeout
+            )
+            response.raise_for_status()
+
+            # Парсинг детальной информации
+            car_detail = parse_car_detail(response.text)
+
+            if car_detail:
+                return AutohubCarDetailResponse(
+                    success=True, data=car_detail, request_params=request_params
+                )
+            else:
+                return AutohubCarDetailResponse(
+                    success=False,
+                    error="Не удалось извлечь информацию об автомобиле из ответа",
+                    request_params=request_params,
+                )
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ошибка HTTP запроса к Autohub detail: {e}")
+            return AutohubCarDetailResponse(
+                success=False,
+                error=f"Ошибка подключения к серверу: {str(e)}",
+                request_params=request_params,
+            )
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка в get_car_detail: {e}")
+            return AutohubCarDetailResponse(
+                success=False,
+                error=f"Внутренняя ошибка сервера: {str(e)}",
+                request_params=request_params,
+            )
+
+    def set_auth_cookies(self, cookies: dict):
+        """Установка cookies для аутентификации"""
+        self.session.cookies.update(cookies)
+        logger.info("Установлены cookies для аутентификации в Autohub")
+
+
+# Глобальный экземпляр сервиса
+autohub_service = AutohubService()
