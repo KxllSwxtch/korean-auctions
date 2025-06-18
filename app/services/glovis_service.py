@@ -21,6 +21,7 @@ from app.models.glovis_filters import (
 from app.parsers.glovis_parser import GlovisParser
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.session_manager import get_session_manager, get_glovis_monitor
 
 logger = get_logger("glovis_service")
 
@@ -39,9 +40,32 @@ class GlovisService:
         self._session_ttl = timedelta(minutes=30)  # TTL сессии 30 минут
         self._last_cookie_update = None
 
+        # Используем глобальный менеджер сессий
+        self.session_manager = get_session_manager()
+        self.glovis_monitor = get_glovis_monitor()
+
+        # Запускаем мониторинг сессии
+        self.glovis_monitor.start_monitoring()
+
+        # Пытаемся загрузить сохраненную сессию при инициализации
+        self._load_saved_session()
+
     def _get_fresh_cookies(self) -> Dict[str, str]:
-        """Возвращает свежие cookies для Glovis (обновлено 2025-01-16)"""
-        # Обновленные cookies из рабочего curl запроса
+        """Возвращает свежие cookies для Glovis"""
+        # Сначала пытаемся загрузить из сохраненной сессии
+        saved_cookies = self.session_manager.load_session("glovis")
+        if saved_cookies and self.session_manager.is_session_fresh(
+            "glovis", max_age_hours=12
+        ):
+            logger.info("✅ Используем сохраненные cookies из кэша")
+            return saved_cookies
+
+        # Если нет сохраненных или они устарели, используем дефолтные
+        logger.warning(
+            "⚠️ Используем дефолтные cookies (сохраненные устарели или отсутствуют)"
+        )
+
+        # Дефолтные cookies на случай если нет сохраненных
         return {
             "SCOUTER": "z6d9hgnq5i09ho",
             "_gcl_au": "1.1.469301602.1749863933",
@@ -52,9 +76,30 @@ class GlovisService:
             "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
             "_ga": "GA1.1.1367887267.1749863933",
             "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-            "JSESSIONID": "35Giap8x5e0ZG5VZ1Cpo9YMm2atfJuTA2y5kwiu39qbCS0kAlEEbYh0hTsD9vvQ5.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24y",
-            "_ga_H9G80S9QWN": "GS2.1.s1750204424$o12$g1$t1750204435$j49$l0$h0",
+            "JSESSIONID": "1n1i0rJMRAKZT3xae8Qa92U24UupRDB4SmIghjp58CAjRUlsltoZS1jbLMEao5SZ.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+            "_ga_H9G80S9QWN": "GS2.1.s1750289809$o13$g1$t1750290339$j25$l0$h0",
         }
+
+    def _load_saved_session(self):
+        """Загружает сохраненную сессию при старте"""
+        try:
+            saved_cookies = self.session_manager.load_session("glovis")
+            if saved_cookies:
+                age = self.session_manager.get_session_age("glovis")
+                if age:
+                    logger.info(
+                        f"📂 Найдена сохраненная сессия Glovis (возраст: {age})"
+                    )
+                    if self.session_manager.is_session_fresh(
+                        "glovis", max_age_hours=24
+                    ):
+                        logger.info("✅ Сохраненная сессия свежая, будет использована")
+                    else:
+                        logger.warning("⚠️ Сохраненная сессия устарела")
+            else:
+                logger.info("📂 Сохраненная сессия Glovis не найдена")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при загрузке сохраненной сессии: {e}")
 
     def _is_session_expired(self) -> bool:
         """Проверяет, истекла ли сессия по времени"""
@@ -63,13 +108,24 @@ class GlovisService:
         return datetime.now() - self._session_created_at > self._session_ttl
 
     def update_cookies(self, new_cookies: Dict[str, str]) -> None:
-        """Обновляет cookies в текущей сессии"""
+        """Обновляет cookies в текущей сессии и сохраняет их"""
         if self._session:
             logger.info("🔄 Обновляю cookies в текущей сессии")
             for name, value in new_cookies.items():
                 self._session.cookies.set(name, value)
             self._last_cookie_update = datetime.now()
-            logger.info("✅ Cookies успешно обновлены")
+
+            # Сохраняем обновленные cookies
+            self.session_manager.save_session(
+                "glovis",
+                new_cookies,
+                metadata={
+                    "source": "manual_update",
+                    "jsessionid": new_cookies.get("JSESSIONID"),
+                },
+            )
+
+            logger.info("✅ Cookies успешно обновлены и сохранены")
         else:
             logger.warning("⚠️ Сессия не инициализирована, cookies не обновлены")
 

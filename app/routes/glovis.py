@@ -1,8 +1,18 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks, Body
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Depends,
+    BackgroundTasks,
+    Body,
+    UploadFile,
+    File,
+)
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from loguru import logger
 from urllib.parse import unquote
+from pathlib import Path
 
 from app.models.glovis import GlovisResponse, GlovisError
 from app.models.glovis_filters import (
@@ -825,3 +835,167 @@ async def get_session_info(glovis_service: GlovisService = Depends(get_glovis_se
             "message": f"Ошибка при получении информации о сессии: {str(e)}",
             "timestamp": datetime.now().isoformat(),
         }
+
+
+@router.post("/update-cookies", response_model=Dict[str, Any])
+async def update_cookies(
+    cookies: Dict[str, str],
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Обновляет cookies для Glovis сессии"""
+    try:
+        # Обновляем cookies в сервисе
+        service.update_cookies(cookies)
+
+        # Проверяем новую сессию
+        session_check = await service.check_session_validity()
+
+        return {
+            "success": True,
+            "message": "Cookies успешно обновлены",
+            "data": {
+                "cookies_count": len(cookies),
+                "jsessionid": (
+                    cookies.get("JSESSIONID", "")[:20] + "..."
+                    if cookies.get("JSESSIONID")
+                    else None
+                ),
+                "new_session_status": session_check,
+            },
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при обновлении cookies: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при обновлении cookies: {str(e)}",
+            "data": None,
+        }
+
+
+@router.get("/check-session", response_model=Dict[str, Any])
+async def check_session(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Проверяет текущий статус сессии Glovis"""
+    try:
+        session_status = await service.check_session_validity()
+
+        # Добавляем информацию о возрасте сессии
+        session_age = service.session_manager.get_session_age("glovis")
+        age_info = str(session_age) if session_age else "Неизвестно"
+
+        return {
+            "success": True,
+            "message": "Статус сессии получен",
+            "data": {
+                **session_status,
+                "session_age": age_info,
+                "is_fresh": service.session_manager.is_session_fresh(
+                    "glovis", max_age_hours=12
+                ),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при проверке сессии: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при проверке сессии: {str(e)}",
+            "data": None,
+        }
+
+
+@router.post("/upload-curl-file", response_model=Dict[str, Any])
+async def upload_curl_file(
+    file: UploadFile = File(...),
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Загружает файл с curl запросом и извлекает cookies"""
+    try:
+        # Сохраняем временный файл
+        temp_file = Path(f"/tmp/{file.filename}")
+        content = await file.read()
+
+        with open(temp_file, "wb") as f:
+            f.write(content)
+
+        # Извлекаем cookies из файла
+        from app.utils.glovis_cookies_updater import GlovisCookiesUpdater
+
+        result = GlovisCookiesUpdater.update_cookies_from_curl_file(str(temp_file))
+
+        # Удаляем временный файл
+        temp_file.unlink()
+
+        if result["success"] and result["cookies"]:
+            # Обновляем cookies
+            service.update_cookies(result["cookies"])
+
+            return {
+                "success": True,
+                "message": "Cookies успешно извлечены и обновлены",
+                "data": {
+                    "cookies_count": len(result["cookies"]),
+                    "jsessionid": (
+                        result.get("jsessionid", "")[:20] + "..."
+                        if result.get("jsessionid")
+                        else None
+                    ),
+                },
+            }
+        else:
+            return {
+                "success": False,
+                "message": result.get("message", "Не удалось извлечь cookies"),
+                "data": None,
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке curl файла: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при загрузке файла: {str(e)}",
+            "data": None,
+        }
+
+
+@router.get("/session-info", response_model=Dict[str, Any])
+async def get_session_info(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Получает подробную информацию о текущей сессии"""
+    try:
+        session_manager = service.session_manager
+
+        # Информация о сохраненной сессии
+        saved_info = {}
+        session_age = session_manager.get_session_age("glovis")
+
+        if session_age:
+            saved_info = {
+                "exists": True,
+                "age": str(session_age),
+                "is_fresh": session_manager.is_session_fresh(
+                    "glovis", max_age_hours=12
+                ),
+            }
+        else:
+            saved_info = {"exists": False, "age": None, "is_fresh": False}
+
+        # Информация о мониторинге
+        monitor_info = {
+            "monitoring_active": service.glovis_monitor.monitoring,
+            "check_interval": service.glovis_monitor.check_interval,
+        }
+
+        return {
+            "success": True,
+            "message": "Информация о сессии",
+            "data": {
+                "saved_session": saved_info,
+                "monitor": monitor_info,
+                "current_cookies": service.get_current_cookies(),
+            },
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при получении информации о сессии: {e}")
+        return {"success": False, "message": f"Ошибка: {str(e)}", "data": None}
