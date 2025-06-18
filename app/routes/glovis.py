@@ -14,6 +14,7 @@ from app.models.glovis_filters import (
 )
 from app.services.glovis_service import GlovisService
 from app.core.logging import get_logger
+from app.utils.glovis_cookies_updater import GlovisCookiesUpdater
 
 # Настраиваем логгер
 glovis_logger = get_logger("glovis_routes")
@@ -22,6 +23,11 @@ router = APIRouter(prefix="/api/v1/glovis", tags=["Glovis"])
 
 # Глобальный экземпляр сервиса
 glovis_service = GlovisService()
+
+
+def get_glovis_service() -> GlovisService:
+    """Dependency для получения экземпляра GlovisService"""
+    return glovis_service
 
 
 @router.get("/cars", response_model=GlovisResponse)
@@ -706,3 +712,116 @@ async def find_car_by_license_plate(
     except Exception as e:
         glovis_logger.error(f"❌ Ошибка при поиске: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
+
+
+@router.post("/admin/update-cookies")
+async def update_cookies_from_curl(
+    file_path: str = "glovis-curl-request.py",
+    glovis_service: GlovisService = Depends(get_glovis_service),
+):
+    """
+    Обновляет cookies Glovis из curl файла
+
+    Args:
+        file_path: Путь к файлу с curl запросом (по умолчанию glovis-curl-request.py)
+
+    Returns:
+        Результат обновления cookies
+    """
+    try:
+        logger.info(f"🔄 Начинаю обновление cookies из файла: {file_path}")
+
+        # Извлекаем данные из curl файла
+        updater = GlovisCookiesUpdater()
+        result = updater.update_cookies_from_curl_file(file_path)
+
+        if not result["success"]:
+            logger.error(f"❌ Ошибка извлечения данных: {result['message']}")
+            return {
+                "success": False,
+                "message": result["message"],
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        # Обновляем cookies в сервисе
+        glovis_service.update_cookies(result["cookies"])
+
+        # Проверяем валидность обновленной сессии
+        session_check = await glovis_service.check_session_validity()
+
+        logger.info(f"✅ Cookies успешно обновлены из {file_path}")
+
+        return {
+            "success": True,
+            "message": f"Cookies успешно обновлены из {file_path}",
+            "jsessionid": result["jsessionid"],
+            "session_valid": session_check.get("is_valid", False),
+            "cookies_count": len(result["cookies"]),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при обновлении cookies: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при обновлении cookies: {str(e)}",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+
+@router.get("/admin/session-info")
+async def get_session_info(glovis_service: GlovisService = Depends(get_glovis_service)):
+    """
+    Получает информацию о текущей сессии Glovis
+
+    Returns:
+        Информация о сессии
+    """
+    try:
+        logger.info("📊 Получаю информацию о сессии Glovis")
+
+        # Проверяем валидность сессии
+        session_check = await glovis_service.check_session_validity()
+
+        # Получаем текущие cookies
+        current_cookies = glovis_service.get_current_cookies()
+
+        # Извлекаем JSESSIONID
+        jsessionid = current_cookies.get("JSESSIONID", "Не найден")
+
+        # Информация о сессии
+        session_info = {
+            "session_valid": session_check.get("is_valid", False),
+            "jsessionid": jsessionid,
+            "cookies_count": len(current_cookies),
+            "session_created": (
+                glovis_service._session_created_at.isoformat()
+                if glovis_service._session_created_at
+                else None
+            ),
+            "last_cookie_update": (
+                glovis_service._last_cookie_update.isoformat()
+                if glovis_service._last_cookie_update
+                else None
+            ),
+            "session_expired": glovis_service._is_session_expired(),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        logger.info(
+            f"📊 Информация о сессии получена: валидность={session_info['session_valid']}"
+        )
+
+        return {
+            "success": True,
+            "session_info": session_info,
+            "message": "Информация о сессии получена успешно",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка при получении информации о сессии: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при получении информации о сессии: {str(e)}",
+            "timestamp": datetime.now().isoformat(),
+        }

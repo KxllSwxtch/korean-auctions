@@ -40,9 +40,8 @@ class GlovisService:
         self._last_cookie_update = None
 
     def _get_fresh_cookies(self) -> Dict[str, str]:
-        """Возвращает свежие cookies для Glovis"""
-        # Здесь можно реализовать логику получения свежих cookies
-        # В будущем можно добавить автоматическое получение cookies из браузера
+        """Возвращает свежие cookies для Glovis (обновлено 2025-01-16)"""
+        # Обновленные cookies из рабочего curl запроса
         return {
             "SCOUTER": "z6d9hgnq5i09ho",
             "_gcl_au": "1.1.469301602.1749863933",
@@ -53,8 +52,8 @@ class GlovisService:
             "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
             "_ga": "GA1.1.1367887267.1749863933",
             "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-            "JSESSIONID": "uwd2WExV2VHUd72e9f23DvE6y5XlYxL8epcInKAtuW8qYVrGlLRwj7BYarfX1KdR.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-            "_ga_H9G80S9QWN": "GS2.1.s1750030729$o7$g1$t1750030786$j3$l0$h0",
+            "JSESSIONID": "35Giap8x5e0ZG5VZ1Cpo9YMm2atfJuTA2y5kwiu39qbCS0kAlEEbYh0hTsD9vvQ5.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24y",
+            "_ga_H9G80S9QWN": "GS2.1.s1750204424$o12$g1$t1750204435$j49$l0$h0",
         }
 
     def _is_session_expired(self) -> bool:
@@ -206,7 +205,7 @@ class GlovisService:
                 "bidcd": "",
                 "exportAuctionYn": "N",
                 "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-                "atn": "747",
+                "atn": "748",
                 "acc": "30",
                 "rc": "",
                 "gn": "",
@@ -228,23 +227,23 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": "20250614090000",
-                "auctenddt": "20250616120000",
-                "primeAuctionChk": "",
-                "primeauctionyn": "N",
-                "primeauctionAlertMessage": "",
+                "auctstardt": "20250617200000",
+                "auctenddt": "20250618120000",
+                "primeAuctionChk": "N",
+                "primeauctionyn": "Y",
+                "primeauctionAlertMessage": "프라임 옥션은 VVIP/VIP등급 회원만 참여 가능합니다.",
                 "searchInput": "",
                 "exceptEmptYn": "Y",
                 "sprice": "",
                 "eprice": "",
                 "syearcd": "",
                 "eyearcd": "",
-                "searchAuctno": "747",
+                "searchAuctno": "748",
                 "auctroomcd": "",
-                "publicauctionsdt": "20250614090000",
-                "publicauctionedt": "20250616120000",
-                "publicauctionsday": "토",
-                "publicauctioneday": "월",
+                "publicauctionsdt": "20250617200000",
+                "publicauctionedt": "20250618120000",
+                "publicauctionsday": "화",
+                "publicauctioneday": "수",
                 "rowLimit": "18",
                 "searchorder": "01",
             }
@@ -267,7 +266,7 @@ class GlovisService:
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=747&acc=30&auctListStat=&flag=Y",
+                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=748&acc=30&auctListStat=&flag=Y",
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
