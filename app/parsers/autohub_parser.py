@@ -163,9 +163,24 @@ class AutohubParser:
             if car_list:
                 items = car_list.find_all("li")
                 if len(items) >= 4:
-                    # Год
+                    # Год - проверяем на формат с датой регистрации
                     year_text = items[0].get_text(strip=True)
-                    if year_text.isdigit():
+                    year_match = re.search(r"(\d{4})", year_text)
+                    if year_match:
+                        info["year"] = int(year_match.group(1))
+
+                        # Проверяем, есть ли дата регистрации в том же элементе
+                        reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", year_text)
+                        if reg_match:
+                            raw_date = reg_match.group(1)
+                            formatted_date = (
+                                f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                            )
+                            info["first_registration_date"] = formatted_date
+                            logger.debug(
+                                f"📅 Найдена дата регистрации в элементе года: {raw_date} -> {formatted_date}"
+                            )
+                    elif year_text.isdigit():
                         info["year"] = int(year_text)
 
                     # Пробег
@@ -180,10 +195,36 @@ class AutohubParser:
                     info["fuel_type"] = self._parse_fuel_type(fuel_text)
 
             # Дополнительная информация из других элементов
-            # Дата регистрации
-            reg_date_element = car_block.find("strong", string="최초등록일 : ")
-            if reg_date_element and reg_date_element.next_sibling:
-                info["first_registration_date"] = reg_date_element.next_sibling.strip()
+            # Дата регистрации - поиск в разных местах (если не найдена выше)
+            first_registration_date = info.get("first_registration_date")
+
+            # Способ 1: Поиск в прямом тексте с меткой "최초등록일 : " (если не найдена выше)
+            if not first_registration_date:
+                reg_date_element = car_block.find("strong", string="최초등록일 : ")
+                if reg_date_element and reg_date_element.next_sibling:
+                    first_registration_date = reg_date_element.next_sibling.strip()
+
+            # Способ 2: Поиск в тексте с годом в формате "YYYY (최초등록일 : YYYYMMDD)" (если не найдена выше)
+            if not first_registration_date:
+                # Ищем в любом тексте формат с годом и датой регистрации
+                text_elements = car_block.find_all(
+                    text=re.compile(r"\d{4}\s*\(최초등록일\s*:\s*\d{8}\)")
+                )
+                for text_elem in text_elements:
+                    reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", text_elem)
+                    if reg_match:
+                        # Форматируем дату из YYYYMMDD в YYYY-MM-DD
+                        raw_date = reg_match.group(1)
+                        first_registration_date = (
+                            f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                        )
+                        logger.debug(
+                            f"📅 Найдена дата регистрации в дополнительном тексте: {raw_date} -> {first_registration_date}"
+                        )
+                        break
+
+            if first_registration_date:
+                info["first_registration_date"] = first_registration_date
 
             # Оценка состояния
             grade_element = car_block.find("strong", string="평가점 : ")
@@ -484,12 +525,31 @@ def parse_car_info(soup: BeautifulSoup) -> AutohubCar:
                     car_info["vin_number"] = value
                 elif "연식" in label:
                     # Парсинг года и даты первой регистрации
+                    # Поддерживаем форматы:
+                    # - "2022 (최초등록일 : 20210809)"
+                    # - "2021 (최초등록일 : 20210615)"
+                    # - "2022" (только год)
+
                     year_match = re.search(r"(\d{4})", value)
+                    # Новый регекс для парсинга даты регистрации в скобках
                     reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", value)
 
                     car_info["year"] = year_match.group(1) if year_match else value
                     if reg_match:
-                        car_info["first_registration"] = reg_match.group(1)
+                        # Форматируем дату из YYYYMMDD в YYYY-MM-DD
+                        raw_date = reg_match.group(1)
+                        formatted_date = (
+                            f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                        )
+                        car_info["first_registration"] = formatted_date
+                        car_info["first_registration_date"] = formatted_date
+                        logger.debug(
+                            f"📅 Найдена дата регистрации: {raw_date} -> {formatted_date}"
+                        )
+                    else:
+                        logger.debug(
+                            f"⚠️ Дата регистрации не найдена в значении: {value}"
+                        )
                 elif "원동기형식" in label:
                     car_info["engine_type"] = value
                 elif "연료" in label:
