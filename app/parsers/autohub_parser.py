@@ -15,6 +15,11 @@ from app.models.autohub import (
     AutohubPerformanceInfo,
     AutohubOptionInfo,
     AutohubImage,
+    AutohubInspectionReport,
+    AutohubInspectionItem,
+    CONDITION_CODES,
+    SEDAN_PARTS,
+    CATEGORY_NAMES,
 )
 from app.core.logging import get_logger
 
@@ -418,6 +423,9 @@ def parse_car_detail(html: str) -> Optional[AutohubCarDetail]:
         # Парсинг изображений
         images = parse_images(soup)
 
+        # Парсинг технического листа с заменами и покрасками
+        inspection_report = parse_inspection_report(soup)
+
         return AutohubCarDetail(
             title=title,
             starting_price=starting_price,
@@ -429,6 +437,7 @@ def parse_car_detail(html: str) -> Optional[AutohubCarDetail]:
             performance_info=performance_info,
             options=options,
             images=images,
+            inspection_report=inspection_report,
             parsed_at=datetime.now(),
         )
 
@@ -731,52 +740,56 @@ def parse_performance_info(soup: BeautifulSoup) -> AutohubPerformanceInfo:
 def parse_options(soup: BeautifulSoup) -> AutohubOptionInfo:
     """Парсинг опций автомобиля"""
     try:
-        # Поиск таблицы с опциями
-        option_table = soup.find("table", class_="tabl_3 tabl_3_tb_th keepStuff")
-        if not option_table:
-            raise ValueError("Таблица с опциями не найдена")
+        # Инициализируем пустые списки для каждой категории опций
+        exterior_options = []
+        interior_options = []
+        safety_options = []
+        convenience_options = []
+        multimedia_options = []
 
-        convenience = []
-        safety = []
-        exterior = []
-        interior = []
+        # Поиск блоков с опциями
+        option_blocks = soup.find_all("div", class_="option-block")
 
-        rows = option_table.find_all("tr")
+        for block in option_blocks:
+            category_element = block.find("h4")
+            if not category_element:
+                continue
 
-        for row in rows:
-            th = row.find("th")
-            td = row.find("td")
+            category = category_element.get_text(strip=True).lower()
+            options_list = block.find_all("li")
 
-            if th and td:
-                category = th.get_text().strip()
+            current_options = []
+            for option in options_list:
+                option_text = option.get_text(strip=True)
+                if option_text:
+                    current_options.append(option_text)
 
-                # Парсинг отмеченных опций
-                checkboxes = td.find_all("input", {"type": "checkbox"})
-                options_list = []
-
-                for checkbox in checkboxes:
-                    if checkbox.get("checked"):
-                        title = checkbox.get("title", "")
-                        if title:
-                            options_list.append(title)
-
-                # Распределение по категориям
-                if "편의" in category:
-                    convenience = options_list
-                elif "안전" in category:
-                    safety = options_list
-                elif "외관" in category:
-                    exterior = options_list
-                elif "내장" in category:
-                    interior = options_list
+            # Распределяем опции по категориям
+            if "외관" in category or "exterior" in category:
+                exterior_options.extend(current_options)
+            elif "내장" in category or "interior" in category:
+                interior_options.extend(current_options)
+            elif "안전" in category or "safety" in category:
+                safety_options.extend(current_options)
+            elif "편의" in category or "convenience" in category:
+                convenience_options.extend(current_options)
+            elif "멀티미디어" in category or "multimedia" in category:
+                multimedia_options.extend(current_options)
+            else:
+                # Если категория не определена, добавляем в удобство
+                convenience_options.extend(current_options)
 
         return AutohubOptionInfo(
-            convenience=convenience, safety=safety, exterior=exterior, interior=interior
+            exterior_options=exterior_options,
+            interior_options=interior_options,
+            safety_options=safety_options,
+            convenience_options=convenience_options,
+            multimedia_options=multimedia_options,
         )
 
     except Exception as e:
         logger.error(f"Ошибка при парсинге опций: {e}")
-        return AutohubOptionInfo(convenience=[], safety=[], exterior=[], interior=[])
+        return AutohubOptionInfo()
 
 
 def parse_images(soup: BeautifulSoup) -> List[AutohubImage]:
@@ -801,3 +814,138 @@ def parse_images(soup: BeautifulSoup) -> List[AutohubImage]:
         logger.error(f"Ошибка при парсинге изображений: {e}")
 
     return images
+
+
+def parse_inspection_report(soup: BeautifulSoup) -> Optional[AutohubInspectionReport]:
+    """Парсинг технического листа с заменами и покрасками"""
+    try:
+        # Поиск скрытых полей с данными о проверке
+        inspresult_input = soup.find("input", {"id": "inspresult"})
+        categorycode_input = soup.find("input", {"id": "categorycode"})
+
+        if not inspresult_input or not categorycode_input:
+            logger.warning("Не найдены данные технического листа")
+            return None
+
+        inspresult = inspresult_input.get("value", "")
+        category_code = categorycode_input.get("value", "")
+
+        if not inspresult or not category_code:
+            logger.warning("Пустые данные технического листа")
+            return None
+
+        logger.info(f"🔧 Парсинг технического листа: категория {category_code}")
+
+        # Разбираем строку результатов проверки
+        inspection_data = inspresult.split(",")
+
+        # Определяем названия частей в зависимости от категории
+        if category_code == "001":
+            parts_map = SEDAN_PARTS
+        else:
+            # Для других категорий используем базовые названия
+            parts_map = {i: f"Часть {i+1}" for i in range(len(inspection_data))}
+
+        category_name = CATEGORY_NAMES.get(category_code, f"Категория {category_code}")
+
+        # Парсим каждую часть
+        inspection_items = []
+        total_items = 0
+        damaged_items = 0
+        replacement_needed = 0
+        bodywork_needed = 0
+        painting_needed = 0
+        damage_summary = {}
+
+        for i, condition_code in enumerate(inspection_data):
+            if condition_code and condition_code != "@@@":
+                total_items += 1
+
+                # Получаем название части
+                part_name = parts_map.get(i, f"Часть {i+1}")
+
+                # Определяем описание состояния
+                condition_desc = CONDITION_CODES.get(
+                    condition_code, "Неизвестное состояние"
+                )
+
+                # Извлекаем дополнительную информацию (степень повреждения)
+                severity = None
+                if len(condition_code) > 3:
+                    severity = condition_code[3:]
+
+                # Создаем элемент проверки
+                item = AutohubInspectionItem(
+                    part_id=i,
+                    part_name=part_name,
+                    condition_code=condition_code,
+                    condition_description=condition_desc,
+                    severity=severity,
+                )
+
+                inspection_items.append(item)
+
+                # Подсчитываем статистику
+                if condition_code != "@@@":
+                    damaged_items += 1
+
+                if item.needs_replacement or item.needs_replacement_required:
+                    replacement_needed += 1
+
+                if item.needs_bodywork:
+                    bodywork_needed += 1
+
+                if item.needs_painting:
+                    painting_needed += 1
+
+                # Добавляем в сводку по типам повреждений
+                base_code = (
+                    condition_code[:3] if len(condition_code) >= 3 else condition_code
+                )
+                damage_summary[base_code] = damage_summary.get(base_code, 0) + 1
+
+        # Ищем дополнительные комментарии
+        special_notes = None
+        inspector_comments = None
+
+        # Поиск особых замечаний
+        special_notes_elem = soup.find("th", string="특기사항/점검자 의견")
+        if special_notes_elem:
+            notes_td = special_notes_elem.find_next("td")
+            if notes_td:
+                special_notes = notes_td.get_text(strip=True)
+
+        # Поиск комментариев по функциональной оценке
+        func_eval_elem = soup.find("th", string="기능평가정보 상세")
+        if func_eval_elem:
+            comments_td = func_eval_elem.find_next("td")
+            if comments_td:
+                inspector_comments = comments_td.get_text(strip=True)
+
+        # Создаем отчет
+        inspection_report = AutohubInspectionReport(
+            category_code=category_code,
+            category_name=category_name,
+            total_items=total_items,
+            damaged_items=damaged_items,
+            replacement_needed=replacement_needed,
+            bodywork_needed=bodywork_needed,
+            painting_needed=painting_needed,
+            inspection_items=inspection_items,
+            special_notes=special_notes,
+            inspector_comments=inspector_comments,
+            damage_summary=damage_summary,
+        )
+
+        logger.info(
+            f"✅ Технический лист: {damaged_items}/{total_items} поврежденных частей"
+        )
+        logger.info(
+            f"   - Замена: {replacement_needed}, Кузовной ремонт: {bodywork_needed}, Покраска: {painting_needed}"
+        )
+
+        return inspection_report
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге технического листа: {e}")
+        return None

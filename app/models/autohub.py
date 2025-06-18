@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from enum import Enum
 
@@ -156,16 +156,101 @@ class AutohubPerformanceInfo(BaseModel):
 
 
 class AutohubOptionInfo(BaseModel):
-    convenience: List[str]
-    safety: List[str]
-    exterior: List[str]
-    interior: List[str]
+    """Информация об опциях автомобиля"""
+
+    exterior_options: List[str] = Field(default_factory=list)
+    interior_options: List[str] = Field(default_factory=list)
+    safety_options: List[str] = Field(default_factory=list)
+    convenience_options: List[str] = Field(default_factory=list)
+    multimedia_options: List[str] = Field(default_factory=list)
 
 
 class AutohubImage(BaseModel):
+    """Изображение автомобиля"""
+
     large_url: str
     small_url: str
     sequence: int
+
+
+class AutohubInspectionItem(BaseModel):
+    """Элемент проверки части автомобиля"""
+
+    part_id: int = Field(..., description="ID части автомобиля")
+    part_name: str = Field(..., description="Название части")
+    condition_code: str = Field(
+        ..., description="Код состояния (@@@, X@@, W@@, A@@, U@@, E@@, M@@, F@@)"
+    )
+    condition_description: str = Field(..., description="Описание состояния")
+    severity: Optional[str] = Field(None, description="Степень повреждения")
+
+    @property
+    def needs_replacement(self) -> bool:
+        """Требует замены"""
+        return self.condition_code.startswith("X") or self.condition_code == "X@@"
+
+    @property
+    def needs_bodywork(self) -> bool:
+        """Требует кузовного ремонта"""
+        return self.condition_code.startswith("W") or self.condition_code == "W@@"
+
+    @property
+    def has_minor_damage(self) -> bool:
+        """Имеет незначительные повреждения"""
+        return (
+            self.condition_code.startswith("A")
+            or self.condition_code == "@A@"
+            or self.condition_code == "A@@"
+        )
+
+    @property
+    def needs_painting(self) -> bool:
+        """Требует покраски"""
+        return self.condition_code.startswith("U") or self.condition_code == "U@@"
+
+    @property
+    def needs_replacement_required(self) -> bool:
+        """Требует обязательной замены"""
+        return self.condition_code.startswith("E") or self.condition_code == "E@@"
+
+
+class AutohubInspectionReport(BaseModel):
+    """Технический лист с результатами проверки автомобиля"""
+
+    category_code: str = Field(
+        ...,
+        description="Код категории автомобиля (001=седан, 002=пикап, 003=микроавтобус, 004=грузовик)",
+    )
+    category_name: str = Field(..., description="Название категории автомобиля")
+
+    # Основные показатели
+    total_items: int = Field(..., description="Общее количество проверенных частей")
+    damaged_items: int = Field(..., description="Количество поврежденных частей")
+    replacement_needed: int = Field(
+        ..., description="Количество частей, требующих замены"
+    )
+    bodywork_needed: int = Field(
+        ..., description="Количество частей, требующих кузовного ремонта"
+    )
+    painting_needed: int = Field(
+        ..., description="Количество частей, требующих покраски"
+    )
+
+    # Детальная информация по частям
+    inspection_items: List[AutohubInspectionItem] = Field(
+        default_factory=list, description="Детальная информация по каждой части"
+    )
+
+    # Дополнительная информация
+    special_notes: Optional[str] = Field(None, description="Особые замечания")
+    inspector_comments: Optional[str] = Field(
+        None, description="Комментарии инспектора"
+    )
+
+    # Статистика по типам повреждений
+    damage_summary: Dict[str, int] = Field(
+        default_factory=dict, description="Сводка по типам повреждений"
+    )
 
 
 class AutohubCarDetail(BaseModel):
@@ -188,6 +273,11 @@ class AutohubCarDetail(BaseModel):
 
     # Изображения
     images: List[AutohubImage]
+
+    # Технический лист с заменами и покрасками
+    inspection_report: Optional[AutohubInspectionReport] = Field(
+        None, description="Технический лист с информацией о повреждениях и ремонте"
+    )
 
     # Метаданные
     parsed_at: datetime
@@ -213,3 +303,66 @@ class AutohubCarDetailResponse(BaseModel):
     data: Optional[AutohubCarDetail] = None
     error: Optional[str] = None
     request_params: AutohubCarDetailRequest
+
+
+# Константы для расшифровки кодов состояния
+CONDITION_CODES = {
+    "@@@": "Нормальное состояние",
+    "X@@": "Замена",
+    "W@@": "Кузовной ремонт, сварка",
+    "A@@": "Незначительные повреждения",
+    "@A@": "Незначительные повреждения",  # Альтернативный формат
+    "U@@": "Кузовной ремонт, покраска требуется",
+    "E@@": "Замена обязательна",
+    "M@@": "Регулировка, снятие/установка",
+    "F@@": "Повреждение/изгиб",
+}
+
+# Названия частей автомобиля по позициям (для седана - категория 001)
+SEDAN_PARTS = {
+    0: "Передний левый крыло",
+    1: "Передний левый фонарь",
+    2: "Передний левый бампер",
+    3: "Передняя левая дверь",
+    4: "Передняя левая стойка",
+    5: "Задняя левая дверь",
+    6: "Задний левый крыло",
+    7: "Задний левый фонарь",
+    8: "Задний левый бампер",
+    9: "Передний капот",
+    10: "Передний левый угол",
+    11: "Передний правый угол",
+    12: "Передняя панель",
+    13: "Крыша передняя",
+    14: "Крыша средняя",
+    15: "Крыша задняя",
+    16: "Задняя панель",
+    17: "Задний левый угол",
+    18: "Задний правый угол",
+    19: "Задний капот",
+    20: "Передний правый крыло",
+    21: "Передний правый фонарь",
+    22: "Передний правый бампер",
+    23: "Передняя правая дверь",
+    24: "Передняя правая стойка",
+    25: "Задняя правая дверь",
+    26: "Задний правый крыло",
+    27: "Задний правый фонарь",
+    28: "Задний правый бампер",
+    29: "Нижняя передняя панель",
+    30: "Левое зеркало",
+    31: "Правое зеркало",
+    32: "Нижняя средняя панель",
+    33: "Нижняя задняя панель",
+    34: "Левое заднее колесо",
+    35: "Правое заднее колесо",
+    36: "Центральная нижняя панель",
+    37: "Нижняя задняя панель",
+}
+
+CATEGORY_NAMES = {
+    "001": "Седан",
+    "002": "Пикап",
+    "003": "Микроавтобус",
+    "004": "Грузовик",
+}
