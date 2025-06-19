@@ -261,8 +261,8 @@ class GlovisService:
                 "bidcd": "",
                 "exportAuctionYn": "N",
                 "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-                "atn": "748",
-                "acc": "30",
+                "atn": "945",
+                "acc": "20",
                 "rc": "",
                 "gn": "",
                 "searchRc": "",
@@ -283,23 +283,21 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": "20250617200000",
-                "auctenddt": "20250618120000",
-                "primeAuctionChk": "N",
-                "primeauctionyn": "Y",
-                "primeauctionAlertMessage": "프라임 옥션은 VVIP/VIP등급 회원만 참여 가능합니다.",
+                "auctstardt": "20250619130000",
+                "auctenddt": "",
+                "primeAuctionChk": "",
+                "primeauctionyn": "",
+                "primeauctionAlertMessage": "",
                 "searchInput": "",
                 "exceptEmptYn": "Y",
                 "sprice": "",
                 "eprice": "",
                 "syearcd": "",
                 "eyearcd": "",
-                "searchAuctno": "748",
+                "searchAuctno": "945",
                 "auctroomcd": "",
-                "publicauctionsdt": "20250617200000",
-                "publicauctionedt": "20250618120000",
-                "publicauctionsday": "화",
-                "publicauctioneday": "수",
+                "searchLanecd": "",
+                "auctListStat": "01",
                 "rowLimit": "18",
                 "searchorder": "01",
             }
@@ -322,7 +320,7 @@ class GlovisService:
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=748&acc=30&auctListStat=&flag=Y",
+                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=945&acc=20&auctListStat=01&flag=Y",
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
@@ -493,7 +491,7 @@ class GlovisService:
 
             # Делаем простой запрос для проверки сессии
             session = self.session
-            test_url = f"{self.base_url}/auction/exhibitList.do?atn=747&acc=30&flag=Y"
+            test_url = f"{self.base_url}/auction/exhibitList.do?atn=945&acc=20&flag=Y"
 
             response = session.get(test_url, timeout=10, allow_redirects=False)
 
