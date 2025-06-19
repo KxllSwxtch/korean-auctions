@@ -65,7 +65,7 @@ class GlovisService:
             "⚠️ Используем дефолтные cookies (сохраненные устарели или отсутствуют)"
         )
 
-        # Дефолтные cookies на случай если нет сохраненных
+        # Свежие cookies из рабочего примера (обновлено 2025-06-19)
         return {
             "SCOUTER": "z6d9hgnq5i09ho",
             "_gcl_au": "1.1.469301602.1749863933",
@@ -76,8 +76,8 @@ class GlovisService:
             "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
             "_ga": "GA1.1.1367887267.1749863933",
             "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-            "JSESSIONID": "1n1i0rJMRAKZT3xae8Qa92U24UupRDB4SmIghjp58CAjRUlsltoZS1jbLMEao5SZ.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-            "_ga_H9G80S9QWN": "GS2.1.s1750289809$o13$g1$t1750290339$j25$l0$h0",
+            "JSESSIONID": "MnHMksSJtqnPpna3cTKG9ePodXjmil3aS6lP0bbN1hBIWcQwl60arHxOa2FFL798.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24y",
+            "_ga_H9G80S9QWN": "GS2.1.s1750316379$o17$g1$t1750316392$j47$l0$h0",
         }
 
     def _load_saved_session(self):
@@ -246,8 +246,22 @@ class GlovisService:
                 # Повторная проверка после обновления
                 session_check = await self.check_session_validity()
                 if not session_check.get("is_valid", False):
-                    logger.error("❌ Не удалось восстановить валидную сессию")
-                    return None
+                    logger.warning(
+                        "⚠️ Стандартное обновление не помогло, пытаемся экстренное..."
+                    )
+                    if self._emergency_cookies_update():
+                        # Проверяем после экстренного обновления
+                        session_check = await self.check_session_validity()
+                        if not session_check.get("is_valid", False):
+                            logger.error("❌ Даже экстренное обновление не помогло")
+                            return None
+                        else:
+                            logger.success(
+                                "✅ Экстренное обновление cookies сработало!"
+                            )
+                    else:
+                        logger.error("❌ Не удалось восстановить валидную сессию")
+                        return None
 
             # Подготавливаем данные для POST запроса на основе примера
             row_from = str((page - 1) * 18 + 1)  # 18 автомобилей на страницу
@@ -283,9 +297,7 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": (datetime.now() + timedelta(days=1)).strftime(
-                    "%Y%m%d130000"
-                ),
+                "auctstardt": "20250620130000",
                 "auctenddt": "",
                 "primeAuctionChk": "",
                 "primeauctionyn": "",
@@ -365,8 +377,34 @@ class GlovisService:
                         logger.info("✅ Сессия успешно восстановлена")
                         return response.text
                     else:
-                        logger.error("❌ Не удалось восстановить сессию")
-                        return None
+                        logger.warning(
+                            "⚠️ Повторный запрос не сработал, пытаемся экстренное обновление..."
+                        )
+                        if self._emergency_cookies_update():
+                            # Третья попытка после экстренного обновления
+                            response = self.session.post(
+                                url,
+                                data=data,
+                                headers=headers,
+                                timeout=30,
+                                allow_redirects=True,
+                            )
+
+                            if (
+                                response.status_code == 200
+                                and "<script>location.href='/login.do';</script>"
+                                not in response.text
+                            ):
+                                logger.success(
+                                    "✅ Экстренное обновление cookies помогло!"
+                                )
+                                return response.text
+                            else:
+                                logger.error("❌ Даже экстренное обновление не помогло")
+                                return None
+                        else:
+                            logger.error("❌ Не удалось восстановить сессию")
+                            return None
 
                 logger.info(
                     f"✅ Успешно получили HTML (размер: {len(response.text)} символов)"
@@ -1196,3 +1234,71 @@ class GlovisService:
     def __del__(self):
         """Деструктор"""
         self.close()
+
+    def _load_cookies_from_curl_file(self) -> Optional[Dict[str, str]]:
+        """
+        Загружает cookies из glovis-curl-request.py файла для восстановления сессии
+
+        Returns:
+            Optional[Dict[str, str]]: Cookies из curl файла или None если не найдены
+        """
+        try:
+            import os
+            import sys
+            import importlib.util
+
+            # Путь к curl файлу
+            curl_file_path = os.path.join(os.getcwd(), "glovis-curl-request.py")
+
+            if not os.path.exists(curl_file_path):
+                logger.warning("⚠️ Файл glovis-curl-request.py не найден")
+                return None
+
+            # Импортируем модуль
+            spec = importlib.util.spec_from_file_location("glovis_curl", curl_file_path)
+            curl_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(curl_module)
+
+            # Извлекаем cookies
+            if hasattr(curl_module, "cookies"):
+                logger.info("✅ Cookies успешно загружены из glovis-curl-request.py")
+                return curl_module.cookies
+            else:
+                logger.warning("⚠️ Не найден объект cookies в glovis-curl-request.py")
+                return None
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки cookies из curl файла: {e}")
+            return None
+
+    def _emergency_cookies_update(self) -> bool:
+        """
+        Экстренное обновление cookies при полном отказе сессии
+
+        Returns:
+            bool: True если cookies успешно обновлены
+        """
+        try:
+            logger.info("🚨 Экстренное обновление cookies...")
+
+            # Пытаемся загрузить из curl файла
+            curl_cookies = self._load_cookies_from_curl_file()
+            if curl_cookies:
+                logger.info("🔄 Обновляю cookies из glovis-curl-request.py")
+                self.update_cookies(curl_cookies)
+
+                # Пересоздаем сессию с новыми cookies
+                if self._session:
+                    self._session.close()
+                self._session = None
+                self._authenticated = False
+
+                logger.success("✅ Экстренное обновление cookies выполнено")
+                return True
+            else:
+                logger.error("❌ Не удалось загрузить cookies из curl файла")
+                return False
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка экстренного обновления cookies: {e}")
+            return False

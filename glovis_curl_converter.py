@@ -44,6 +44,16 @@ class GlovisCurlConverter:
                 cookie_match = re.search(cookie_pattern, curl_command, re.IGNORECASE)
             
             if not cookie_match:
+                # Поиск через -b параметр (короткая форма cookies)
+                cookie_pattern = r"-b ['\"]([^'\"]+)['\"]"
+                cookie_match = re.search(cookie_pattern, curl_command, re.IGNORECASE)
+            
+            if not cookie_match:
+                # Поиск через --cookie параметр
+                cookie_pattern = r"--cookie ['\"]([^'\"]+)['\"]"
+                cookie_match = re.search(cookie_pattern, curl_command, re.IGNORECASE)
+            
+            if not cookie_match:
                 raise ValueError("Не найден cookie заголовок в cURL команде")
             
             cookie_string = cookie_match.group(1)
