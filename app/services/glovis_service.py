@@ -261,7 +261,7 @@ class GlovisService:
                 "bidcd": "",
                 "exportAuctionYn": "N",
                 "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-                "atn": "945",
+                "atn": "946",
                 "acc": "20",
                 "rc": "",
                 "gn": "",
@@ -296,7 +296,7 @@ class GlovisService:
                 "eprice": "",
                 "syearcd": "",
                 "eyearcd": "",
-                "searchAuctno": "945",
+                "searchAuctno": "946",
                 "auctroomcd": "",
                 "searchLanecd": "",
                 "auctListStat": "01",
@@ -316,13 +316,15 @@ class GlovisService:
                 if "car_manufacturer" in params:
                     data["prodmancd"] = str(params["car_manufacturer"])
                 if "auction_number" in params:
-                    data["searchAuctno"] = str(params["auction_number"])
+                    auction_num = str(params["auction_number"])
+                    data["searchAuctno"] = auction_num
+                    data["atn"] = auction_num
 
             # Настраиваем headers для POST запроса
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=945&acc=20&auctListStat=01&flag=Y",
+                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=946&acc=20&auctListStat=01&flag=Y",
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
@@ -493,7 +495,7 @@ class GlovisService:
 
             # Делаем простой запрос для проверки сессии
             session = self.session
-            test_url = f"{self.base_url}/auction/exhibitList.do?atn=945&acc=20&flag=Y"
+            test_url = f"{self.base_url}/auction/exhibitList.do?atn=946&acc=20&flag=Y"
 
             response = session.get(test_url, timeout=10, allow_redirects=False)
 
