@@ -10,8 +10,8 @@ cookies = {
     "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
     "_ga": "GA1.1.1367887267.1749863933",
     "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-    "JSESSIONID": "1n1i0rJMRAKZT3xae8Qa92U24UupRDB4SmIghjp58CAjRUlsltoZS1jbLMEao5SZ.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-    "_ga_H9G80S9QWN": "GS2.1.s1750289809$o13$g1$t1750290339$j25$l0$h0",
+    "JSESSIONID": "Xj5FsVlgrbW9TyjulUVDFIVc7Z4VvVPrScOX86KHxZNAf349lU6U7XHZ36chII5n.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+    "_ga_H9G80S9QWN": "GS2.1.s1750296658$o15$g1$t1750297610$j60$l0$h0",
 }
 
 headers = {
@@ -20,7 +20,7 @@ headers = {
     "Connection": "keep-alive",
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "Origin": "https://auction.autobell.co.kr",
-    "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do?atn=945&acc=20&auctListStat=01&flag=Y",
+    "Referer": "https://auction.autobell.co.kr/auction/exhibitList.do?acc=20&atn=946&flag=Y",
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-origin",
@@ -29,7 +29,7 @@ headers = {
     "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"Windows"',
-    # 'Cookie': 'SCOUTER=z6d9hgnq5i09ho; _gcl_au=1.1.469301602.1749863933; _fwb=191nmCARVubatjoH72cRPm8.1749863933091; _fbp=fb.2.1749863933206.396345519817813213; _gcl_aw=GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _gcl_gs=2.1.k1$i1749867755$u107600402; _gac_UA-163217058-4=1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _ga=GA1.1.1367887267.1749863933; _ga_WBXP3Q01TE=GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0; JSESSIONID=1n1i0rJMRAKZT3xae8Qa92U24UupRDB4SmIghjp58CAjRUlsltoZS1jbLMEao5SZ.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x; _ga_H9G80S9QWN=GS2.1.s1750289809$o13$g1$t1750290339$j25$l0$h0',
+    # 'Cookie': 'SCOUTER=z6d9hgnq5i09ho; _gcl_au=1.1.469301602.1749863933; _fwb=191nmCARVubatjoH72cRPm8.1749863933091; _fbp=fb.2.1749863933206.396345519817813213; _gcl_aw=GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _gcl_gs=2.1.k1$i1749867755$u107600402; _gac_UA-163217058-4=1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE; _ga=GA1.1.1367887267.1749863933; _ga_WBXP3Q01TE=GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0; JSESSIONID=Xj5FsVlgrbW9TyjulUVDFIVc7Z4VvVPrScOX86KHxZNAf349lU6U7XHZ36chII5n.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x; _ga_H9G80S9QWN=GS2.1.s1750296658$o15$g1$t1750297610$j60$l0$h0',
 }
 
 data = {
@@ -41,7 +41,7 @@ data = {
     "bidcd": "",
     "exportAuctionYn": "N",
     "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-    "atn": "945",
+    "atn": "946",
     "acc": "20",
     "rc": "",
     "gn": "",
@@ -63,7 +63,7 @@ data = {
     "searchtype": "",
     "searchtext": "",
     "deviceType": "",
-    "auctstardt": "20250619130000",
+    "auctstardt": "20250620130000",
     "auctenddt": "",
     "primeAuctionChk": "",
     "primeauctionyn": "",
@@ -74,10 +74,10 @@ data = {
     "eprice": "",
     "syearcd": "",
     "eyearcd": "",
-    "searchAuctno": "945",
+    "searchAuctno": "946",
     "auctroomcd": "",
     "searchLanecd": "",
-    "auctListStat": "01",
+    "auctListStat": "",
     "rowLimit": "18",
     "searchorder": "01",
 }
