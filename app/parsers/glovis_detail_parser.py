@@ -94,37 +94,52 @@ class GlovisDetailParser:
 
         # Информация из описания
         spec_desc = self.soup.find("div", class_="spec-desc")
-        if spec_desc:
-            desc_text = spec_desc.get_text()
 
-            # Извлекаем данные из описания
-            year_match = re.search(
-                r"최초등록일\s*(\d{4}년\s*\d{2}월\s*\d{2}일)", desc_text
-            )
-            fuel_match = re.search(r"연료\s*([^,]+)", desc_text)
-            mileage_match = re.search(r"주행거리\s*([^,]+)", desc_text)
-            transmission_match = re.search(r"변속기\s*([^,]+)", desc_text)
-            color_match = re.search(r"색상\s*([^)]+)", desc_text)
-            status_match = re.search(r"해당 차량은\s*([^)]+)", desc_text)
-
-            first_registration = year_match.group(1).strip() if year_match else None
-            fuel_type = fuel_match.group(1).strip() if fuel_match else None
-            mileage = mileage_match.group(1).strip() if mileage_match else None
-            transmission = (
-                transmission_match.group(1).strip() if transmission_match else None
-            )
-            color = color_match.group(1).strip() if color_match else None
-            auction_status = status_match.group(1).strip() if status_match else None
-        else:
-            first_registration = fuel_type = mileage = transmission = color = (
-                auction_status
-            ) = None
-
-        # Определяем год из даты регистрации
+        # Инициализируем переменные
+        first_registration = fuel_type = mileage = transmission = color = (
+            auction_status
+        ) = None
         year = None
-        if first_registration:
-            year_match = re.search(r"(\d{4})", first_registration)
-            year = year_match.group(1) if year_match else None
+
+        if spec_desc:
+            # Ищем все элементы li в spec-desc
+            li_elements = spec_desc.find_all("li")
+
+            for li in li_elements:
+                text = li.get_text()
+
+                # Первый li содержит основную информацию
+                if "출품 차량은" in text:
+                    # Извлекаем данные из первого li
+                    year_match = re.search(r"최초등록일\s*([^,]+)", text)
+                    if year_match:
+                        first_registration = self._clean_text(year_match.group(1))
+                        # Извлекаем год из даты
+                        year_extract = re.search(r"(\d{4})년", first_registration)
+                        if year_extract:
+                            year = year_extract.group(1)
+
+                    fuel_match = re.search(r"연료\s*([^,]+)", text)
+                    if fuel_match:
+                        fuel_type = self._clean_text(fuel_match.group(1))
+
+                    mileage_match = re.search(r"주행거리\s*([0-9,]+km)", text)
+                    if mileage_match:
+                        mileage = self._clean_text(mileage_match.group(1))
+
+                    transmission_match = re.search(r"변속기\s*([^,]+)", text)
+                    if transmission_match:
+                        transmission = self._clean_text(transmission_match.group(1))
+
+                    color_match = re.search(r"색상\s*([^입니다]+)", text)
+                    if color_match:
+                        color = self._clean_text(color_match.group(1))
+
+                # Второй li содержит статус аукциона
+                elif "해당 차량은" in text:
+                    status_match = re.search(r"해당 차량은\s*([^차량]+차량)", text)
+                    if status_match:
+                        auction_status = self._clean_text(status_match.group(1))
 
         return GlovisCarBasicInfo(
             name=name,
@@ -151,14 +166,33 @@ class GlovisDetailParser:
         new_car_price = None
         estimated_price = None
 
-        # Ищем цену нового автомобиля
-        price_spans = pricing_section.find_all("span", class_="price")
-        if price_spans:
-            new_car_price = self._clean_text(price_spans[0].get_text())
-            if len(price_spans) > 1:
-                estimated_price = self._clean_text(price_spans[1].get_text())
+        # Ищем все dl элементы
+        dl_elements = pricing_section.find_all("dl")
 
-        # Пока не парсим активные цены торгов, так как это требует JavaScript
+        if dl_elements:
+            # В Glovis все цены находятся в одном dl
+            dl = dl_elements[0]
+            dt_elements = dl.find_all("dt")
+            dd_elements = dl.find_all("dd")
+
+            for dt, dd in zip(dt_elements, dd_elements):
+                label = self._clean_text(dt.get_text())
+                logger.info(f"💰 Проверяем label: '{label}'")
+
+                if "신차가격" in label:
+                    price_span = dd.find("span", class_="price")
+                    if price_span:
+                        new_car_price = self._clean_text(price_span.get_text())
+                        logger.info(f"✅ Найдена цена нового авто: {new_car_price}")
+
+                elif "차량출고가" in label:
+                    price_span = dd.find("span", class_="price")
+                    if price_span:
+                        estimated_price = self._clean_text(price_span.get_text())
+                        logger.info(f"✅ Найдена цена с опциями: {estimated_price}")
+                    else:
+                        logger.info(f"❌ Не найден span с ценой для label: {label}")
+
         return GlovisCarPricing(
             new_car_price=new_car_price, estimated_price=estimated_price
         )
@@ -185,7 +219,53 @@ class GlovisDetailParser:
                 for dt, dd in zip(dt_elements, dd_elements):
                     key = self._clean_text(dt.get_text())
                     value = self._clean_text(dd.get_text())
+
+                    # Особая обработка для полей с кнопками
+                    if key == "차량번호":
+                        # Извлекаем только номер, убираем текст кнопки
+                        car_num_match = re.search(r"([\d가-힣]+)", value)
+                        if car_num_match:
+                            value = car_num_match.group(1)
+                    elif key == "차대번호":
+                        # Извлекаем только номер шасси
+                        chassis_match = re.search(r"([A-Z0-9]+)", value)
+                        if chassis_match:
+                            value = chassis_match.group(1)
+                    elif key == "완비서류":
+                        # Убираем текст ссылки "구비서류 안내"
+                        value = re.sub(r"구비서류\s*안내", "", value).strip()
+
                     specs_data[key] = value
+
+        # Дополнительно ищем информацию в spec-desc для недостающих данных
+        spec_desc = self.soup.find("div", class_="spec-desc")
+        if spec_desc:
+            # Парсим информацию из spec-desc если она не найдена в specs_data
+            li_elements = spec_desc.find_all("li")
+            for li in li_elements:
+                text = li.get_text()
+
+                if "최초등록일" in text and "최초등록일" not in specs_data:
+                    reg_match = re.search(r"최초등록일\s*([^,]+)", text)
+                    if reg_match:
+                        specs_data["최초등록일"] = self._clean_text(reg_match.group(1))
+
+                if "주행거리" in text and "주행거리" not in specs_data:
+                    mileage_match = re.search(r"주행거리\s*([0-9,]+km)", text)
+                    if mileage_match:
+                        specs_data["주행거리"] = self._clean_text(
+                            mileage_match.group(1)
+                        )
+
+                if "색상" in text and "색상" not in specs_data:
+                    color_match = re.search(r"색상\s*([^입니다]+)", text)
+                    if color_match:
+                        specs_data["색상"] = self._clean_text(color_match.group(1))
+
+                if "변속기" in text and "변속기" not in specs_data:
+                    trans_match = re.search(r"변속기\s*([^,]+)", text)
+                    if trans_match:
+                        specs_data["변속기"] = self._clean_text(trans_match.group(1))
 
         return GlovisCarDetailedSpecs(
             product_category=specs_data.get("상품구분"),
@@ -212,8 +292,13 @@ class GlovisDetailParser:
         """Парсинг результатов технической проверки"""
         logger.debug("🔍 Парсинг результатов технической проверки")
 
+        # Ищем секцию с результатами проверки
+        perf_section = self.soup.find("div", class_="spec-box spec02")
+        if not perf_section:
+            return None
+
         # Ищем таблицу с результатами проверки
-        perf_table = self.soup.find("div", class_="table-box type01")
+        perf_table = perf_section.find("div", class_="table-box type01")
         if not perf_table:
             return None
 
@@ -221,43 +306,41 @@ class GlovisDetailParser:
         if not table:
             return None
 
-        # Парсим заголовки
-        headers = []
-        thead = table.find("thead")
-        if thead:
-            th_elements = thead.find_all("th")
-            headers = [self._clean_text(th.get_text()) for th in th_elements]
-
-        # Парсим данные
+        # Парсим данные из tbody
         performance_data = {}
         tbody = table.find("tbody")
         if tbody:
             rows = tbody.find_all("tr")
             for row in rows:
-                cells = row.find_all("td")
-                if len(cells) == len(headers):
-                    for header, cell in zip(headers, cells):
-                        value = self._clean_text(cell.get_text())
-                        performance_data[header] = value
+                th_elements = row.find_all("th")
+                td_elements = row.find_all("td")
+
+                # Парсим пары th-td
+                for th, td in zip(th_elements, td_elements):
+                    key = self._clean_text(th.get_text())
+                    value = self._clean_text(td.get_text())
+                    performance_data[key] = value
 
         # Ищем дополнительную таблицу с особыми замечаниями
-        additional_table = self.soup.find("div", class_="table-box type02")
+        additional_table = perf_section.find("div", class_="table-box type02")
         special_notes = changes = evaluation_opinion = None
 
         if additional_table:
             rows = additional_table.find_all("tr")
             for row in rows:
-                cells = row.find_all(["th", "td"])
-                if len(cells) >= 2:
-                    label = self._clean_text(cells[0].get_text())
-                    value = self._clean_text(cells[1].get_text())
+                th = row.find("th")
+                td = row.find("td")
+
+                if th and td:
+                    label = self._clean_text(th.get_text())
+                    value = self._clean_text(td.get_text())
 
                     if "특이사항" in label:
-                        special_notes = value
+                        special_notes = value if value and value != "-" else None
                     elif "변경사항" in label:
-                        changes = value
+                        changes = value if value and value != "-" else None
                     elif "평가의견" in label:
-                        evaluation_opinion = value
+                        evaluation_opinion = value if value and value != "-" else None
 
         return GlovisCarPerformanceCheck(
             engine=performance_data.get("기관"),
@@ -279,26 +362,41 @@ class GlovisDetailParser:
         """Парсинг опций автомобиля"""
         logger.debug("⚙️ Парсинг опций автомобиля")
 
-        # Ищем секцию с опциями
+        # Ищем секцию с опциями в new-car-info
         options_section = self.soup.find("div", class_="new-car-info")
         if not options_section:
             return None
 
-        options_div = options_section.find("div", class_="option")
-        if not options_div:
-            return None
-
-        options_text = self._clean_text(options_div.get_text())
-
-        # Разбираем опции по запятым
+        options_text = None
         options_list = []
-        if options_text and options_text != "-":
-            # Убираем начальный "-" и разбиваем по запятым
-            cleaned_text = options_text.lstrip("- ").strip()
-            if cleaned_text:
-                options_list = [
-                    opt.strip() for opt in cleaned_text.split(",") if opt.strip()
-                ]
+
+        # Ищем dl с опциями
+        dl_elements = options_section.find_all("dl")
+        for dl in dl_elements:
+            dt = dl.find("dt")
+            dd = dl.find("dd")
+
+            if dt and dd and "옵션 장착 현황" in dt.get_text():
+                options_div = dd.find("div", class_="option")
+                if options_div:
+                    options_text = self._clean_text(options_div.get_text())
+
+                    # Разбираем опции по запятым
+                    if options_text and options_text != "-":
+                        # Убираем начальный "-" и разбиваем по запятым
+                        cleaned_text = options_text.lstrip("- ").strip()
+                        if cleaned_text:
+                            options_list = [
+                                opt.strip()
+                                for opt in cleaned_text.split(",")
+                                if opt.strip()
+                            ]
+
+        # Также проверяем секцию spec03 для опций
+        options_spec_section = self.soup.find("div", class_="spec-box spec03")
+        if options_spec_section and not options_list:
+            # Здесь может быть дополнительная информация об опциях
+            pass
 
         return GlovisCarOptions(
             standard_options=options_list, all_options_text=options_text
@@ -309,6 +407,7 @@ class GlovisDetailParser:
         logger.debug("📷 Парсинг изображений автомобиля")
 
         images = []
+        seen_urls = set()  # Для избежания дубликатов
 
         # Ищем изображения в swiper
         swiper_slides = self.soup.find_all("div", class_="swiper-slide")
@@ -316,11 +415,17 @@ class GlovisDetailParser:
             img = slide.find("img")
             if img and img.get("src"):
                 url = img.get("src")
+
+                # Пропускаем дубликаты
+                if url in seen_urls:
+                    continue
+
+                seen_urls.add(url)
                 alt_text = img.get("alt", "")
 
                 images.append(GlovisCarImage(url=url, alt_text=alt_text))
 
-        logger.debug(f"📷 Найдено {len(images)} изображений")
+        logger.debug(f"📷 Найдено {len(images)} уникальных изображений")
         return images
 
     def _parse_additional_info(self) -> Optional[GlovisCarAdditionalInfo]:
@@ -344,23 +449,39 @@ class GlovisDetailParser:
         if not name:
             return "", "", None
 
-        # Убираем квадратные скобки и лишние пробелы
-        clean_name = re.sub(r"\[|\]", "", name).strip()
-
-        # Разбиваем по пробелам
-        parts = clean_name.split()
-
-        if len(parts) == 0:
-            return "", "", None
-        elif len(parts) == 1:
-            return parts[0], "", None
-        elif len(parts) == 2:
-            return parts[0], parts[1], None
+        # Паттерн для извлечения производителя в квадратных скобках
+        manufacturer_match = re.search(r"\[([^\]]+)\]", name)
+        if manufacturer_match:
+            manufacturer = manufacturer_match.group(1)
+            # Убираем производителя из названия для дальнейшего парсинга
+            remaining = name.replace(f"[{manufacturer}]", "").strip()
         else:
-            # Первое слово - производитель, второе - модель, остальное - комплектация
+            # Если нет квадратных скобок, первое слово - производитель
+            parts = name.split()
+            if not parts:
+                return "", "", None
             manufacturer = parts[0]
-            model = parts[1]
-            grade = " ".join(parts[2:])
+            remaining = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+        # Разбираем оставшуюся часть
+        if not remaining:
+            return manufacturer, "", None
+
+        # Обычно второе слово (или первые несколько слов) - это модель
+        remaining_parts = remaining.split()
+        if not remaining_parts:
+            return manufacturer, "", None
+
+        # Попытаемся определить модель и комплектацию
+        # Часто модель состоит из 1-2 слов, остальное - комплектация
+        if len(remaining_parts) == 1:
+            return manufacturer, remaining_parts[0], None
+        elif len(remaining_parts) == 2:
+            return manufacturer, " ".join(remaining_parts[:2]), None
+        else:
+            # Берем первые 2 слова как модель, остальное как комплектацию
+            model = " ".join(remaining_parts[:2])
+            grade = " ".join(remaining_parts[2:])
             return manufacturer, model, grade
 
     def _extract_ids_from_url(
