@@ -958,6 +958,90 @@ async def upload_curl_file(
         }
 
 
+@router.post("/paste-curl", response_model=Dict[str, Any])
+async def paste_curl_command(
+    curl_command: str = Body(..., description="cURL команда из DevTools"),
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """
+    Принимает cURL команду напрямую и извлекает cookies
+    
+    **Пример использования:**
+    ```json
+    POST /api/v1/glovis/paste-curl
+    {
+        "curl_command": "curl 'https://auction.autobell.co.kr/auction/exhibitListInclude.do' -H 'cookie: JSESSIONID=...; _ga=...' ..."
+    }
+    ```
+    """
+    try:
+        glovis_logger.info("📋 Получена cURL команда для обработки")
+        
+        # Импортируем конвертер
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        
+        from glovis_curl_converter import GlovisCurlConverter
+        
+        # Создаем конвертер и обрабатываем команду
+        converter = GlovisCurlConverter()
+        converter.api_url = "http://localhost:8000"  # Внутренний URL
+        
+        # Парсим cookies из cURL команды
+        cookies = converter.parse_curl_command(curl_command)
+        
+        if not cookies:
+            return {
+                "success": False,
+                "message": "Не удалось извлечь cookies из cURL команды",
+                "data": None
+            }
+        
+        # Валидируем cookies
+        if not converter.validate_cookies(cookies):
+            return {
+                "success": False,
+                "message": "Извлеченные cookies невалидны",
+                "data": {
+                    "cookies_found": list(cookies.keys()),
+                    "has_jsessionid": "JSESSIONID" in cookies
+                }
+            }
+        
+        # Обновляем cookies в сервисе
+        service.update_cookies(cookies)
+        
+        # Проверяем обновленную сессию
+        session_check = await service.check_session_validity()
+        
+        glovis_logger.info(f"✅ Cookies успешно обновлены из cURL команды")
+        
+        return {
+            "success": True,
+            "message": "Cookies успешно извлечены и обновлены из cURL команды",
+            "data": {
+                "cookies_count": len(cookies),
+                "cookies_found": list(cookies.keys()),
+                "jsessionid": (
+                    cookies.get("JSESSIONID", "")[:20] + "..."
+                    if cookies.get("JSESSIONID")
+                    else None
+                ),
+                "session_valid": session_check.get("is_valid", False),
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        glovis_logger.error(f"❌ Ошибка при обработке cURL команды: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка при обработке cURL команды: {str(e)}",
+            "data": None
+        }
+
+
 @router.get("/session-info", response_model=Dict[str, Any])
 async def get_session_info(
     service: GlovisService = Depends(get_glovis_service),
