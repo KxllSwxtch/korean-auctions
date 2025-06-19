@@ -5,6 +5,7 @@
 import asyncio
 from typing import Optional, Dict, Any
 from urllib.parse import quote, unquote
+import os
 
 from app.core.http_client import AsyncHttpClient
 from app.parsers.glovis_detail_parser import GlovisDetailParser

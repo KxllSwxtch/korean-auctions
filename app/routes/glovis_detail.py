@@ -481,7 +481,20 @@ async def get_car_detail_simple(
     GET /api/v1/glovis/car-detail?gn=JkSvM%2Fvdt6NccTdCJooXww%3D%3D&rc=3100
     ```
     """
-    logger.info(f"🔍 Простой запрос детальной информации: gn={gn}, rc={rc}")
+    # Получаем дополнительные параметры
+    rc = request.args.get("rc", "3100")
+    acc = request.args.get("acc")
+    atn = request.args.get("atn")
+
+    # Проверяем наличие важных параметров
+    if not acc or not atn:
+        logger.warning(
+            f"⚠️ Отсутствуют параметры acc или atn. acc={acc}, atn={atn}. Результат может быть пустым!"
+        )
+
+    logger.info(
+        f"🔍 Простой запрос детальной информации: gn={gn}, rc={rc}, acc={acc}, atn={atn}"
+    )
 
     try:
         # Декодируем gn, если он закодирован

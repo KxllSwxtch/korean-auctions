@@ -79,6 +79,8 @@ class GlovisParser:
                 count_span = total_element.find("span")
                 if count_span:
                     count_text = count_span.get_text().strip()
+                    # Убираем запятые из числа
+                    count_text = count_text.replace(",", "")
                     return int(count_text)
 
             logger.warning("Не удалось найти общее количество автомобилей")
