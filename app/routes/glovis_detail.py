@@ -464,8 +464,8 @@ async def debug_car_detail(
 async def get_car_detail_simple(
     gn: str = Query(..., description="ID автомобиля (gn)"),
     rc: str = Query(..., description="Код региона (rc)"),
-    acc: str = Query("30", description="Параметр acc"),
-    atn: str = Query("747", description="Номер аукциона"),
+    acc: Optional[str] = Query(None, description="Параметр acc"),
+    atn: Optional[str] = Query(None, description="Номер аукциона"),
 ):
     """
     Простой endpoint для получения детальной информации об автомобиле
@@ -481,16 +481,17 @@ async def get_car_detail_simple(
     GET /api/v1/glovis/car-detail?gn=JkSvM%2Fvdt6NccTdCJooXww%3D%3D&rc=3100
     ```
     """
-    # Получаем дополнительные параметры
-    rc = request.args.get("rc", "3100")
-    acc = request.args.get("acc")
-    atn = request.args.get("atn")
-
-    # Проверяем наличие важных параметров
-    if not acc or not atn:
+    # Проверяем наличие важных параметров и устанавливаем дефолтные значения
+    if not acc:
         logger.warning(
-            f"⚠️ Отсутствуют параметры acc или atn. acc={acc}, atn={atn}. Результат может быть пустым!"
+            f"⚠️ Отсутствует параметр acc. Используем значение по умолчанию: 30"
         )
+        acc = "30"
+    if not atn:
+        logger.warning(
+            f"⚠️ Отсутствует параметр atn. Используем значение по умолчанию: 747"
+        )
+        atn = "747"
 
     logger.info(
         f"🔍 Простой запрос детальной информации: gn={gn}, rc={rc}, acc={acc}, atn={atn}"

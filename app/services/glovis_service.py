@@ -283,7 +283,9 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": "20250619130000",
+                "auctstardt": (datetime.now() + timedelta(days=1)).strftime(
+                    "%Y%m%d130000"
+                ),
                 "auctenddt": "",
                 "primeAuctionChk": "",
                 "primeauctionyn": "",
