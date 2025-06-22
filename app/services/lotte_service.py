@@ -12,8 +12,19 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.models.lotte import LotteCar, LotteResponse, LotteAuctionDate, LotteError
-from app.parsers.lotte_parser import LotteParser
+from app.models.lotte import (
+    LotteCar,
+    LotteResponse,
+    LotteAuctionDate,
+    LotteError,
+    LotteCarResponse,
+    LotteCarDetail,
+)
+from app.parsers.lotte_parser import (
+    LotteParser,
+    parse_lotte_cars,
+    parse_lotte_car_detail,
+)
 
 
 class LotteService:
@@ -611,3 +622,74 @@ class LotteService:
         except Exception as e:
             logger.error(f"Ошибка при получении общего количества автомобилей: {e}")
             return 0
+
+    def get_car_detail(
+        self, search_mng_div_cd: str, search_mng_no: str, search_exhi_regi_seq: str
+    ) -> LotteCarResponse:
+        """
+        Получает детальную информацию об автомобиле
+
+        Args:
+            search_mng_div_cd: Код подразделения управления (например, "KS")
+            search_mng_no: Номер управления (например, "KS202506090099")
+            search_exhi_regi_seq: Последовательность регистрации выставки (например, "2")
+
+        Returns:
+            LotteCarResponse: Ответ с детальной информацией об автомобиле
+        """
+        try:
+            # Параметры запроса для детальной страницы
+            params = {
+                "searchMngDivCd": search_mng_div_cd,
+                "searchMngNo": search_mng_no,
+                "searchExhiRegiSeq": search_exhi_regi_seq,
+            }
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Referer": f"{self.base_url}/hp/cmm/actionMenuLinkPage.do?baseMenuNo=1010000&link=forward%3A%2Fhp%2Fauct%2Fmyp%2Fentry%2FselectMypEntryList.do&redirectMode=&popHeight=&popWidth=&subMenuNo=1010200&subSubMenuNo=",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+            }
+
+            # URL для детальной страницы автомобиля
+            url = f"{self.base_url}/hp/auct/myp/entry/selectMypEntryCarDetPop.do"
+
+            response = self._init_session().get(
+                url, params=params, headers=headers, timeout=30
+            )
+            response.raise_for_status()
+
+            # Формируем source URL для отслеживания
+            source_url = f"{url}?{requests.compat.urlencode(params)}"
+
+            # Парсим детальную информацию
+            car_detail = parse_lotte_car_detail(response.text, source_url)
+
+            return LotteCarResponse(
+                success=True,
+                message="Детальная информация об автомобиле успешно получена",
+                data=car_detail,
+            )
+
+        except requests.RequestException as e:
+            logger.error(f"Ошибка HTTP запроса к Lotte car detail: {e}")
+            return LotteCarResponse(
+                success=False, message=f"Ошибка сети: {str(e)}", error=str(e)
+            )
+        except Exception as e:
+            logger.error(f"Ошибка получения детальной информации Lotte: {e}")
+            return LotteCarResponse(
+                success=False, message=f"Внутренняя ошибка: {str(e)}", error=str(e)
+            )

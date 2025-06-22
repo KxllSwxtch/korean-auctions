@@ -1,10 +1,16 @@
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, Path
 from fastapi.responses import JSONResponse
 import time
 
-from app.models.lotte import LotteResponse, LotteCar, LotteError, LotteAuctionDate
+from app.models.lotte import (
+    LotteResponse,
+    LotteCar,
+    LotteError,
+    LotteAuctionDate,
+    LotteCarResponse,
+)
 from app.services.lotte_service import LotteService
 from app.core.logging import logger
 
@@ -840,3 +846,67 @@ async def debug_pagination(
             },
             "timestamp": datetime.now().isoformat(),
         }
+
+
+@router.get("/car-detail", response_model=LotteCarResponse)
+async def get_car_detail(
+    search_mng_div_cd: str = Query(
+        ..., description="Код подразделения управления (например, KS)"
+    ),
+    search_mng_no: str = Query(
+        ..., description="Номер управления (например, KS202506090099)"
+    ),
+    search_exhi_regi_seq: str = Query(
+        ..., description="Последовательность регистрации выставки (например, 2)"
+    ),
+    service: LotteService = Depends(get_lotte_service),
+):
+    """
+    Получение детальной информации об автомобиле Lotte
+
+    Возвращает максимально полную информацию об автомобиле:
+    - Основную информацию (название, номер, цена, статус)
+    - Информацию о владельце
+    - Технические характеристики (год, пробег, трансмиссия, топливо и т.д.)
+    - Состояние автомобиля (оценки всех систем)
+    - Правовой статус (аресты, залоги)
+    - Медиа файлы (фотографии, видео)
+    - Записи об осмотре
+
+    Параметры:
+    - search_mng_div_cd: Код подразделения (обычно "KS")
+    - search_mng_no: Управленческий номер автомобиля
+    - search_exhi_regi_seq: Порядковый номер выставки
+    """
+    try:
+        logger.info(
+            f"Запрос детальной информации Lotte: div={search_mng_div_cd}, no={search_mng_no}, seq={search_exhi_regi_seq}"
+        )
+
+        # Вызываем сервис для получения детальной информации
+        response = service.get_car_detail(
+            search_mng_div_cd=search_mng_div_cd,
+            search_mng_no=search_mng_no,
+            search_exhi_regi_seq=search_exhi_regi_seq,
+        )
+
+        if not response.success:
+            logger.warning(
+                f"Не удалось получить детальную информацию: {response.message}"
+            )
+            return JSONResponse(
+                status_code=404 if "не найден" in response.message.lower() else 500,
+                content=response.model_dump(),
+            )
+
+        logger.info(
+            f"Успешно получена детальная информация об автомобиле: {response.data.basic_info.title if response.data else 'N/A'}"
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении детальной информации Lotte: {e}")
+        error_response = LotteCarResponse(
+            success=False, message=f"Внутренняя ошибка сервера: {str(e)}", error=str(e)
+        )
+        return JSONResponse(status_code=500, content=error_response.model_dump())
