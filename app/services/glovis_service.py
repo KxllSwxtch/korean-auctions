@@ -382,7 +382,7 @@ class GlovisService:
                         logger.error("❌ Не удалось восстановить валидную сессию")
                         return None
 
-            # Подготавливаем данные для POST запроса на основе примера
+            # Подготавливаем данные для POST запроса на основе glovis-new-curl.py
             row_from = str((page - 1) * 18 + 1)  # 18 автомобилей на страницу
 
             data = {
@@ -394,8 +394,8 @@ class GlovisService:
                 "bidcd": "",
                 "exportAuctionYn": "N",
                 "ac": "TQhYt3GD6GvgPdVw1QX+Wg==",
-                "atn": "946",
-                "acc": "20",
+                "atn": "749",  # Обновлено из glovis-new-curl.py
+                "acc": "30",  # Обновлено из glovis-new-curl.py
                 "rc": "",
                 "gn": "",
                 "searchRc": "",
@@ -416,10 +416,10 @@ class GlovisService:
                 "searchtype": "",
                 "searchtext": "",
                 "deviceType": "",
-                "auctstardt": "20250620130000",
-                "auctenddt": "",
+                "auctstardt": "20250621090000",  # Обновлено из glovis-new-curl.py
+                "auctenddt": "20250623120000",  # Обновлено из glovis-new-curl.py
                 "primeAuctionChk": "",
-                "primeauctionyn": "",
+                "primeauctionyn": "N",  # Обновлено из glovis-new-curl.py
                 "primeauctionAlertMessage": "",
                 "searchInput": "",
                 "exceptEmptYn": "Y",
@@ -427,10 +427,15 @@ class GlovisService:
                 "eprice": "",
                 "syearcd": "",
                 "eyearcd": "",
-                "searchAuctno": "946",
+                "searchAuctno": "749",  # Обновлено из glovis-new-curl.py
                 "auctroomcd": "",
                 "searchLanecd": "",
-                "auctListStat": "01",
+                "auctListStat": "",  # Обновлено из glovis-new-curl.py (пустое)
+                # Новые поля из glovis-new-curl.py
+                "publicauctionsdt": "20250621090000",
+                "publicauctionedt": "20250623120000",
+                "publicauctionsday": "토",
+                "publicauctioneday": "월",
                 "rowLimit": "18",
                 "searchorder": "01",
             }
@@ -451,15 +456,22 @@ class GlovisService:
                     data["searchAuctno"] = auction_num
                     data["atn"] = auction_num
 
-            # Настраиваем headers для POST запроса
+            # Настраиваем headers для POST запроса (обновлено из glovis-new-curl.py)
             headers = {
+                "Accept": "text/html, */*; q=0.01",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Connection": "keep-alive",
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                 "Origin": self.base_url,
-                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=946&acc=20&auctListStat=01&flag=Y",
+                "Referer": f"{self.base_url}/auction/exhibitList.do?atn=749&acc=30&auctListStat=&flag=Y",
                 "Sec-Fetch-Dest": "empty",
                 "Sec-Fetch-Mode": "cors",
                 "Sec-Fetch-Site": "same-origin",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
                 "X-Requested-With": "XMLHttpRequest",
+                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"Windows"',
             }
 
             logger.info(f"Отправляем POST запрос на {url} для страницы {page}")
