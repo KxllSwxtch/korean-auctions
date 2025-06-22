@@ -22,7 +22,6 @@ from app.models.lotte import (
 )
 from app.parsers.lotte_parser import (
     LotteParser,
-    parse_lotte_cars,
     parse_lotte_car_detail,
 )
 
