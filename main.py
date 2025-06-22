@@ -6,6 +6,7 @@ from app.routes import (
     autohub,
     autohub_demo,
     lotte,
+    lotte_filters,
     kcar,
     glovis,
     enhanced_lotte,
@@ -45,6 +46,7 @@ app.include_router(
     autohub_demo.router, prefix="/api/v1/autohub/cars", tags=["Autohub Demo"]
 )
 app.include_router(lotte.router, tags=["Lotte Auction"])
+app.include_router(lotte_filters.router, tags=["Lotte Filters"])
 app.include_router(kcar.router, tags=["KCar Auction"])
 app.include_router(glovis.router, tags=["Glovis Auction"])
 
@@ -52,6 +54,9 @@ app.include_router(glovis.router, tags=["Glovis Auction"])
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
 app.include_router(
     glovis_detail.router, prefix="/api/v1/glovis", tags=["Glovis Car Details"]
+)
+app.include_router(
+    glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]
 )
 app.include_router(
     glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]

@@ -93,7 +93,6 @@ class AsyncSessionManager:
             connector=connector,
             timeout=timeout,
             headers=headers,
-            max_redirects=self.config.max_redirects,
         )
 
         logger.info(f"Создана асинхронная сессия {session_id}")
