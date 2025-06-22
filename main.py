@@ -10,6 +10,7 @@ from app.routes import (
     glovis,
     enhanced_lotte,
     glovis_detail,
+    glovis_windows_auth,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -51,6 +52,9 @@ app.include_router(glovis.router, tags=["Glovis Auction"])
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
 app.include_router(
     glovis_detail.router, prefix="/api/v1/glovis", tags=["Glovis Car Details"]
+)
+app.include_router(
+    glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]
 )
 
 

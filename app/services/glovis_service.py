@@ -78,7 +78,126 @@ class GlovisService:
             "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
             "JSESSIONID": "MnHMksSJtqnPpna3cTKG9ePodXjmil3aS6lP0bbN1hBIWcQwl60arHxOa2FFL798.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24y",
             "_ga_H9G80S9QWN": "GS2.1.s1750316379$o17$g1$t1750316392$j47$l0$h0",
+            # ⭐ НОВЫЕ: Windows-специфичные cookies для авторизации
+            "idChk": "1",  # Флаг проверки идентичности
+            "Chk": "7552",  # Код проверки (может меняться)
         }
+
+    def _get_windows_cookies(self) -> Dict[str, str]:
+        """Возвращает Windows-специфичные cookies из перехваченного запроса"""
+        return {
+            "_gcl_au": "1.1.982350429.1749522778",
+            "_fwb": "19cGXz96Ifjpyk0wuJ5XI.1749522778595",
+            "idChk": "1",  # ⭐ КРИТИЧНЫЙ - флаг проверки идентичности
+            "Chk": "7552",  # ⭐ КРИТИЧНЫЙ - код проверки
+            "SCOUTER": "zcsqd8tkmdiai",
+            "_ga": "GA1.1.450054511.1749522779",
+            "_ga_WBXP3Q01TE": "GS2.1.s1749793770$o3$g0$t1749793788$j42$l0$h0",
+            "JSESSIONID": "qbVljRoxFc3oRHlXZC4Vo68nB5YJ3qaRQK0iqgrvwH3QxtZdlGVEbH9XrNqSJ9vi.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+            "_ga_H9G80S9QWN": "GS2.1.s1750551573$o1$g0$t1750551573$j60$l0$h0",
+        }
+
+    def _generate_auth_token(self) -> str:
+        """
+        Генерирует authToken на основе анализа Windows приложения
+
+        ⚠️ ТРЕБУЕТ ДОПОЛНИТЕЛЬНОГО ИССЛЕДОВАНИЯ
+        authToken из Windows приложения: xMWEaaBPpJmiteLCzigMIw==
+        Base64 decoded: b'\xc4\xc5\x84i\xa0O\xa4\x99\xa2\xb5\xe2\xc2\xce(\x0c#'
+        """
+        import base64
+        import os
+        import time
+
+        # Временное решение: используем известный рабочий токен
+        # TODO: Исследовать алгоритм генерации authToken
+        return "xMWEaaBPpJmiteLCzigMIw%3D%3D"
+
+    def _create_session_with_auth_token(
+        self, auth_token: str = None
+    ) -> requests.Session:
+        """
+        Создает сессию с поддержкой authToken из Windows приложения
+
+        Args:
+            auth_token: authToken из Windows приложения
+        """
+        session = requests.Session()
+
+        # Настройка retry стратегии
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["HEAD", "GET", "POST", "OPTIONS"],
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        # Используем Windows-специфичные cookies
+        windows_cookies = self._get_windows_cookies()
+
+        # Обновляем cookies из кэша если они есть
+        saved_cookies = self.session_manager.load_session("glovis")
+        if saved_cookies:
+            # Обновляем JSESSIONID и другие важные cookies
+            for key in ["JSESSIONID", "_ga", "_ga_WBXP3Q01TE", "_ga_H9G80S9QWN"]:
+                if key in saved_cookies:
+                    windows_cookies[key] = saved_cookies[key]
+
+        # Настройка headers с поддержкой authToken
+        if not auth_token:
+            auth_token = self._generate_auth_token()
+
+        # Создаем Referer с authToken (как в Windows приложении)
+        referer_with_token = f"https://auction.autobell.co.kr/auction/exhibitList.do?authToken={auth_token}&ABLE_LANGUAGE_SELECTION_PARAM=ko&flagHouse=W&acc=30&rc=&atn=749&searchListType=SHORTSELLING&bidcd=3&auctListStat="
+
+        session.headers.update(
+            {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Referer": referer_with_token,  # ⭐ КРИТИЧНЫЙ - с authToken
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+            }
+        )
+
+        # Устанавливаем cookies
+        for name, value in windows_cookies.items():
+            session.cookies.set(name, value)
+
+        # Отключаем проверку SSL сертификатов
+        session.verify = False
+
+        # Подавляем предупреждения о незащищённых запросах
+        import urllib3
+
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        logger.info(f"🔐 Создана сессия с authToken: {auth_token[:20]}...")
+        self._session_created_at = datetime.now()
+        self._authenticated = True
+        return session
+
+    def get_session_with_auth_token(self, auth_token: str = None) -> requests.Session:
+        """
+        Публичный метод для получения сессии с authToken
+
+        Args:
+            auth_token: authToken из Windows приложения
+        """
+        return self._create_session_with_auth_token(auth_token)
 
     def _load_saved_session(self):
         """Загружает сохраненную сессию при старте"""

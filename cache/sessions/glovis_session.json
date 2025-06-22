@@ -1,20 +1,18 @@
 {
   "cookies": {
-    "SCOUTER": "z6d9hgnq5i09ho",
-    "_gcl_au": "1.1.469301602.1749863933",
-    "_fwb": "191nmCARVubatjoH72cRPm8.1749863933091",
-    "_fbp": "fb.2.1749863933206.396345519817813213",
-    "_gcl_aw": "GCL.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
-    "_gcl_gs": "2.1.k1$i1749867755$u107600402",
-    "_gac_UA-163217058-4": "1.1749867756.EAIaIQobChMI5I30r-3vjQMV9V4PAh1xVhhmEAAYASAAEgInMPD_BwE",
-    "_ga": "GA1.1.1367887267.1749863933",
-    "_ga_WBXP3Q01TE": "GS2.1.s1749866209$o2$g1$t1749867760$j56$l0$h0",
-    "JSESSIONID": "Xj5FsVlgrbW9TyjulUVDFIVc7Z4VvVPrScOX86KHxZNAf349lU6U7XHZ36chII5n.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
-    "_ga_H9G80S9QWN": "GS2.1.s1750296658$o15$g1$t1750297610$j60$l0$h0"
+    "_gcl_au": "1.1.982350429.1749522778",
+    "_fwb": "19cGXz96Ifjpyk0wuJ5XI.1749522778595",
+    "idChk": "1",
+    "Chk": "7552",
+    "SCOUTER": "zcsqd8tkmdiai",
+    "_ga": "GA1.1.450054511.1749522779",
+    "_ga_WBXP3Q01TE": "GS2.1.s1749793770$o3$g0$t1749793788$j42$l0$h0",
+    "JSESSIONID": "qbVljRoxFc3oRHlXZC4Vo68nB5YJ3qaRQK0iqgrvwH3QxtZdlGVEbH9XrNqSJ9vi.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x",
+    "_ga_H9G80S9QWN": "GS2.1.s1750551573$o1$g0$t1750551573$j60$l0$h0"
   },
-  "timestamp": "2025-06-19T15:48:11.303136",
+  "timestamp": "2025-06-22T09:29:39.122277",
   "metadata": {
-    "source": "manual_update",
-    "jsessionid": "Xj5FsVlgrbW9TyjulUVDFIVc7Z4VvVPrScOX86KHxZNAf349lU6U7XHZ36chII5n.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x"
+    "source": "curl_file",
+    "jsessionid": "qbVljRoxFc3oRHlXZC4Vo68nB5YJ3qaRQK0iqgrvwH3QxtZdlGVEbH9XrNqSJ9vi.QXV0b0F1Y3Rpb24vQXV0b0F1Y3Rpb24x"
   }
 }
