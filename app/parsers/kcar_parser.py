@@ -94,8 +94,15 @@ class KCarParser:
                     # Уже полный путь, добавляем только домен
                     car.thumbnail = f"https://www.kcarauction.com{car.thumbnail}"
                 else:
-                    # Формируем полный путь через FILE_UPLOAD/IMAGE_UPLOAD/CAR
-                    car.thumbnail = f"https://www.kcarauction.com/FILE_UPLOAD/IMAGE_UPLOAD/CAR/{car.thumbnail.lstrip('/')}"
+                    # Убираем суффиксы качества (_370, _640) для получения оригинала
+                    clean_thumbnail = car.thumbnail
+                    if "_370" in clean_thumbnail:
+                        clean_thumbnail = clean_thumbnail.replace("_370", "")
+                    elif "_640" in clean_thumbnail:
+                        clean_thumbnail = clean_thumbnail.replace("_640", "")
+
+                    # Формируем полный путь
+                    car.thumbnail = f"https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/{clean_thumbnail}"
 
             if car.thumbnail_mobile:
                 # Проверяем, если уже есть полный URL
@@ -107,8 +114,19 @@ class KCarParser:
                         f"https://www.kcarauction.com{car.thumbnail_mobile}"
                     )
                 else:
-                    # Формируем полный путь через FILE_UPLOAD/IMAGE_UPLOAD/CAR
-                    car.thumbnail_mobile = f"https://www.kcarauction.com/FILE_UPLOAD/IMAGE_UPLOAD/CAR/{car.thumbnail_mobile.lstrip('/')}"
+                    # Убираем суффиксы качества (_370, _640) для получения оригинала
+                    clean_thumbnail_mobile = car.thumbnail_mobile.lstrip("/")
+                    if "_370" in clean_thumbnail_mobile:
+                        clean_thumbnail_mobile = clean_thumbnail_mobile.replace(
+                            "_370", ""
+                        )
+                    elif "_640" in clean_thumbnail_mobile:
+                        clean_thumbnail_mobile = clean_thumbnail_mobile.replace(
+                            "_640", ""
+                        )
+
+                    # Формируем полный путь
+                    car.thumbnail_mobile = f"https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/{clean_thumbnail_mobile}"
 
             # Логируем основную информацию об автомобиле
             car_info = (

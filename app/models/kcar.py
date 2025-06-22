@@ -16,12 +16,12 @@ class KCarCar(BaseModel):
     thumbnail: Optional[str] = Field(
         None,
         alias="THUMBNAIL",
-        description="URL миниатюры фотографии автомобиля (370px)",
+        description="URL фотографии автомобиля (оригинальное качество)",
     )
     thumbnail_mobile: Optional[str] = Field(
         None,
         alias="THUMBNAIL_MOBILE",
-        description="URL мобильной фотографии автомобиля (640px)",
+        description="URL фотографии автомобиля (оригинальное качество)",
     )
 
     # Цена и аукцион
