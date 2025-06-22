@@ -24,7 +24,6 @@ from app.models.glovis_filters import (
 )
 from app.services.glovis_service import GlovisService
 from app.core.logging import get_logger
-from app.utils.glovis_cookies_updater import GlovisCookiesUpdater
 
 # Настраиваем логгер
 glovis_logger = get_logger("glovis_routes")
@@ -911,43 +910,11 @@ async def upload_curl_file(
 ):
     """Загружает файл с curl запросом и извлекает cookies"""
     try:
-        # Сохраняем временный файл
-        temp_file = Path(f"/tmp/{file.filename}")
-        content = await file.read()
-
-        with open(temp_file, "wb") as f:
-            f.write(content)
-
-        # Извлекаем cookies из файла
-        from app.utils.glovis_cookies_updater import GlovisCookiesUpdater
-
-        result = GlovisCookiesUpdater.update_cookies_from_curl_file(str(temp_file))
-
-        # Удаляем временный файл
-        temp_file.unlink()
-
-        if result["success"] and result["cookies"]:
-            # Обновляем cookies
-            service.update_cookies(result["cookies"])
-
-            return {
-                "success": True,
-                "message": "Cookies успешно извлечены и обновлены",
-                "data": {
-                    "cookies_count": len(result["cookies"]),
-                    "jsessionid": (
-                        result.get("jsessionid", "")[:20] + "..."
-                        if result.get("jsessionid")
-                        else None
-                    ),
-                },
-            }
-        else:
-            return {
-                "success": False,
-                "message": result.get("message", "Не удалось извлечь cookies"),
-                "data": None,
-            }
+        return {
+            "success": False,
+            "message": "Функция временно отключена. Используйте /paste-curl или /update-cookies",
+            "data": None,
+        }
 
     except Exception as e:
         logger.error(f"Ошибка при загрузке curl файла: {e}")
@@ -965,7 +932,7 @@ async def paste_curl_command(
 ):
     """
     Принимает cURL команду напрямую и извлекает cookies
-    
+
     **Пример использования:**
     ```json
     POST /api/v1/glovis/paste-curl
@@ -976,28 +943,29 @@ async def paste_curl_command(
     """
     try:
         glovis_logger.info("📋 Получена cURL команда для обработки")
-        
+
         # Импортируем конвертер
         import sys
         import os
+
         sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        
+
         from glovis_curl_converter import GlovisCurlConverter
-        
+
         # Создаем конвертер и обрабатываем команду
         converter = GlovisCurlConverter()
         converter.api_url = "http://localhost:8000"  # Внутренний URL
-        
+
         # Парсим cookies из cURL команды
         cookies = converter.parse_curl_command(curl_command)
-        
+
         if not cookies:
             return {
                 "success": False,
                 "message": "Не удалось извлечь cookies из cURL команды",
-                "data": None
+                "data": None,
             }
-        
+
         # Валидируем cookies
         if not converter.validate_cookies(cookies):
             return {
@@ -1005,18 +973,18 @@ async def paste_curl_command(
                 "message": "Извлеченные cookies невалидны",
                 "data": {
                     "cookies_found": list(cookies.keys()),
-                    "has_jsessionid": "JSESSIONID" in cookies
-                }
+                    "has_jsessionid": "JSESSIONID" in cookies,
+                },
             }
-        
+
         # Обновляем cookies в сервисе
         service.update_cookies(cookies)
-        
+
         # Проверяем обновленную сессию
         session_check = await service.check_session_validity()
-        
+
         glovis_logger.info(f"✅ Cookies успешно обновлены из cURL команды")
-        
+
         return {
             "success": True,
             "message": "Cookies успешно извлечены и обновлены из cURL команды",
@@ -1029,16 +997,16 @@ async def paste_curl_command(
                     else None
                 ),
                 "session_valid": session_check.get("is_valid", False),
-                "timestamp": datetime.now().isoformat()
-            }
+                "timestamp": datetime.now().isoformat(),
+            },
         }
-        
+
     except Exception as e:
         glovis_logger.error(f"❌ Ошибка при обработке cURL команды: {e}")
         return {
             "success": False,
             "message": f"Ошибка при обработке cURL команды: {str(e)}",
-            "data": None
+            "data": None,
         }
 
 

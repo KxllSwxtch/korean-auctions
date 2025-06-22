@@ -153,40 +153,8 @@ class GlovisSessionMonitor:
 
     def _try_update_from_curl_file(self):
         """Пытается обновить сессию из файла curl"""
-        curl_file = Path("glovis-curl-request.py")
-
-        if not curl_file.exists():
-            logger.warning("⚠️ Файл glovis-curl-request.py не найден")
-            return
-
-        # Проверяем, не слишком ли старый файл
-        file_age = datetime.now() - datetime.fromtimestamp(curl_file.stat().st_mtime)
-        if file_age > timedelta(hours=24):
-            logger.warning(f"⚠️ Файл curl старше 24 часов ({file_age})")
-            return
-
-        try:
-            # Используем утилиту для извлечения cookies
-            from app.utils.glovis_cookies_updater import GlovisCookiesUpdater
-
-            result = GlovisCookiesUpdater.update_cookies_from_curl_file(str(curl_file))
-
-            if result["success"] and result["cookies"]:
-                # Сохраняем новую сессию
-                self.session_manager.save_session(
-                    "glovis",
-                    result["cookies"],
-                    metadata={
-                        "source": "curl_file",
-                        "jsessionid": result.get("jsessionid"),
-                    },
-                )
-                logger.info("✅ Сессия Glovis обновлена из файла curl")
-            else:
-                logger.error(f"❌ Не удалось извлечь cookies: {result['message']}")
-
-        except Exception as e:
-            logger.error(f"❌ Ошибка при обновлении из curl файла: {e}")
+        logger.info("⚠️ Автоматическое обновление из curl файла временно отключено")
+        return
 
 
 # Глобальный экземпляр менеджера сессий

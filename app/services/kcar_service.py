@@ -115,7 +115,6 @@ class KCarService:
             if response.status_code == 200:
                 try:
                     response_data = response.json()
-                    logger.debug(f"🔍 Ответ авторизации: {response_data}")
 
                     # Проверяем успешность авторизации
                     if response_data.get("successYn") == "Y":
@@ -190,7 +189,6 @@ class KCarService:
             if response.status_code == 200:
                 try:
                     response_data = response.json()
-                    logger.debug(f"🔍 Ответ согласия: {response_data}")
 
                     # Проверяем успешность
                     if response_data.get("S_USER_ID"):
