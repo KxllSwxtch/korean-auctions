@@ -137,11 +137,32 @@ class LotteParser:
             # Ищем информацию о пагинации и общем количестве
             # Обычно это находится в элементах типа "1/23" или "총 234건"
 
-            # Вариант 1: Поиск текста с "총 [число]건"
-            total_pattern = re.search(r"총\s*(\d+(?:,\d+)*)\s*건", html_content)
-            if total_pattern:
-                total_str = total_pattern.group(1).replace(",", "")
-                return int(total_str)
+            # Вариант 0: Поиск специфичного для Lotte элемента .total-carnum
+            total_carnum = soup.select_one(".total-carnum")
+            if total_carnum:
+                text = total_carnum.get_text(strip=True)
+                self.logger.info(f"Найден элемент .total-carnum: '{text}'")
+                # Ищем число в тексте типа "총 등록대수1,320"
+                numbers = re.findall(r"\d+(?:,\d+)*", text)
+                if numbers:
+                    # Берем самое большое число
+                    max_number = max([int(n.replace(",", "")) for n in numbers])
+                    self.logger.info(f"Извлечено общее количество: {max_number}")
+                    return max_number
+
+            # Вариант 1: Поиск текста с "총 등록대수" или "총 [число]건"
+            total_patterns = [
+                r"총\s*등록대수\s*(\d+(?:,\d+)*)",
+                r"총\s*(\d+(?:,\d+)*)\s*건",
+                r"총\s*(\d+(?:,\d+)*)\s*대",
+            ]
+
+            for pattern in total_patterns:
+                total_match = re.search(pattern, html_content)
+                if total_match:
+                    total_str = total_match.group(1).replace(",", "")
+                    self.logger.info(f"Найдено по паттерну '{pattern}': {total_str}")
+                    return int(total_str)
 
             # Вариант 2: Поиск в пагинации
             pagination_selectors = [
@@ -150,6 +171,7 @@ class LotteParser:
                 ".page-info .total",
                 ".search-result .total",
                 ".list-info .total",
+                ".total-carnum",
             ]
 
             for selector in pagination_selectors:
@@ -161,6 +183,9 @@ class LotteParser:
                         # Берем самое большое число (скорее всего общее количество)
                         max_number = max([int(n.replace(",", "")) for n in numbers])
                         if max_number > 0:
+                            self.logger.info(
+                                f"Найдено в селекторе '{selector}': {max_number}"
+                            )
                             return max_number
 
             # Вариант 3: Поиск в скриптах или hidden полях
