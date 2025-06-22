@@ -43,10 +43,11 @@ async def get_kcar_cars(
         )
 
         # Формируем параметры запроса
+        # В KCar START_RNUM = номер страницы, а не номер записи!
         params = {
-            "AUC_TYPE": auction_type or "daily",
-            "PAGE_CNT": str(page_size),
-            "START_RNUM": str((page - 1) * page_size + 1),
+            "AUC_TYPE": auction_type or "weekly",
+            "PAGE_CNT": page_size,
+            "page": page,  # Передаем номер страницы отдельно
         }
 
         # Добавляем фильтры если указаны

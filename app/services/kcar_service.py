@@ -270,13 +270,15 @@ class KCarService:
 
             # Точно копируем параметры из примеров payload
             # Пример для Line A: AUC_TYPE=weekly&MNUFTR_CD=&MODEL_GRP_CD=&MODEL_CD=&PAGE_CNT=18&START_RNUM=1&ORDER=&OPTION_CD=&FORM_YR_ST=&FORM_YR_ED=&AUC_START_PRC_ST=&AUC_START_PRC_ED=&MILG_ST=&MILG_ED=&CNO=&FUEL_CD=&GBOX_DCD=&COLOR_CD=&SRC_OPT=weekly&CAR_TYPE=&CARMD_CD=&PAGE_TYPE=wCfm&LANE_TYPE=A&TO_DATE=&FROM_DATE=&CAR_STAT_CD=&AUC_SEQ=&TODAY=&IPTCAR_DCD=&AUC_PLC_CD=
+            # В KCar START_RNUM = номер страницы, а не номер записи!
+            page_number = params.get("page", 1) if params else 1
             default_params = {
                 "AUC_TYPE": "weekly",
                 "MNUFTR_CD": "",
                 "MODEL_GRP_CD": "",
                 "MODEL_CD": "",
-                "PAGE_CNT": "100",
-                "START_RNUM": "1",
+                "PAGE_CNT": str(params.get("PAGE_CNT", 100)) if params else "100",
+                "START_RNUM": str(page_number),
                 "ORDER": "",
                 "OPTION_CD": "",
                 "FORM_YR_ST": "",

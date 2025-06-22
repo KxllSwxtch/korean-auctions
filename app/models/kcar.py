@@ -132,7 +132,7 @@ class KCarAuctionReqVo(BaseModel):
         None, alias="PAGE_CNT", description="Количество на странице"
     )
     start_rnum: Optional[int] = Field(
-        None, alias="START_RNUM", description="Начальный номер"
+        None, alias="START_RNUM", description="Номер страницы (не номер записи!)"
     )
     end_rnum: Optional[int] = Field(
         None, alias="END_RNUM", description="Конечный номер"
