@@ -1277,10 +1277,39 @@ class KCarService:
                 "PAGE_CNT": str(filters.page_size),
                 "START_RNUM": str(filters.page),
                 "ORDER": filters.sort_order or "",
+                "OPTION_CD": "",
+                "SRC_OPT": filters.auction_type,  # Добавляем недостающий параметр
+                "CAR_TYPE": "",
+                "CARMD_CD": "",
                 "PAGE_TYPE": "wCfm",
                 "LANE_TYPE": filters.lane_type,
+                "TO_DATE": "",
+                "FROM_DATE": "",
+                "CAR_STAT_CD": "",
+                "AUC_SEQ": "",
+                "TODAY": "",
                 "IPTCAR_DCD": "001",
+                "AUC_PLC_CD": "",
             }
+
+            # Добавляем все поля из примера с пустыми значениями по умолчанию
+            data.update(
+                {
+                    "MNUFTR_CD": "",
+                    "MODEL_GRP_CD": "",
+                    "MODEL_CD": "",
+                    "FORM_YR_ST": "",
+                    "FORM_YR_ED": "",
+                    "AUC_START_PRC_ST": "",
+                    "AUC_START_PRC_ED": "",
+                    "MILG_ST": "",
+                    "MILG_ED": "",
+                    "CNO": "",
+                    "FUEL_CD": "",
+                    "GBOX_DCD": "",
+                    "COLOR_CD": "",
+                }
+            )
 
             # Добавляем фильтры если указаны
             if filters.manufacturer_code:
