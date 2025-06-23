@@ -995,6 +995,9 @@ class KCarService:
 
             if auction_code:
                 params["AUC_CD"] = auction_code
+                logger.info(f"🔍 Поиск в конкретном аукционе: {auction_code}")
+            else:
+                logger.info("🔍 Поиск во всех аукционах")
 
             # Получаем список автомобилей
             response = self.get_cars(params)
@@ -1008,18 +1011,49 @@ class KCarService:
 
             # Ищем автомобиль по номеру
             found_car = None
+            search_number = car_number.strip().lower()
+
+            # Сначала точное совпадение
             for car in response.car_list:
-                if car.car_number and car_number.lower() in car.car_number.lower():
+                if car.car_number and car.car_number.strip().lower() == search_number:
                     found_car = car
+                    logger.info(f"🎯 Найдено точное совпадение: {car.car_number}")
                     break
 
+            # Если точного совпадения нет, ищем частичное
+            if not found_car:
+                for car in response.car_list:
+                    if car.car_number and (
+                        search_number in car.car_number.lower()
+                        or car.car_number.lower() in search_number
+                    ):
+                        found_car = car
+                        logger.info(
+                            f"🔍 Найдено частичное совпадение: {car.car_number}"
+                        )
+                        break
+
             if found_car:
+                # Определяем тип совпадения
+                match_type = (
+                    "exact_match"
+                    if found_car.car_number.strip().lower() == search_number
+                    else "partial_match"
+                )
+                confidence = 1.0 if match_type == "exact_match" else 0.8
+
                 logger.success(
                     f"✅ Найден автомобиль: {found_car.car_id} - {found_car.car_name}"
                 )
                 return {
                     "success": True,
                     "message": f"Найден автомобиль с номером {car_number}",
+                    "car_id": found_car.car_id,
+                    "car_number": found_car.car_number,
+                    "match_type": match_type,
+                    "confidence": confidence,
+                    "searched_count": len(response.car_list),
+                    "all_matches": [found_car.car_id],
                     "car": found_car,
                 }
             else:
@@ -1027,6 +1061,9 @@ class KCarService:
                 return {
                     "success": False,
                     "message": f"Автомобиль с номером {car_number} не найден",
+                    "searched_count": (
+                        len(response.car_list) if response and response.car_list else 0
+                    ),
                     "car": None,
                 }
 

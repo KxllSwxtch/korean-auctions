@@ -331,6 +331,11 @@ class KCarParser:
                 f"🔍 {self.name}: Начинаю парсинг HTML детальной информации для автомобиля {car_id}"
             )
 
+            # Парсим HTML с помощью BeautifulSoup
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(html_content, "html.parser")
+
             # Создаем базовый объект с известными данными
             car = KCarDetailedCar(
                 car_id=car_id,
@@ -341,15 +346,142 @@ class KCarParser:
                 options=[],
             )
 
-            # Здесь можно добавить парсинг HTML контента
-            # Для начала просто возвращаем базовую структуру
-            # TODO: Реализовать парсинг HTML с помощью BeautifulSoup если потребуется
+            # Пытаемся извлечь базовую информацию
+            try:
+                # 1. Ищем название автомобиля в таблице с классом "ttable_tit"
+                car_name_row = soup.find("td", class_="ttable_tit", string="차명")
+                if car_name_row:
+                    car_name_cell = car_name_row.find_next_sibling("td")
+                    if car_name_cell:
+                        car.car_name = car_name_cell.get_text(strip=True)
+                        logger.debug(f"🚗 Найдено название: {car.car_name}")
+
+                # 2. Ищем номер автомобиля в таблице
+                car_number_row = soup.find("td", class_="table_tit", string="차량번호")
+                if car_number_row:
+                    car_number_cell = car_number_row.find_next_sibling("td")
+                    if car_number_cell:
+                        car_number_p = car_number_cell.find("p")
+                        if car_number_p:
+                            car.car_number = car_number_p.get_text(strip=True)
+                            logger.debug(f"🔢 Найден номер: {car.car_number}")
+
+                # 3. Ищем год в таблице
+                year_row = soup.find("td", class_="ttable_tit", string="연식")
+                if year_row:
+                    year_cell = year_row.find_next_sibling("td")
+                    if year_cell:
+                        car.year = year_cell.get_text(strip=True)
+                        logger.debug(f"📅 Найден год: {car.year}")
+
+                # 4. Ищем пробег в carinfo секции
+                # Ищем элемент p, который содержит текст "주행거리"
+                for p_tag in soup.find_all("p"):
+                    if p_tag.get_text() and "주행거리" in p_tag.get_text():
+                        mileage_span = p_tag.find("span")
+                        if mileage_span:
+                            car.mileage = mileage_span.get_text(strip=True)
+                            logger.debug(f"🏃 Найден пробег: {car.mileage}")
+                            break
+
+                # 5. Ищем топливо в carinfo секции
+                fuel_p = soup.find("p", string=lambda text: text and "연료" in text)
+                if fuel_p:
+                    fuel_span = fuel_p.find("span")
+                    if fuel_span:
+                        car.fuel_type = fuel_span.get_text(strip=True)
+                        logger.debug(f"⛽ Найдено топливо: {car.fuel_type}")
+
+                # 6. Ищем коробку передач в таблице
+                transmission_row = soup.find("td", class_="table_tit", string="미션")
+                if transmission_row:
+                    transmission_cell = transmission_row.find_next_sibling("td")
+                    if transmission_cell:
+                        transmission_p = transmission_cell.find("p")
+                        if transmission_p:
+                            car.transmission = transmission_p.get_text(strip=True)
+                            logger.debug(f"⚙️ Найдена КПП: {car.transmission}")
+
+                # 7. Ищем топливо и цвет в таблице
+                fuel_color_row = soup.find("td", class_="table_tit", string="연료/색상")
+                if fuel_color_row:
+                    fuel_color_cell = fuel_color_row.find_next_sibling("td")
+                    if fuel_color_cell:
+                        fuel_color_p = fuel_color_cell.find("p")
+                        if fuel_color_p:
+                            fuel_color_text = fuel_color_p.get_text(strip=True)
+                            if "/" in fuel_color_text:
+                                fuel_part, color_part = fuel_color_text.split("/", 1)
+                                if not car.fuel_type:  # Если еще не найдено
+                                    car.fuel_type = fuel_part.strip()
+                                car.exterior_color = color_part.strip()
+                                logger.debug(
+                                    f"🎨 Найдены топливо/цвет: {car.fuel_type}/{car.exterior_color}"
+                                )
+
+                # 8. Ищем главное изображение
+                main_img = soup.find("img", id="main_img")
+                if main_img and main_img.get("src"):
+                    main_img_src = main_img.get("src")
+                    if main_img_src.startswith("/"):
+                        car.main_image = f"https://www.kcarauction.com{main_img_src}"
+                    else:
+                        car.main_image = main_img_src
+                    logger.debug(f"📸 Найдено главное изображение: {car.main_image}")
+
+                # 9. Ищем все изображения (в слайдере и других местах)
+                all_images = []
+                img_tags = soup.find_all("img")
+
+                for img in img_tags:
+                    src = img.get("src", "")
+                    if src and (car_id in src or "CAR" in src.upper()):
+                        # Формируем полный URL изображения
+                        if src.startswith("http"):
+                            full_url = src
+                        elif src.startswith("/"):
+                            full_url = f"https://www.kcarauction.com{src}"
+                        else:
+                            full_url = f"https://www.kcarauction.com/{src}"
+
+                        if full_url not in all_images:
+                            all_images.append(full_url)
+
+                car.all_images = all_images
+                logger.debug(f"📸 Найдено {len(all_images)} изображений")
+
+                # 10. Ищем VIN номер
+                vin_row = soup.find("td", class_="ttable_tit", string="차대번호")
+                if vin_row:
+                    vin_cell = vin_row.find_next_sibling("td")
+                    if vin_cell:
+                        car.vin = vin_cell.get_text(strip=True)
+                        logger.debug(f"🔐 Найден VIN: {car.vin}")
+
+                # 11. Ищем объем двигателя
+                displacement_row = soup.find("td", class_="table_tit", string="배기량")
+                if displacement_row:
+                    displacement_cell = displacement_row.find_next_sibling("td")
+                    if displacement_cell:
+                        displacement_p = displacement_cell.find("p")
+                        if displacement_p:
+                            car.displacement = displacement_p.get_text(strip=True)
+                            logger.debug(
+                                f"🔧 Найден объем двигателя: {car.displacement}"
+                            )
+
+                logger.debug(
+                    f"🔍 Извлеченные данные: название={car.car_name}, номер={car.car_number}, год={car.year}, пробег={car.mileage}"
+                )
+
+            except Exception as parse_error:
+                logger.warning(f"⚠️ Ошибка извлечения данных из HTML: {parse_error}")
 
             response = KCarDetailResponse(
                 car=car,
                 success=True,
                 message="Детальная информация получена успешно",
-                source_url=f"https://www.kcarauction.com/kcar/auction/weekly_auction/colCarDtl.do?CAR_ID={car_id}&AUC_CD={auction_code}",
+                source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}",
             )
 
             logger.success(
