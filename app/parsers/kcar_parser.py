@@ -21,12 +21,21 @@ class KCarParser:
         self.name = "KCar Parser"
         logger.info(f"🔧 {self.name} инициализирован")
 
-    def parse_cars_json(self, json_data: Dict[str, Any]) -> KCarResponse:
+    def parse_cars_json(
+        self,
+        json_data: Dict[str, Any],
+        page: int = 1,
+        page_size: int = 50,
+        total_count: Optional[int] = None,
+    ) -> KCarResponse:
         """
         Парсинг JSON ответа со списком автомобилей
 
         Args:
             json_data: JSON данные от KCar API
+            page: Номер страницы
+            page_size: Размер страницы
+            total_count: Общее количество автомобилей
 
         Returns:
             KCarResponse с списком автомобилей
@@ -51,16 +60,31 @@ class KCarParser:
             # Извлекаем информацию о запросе
             auction_req_vo = json_data.get("auctionReqVo", {})
 
+            # Рассчитываем поля пагинации
+            actual_total_count = total_count if total_count is not None else len(cars)
+            total_pages = None
+            has_next_page = False
+            has_prev_page = page > 1
+
+            if actual_total_count > 0:
+                total_pages = (actual_total_count + page_size - 1) // page_size
+                has_next_page = page < total_pages
+
             response = KCarResponse(
                 auction_req_vo=auction_req_vo,
                 car_list=cars,
-                total_count=len(cars),
+                total_count=actual_total_count,
+                current_page=page,
+                page_size=page_size,
+                total_pages=total_pages,
+                has_next_page=has_next_page,
+                has_prev_page=has_prev_page,
                 success=True,
                 message=f"Успешно обработано {len(cars)} автомобилей",
             )
 
             logger.success(
-                f"✅ {self.name}: Успешно обработано {len(cars)} автомобилей"
+                f"✅ {self.name}: Успешно обработано {len(cars)} автомобилей (страница {page}/{total_pages})"
             )
             return response
 
@@ -69,6 +93,11 @@ class KCarParser:
             return KCarResponse(
                 car_list=[],
                 total_count=0,
+                current_page=page,
+                page_size=page_size,
+                total_pages=1,
+                has_next_page=False,
+                has_prev_page=page > 1,
                 success=False,
                 message=f"Ошибка парсинга: {str(e)}",
             )
@@ -299,7 +328,9 @@ class KCarParser:
                 test_cars.append(car_data)
 
             # Парсим тестовые данные
-            response = self.parse_cars_json({"CAR_LIST": test_cars})
+            response = self.parse_cars_json(
+                {"CAR_LIST": test_cars}, page=1, page_size=count, total_count=count
+            )
             logger.success(f"✅ {self.name}: Генерация тестовых данных завершена")
             return response
 

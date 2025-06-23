@@ -163,6 +163,14 @@ class KCarResponse(BaseModel):
         default_factory=list, alias="CAR_LIST", description="Список автомобилей"
     )
     total_count: Optional[int] = Field(None, description="Общее количество автомобилей")
+
+    # Поля пагинации
+    current_page: int = Field(1, description="Текущая страница")
+    page_size: int = Field(50, description="Размер страницы")
+    total_pages: Optional[int] = Field(None, description="Общее количество страниц")
+    has_next_page: bool = Field(False, description="Есть ли следующая страница")
+    has_prev_page: bool = Field(False, description="Есть ли предыдущая страница")
+
     success: bool = Field(True, description="Статус успешности")
     message: Optional[str] = Field(None, description="Сообщение")
 

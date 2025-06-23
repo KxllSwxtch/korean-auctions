@@ -677,8 +677,12 @@ class KCarService:
                         )
                         logger.debug(f"🔍 Ключи в ответе: {list(json_data.keys())}")
 
-                    # Обрабатываем данные через парсер
-                    lane_result = self.parser.parse_cars_json(json_data)
+                    # Обрабатываем данные через парсер с параметрами пагинации
+                    page_number = params.get("page", 1) if params else 1
+                    page_size = int(params.get("PAGE_CNT", 50)) if params else 50
+                    lane_result = self.parser.parse_cars_json(
+                        json_data, page=page_number, page_size=page_size
+                    )
 
                     if lane_result.success and lane_result.car_list:
                         # Добавляем информацию о лейне к каждому автомобилю
@@ -703,17 +707,33 @@ class KCarService:
                     logger.debug(f"Response text: {response.text[:500]}...")
                     continue
 
+            # Параметры пагинации уже извлечены выше
+
+            # Рассчитываем поля пагинации
+            total_pages = None
+            has_next_page = False
+            has_prev_page = page_number > 1
+
+            if total_count > 0:
+                total_pages = (total_count + page_size - 1) // page_size
+                has_next_page = page_number < total_pages
+
             # Создаем результат
             if all_cars:
                 result = KCarResponse(
                     car_list=all_cars,
                     total_count=total_count,
+                    current_page=page_number,
+                    page_size=page_size,
+                    total_pages=total_pages,
+                    has_next_page=has_next_page,
+                    has_prev_page=has_prev_page,
                     success=True,
                     message=f"Успешно получено {total_count} автомобилей из weekly аукционов (LANE A+B)",
                 )
 
                 logger.success(
-                    f"✅ Объединено {total_count} автомобилей из обоих лейнов"
+                    f"✅ Объединено {total_count} автомобилей из обоих лейнов (страница {page_number}/{total_pages})"
                 )
                 return result
             else:
@@ -727,15 +747,27 @@ class KCarService:
                 return KCarResponse(
                     car_list=[],
                     total_count=0,
+                    current_page=page_number,
+                    page_size=page_size,
+                    total_pages=1,
+                    has_next_page=False,
+                    has_prev_page=has_prev_page,
                     success=True,  # Изменено на True - пустой список это успех
                     message="В данный момент нет доступных автомобилей в weekly аукционах. Торги могли завершиться или еще не начаться.",
                 )
 
         except Exception as e:
             logger.error(f"❌ Ошибка получения автомобилей KCar: {e}")
+            page_number = params.get("page", 1) if params else 1
+            page_size = int(params.get("PAGE_CNT", 50)) if params else 50
             return KCarResponse(
                 car_list=[],
                 total_count=0,
+                current_page=page_number,
+                page_size=page_size,
+                total_pages=1,
+                has_next_page=False,
+                has_prev_page=page_number > 1,
                 success=False,
                 message=f"Ошибка получения данных: {str(e)}",
             )
