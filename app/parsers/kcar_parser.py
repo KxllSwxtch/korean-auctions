@@ -382,7 +382,7 @@ class KCarParser:
 
             # Создаем ответ напрямую из JSON данных
             # Pydantic автоматически обработает алиасы полей
-            response = KCarModelsResponse(**json_data)
+            response = KCarModelsResponse.model_validate(json_data)
             response.success = True
             response.message = f"Успешно получено {len(response.models)} моделей"
 
@@ -393,6 +393,7 @@ class KCarParser:
 
         except Exception as e:
             logger.error(f"❌ {self.name}: Ошибка парсинга JSON моделей: {e}")
+            logger.debug(f"🔍 JSON данные: {json_data}")
             return KCarModelsResponse(
                 models=[],
                 success=False,
@@ -416,7 +417,7 @@ class KCarParser:
 
             # Создаем ответ напрямую из JSON данных
             # Pydantic автоматически обработает алиасы полей
-            response = KCarGenerationsResponse(**json_data)
+            response = KCarGenerationsResponse.model_validate(json_data)
             response.success = True
             response.message = f"Успешно получено {len(response.generations)} поколений"
 
@@ -427,6 +428,7 @@ class KCarParser:
 
         except Exception as e:
             logger.error(f"❌ {self.name}: Ошибка парсинга JSON поколений: {e}")
+            logger.debug(f"🔍 JSON данные: {json_data}")
             return KCarGenerationsResponse(
                 generations=[],
                 success=False,
