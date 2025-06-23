@@ -2,7 +2,17 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional, Dict, Any
 from loguru import logger
 
-from app.models.kcar import KCarResponse, KCarCar, KCarStatsResponse, KCarDetailResponse
+from app.models.kcar import (
+    KCarResponse,
+    KCarCar,
+    KCarStatsResponse,
+    KCarDetailResponse,
+    KCarModelsResponse,
+    KCarGenerationsResponse,
+    KCarSearchResponse,
+    KCarSearchFilters,
+    KCAR_MANUFACTURERS,
+)
 from app.services.kcar_service import KCarService
 
 router = APIRouter(prefix="/api/v1/kcar", tags=["KCar"])
@@ -444,50 +454,258 @@ async def get_kcar_info():
     """
     Получить информацию о KCar API
 
-    Возвращает общую информацию о сервисе и доступных параметрах.
+    Возвращает базовую информацию о работе с KCar API.
     """
-    return {
-        "service": "KCar Auction Parser",
-        "version": "1.0.0",
-        "description": "API для получения данных автомобилей с KCar аукциона",
-        "base_url": "https://www.kcarauction.com",
-        "features": [
-            "Получение списка автомобилей",
-            "Фильтрация по параметрам",
-            "Статистика и аналитика",
-            "Тестовые и демо данные",
-        ],
-        "parameters": {
-            "auction_types": ["daily", "weekly", "special"],
-            "fuel_types": ["G", "D", "H", "E"],  # Бензин, Дизель, Гибрид, Электро
-            "transmissions": ["A", "M"],  # Автомат, Механика
-            "locations": ["서울경매장", "부산경매장", "경기경매장", "대구경매장"],
-        },
-        "endpoints": [
-            {"path": "/cars", "method": "GET", "description": "Список автомобилей"},
-            {"path": "/cars/test", "method": "GET", "description": "Тестовые данные"},
-            {"path": "/cars/demo", "method": "GET", "description": "Демо данные"},
-            {"path": "/cars/stats", "method": "GET", "description": "Статистика"},
-            {"path": "/cars/count", "method": "GET", "description": "Количество"},
-            {
-                "path": "/cars/{car_id}/detail",
-                "method": "GET",
-                "description": "Детальная информация",
+    try:
+        return {
+            "name": "KCar Auction API",
+            "version": "1.0.0",
+            "description": "API для работы с корейским автомобильным аукционом KCar",
+            "features": [
+                "Получение списка автомобилей",
+                "Детальная информация об автомобилях",
+                "Поиск по номеру автомобиля",
+                "Статистика аукционов",
+                "Тестовые данные",
+            ],
+            "supported_auctions": ["WEEKLY"],
+            "authentication": "Required (username/password)",
+            "base_url": "https://www.kcarauction.com",
+            "status": "Active",
+            "last_updated": "2025-01-24",
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения информации о KCar API: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Ошибка получения информации", "message": str(e)},
+        )
+
+
+# =============================================================================
+# ЭНДПОИНТЫ СИСТЕМЫ ФИЛЬТРАЦИИ
+# =============================================================================
+
+
+@router.get("/manufacturers")
+async def get_manufacturers():
+    """
+    Получить список производителей автомобилей
+
+    Возвращает статический список всех поддерживаемых производителей.
+    """
+    try:
+        logger.info("📋 Запрос списка производителей KCar")
+
+        manufacturers = kcar_service.get_manufacturers()
+
+        logger.success(f"✅ Возвращено {len(manufacturers)} производителей")
+        return {
+            "manufacturers": manufacturers,
+            "total_count": len(manufacturers),
+            "success": True,
+            "message": f"Получено {len(manufacturers)} производителей",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения списка производителей: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Ошибка получения производителей", "message": str(e)},
+        )
+
+
+@router.get("/models/{manufacturer_code}", response_model=KCarModelsResponse)
+async def get_models(
+    manufacturer_code: str,
+    input_car_code: str = Query("001", description="Код типа автомобиля"),
+):
+    """
+    Получить список моделей для производителя
+
+    Возвращает все доступные модели для указанного производителя.
+    """
+    try:
+        logger.info(f"📋 Запрос моделей для производителя {manufacturer_code}")
+
+        result = kcar_service.get_models(manufacturer_code, input_car_code)
+
+        if not result.success:
+            logger.warning(
+                f"⚠️ Не удалось получить модели для производителя {manufacturer_code}: {result.message}"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Ошибка получения моделей",
+                    "message": result.message,
+                    "manufacturer_code": manufacturer_code,
+                },
+            )
+
+        logger.success(
+            f"✅ Возвращено {len(result.models)} моделей для производителя {manufacturer_code}"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка в эндпоинте получения моделей: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Внутренняя ошибка сервера", "message": str(e)},
+        )
+
+
+@router.get(
+    "/generations/{manufacturer_code}/{model_group_code}",
+    response_model=KCarGenerationsResponse,
+)
+async def get_generations(
+    manufacturer_code: str,
+    model_group_code: str,
+    input_car_code: str = Query("001", description="Код типа автомобиля"),
+):
+    """
+    Получить список поколений для модели
+
+    Возвращает все доступные поколения для указанной модели производителя.
+    """
+    try:
+        logger.info(
+            f"📋 Запрос поколений для модели {model_group_code} производителя {manufacturer_code}"
+        )
+
+        result = kcar_service.get_generations(
+            manufacturer_code, model_group_code, input_car_code
+        )
+
+        if not result.success:
+            logger.warning(f"⚠️ Не удалось получить поколения: {result.message}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Ошибка получения поколений",
+                    "message": result.message,
+                    "manufacturer_code": manufacturer_code,
+                    "model_group_code": model_group_code,
+                },
+            )
+
+        logger.success(
+            f"✅ Возвращено {len(result.generations)} поколений для модели {model_group_code}"
+        )
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка в эндпоинте получения поколений: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Внутренняя ошибка сервера", "message": str(e)},
+        )
+
+
+@router.post("/search", response_model=KCarSearchResponse)
+async def search_cars(filters: KCarSearchFilters):
+    """
+    Расширенный поиск автомобилей с фильтрами
+
+    Позволяет искать автомобили с множественными фильтрами:
+    - Производитель, модель, поколение
+    - Год выпуска, цена, пробег
+    - Тип топлива, коробка передач, цвет
+    - Местоположение аукциона
+    """
+    try:
+        logger.info(f"🔍 Запрос расширенного поиска автомобилей KCar")
+        logger.debug(f"🔍 Параметры поиска: {filters.model_dump()}")
+
+        result = kcar_service.search_cars(filters)
+
+        if not result.success:
+            logger.warning(f"⚠️ Ошибка расширенного поиска: {result.message}")
+            # Для поиска возвращаем ошибку, но не критичную
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "Ошибка поиска автомобилей",
+                    "message": result.message,
+                    "filters": filters.model_dump(),
+                },
+            )
+
+        # Успешный результат (может быть пустым)
+        if len(result.cars) == 0:
+            logger.info("ℹ️ Поиск не вернул результатов")
+        else:
+            logger.success(f"✅ Найдено {len(result.cars)} автомобилей")
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Ошибка в эндпоинте расширенного поиска: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Внутренняя ошибка сервера", "message": str(e)},
+        )
+
+
+@router.get("/search/filters/info")
+async def get_search_filters_info():
+    """
+    Получить информацию о доступных фильтрах поиска
+
+    Возвращает справочную информацию о всех возможных фильтрах.
+    """
+    try:
+        logger.info("📋 Запрос информации о фильтрах поиска")
+
+        # Получаем схему модели фильтров
+        schema = KCarSearchFilters.model_json_schema()
+
+        # Дополнительная информация
+        additional_info = {
+            "manufacturer_codes": {
+                "001": "현대 (Hyundai)",
+                "002": "기아 (Kia)",
+                "003": "삼성르노 (Samsung Renault)",
+                "004": "대우GM (Daewoo GM)",
+                "005": "쌍용 (SsangYong)",
+                "006": "한국GM (GM Korea)",
+                "007": "수입 (Import)",
+                "008": "기타 (Others)",
             },
-            {
-                "path": "/cars/search/by-number",
-                "method": "GET",
-                "description": "Поиск car_id по номеру автомобиля",
+            "auction_types": ["weekly"],
+            "lane_types": ["A", "B"],
+            "common_fuel_types": ["가솔린", "디젤", "LPG", "하이브리드", "전기"],
+            "common_transmissions": ["오토", "수동", "CVT", "DCT"],
+            "tips": [
+                "Используйте manufacturer_code для получения списка моделей",
+                "Получите поколения через manufacturer_code + model_group_code",
+                "Фильтры можно комбинировать для точного поиска",
+                "Пагинация поддерживается через page и page_size",
+                "START_RNUM в KCar = номер страницы, не записи",
+            ],
+        }
+
+        return {
+            "schema": schema,
+            "additional_info": additional_info,
+            "success": True,
+            "message": "Информация о фильтрах получена успешно",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения информации о фильтрах: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Ошибка получения информации о фильтрах",
+                "message": str(e),
             },
-            {"path": "/info", "method": "GET", "description": "Информация о API"},
-        ],
-        "auth_required": {
-            "/cars": True,
-            "/cars/test": False,
-            "/cars/demo": False,
-            "/cars/stats": True,
-            "/cars/count": True,
-            "/cars/{car_id}/detail": True,
-            "/cars/search/by-number": True,
-        },
-    }
+        )

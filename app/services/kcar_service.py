@@ -1,7 +1,7 @@
 import requests
 import json
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from urllib3.exceptions import InsecureRequestWarning
 from urllib3 import disable_warnings
 from loguru import logger
@@ -9,11 +9,27 @@ from fake_useragent import UserAgent
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import get_settings
-from app.models.kcar import KCarResponse, KCarDetailResponse
+from app.models.kcar import (
+    KCarResponse,
+    KCarDetailResponse,
+    KCarModelsResponse,
+    KCarGenerationsResponse,
+    KCarSearchResponse,
+    KCarSearchFilters,
+    KCAR_MANUFACTURERS,
+    KCAR_API_MANUFACTURERS,
+    KCAR_UI_TO_API_MAPPING,
+    KCarManufacturer,
+)
 from app.parsers.kcar_parser import KCarParser
 
 # Отключаем предупреждения SSL
 disable_warnings(InsecureRequestWarning)
+
+
+def convert_ui_to_api_code(ui_code: str) -> str:
+    """Преобразует UI код производителя в API код"""
+    return KCAR_UI_TO_API_MAPPING.get(ui_code, ui_code)
 
 
 class KCarService:
@@ -953,103 +969,403 @@ class KCarService:
 
     def find_car_id_by_number(self, car_number: str, auction_code: str = None) -> dict:
         """
-        Поиск car_id по номеру автомобиля
+        Поиск автомобиля по номеру
 
         Args:
-            car_number: Номер автомобиля (например: "20머3749")
+            car_number: Номер автомобиля для поиска
             auction_code: Код аукциона (опционально)
 
         Returns:
-            dict с car_id или сообщением об ошибке
+            dict: Информация о найденном автомобиле или ошибка
         """
         try:
-            logger.info(f"🔍 Поиск car_id для номера автомобиля: {car_number}")
+            logger.info(f"🔍 Поиск автомобиля по номеру: {car_number}")
+
+            if not self.authenticated:
+                logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
+                if not self._authenticate():
+                    return {
+                        "success": False,
+                        "message": "Ошибка авторизации",
+                        "car": None,
+                    }
+
+            # Параметры для поиска всех автомобилей
+            params = {"AUC_TYPE": "weekly", "PAGE_CNT": 100}
+
+            if auction_code:
+                params["AUC_CD"] = auction_code
 
             # Получаем список автомобилей
-            params = {
-                "AUC_TYPE": "weekly",
-                "PAGE_CNT": "100",  # Больше результатов для поиска
-                "START_RNUM": "1",
-            }
+            response = self.get_cars(params)
 
-            cars_result = self.get_cars(params)
-
-            if not cars_result.success or not cars_result.car_list:
+            if not response.success:
                 return {
                     "success": False,
-                    "message": "Не удалось получить список автомобилей для поиска",
-                    "car_id": None,
+                    "message": "Ошибка получения списка автомобилей",
+                    "car": None,
                 }
 
             # Ищем автомобиль по номеру
-            found_cars = []
-            for car in cars_result.car_list:
-                # Проверяем различные варианты совпадений
-                car_num = car.car_number or ""
-                car_id_num = car.car_id or ""
+            found_car = None
+            for car in response.car_list:
+                if car.car_number and car_number.lower() in car.car_number.lower():
+                    found_car = car
+                    break
 
-                # Точное совпадение
-                if car_number == car_num:
-                    found_cars.append(
-                        {
-                            "car_id": car.car_id,
-                            "car_number": car.car_number,
-                            "match_type": "exact",
-                            "confidence": 100,
-                        }
-                    )
-                # Частичное совпадение (номер содержится в записи)
-                elif car_number in car_num:
-                    found_cars.append(
-                        {
-                            "car_id": car.car_id,
-                            "car_number": car.car_number,
-                            "match_type": "partial",
-                            "confidence": 80,
-                        }
-                    )
-                # Совпадение в car_id
-                elif car_number in car_id_num:
-                    found_cars.append(
-                        {
-                            "car_id": car.car_id,
-                            "car_number": car.car_number,
-                            "match_type": "car_id_partial",
-                            "confidence": 60,
-                        }
-                    )
-
-            if not found_cars:
-                logger.warning(f"❌ Автомобиль с номером {car_number} не найден")
+            if found_car:
+                logger.success(
+                    f"✅ Найден автомобиль: {found_car.car_id} - {found_car.car_name}"
+                )
+                return {
+                    "success": True,
+                    "message": f"Найден автомобиль с номером {car_number}",
+                    "car": found_car,
+                }
+            else:
+                logger.info(f"ℹ️ Автомобиль с номером {car_number} не найден")
                 return {
                     "success": False,
-                    "message": f"Автомобиль с номером {car_number} не найден в текущих аукционах",
-                    "car_id": None,
-                    "searched_count": len(cars_result.car_list),
+                    "message": f"Автомобиль с номером {car_number} не найден",
+                    "car": None,
                 }
 
-            # Сортируем по уверенности
-            found_cars.sort(key=lambda x: x["confidence"], reverse=True)
-            best_match = found_cars[0]
-
-            logger.success(
-                f"✅ Найден car_id {best_match['car_id']} для номера {car_number}"
-            )
-
-            return {
-                "success": True,
-                "message": f"Найден автомобиль с номером {car_number}",
-                "car_id": best_match["car_id"],
-                "car_number": best_match["car_number"],
-                "match_type": best_match["match_type"],
-                "confidence": best_match["confidence"],
-                "all_matches": found_cars[:5],  # Топ 5 совпадений
-            }
-
         except Exception as e:
-            logger.error(f"❌ Ошибка поиска car_id по номеру {car_number}: {e}")
+            logger.error(f"❌ Ошибка поиска автомобиля по номеру: {e}")
             return {
                 "success": False,
                 "message": f"Ошибка поиска: {str(e)}",
-                "car_id": None,
+                "car": None,
             }
+
+    # =============================================================================
+    # МЕТОДЫ СИСТЕМЫ ФИЛЬТРАЦИИ
+    # =============================================================================
+
+    def get_manufacturers(self) -> List[Dict[str, str]]:
+        """
+        Получить статический список производителей
+
+        Returns:
+            List[Dict]: Список производителей
+        """
+        try:
+            logger.info("📋 Получение списка производителей KCar")
+
+            manufacturers = []
+            for manufacturer in KCAR_MANUFACTURERS:
+                manufacturers.append(manufacturer.model_dump())
+
+            logger.success(f"✅ Возвращено {len(manufacturers)} производителей")
+            return manufacturers
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения списка производителей: {e}")
+            return []
+
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def get_models(
+        self, manufacturer_code: str, input_car_code: str = "001"
+    ) -> KCarModelsResponse:
+        """
+        Получить список моделей для производителя
+
+        Args:
+            manufacturer_code: Код производителя
+            input_car_code: Код типа автомобиля (по умолчанию "001")
+
+        Returns:
+            KCarModelsResponse: Ответ с списком моделей
+        """
+        try:
+            logger.info(f"📋 Получение моделей для производителя {manufacturer_code}")
+
+            if not self.authenticated:
+                logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
+                if not self._authenticate():
+                    return KCarModelsResponse(
+                        models=[], success=False, message="Ошибка авторизации"
+                    )
+
+            # Преобразуем UI код в API код
+            api_manufacturer_code = convert_ui_to_api_code(manufacturer_code)
+            logger.info(
+                f"🔄 Преобразование кода: {manufacturer_code} -> {api_manufacturer_code}"
+            )
+
+            # Подготовка данных запроса (как в models.py)
+            data = {
+                "MNUFTR_CD": api_manufacturer_code,
+                "IPTCAR_DCD": input_car_code,
+            }
+
+            # Заголовки для AJAX запроса
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+
+            # URL для получения моделей
+            url = f"{self.base_url}/kcar/main/model_ajax.do"
+
+            logger.info(f"📡 Отправляю запрос на получение моделей: {url}")
+            logger.debug(f"🔍 Данные запроса: {data}")
+
+            response = self.session.post(url, data=data, headers=headers)
+
+            if response.status_code == 200:
+                try:
+                    json_data = response.json()
+                    logger.debug(f"📥 Получен JSON ответ моделей")
+
+                    # Парсим ответ
+                    result = self.parser.parse_models_json(json_data)
+
+                    logger.success(
+                        f"✅ Получено {len(result.models)} моделей для производителя {manufacturer_code}"
+                    )
+                    return result
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Ошибка парсинга JSON ответа моделей: {e}")
+                    return KCarModelsResponse(
+                        models=[],
+                        success=False,
+                        message=f"Ошибка парсинга ответа: {str(e)}",
+                    )
+            else:
+                logger.error(
+                    f"❌ HTTP ошибка получения моделей: {response.status_code}"
+                )
+                return KCarModelsResponse(
+                    models=[],
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения моделей: {e}")
+            return KCarModelsResponse(
+                models=[], success=False, message=f"Ошибка запроса: {str(e)}"
+            )
+
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def get_generations(
+        self, manufacturer_code: str, model_group_code: str, input_car_code: str = "001"
+    ) -> KCarGenerationsResponse:
+        """
+        Получить список поколений для модели
+
+        Args:
+            manufacturer_code: Код производителя
+            model_group_code: Код группы модели
+            input_car_code: Код типа автомобиля (по умолчанию "001")
+
+        Returns:
+            KCarGenerationsResponse: Ответ с списком поколений
+        """
+        try:
+            logger.info(
+                f"📋 Получение поколений для модели {model_group_code} производителя {manufacturer_code}"
+            )
+
+            if not self.authenticated:
+                logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
+                if not self._authenticate():
+                    return KCarGenerationsResponse(
+                        generations=[], success=False, message="Ошибка авторизации"
+                    )
+
+            # Преобразуем UI код в API код
+            api_manufacturer_code = convert_ui_to_api_code(manufacturer_code)
+            logger.info(
+                f"🔄 Преобразование кода: {manufacturer_code} -> {api_manufacturer_code}"
+            )
+
+            # Подготовка данных запроса (как в generations.py)
+            data = {
+                "MNUFTR_CD": api_manufacturer_code,
+                "MODEL_GRP_CD": model_group_code,
+                "IPTCAR_DCD": input_car_code,
+            }
+
+            # Заголовки для AJAX запроса
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+
+            # URL для получения поколений
+            url = f"{self.base_url}/kcar/main/modelDetail_ajax.do"
+
+            logger.info(f"📡 Отправляю запрос на получение поколений: {url}")
+            logger.debug(f"🔍 Данные запроса: {data}")
+
+            response = self.session.post(url, data=data, headers=headers)
+
+            if response.status_code == 200:
+                try:
+                    json_data = response.json()
+                    logger.debug(f"📥 Получен JSON ответ поколений")
+
+                    # Парсим ответ
+                    result = self.parser.parse_generations_json(json_data)
+
+                    logger.success(
+                        f"✅ Получено {len(result.generations)} поколений для модели {model_group_code}"
+                    )
+                    return result
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Ошибка парсинга JSON ответа поколений: {e}")
+                    return KCarGenerationsResponse(
+                        generations=[],
+                        success=False,
+                        message=f"Ошибка парсинга ответа: {str(e)}",
+                    )
+            else:
+                logger.error(
+                    f"❌ HTTP ошибка получения поколений: {response.status_code}"
+                )
+                return KCarGenerationsResponse(
+                    generations=[],
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения поколений: {e}")
+            return KCarGenerationsResponse(
+                generations=[], success=False, message=f"Ошибка запроса: {str(e)}"
+            )
+
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
+    def search_cars(self, filters: KCarSearchFilters) -> KCarSearchResponse:
+        """
+        Расширенный поиск автомобилей с фильтрами
+
+        Args:
+            filters: Фильтры поиска
+
+        Returns:
+            KCarSearchResponse: Результаты поиска
+        """
+        try:
+            logger.info(f"🔍 Расширенный поиск автомобилей KCar с фильтрами")
+            logger.debug(f"🔍 Фильтры: {filters.model_dump()}")
+
+            if not self.authenticated:
+                logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
+                if not self._authenticate():
+                    return KCarSearchResponse(
+                        cars=[], success=False, message="Ошибка авторизации"
+                    )
+
+            # Подготовка данных запроса (как в filters-cars.py)
+            data = {
+                "AUC_TYPE": filters.auction_type,
+                "PAGE_CNT": str(filters.page_size),
+                "START_RNUM": str(filters.page),
+                "ORDER": filters.sort_order or "",
+                "PAGE_TYPE": "wCfm",
+                "LANE_TYPE": filters.lane_type,
+                "IPTCAR_DCD": "001",
+            }
+
+            # Добавляем фильтры если указаны
+            if filters.manufacturer_code:
+                api_manufacturer_code = convert_ui_to_api_code(
+                    filters.manufacturer_code
+                )
+                logger.info(
+                    f"🔄 Преобразование кода в поиске: {filters.manufacturer_code} -> {api_manufacturer_code}"
+                )
+                data["MNUFTR_CD"] = api_manufacturer_code
+            if filters.model_group_code:
+                data["MODEL_GRP_CD"] = filters.model_group_code
+            if filters.model_code:
+                data["MODEL_CD"] = filters.model_code
+            if filters.year_from:
+                data["FORM_YR_ST"] = filters.year_from
+            if filters.year_to:
+                data["FORM_YR_ED"] = filters.year_to
+            if filters.price_from:
+                data["AUC_START_PRC_ST"] = filters.price_from
+            if filters.price_to:
+                data["AUC_START_PRC_ED"] = filters.price_to
+            if filters.mileage_from:
+                data["MILG_ST"] = filters.mileage_from
+            if filters.mileage_to:
+                data["MILG_ED"] = filters.mileage_to
+            if filters.fuel_type:
+                data["FUEL_CD"] = filters.fuel_type
+            if filters.transmission:
+                data["GBOX_DCD"] = filters.transmission
+            if filters.color_code:
+                data["COLOR_CD"] = filters.color_code
+            if filters.auction_location:
+                data["AUC_PLC_CD"] = filters.auction_location
+            if filters.car_number:
+                data["CNO"] = filters.car_number
+
+            # Заголовки для AJAX запроса
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+
+            # URL для расширенного поиска
+            url = f"{self.base_url}/kcar/auction/getAuctionCarList_ajax.do"
+
+            logger.info(f"📡 Отправляю запрос расширенного поиска: {url}")
+            logger.debug(f"🔍 Параметры поиска: {data}")
+
+            response = self.session.post(url, data=data, headers=headers)
+
+            if response.status_code == 200:
+                try:
+                    json_data = response.json()
+                    logger.debug(f"📥 Получен JSON ответ поиска")
+
+                    # Парсим ответ
+                    result = self.parser.parse_search_json(json_data)
+
+                    logger.success(
+                        f"✅ Расширенный поиск завершен - найдено {len(result.cars)} автомобилей"
+                    )
+                    return result
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"❌ Ошибка парсинга JSON ответа поиска: {e}")
+                    return KCarSearchResponse(
+                        cars=[],
+                        success=False,
+                        message=f"Ошибка парсинга ответа: {str(e)}",
+                    )
+            else:
+                logger.error(
+                    f"❌ HTTP ошибка расширенного поиска: {response.status_code}"
+                )
+                return KCarSearchResponse(
+                    cars=[],
+                    success=False,
+                    message=f"HTTP ошибка: {response.status_code}",
+                )
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка расширенного поиска: {e}")
+            return KCarSearchResponse(
+                cars=[], success=False, message=f"Ошибка запроса: {str(e)}"
+            )

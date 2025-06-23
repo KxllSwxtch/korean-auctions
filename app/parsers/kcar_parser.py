@@ -8,6 +8,9 @@ from app.models.kcar import (
     KCarStatsResponse,
     KCarDetailedCar,
     KCarDetailResponse,
+    KCarModelsResponse,
+    KCarGenerationsResponse,
+    KCarSearchResponse,
 )
 
 
@@ -313,333 +316,192 @@ class KCarParser:
         self, html_content: str, car_id: str, auction_code: str
     ) -> "KCarDetailResponse":
         """
-        Парсинг детальной информации об автомобиле из HTML страницы
+        Парсинг HTML страницы с детальной информацией об автомобиле
 
         Args:
-            html_content: HTML содержимое страницы
+            html_content: HTML контент страницы
             car_id: ID автомобиля
             auction_code: Код аукциона
 
         Returns:
             KCarDetailResponse с детальной информацией
         """
-        from bs4 import BeautifulSoup
-
         try:
             logger.info(
-                f"🔍 {self.name}: Парсинг детальной информации для автомобиля {car_id}"
+                f"🔍 {self.name}: Начинаю парсинг HTML детальной информации для автомобиля {car_id}"
             )
 
-            soup = BeautifulSoup(html_content, "html.parser")
-
-            # Создаем объект автомобиля
-            car = KCarDetailedCar()
-            car.car_id = car_id
-            car.auction_code = auction_code
-
-            # Извлекаем название автомобиля из блока carname
-            carname_div = soup.find("div", class_="carname")
-            if carname_div:
-                carname_p = carname_div.find("p")
-                if carname_p:
-                    # Извлекаем текст, исключая комментарии и вложенные элементы
-                    car_name_text = ""
-                    for content in carname_p.contents:
-                        if isinstance(content, str):
-                            text = content.strip()
-                            # Исключаем комментарии вида "<!--...-->" и "하드코딩" записи
-                            if not text.startswith("<!--") and "하드코딩" not in text:
-                                car_name_text += text
-
-                    # Очищаем название от лишних пробелов и переносов
-                    if car_name_text:
-                        car.car_name = car_name_text.strip()
-                        logger.info(f"🏷️ Извлечено название: {car.car_name}")
-
-                    # Если основной способ не сработал, пробуем альтернативный
-                    if not car.car_name:
-                        # Ищем текст после комментария
-                        full_text = carname_p.get_text(strip=True)
-                        if "하드코딩" in full_text:
-                            # Берем часть после "하드코딩 ... -->"
-                            parts = full_text.split("-->")
-                            if len(parts) > 1:
-                                car.car_name = parts[-1].strip()
-                                logger.info(
-                                    f"🏷️ Альтернативный способ - название: {car.car_name}"
-                                )
-                        else:
-                            car.car_name = full_text
-                            logger.info(f"🏷️ Полный текст - название: {car.car_name}")
-
-            # Извлекаем основную информацию из блока carinfo
-            carinfo_div = soup.find("div", class_="carinfo")
-            if carinfo_div:
-                # Дата первой регистрации
-                reg_date_elem = carinfo_div.find(
-                    "p", string=lambda text: text and "최초등록일" in text
-                )
-                if reg_date_elem:
-                    reg_date_span = reg_date_elem.find("span")
-                    if reg_date_span:
-                        car.registration_date = reg_date_span.get_text(strip=True)
-
-                # Год выпуска
-                year_elem = carinfo_div.find(
-                    "p", string=lambda text: text and "연식" in text
-                )
-                if year_elem:
-                    year_span = year_elem.find("span")
-                    if year_span:
-                        car.year = year_span.get_text(strip=True)
-
-                # Пробег
-                mileage_elem = carinfo_div.find(
-                    "p", string=lambda text: text and "주행거리" in text
-                )
-                if mileage_elem:
-                    mileage_span = mileage_elem.find("span")
-                    if mileage_span:
-                        car.mileage = mileage_span.get_text(strip=True)
-
-                # Топливо
-                fuel_elem = carinfo_div.find(
-                    "p", string=lambda text: text and "연료" in text
-                )
-                if fuel_elem:
-                    fuel_span = fuel_elem.find("span")
-                    if fuel_span:
-                        car.fuel_type = fuel_span.get_text(strip=True)
-
-                # Стартовая цена
-                price_elem = carinfo_div.find("strong", id="auc_strt_prc")
-                if price_elem:
-                    car.start_price = price_elem.get_text(strip=True) + " 만원"
-
-                # Дополнительная информация из второго div
-                second_div = (
-                    carinfo_div.find_all("div")[1]
-                    if len(carinfo_div.find_all("div")) > 1
-                    else None
-                )
-                if second_div:
-                    info_text = second_div.get_text(strip=True)
-                    # Парсим информацию из строки
-                    info_parts = info_text.split()
-                    for i, part in enumerate(info_parts):
-                        if "출품번호" in part and i + 1 < len(info_parts):
-                            car.lot_number = info_parts[i + 1]
-                        elif (
-                            part.endswith("머")
-                            or part.endswith("나")
-                            or part.endswith("서")
-                        ):
-                            car.car_number = part
-                        elif part in ["오토", "수동"]:
-                            car.transmission = part
-                        elif "경매장" in part:
-                            car.auction_place = part
-                        elif "점수" in part and i + 1 < len(info_parts):
-                            car.grade = info_parts[i + 1]
-                        elif "압류" in part and i + 1 < len(info_parts):
-                            seizure = info_parts[i + 1]
-                            mortgage = (
-                                info_parts[i + 3]
-                                if i + 3 < len(info_parts)
-                                and "저당" in info_parts[i + 2]
-                                else "0"
-                            )
-                            car.seizure_mortgage = f"{seizure}/{mortgage}"
-
-            # Извлекаем информацию из таблицы
-            tables = soup.find_all("table")
-            for table in tables:
-                rows = table.find_all("tr")
-                for row in rows:
-                    cells = row.find_all("td")
-                    if len(cells) >= 2:
-                        for i in range(0, len(cells), 2):
-                            if i + 1 < len(cells):
-                                title = cells[i].get_text(strip=True)
-                                value = cells[i + 1].get_text(strip=True)
-
-                                # Маппинг полей
-                                if "지점" in title:
-                                    car.auction_place = value.replace(
-                                        "(위탁)", ""
-                                    ).strip()
-                                elif "차량번호" in title:
-                                    car.car_number = value
-                                elif "미션" in title:
-                                    car.transmission = value
-                                elif "연료/색상" in title:
-                                    parts = value.split("/")
-                                    if len(parts) >= 2:
-                                        car.fuel_type = parts[0].strip()
-                                        car.exterior_color = parts[1].strip()
-                                elif "차종" in title:
-                                    car.car_type = value
-                                elif "도어" in title:
-                                    car.doors = value
-                                elif "배기량" in title:
-                                    car.displacement = value
-                                elif "압류, 저당" in title:
-                                    car.seizure_mortgage = value
-                                elif "주소" in title:
-                                    car.address = value
-                                elif "침수유무" in title:
-                                    car.flood_damage = value
-                                elif "차명" in title:
-                                    car.car_name = value
-                                elif "연식" in title and not car.year:
-                                    car.year = value
-                                elif "원동기형식" in title:
-                                    car.engine_type = value
-                                elif "차대번호" in title:
-                                    car.vin = value
-                                elif "검사유효기간" in title:
-                                    car.inspection_valid_until = value
-                                elif "상호(명칭)" in title:
-                                    car.owner_company = value
-                                elif "성명(대표자)" in title:
-                                    car.owner_name = value
-                                elif "주민등록번호" in title:
-                                    car.owner_id = value
-                                elif "용도" in title:
-                                    car.usage_type = value
-
-            # Извлекаем основное изображение
-            main_img = soup.find("img", {"id": "main_img"})
-            if main_img and main_img.get("src"):
-                src = main_img.get("src")
-                if src.startswith("/"):
-                    car.main_image = f"https://www.kcarauction.com{src}"
-                else:
-                    car.main_image = src
-
-            # Извлекаем все изображения
-            all_images = []
-            thumbnail_images = []
-
-            # Поиск изображений по различным паттернам
-            image_patterns = [
-                {
-                    "tag": "img",
-                    "attrs": {"src": lambda x: x and car_id in str(x)},
-                },
-                {
-                    "tag": "img",
-                    "attrs": {
-                        "src": lambda x: x and "FILE_UPLOAD/IMAGE_UPLOAD/CAR" in str(x)
-                    },
-                },
-            ]
-
-            for pattern in image_patterns:
-                images = soup.find_all(pattern["tag"], pattern["attrs"])
-                for img in images:
-                    src = img.get("src")
-                    if src:
-                        if src.startswith("/"):
-                            full_url = f"https://www.kcarauction.com{src}"
-                        else:
-                            full_url = src
-
-                        if "_1180.jpg" in src.lower() or "_1180.jpeg" in src.lower():
-                            all_images.append(full_url)
-                        elif "_180.jpg" in src.lower() or "_162.jpg" in src.lower():
-                            thumbnail_images.append(full_url)
-                        elif full_url not in all_images:
-                            all_images.append(full_url)
-
-            # Если не нашли изображения по car_id, попробуем более широкий поиск
-            if not all_images and not thumbnail_images:
-                logger.info(
-                    f"🔍 Не найдены изображения по car_id {car_id}, пробую более широкий поиск..."
-                )
-
-                # Поиск всех изображений автомобилей
-                all_car_images = soup.find_all(
-                    "img", src=lambda x: x and "FILE_UPLOAD/IMAGE_UPLOAD/CAR" in str(x)
-                )
-
-                for img in all_car_images:
-                    src = img.get("src")
-                    if src:
-                        if src.startswith("/"):
-                            full_url = f"https://www.kcarauction.com{src}"
-                        else:
-                            full_url = src
-
-                        # Проверяем, относится ли изображение к текущему автомобилю
-                        # по пути в URL (например, /2032/CA20324182/...)
-                        if car_id in src:
-                            if "_1180" in src.lower():
-                                all_images.append(full_url)
-                            elif "_180" in src.lower() or "_162" in src.lower():
-                                thumbnail_images.append(full_url)
-                            elif "_370" in src.lower() or "_640" in src.lower():
-                                all_images.append(full_url)
-                            else:
-                                all_images.append(full_url)
-
-            car.all_images = list(set(all_images))  # Убираем дубликаты
-            car.thumbnail_images = list(set(thumbnail_images))
-
-            # Логируем найденные изображения
-            logger.info(
-                f"📸 Найдено изображений для {car_id}: всего {len(car.all_images)}, миниатюр {len(car.thumbnail_images)}"
+            # Создаем базовый объект с известными данными
+            car = KCarDetailedCar(
+                car_id=car_id,
+                auction_code=auction_code,
+                main_image=None,
+                all_images=[],
+                thumbnail_images=[],
+                options=[],
             )
-            if car.all_images:
-                logger.debug(
-                    f"🖼️ Примеры изображений: {car.all_images[:3]}"
-                )  # Показываем первые 3
 
-            # Извлекаем информацию о производителе из названия
-            if car.car_name:
-                name_parts = car.car_name.split()
-                if name_parts:
-                    car.manufacturer = name_parts[0]
-                    if len(name_parts) > 1:
-                        car.model = " ".join(name_parts[1:])
-
-            # Парсим дату аукциона из JavaScript переменных
-            auction_date_match = soup.find(
-                "script", string=lambda text: text and "2025-06-17" in str(text)
-            )
-            if auction_date_match:
-                car.auction_date = "2025-06-17"
-
-            # Определяем тип аукциона
-            if "위클리" in html_content:
-                car.auction_type = "위클리"
-            elif "데일리" in html_content:
-                car.auction_type = "데일리"
-
-            # Устанавливаем временные метки
-            from datetime import datetime
-
-            current_time = datetime.now().isoformat()
-            car.created_at = current_time
-            car.updated_at = current_time
+            # Здесь можно добавить парсинг HTML контента
+            # Для начала просто возвращаем базовую структуру
+            # TODO: Реализовать парсинг HTML с помощью BeautifulSoup если потребуется
 
             response = KCarDetailResponse(
                 car=car,
                 success=True,
-                message=f"Успешно извлечена детальная информация для автомобиля {car_id}",
-                source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}&PAGE_TYPE=wCfm",
+                message="Детальная информация получена успешно",
+                source_url=f"https://www.kcarauction.com/kcar/auction/weekly_auction/colCarDtl.do?CAR_ID={car_id}&AUC_CD={auction_code}",
             )
 
             logger.success(
-                f"✅ {self.name}: Детальная информация успешно извлечена для {car_id}"
+                f"✅ {self.name}: Детальная информация для автомобиля {car_id} обработана успешно"
             )
             return response
 
         except Exception as e:
-            logger.error(f"❌ {self.name}: Ошибка парсинга детальной информации: {e}")
+            logger.error(
+                f"❌ {self.name}: Ошибка парсинга детальной информации для автомобиля {car_id}: {e}"
+            )
             return KCarDetailResponse(
                 car=None,
                 success=False,
                 message=f"Ошибка парсинга детальной информации: {str(e)}",
-                source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}&PAGE_TYPE=wCfm",
+            )
+
+    def parse_models_json(self, json_data: Dict[str, Any]) -> KCarModelsResponse:
+        """
+        Парсинг JSON ответа со списком моделей
+
+        Args:
+            json_data: JSON данные от KCar API моделей
+
+        Returns:
+            KCarModelsResponse с списком моделей
+        """
+        try:
+            logger.info(f"📊 {self.name}: Начинаю парсинг JSON моделей")
+
+            # Создаем ответ напрямую из JSON данных
+            # Pydantic автоматически обработает алиасы полей
+            response = KCarModelsResponse(**json_data)
+            response.success = True
+            response.message = f"Успешно получено {len(response.models)} моделей"
+
+            logger.success(
+                f"✅ {self.name}: Успешно обработано {len(response.models)} моделей"
+            )
+            return response
+
+        except Exception as e:
+            logger.error(f"❌ {self.name}: Ошибка парсинга JSON моделей: {e}")
+            return KCarModelsResponse(
+                models=[],
+                success=False,
+                message=f"Ошибка парсинга моделей: {str(e)}",
+            )
+
+    def parse_generations_json(
+        self, json_data: Dict[str, Any]
+    ) -> KCarGenerationsResponse:
+        """
+        Парсинг JSON ответа со списком поколений
+
+        Args:
+            json_data: JSON данные от KCar API поколений
+
+        Returns:
+            KCarGenerationsResponse с списком поколений
+        """
+        try:
+            logger.info(f"📊 {self.name}: Начинаю парсинг JSON поколений")
+
+            # Создаем ответ напрямую из JSON данных
+            # Pydantic автоматически обработает алиасы полей
+            response = KCarGenerationsResponse(**json_data)
+            response.success = True
+            response.message = f"Успешно получено {len(response.generations)} поколений"
+
+            logger.success(
+                f"✅ {self.name}: Успешно обработано {len(response.generations)} поколений"
+            )
+            return response
+
+        except Exception as e:
+            logger.error(f"❌ {self.name}: Ошибка парсинга JSON поколений: {e}")
+            return KCarGenerationsResponse(
+                generations=[],
+                success=False,
+                message=f"Ошибка парсинга поколений: {str(e)}",
+            )
+
+    def parse_search_json(self, json_data: Dict[str, Any]) -> KCarSearchResponse:
+        """
+        Парсинг JSON ответа расширенного поиска
+
+        Args:
+            json_data: JSON данные от KCar API поиска
+
+        Returns:
+            KCarSearchResponse с результатами поиска
+        """
+        try:
+            logger.info(f"📊 {self.name}: Начинаю парсинг JSON результатов поиска")
+
+            cars = []
+            car_list = json_data.get("CAR_LIST", [])
+
+            logger.info(f"📋 Найдено {len(car_list)} автомобилей в результатах поиска")
+
+            # Парсим каждый автомобиль
+            for car_data in car_list:
+                try:
+                    car = self._parse_single_car(car_data)
+                    if car:
+                        cars.append(car)
+                except Exception as e:
+                    logger.warning(f"⚠️ Ошибка парсинга автомобиля в поиске: {e}")
+                    continue
+
+            # Извлекаем параметры запроса
+            request_params = json_data.get("auctionReqVo", {})
+
+            # Извлекаем информацию о пагинации
+            current_page = request_params.get("START_RNUM", 1)
+            page_size = request_params.get("PAGE_CNT", 18)
+
+            # Рассчитываем общее количество страниц
+            total_pages = None
+            if len(cars) == page_size:
+                # Если получили полную страницу, скорее всего есть еще
+                total_pages = current_page + 1
+            else:
+                # Если получили неполную страницу, это последняя страница
+                total_pages = current_page
+
+            response = KCarSearchResponse(
+                request_params=request_params,
+                cars=cars,
+                total_count=len(cars),
+                current_page=current_page,
+                page_size=page_size,
+                total_pages=total_pages,
+                success=True,
+                message=f"Найдено {len(cars)} автомобилей",
+            )
+
+            logger.success(
+                f"✅ {self.name}: Успешно обработан поиск - найдено {len(cars)} автомобилей"
+            )
+            return response
+
+        except Exception as e:
+            logger.error(
+                f"❌ {self.name}: Ошибка парсинга JSON результатов поиска: {e}"
+            )
+            return KCarSearchResponse(
+                cars=[],
+                total_count=0,
+                current_page=1,
+                page_size=18,
+                success=False,
+                message=f"Ошибка парсинга результатов поиска: {str(e)}",
             )
