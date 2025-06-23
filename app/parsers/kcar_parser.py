@@ -429,13 +429,13 @@ class KCarParser:
                         car.main_image = main_img_src
                     logger.debug(f"📸 Найдено главное изображение: {car.main_image}")
 
-                # 9. Ищем все изображения (в слайдере и других местах)
+                # 9. Ищем все изображения автомобиля (фильтруем элементы интерфейса)
                 all_images = []
                 img_tags = soup.find_all("img")
 
                 for img in img_tags:
                     src = img.get("src", "")
-                    if src and (car_id in src or "CAR" in src.upper()):
+                    if src:
                         # Формируем полный URL изображения
                         if src.startswith("http"):
                             full_url = src
@@ -444,8 +444,24 @@ class KCarParser:
                         else:
                             full_url = f"https://www.kcarauction.com/{src}"
 
-                        if full_url not in all_images:
-                            all_images.append(full_url)
+                        # Фильтруем только фотографии автомобиля
+                        # Исключаем элементы интерфейса, логотипы и иконки
+                        full_url_lower = full_url.lower()
+
+                        # Фотографии автомобиля должны содержать ID автомобиля и находиться в папке IMAGE_UPLOAD/CAR
+                        if (
+                            car_id.lower() in full_url_lower
+                            and "/image_upload/car/" in full_url_lower
+                        ):
+                            if full_url not in all_images:
+                                all_images.append(full_url)
+                        # Или быть главным изображением (main_img)
+                        elif (
+                            img.get("id") == "main_img"
+                            and car_id.lower() in full_url_lower
+                        ):
+                            if full_url not in all_images:
+                                all_images.append(full_url)
 
                 car.all_images = all_images
                 logger.debug(f"📸 Найдено {len(all_images)} изображений")
