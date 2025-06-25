@@ -86,8 +86,8 @@ async def get_heydealer_cars(
             "order": order,
         }
 
-        # Добавляем параметры фильтрации если они указаны
-        if brand:
+        # Добавляем параметры фильтрации если они указаны (и не пустые)
+        if brand and brand.strip():
             # Если передано название бренда, пытаемся найти hash_id
             if not brand.startswith(
                 ("xo", "2o", "vg", "Bk", "lk", "re")
@@ -100,11 +100,11 @@ async def get_heydealer_cars(
             else:
                 params["brand"] = brand
 
-        if model_group:
+        if model_group and model_group.strip():
             params["model_group"] = model_group
-        if model:
+        if model and model.strip():
             params["model"] = model
-        if grade:
+        if grade and grade.strip():
             params["grade"] = grade
 
         # Выполняем запрос
@@ -383,14 +383,14 @@ async def get_filtered_cars(
             "order": order,
         }
 
-        # Добавляем фильтры
-        if brand:
+        # Добавляем фильтры (только если они не пустые)
+        if brand and brand.strip():
             params["brand"] = brand
-        if model_group:
+        if model_group and model_group.strip():
             params["model_group"] = model_group
-        if model:
+        if model and model.strip():
             params["model"] = model
-        if grade:
+        if grade and grade.strip():
             params["grade"] = grade
         if min_year:
             params["min_year"] = min_year
@@ -404,11 +404,11 @@ async def get_filtered_cars(
             params["min_mileage"] = min_mileage
         if max_mileage:
             params["max_mileage"] = max_mileage
-        if fuel:
+        if fuel and fuel.strip():
             params["fuel"] = fuel
-        if transmission:
+        if transmission and transmission.strip():
             params["transmission"] = transmission
-        if location:
+        if location and location.strip():
             params["location"] = location
 
         logger.info(f"Параметры фильтрации: {params}")
@@ -1327,8 +1327,8 @@ async def get_filtered_cars_direct(
         cookies = {
             "_gid": "GA1.2.607092972.1750804665",
             "ga_dsi": "2f27c9738d9441acb3019f0388816973",
-            "_ga_P1L3JSNSES": "GS2.2.s1750808840$o1$g0$t1750808840$j60$l0$h0",
-            "_ga_4N2EP0M69Q": "GS2.1.s1750808839$o1$g0$t1750808842$j57$l0$h0",
+            "ga_P1L3JSNSES": "GS2.2.s1750808840$o1$g0$t1750808840$j60$l0$h0",
+            "ga_4N2EP0M69Q": "GS2.1.s1750808839$o1$g0$t1750808842$j57$l0$h0",
             "_ga": "GA1.2.225253972.1750804665",
             "csrftoken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
             "sessionid": "03qqprbun190abkr8nj2dkfcxzvfvmxl",
@@ -1537,3 +1537,96 @@ async def get_filters():
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте фильтров: {str(e)}")
         return {"success": False, "data": {}, "message": f"Ошибка: {str(e)}"}
+
+
+async def find_model_group_by_name(model_group_name: str) -> Optional[str]:
+    """Поиск hash_id группы моделей по названию"""
+    try:
+        # Словарь соответствий английских названий корейским для BMW
+        model_mapping = {
+            "1-series": "1시리즈",
+            "2-series": "2시리즈",
+            "3-series": "3시리즈",
+            "4-series": "4시리즈",
+            "5-series": "5시리즈",
+            "6-series": "6시리즈",
+            "7-series": "7시리즈",
+            "8-series": "8시리즈",
+            "6-er": "6시리즈",
+            "x1": "X1",
+            "x2": "X2",
+            "x3": "X3",
+            "x4": "X4",
+            "x5": "X5",
+            "x6": "X6",
+            "x7": "X7",
+            "z3": "Z3",
+            "z4": "Z4",
+            "i3": "i3",
+            "i8": "i8",
+            "m3": "M3",
+            "m5": "M5",
+            "m6": "M6",
+        }
+
+        # Поскольку у нас нет полного списка всех model_groups,
+        # попробуем найти через бренды
+        service = HeyDealerService()
+        brands_data = await service.get_brands()
+
+        if not brands_data:
+            return None
+
+        # Преобразуем название если есть соответствие
+        search_name = model_mapping.get(model_group_name.lower(), model_group_name)
+
+        # Ищем во всех брендах
+        for brand in brands_data:
+            try:
+                brand_models = await service.get_brand_models(brand.get("hash_id"))
+                if brand_models and "model_groups" in brand_models:
+                    for model_group in brand_models["model_groups"]:
+                        model_name = model_group.get("name", "")
+                        if (
+                            model_name.lower() == model_group_name.lower()
+                            or model_name == search_name
+                            or model_name == model_group_name
+                        ):
+                            return model_group.get("hash_id")
+            except:
+                continue
+
+        return None
+
+    except Exception as e:
+        logger.error(
+            f"Ошибка поиска model_group по названию {model_group_name}: {str(e)}"
+        )
+        return None
+
+
+@router.get(
+    "/model-groups/{model_group_name}/generations",
+    response_model=HeyDealerModelDetailResponse,
+)
+async def get_model_generations_by_name(model_group_name: str):
+    """Получение списка поколений для выбранной модели по названию"""
+    try:
+        # Находим hash_id группы моделей по названию
+        model_group_hash_id = await find_model_group_by_name(model_group_name)
+
+        if not model_group_hash_id:
+            return HeyDealerModelDetailResponse(
+                success=False,
+                data={},
+                message=f"Группа моделей {model_group_name} не найдена",
+            )
+
+        # Используем существующую функцию
+        return await get_model_generations(model_group_hash_id)
+
+    except Exception as e:
+        logger.error(f"Ошибка в эндпоинте получения поколений по названию: {str(e)}")
+        return HeyDealerModelDetailResponse(
+            success=False, data={}, message=f"Ошибка: {str(e)}"
+        )
