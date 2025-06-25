@@ -374,10 +374,23 @@ class HeyDealerService:
     # === МЕТОДЫ ДЛЯ ФИЛЬТРОВ ===
 
     async def get_brands(self) -> List[Dict[str, Any]]:
-        """Получение списка марок автомобилей"""
+        """Получает список марок автомобилей"""
         try:
-            await self.ensure_authenticated()
+            logger.info("🔍 Начинаю получение списка марок...")
 
+            # Используем автоматический сервис авторизации
+            cookies, headers = heydealer_auth.get_valid_session()
+
+            logger.info(f"🔑 Cookies получены: {bool(cookies)}")
+            logger.info(f"🔑 Headers получены: {bool(headers)}")
+
+            if not cookies or not headers:
+                logger.error(
+                    "❌ Не удалось получить валидную сессию для получения марок"
+                )
+                return []
+
+            # Параметры для запроса
             params = {
                 "type": "auction",
                 "is_subscribed": "false",
@@ -385,27 +398,46 @@ class HeyDealerService:
                 "is_previously_bid": "false",
             }
 
-            response = await self.http_client.get(
-                f"{self.base_url}/v2/dealers/web/car_meta/brands/", params=params
+            logger.info(
+                f"📡 Отправляю запрос к {self.base_url}/v2/dealers/web/car_meta/brands/"
             )
 
+            response = await self.http_client.get(
+                url=f"{self.base_url}/v2/dealers/web/car_meta/brands/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
+            )
+
+            logger.info(f"📊 Статус ответа: {response.status_code}")
+
             if response.status_code == 200:
-                brands_data = response.json()
-                logger.info(f"Получено {len(brands_data)} марок")
-                return brands_data
+                data = response.json()
+                logger.info(f"✅ Получено {len(data)} марок")
+                return data
             else:
-                logger.error(f"Ошибка получения марок: {response.status_code}")
+                logger.error(
+                    f"❌ Ошибка получения марок: {response.status_code} - {response.text}"
+                )
                 return []
 
         except Exception as e:
-            logger.error(f"Ошибка при получении марок: {str(e)}")
+            logger.error(f"💥 Исключение при получении марок: {e}")
             return []
 
     async def get_brand_models(self, brand_hash_id: str) -> Dict[str, Any]:
-        """Получение списка моделей для марки"""
+        """Получает список моделей для указанной марки"""
         try:
-            await self.ensure_authenticated()
+            # Используем автоматический сервис авторизации
+            cookies, headers = heydealer_auth.get_valid_session()
 
+            if not cookies or not headers:
+                logger.error(
+                    "Не удалось получить валидную сессию для получения моделей"
+                )
+                return {}
+
+            # Параметры для запроса
             params = {
                 "type": "auction",
                 "is_subscribed": "false",
@@ -414,27 +446,39 @@ class HeyDealerService:
             }
 
             response = await self.http_client.get(
-                f"{self.base_url}/v2/dealers/web/car_meta/brands/{brand_hash_id}/",
+                url=f"{self.base_url}/v2/dealers/web/car_meta/brands/{brand_hash_id}/",
                 params=params,
+                headers=headers,
+                cookies=cookies,
             )
 
             if response.status_code == 200:
-                brand_data = response.json()
+                data = response.json()
                 logger.info(f"Получены модели для марки {brand_hash_id}")
-                return brand_data
+                return data
             else:
-                logger.error(f"Ошибка получения моделей: {response.status_code}")
+                logger.error(
+                    f"Ошибка получения моделей: {response.status_code} - {response.text}"
+                )
                 return {}
 
         except Exception as e:
-            logger.error(f"Ошибка при получении моделей: {str(e)}")
+            logger.error(f"Исключение при получении моделей: {e}")
             return {}
 
     async def get_model_generations(self, model_group_hash_id: str) -> Dict[str, Any]:
-        """Получение списка поколений для модели"""
+        """Получает список поколений для указанной модели"""
         try:
-            await self.ensure_authenticated()
+            # Используем автоматический сервис авторизации
+            cookies, headers = heydealer_auth.get_valid_session()
 
+            if not cookies or not headers:
+                logger.error(
+                    "Не удалось получить валидную сессию для получения поколений"
+                )
+                return {}
+
+            # Параметры для запроса
             params = {
                 "type": "auction",
                 "is_subscribed": "false",
@@ -444,27 +488,39 @@ class HeyDealerService:
             }
 
             response = await self.http_client.get(
-                f"{self.base_url}/v2/dealers/web/car_meta/model_groups/{model_group_hash_id}/",
+                url=f"{self.base_url}/v2/dealers/web/car_meta/model_groups/{model_group_hash_id}/",
                 params=params,
+                headers=headers,
+                cookies=cookies,
             )
 
             if response.status_code == 200:
-                model_data = response.json()
+                data = response.json()
                 logger.info(f"Получены поколения для модели {model_group_hash_id}")
-                return model_data
+                return data
             else:
-                logger.error(f"Ошибка получения поколений: {response.status_code}")
+                logger.error(
+                    f"Ошибка получения поколений: {response.status_code} - {response.text}"
+                )
                 return {}
 
         except Exception as e:
-            logger.error(f"Ошибка при получении поколений: {str(e)}")
+            logger.error(f"Исключение при получении поколений: {e}")
             return {}
 
     async def get_model_configurations(self, model_hash_id: str) -> Dict[str, Any]:
-        """Получение списка конфигураций для поколения"""
+        """Получает список конфигураций для указанного поколения"""
         try:
-            await self.ensure_authenticated()
+            # Используем автоматический сервис авторизации
+            cookies, headers = heydealer_auth.get_valid_session()
 
+            if not cookies or not headers:
+                logger.error(
+                    "Не удалось получить валидную сессию для получения конфигураций"
+                )
+                return {}
+
+            # Параметры для запроса
             params = {
                 "type": "auction",
                 "is_subscribed": "false",
@@ -474,28 +530,44 @@ class HeyDealerService:
             }
 
             response = await self.http_client.get(
-                f"{self.base_url}/v2/dealers/web/car_meta/models/{model_hash_id}/",
+                url=f"{self.base_url}/v2/dealers/web/car_meta/models/{model_hash_id}/",
                 params=params,
+                headers=headers,
+                cookies=cookies,
             )
 
             if response.status_code == 200:
-                config_data = response.json()
+                data = response.json()
                 logger.info(f"Получены конфигурации для поколения {model_hash_id}")
-                return config_data
+                return data
             else:
-                logger.error(f"Ошибка получения конфигураций: {response.status_code}")
+                logger.error(
+                    f"Ошибка получения конфигураций: {response.status_code} - {response.text}"
+                )
                 return {}
 
         except Exception as e:
-            logger.error(f"Ошибка при получении конфигураций: {str(e)}")
+            logger.error(f"Исключение при получении конфигураций: {e}")
             return {}
 
     async def get_filtered_cars(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Получение отфильтрованного списка автомобилей"""
+        """Получает отфильтрованный список автомобилей"""
         try:
-            await self.ensure_authenticated()
+            logger.info("🔍 Начинаю получение отфильтрованных автомобилей...")
 
-            # Базовые параметры
+            # Используем автоматический сервис авторизации
+            cookies, headers = heydealer_auth.get_valid_session()
+
+            logger.info(f"🔑 Cookies получены: {bool(cookies)}")
+            logger.info(f"🔑 Headers получены: {bool(headers)}")
+
+            if not cookies or not headers:
+                logger.error(
+                    "❌ Не удалось получить валидную сессию для фильтрации автомобилей"
+                )
+                return []
+
+            # Подготавливаем параметры запроса
             params = {
                 "page": filters.get("page", 1),
                 "type": "auction",
@@ -505,48 +577,53 @@ class HeyDealerService:
                 "order": filters.get("order", "default"),
             }
 
-            # Добавляем фильтры если они указаны
-            if filters.get("brand"):
-                params["brand"] = filters["brand"]
-            if filters.get("model_group"):
-                params["model_group"] = filters["model_group"]
-            if filters.get("model"):
-                params["model"] = filters["model"]
-            if filters.get("grade"):
-                params["grade"] = filters["grade"]
-            if filters.get("min_year"):
-                params["min_year"] = filters["min_year"]
-            if filters.get("max_year"):
-                params["max_year"] = filters["max_year"]
-            if filters.get("min_price"):
-                params["min_price"] = filters["min_price"]
-            if filters.get("max_price"):
-                params["max_price"] = filters["max_price"]
-            if filters.get("min_mileage"):
-                params["min_mileage"] = filters["min_mileage"]
-            if filters.get("max_mileage"):
-                params["max_mileage"] = filters["max_mileage"]
-            if filters.get("fuel"):
-                params["fuel"] = filters["fuel"]
-            if filters.get("transmission"):
-                params["transmission"] = filters["transmission"]
-            if filters.get("location"):
-                params["location"] = filters["location"]
+            # Добавляем фильтры
+            filter_mapping = {
+                "brand": "brand",
+                "model_group": "model_group",
+                "model": "model",
+                "grade": "grade",
+                "min_year": "min_year",
+                "max_year": "max_year",
+                "min_price": "min_price",
+                "max_price": "max_price",
+                "min_mileage": "min_mileage",
+                "max_mileage": "max_mileage",
+                "fuel": "fuel",
+                "transmission": "transmission",
+                "location": "location",
+            }
+
+            for filter_key, param_key in filter_mapping.items():
+                if filter_key in filters and filters[filter_key] is not None:
+                    params[param_key] = filters[filter_key]
+
+            logger.info(f"📋 Параметры запроса: {params}")
+            logger.info(f"📡 Отправляю запрос к {self.base_url}/v2/dealers/web/cars/")
 
             response = await self.http_client.get(
-                f"{self.base_url}/v2/dealers/web/cars/", params=params
+                url=f"{self.base_url}/v2/dealers/web/cars/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
             )
 
+            logger.info(f"📊 Статус ответа: {response.status_code}")
+
             if response.status_code == 200:
-                cars_data = response.json()
-                logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
-                return cars_data
+                data = response.json()
+                logger.info(f"✅ Получено {len(data)} отфильтрованных автомобилей")
+                return data
             else:
-                logger.error(f"Ошибка получения автомобилей: {response.status_code}")
+                logger.error(
+                    f"❌ Ошибка получения отфильтрованных автомобилей: {response.status_code} - {response.text[:200]}"
+                )
                 return []
 
         except Exception as e:
-            logger.error(f"Ошибка при получении автомобилей: {str(e)}")
+            logger.error(
+                f"💥 Исключение при получении отфильтрованных автомобилей: {e}"
+            )
             return []
 
     async def get_cars_with_auto_auth(

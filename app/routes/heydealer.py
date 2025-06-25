@@ -314,6 +314,116 @@ async def get_heydealer_status(
         }
 
 
+@router.get("/cars/filtered", response_model=HeyDealerListResponse)
+async def get_filtered_cars(
+    page: int = Query(1, description="Номер страницы"),
+    order: str = Query("default", description="Сортировка"),
+    brand: Optional[str] = Query(None, description="ID марки"),
+    model_group: Optional[str] = Query(None, description="ID группы моделей"),
+    model: Optional[str] = Query(None, description="ID поколения"),
+    grade: Optional[str] = Query(None, description="ID конфигурации"),
+    min_year: Optional[int] = Query(None, description="Минимальный год"),
+    max_year: Optional[int] = Query(None, description="Максимальный год"),
+    min_price: Optional[int] = Query(None, description="Минимальная цена"),
+    max_price: Optional[int] = Query(None, description="Максимальная цена"),
+    min_mileage: Optional[int] = Query(None, description="Минимальный пробег"),
+    max_mileage: Optional[int] = Query(None, description="Максимальный пробег"),
+    fuel: Optional[str] = Query(None, description="Тип топлива"),
+    transmission: Optional[str] = Query(None, description="Тип КПП"),
+    location: Optional[str] = Query(None, description="Местоположение"),
+):
+    """Получение отфильтрованного списка автомобилей"""
+    try:
+        logger.info(f"Получение отфильтрованных автомобилей HeyDealer: страница {page}")
+
+        # Используем автоматический сервис авторизации
+        cookies, headers = heydealer_auth.get_valid_session()
+
+        if not cookies or not headers:
+            logger.error("Не удалось получить валидную сессию HeyDealer")
+            return HeyDealerListResponse(
+                success=False,
+                data=[],
+                message="Ошибка авторизации HeyDealer",
+            )
+
+        # Подготавливаем параметры
+        params = {
+            "page": page,
+            "type": "auction",
+            "is_subscribed": "false",
+            "is_retried": "false",
+            "is_previously_bid": "false",
+            "order": order,
+        }
+
+        # Добавляем фильтры
+        if brand:
+            params["brand"] = brand
+        if model_group:
+            params["model_group"] = model_group
+        if model:
+            params["model"] = model
+        if grade:
+            params["grade"] = grade
+        if min_year:
+            params["min_year"] = min_year
+        if max_year:
+            params["max_year"] = max_year
+        if min_price:
+            params["min_price"] = min_price
+        if max_price:
+            params["max_price"] = max_price
+        if min_mileage:
+            params["min_mileage"] = min_mileage
+        if max_mileage:
+            params["max_mileage"] = max_mileage
+        if fuel:
+            params["fuel"] = fuel
+        if transmission:
+            params["transmission"] = transmission
+        if location:
+            params["location"] = location
+
+        logger.info(f"Параметры фильтрации: {params}")
+
+        # Выполняем запрос
+        response = requests.get(
+            "https://api.heydealer.com/v2/dealers/web/cars/",
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            cars_data = response.json()
+            logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
+
+            # Парсим данные в модели Pydantic
+            cars = [HeyDealerCar(**car) for car in cars_data]
+            return HeyDealerListResponse(
+                success=True,
+                data=cars,
+                message=f"Получено {len(cars)} автомобилей с фильтрами",
+            )
+        else:
+            logger.error(
+                f"Ошибка получения отфильтрованных автомобилей: {response.status_code} - {response.text}"
+            )
+            return HeyDealerListResponse(
+                success=False,
+                data=[],
+                message=f"Ошибка получения данных: {response.status_code}",
+            )
+
+    except Exception as e:
+        logger.error(f"Ошибка в эндпоинте фильтрации автомобилей: {str(e)}")
+        return HeyDealerListResponse(
+            success=False, data=[], message=f"Ошибка: {str(e)}"
+        )
+
+
 @router.get("/cars/{car_hash_id}")
 async def get_heydealer_car_detail_final_working(
     car_hash_id: str = Path(..., description="Hash ID автомобиля"),
@@ -988,81 +1098,6 @@ async def get_model_configurations(model_hash_id: str):
         )
 
 
-@router.get("/cars/filtered", response_model=HeyDealerListResponse)
-async def get_filtered_cars(
-    page: int = Query(1, description="Номер страницы"),
-    order: str = Query("default", description="Сортировка"),
-    brand: Optional[str] = Query(None, description="ID марки"),
-    model_group: Optional[str] = Query(None, description="ID группы моделей"),
-    model: Optional[str] = Query(None, description="ID поколения"),
-    grade: Optional[str] = Query(None, description="ID конфигурации"),
-    min_year: Optional[int] = Query(None, description="Минимальный год"),
-    max_year: Optional[int] = Query(None, description="Максимальный год"),
-    min_price: Optional[int] = Query(None, description="Минимальная цена"),
-    max_price: Optional[int] = Query(None, description="Максимальная цена"),
-    min_mileage: Optional[int] = Query(None, description="Минимальный пробег"),
-    max_mileage: Optional[int] = Query(None, description="Максимальный пробег"),
-    fuel: Optional[str] = Query(None, description="Тип топлива"),
-    transmission: Optional[str] = Query(None, description="Тип КПП"),
-    location: Optional[str] = Query(None, description="Местоположение"),
-):
-    """Получение отфильтрованного списка автомобилей"""
-    try:
-        service = HeyDealerService()
-
-        # Формируем фильтры
-        filters = {"page": page, "order": order}
-
-        # Добавляем только непустые фильтры
-        if brand:
-            filters["brand"] = brand
-        if model_group:
-            filters["model_group"] = model_group
-        if model:
-            filters["model"] = model
-        if grade:
-            filters["grade"] = grade
-        if min_year:
-            filters["min_year"] = min_year
-        if max_year:
-            filters["max_year"] = max_year
-        if min_price:
-            filters["min_price"] = min_price
-        if max_price:
-            filters["max_price"] = max_price
-        if min_mileage:
-            filters["min_mileage"] = min_mileage
-        if max_mileage:
-            filters["max_mileage"] = max_mileage
-        if fuel:
-            filters["fuel"] = fuel
-        if transmission:
-            filters["transmission"] = transmission
-        if location:
-            filters["location"] = location
-
-        cars_data = await service.get_filtered_cars(filters)
-
-        if cars_data:
-            # Парсим данные в модели Pydantic
-            cars = [HeyDealerCar(**car) for car in cars_data]
-            return HeyDealerListResponse(
-                success=True,
-                data=cars,
-                message=f"Получено {len(cars)} автомобилей с фильтрами",
-            )
-        else:
-            return HeyDealerListResponse(
-                success=False, data=[], message="Не удалось получить список автомобилей"
-            )
-
-    except Exception as e:
-        logger.error(f"Ошибка в эндпоинте фильтрации автомобилей: {str(e)}")
-        return HeyDealerListResponse(
-            success=False, data=[], message=f"Ошибка: {str(e)}"
-        )
-
-
 @router.get("/brands/raw", response_model=Dict[str, Any])
 async def get_brands_raw():
     """Получение сырых данных марок для отладки"""
@@ -1086,11 +1121,10 @@ async def get_brands_raw():
 async def get_filtered_cars_raw(
     page: int = Query(1, description="Номер страницы"),
     grade: Optional[str] = Query(None, description="ID конфигурации"),
+    service: HeyDealerService = Depends(get_heydealer_service),
 ):
     """Получение сырых данных отфильтрованных автомобилей для отладки"""
     try:
-        service = HeyDealerService()
-
         filters = {"page": page}
         if grade:
             filters["grade"] = grade
