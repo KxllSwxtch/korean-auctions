@@ -70,6 +70,53 @@ class HeyDealerParser:
             return None
 
     @staticmethod
+    def parse_car_list_with_pagination(
+        raw_data: List[Dict[str, Any]], total_count: int, page: int, page_size: int
+    ) -> Optional[HeyDealerCarList]:
+        """
+        Парсит список автомобилей с информацией о пагинации из HTTP заголовков
+
+        Args:
+            raw_data: Сырые данные от API
+            total_count: Общее количество автомобилей из заголовка X-Pagination-Count
+            page: Номер текущей страницы
+            page_size: Размер страницы из заголовка X-Pagination-Page-Size
+
+        Returns:
+            Обработанный список автомобилей с правильной пагинацией или None при ошибке
+        """
+        try:
+            if not raw_data:
+                logger.warning("Получен пустой список автомобилей")
+                return HeyDealerCarList(cars=[], total_count=total_count, page=page)
+
+            cars = []
+            for car_data in raw_data:
+                try:
+                    car = HeyDealerParser._parse_single_car(car_data)
+                    if car:
+                        cars.append(car)
+                except Exception as e:
+                    logger.error(
+                        f"Ошибка парсинга автомобиля {car_data.get('hash_id', 'unknown')}: {e}"
+                    )
+                    continue
+
+            logger.info(
+                f"Парсинг завершен: {len(cars)} автомобилей, страница {page}, общее количество {total_count}"
+            )
+
+            return HeyDealerCarList(
+                cars=cars,
+                total_count=total_count,
+                page=page,
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка парсинга списка автомобилей с пагинацией: {e}")
+            return None
+
+    @staticmethod
     def _parse_single_car(car_data: Dict[str, Any]) -> Optional[HeyDealerCar]:
         """
         Парсит данные одного автомобиля

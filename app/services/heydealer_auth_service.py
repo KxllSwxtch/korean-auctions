@@ -1,5 +1,5 @@
 """
-Сервис автоматической авторизации для HeyDealer с обновлением cookies
+Сервис автоматической авторизации для HeyDealer с обновлением cookies и user token
 """
 
 import requests
@@ -29,102 +29,146 @@ class HeyDealerAuthService:
             "_ga": "GA1.2.225253972.1750804665",
             "_gid": "GA1.2.607092972.1750804665",
             "ga_dsi": "2f27c9738d9441acb3019f0388816973",
-            "_gat": "1",
-            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750805823$j45$l0$h0",
         }
 
-        self._session_data = None
-        self._session_expires = None
+        # Базовые headers
+        self.base_headers = {
+            "Accept": "*/*",
+            "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+            "App-Os": "pc",
+            "App-Type": "dealer",
+            "App-Version": "1.9.0",
+            "Connection": "keep-alive",
+            "Origin": "https://dealer.heydealer.com",
+            "Referer": "https://dealer.heydealer.com/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "same-site",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+        }
 
-    def _get_csrf_token(self) -> Optional[str]:
+        # Создаем директорию для кэша если не существует
+        os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
+
+    def get_csrf_token(self) -> Optional[str]:
         """Получает CSRF токен для авторизации"""
         try:
-            # Делаем запрос на главную страницу чтобы получить CSRF токен
+            # Сначала пробуем получить через главную страницу
             response = requests.get(
-                "https://dealer.heydealer.com/", cookies=self.base_cookies, timeout=10
+                "https://dealer.heydealer.com/",
+                cookies=self.base_cookies,
+                headers=self.base_headers,
+                timeout=30,
             )
 
             if response.status_code == 200:
-                # Ищем CSRF токен в cookies
+                # Извлекаем CSRF токен из cookies
                 csrf_token = response.cookies.get("csrftoken")
                 if csrf_token:
-                    logger.info(f"Получен CSRF токен: {csrf_token[:10]}...")
+                    logger.info(f"CSRF токен получен: {csrf_token[:8]}...")
                     return csrf_token
 
-            logger.warning("Не удалось получить CSRF токен")
-            return None
+            # Если не получилось, пробуем через API endpoint
+            logger.warning(
+                "Не удалось получить CSRF через главную страницу, пробую через API..."
+            )
+
+            # Создаем новые cookies с временным CSRF
+            temp_cookies = self.base_cookies.copy()
+            temp_headers = self.base_headers.copy()
+
+            # Делаем запрос к API для получения CSRF
+            api_response = requests.get(
+                "https://api.heydealer.com/v2/dealers/web/",
+                cookies=temp_cookies,
+                headers=temp_headers,
+                timeout=30,
+            )
+
+            if api_response.status_code in [200, 403]:  # 403 тоже может содержать CSRF
+                csrf_token = api_response.cookies.get("csrftoken")
+                if csrf_token:
+                    logger.info(f"CSRF токен получен через API: {csrf_token[:8]}...")
+                    return csrf_token
+
+            # Fallback - используем известный рабочий токен
+            logger.warning("Используем fallback CSRF токен")
+            return "86vF233dOdoOCeznt8rwfXkVlwacieWi"
 
         except Exception as e:
-            logger.error(f"Ошибка получения CSRF токена: {e}")
-            return None
+            logger.error(f"Исключение при получении CSRF токена: {e}")
+            # Fallback токен
+            logger.warning("Используем fallback CSRF токен из-за исключения")
+            return "86vF233dOdoOCeznt8rwfXkVlwacieWi"
 
-    def _perform_login(self) -> Optional[Dict]:
-        """Выполняет авторизацию и возвращает новые cookies"""
+    def login(self) -> Optional[Dict]:
+        """Выполняет логин и возвращает данные сессии"""
         try:
-            # Получаем CSRF токен
-            csrf_token = self._get_csrf_token()
-            if not csrf_token:
-                # Используем fallback токен
-                csrf_token = "oF1QX8pojFyAYw9J9yYO3JZgEHkxNEzB"
+            logger.info("Начинаю процесс авторизации HeyDealer...")
 
-            # Подготавливаем cookies для авторизации
+            # Получаем CSRF токен
+            csrf_token = self.get_csrf_token()
+            if not csrf_token:
+                logger.error("Не удалось получить CSRF токен")
+                return None
+
+            # Подготавливаем cookies и headers для логина
             login_cookies = self.base_cookies.copy()
             login_cookies["csrftoken"] = csrf_token
 
-            headers = {
-                "Accept": "*/*",
-                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
-                "App-Os": "pc",
-                "App-Type": "dealer",
-                "App-Version": "1.9.0",
-                "Connection": "keep-alive",
-                "Content-Type": "application/json",
-                "Origin": "https://dealer.heydealer.com",
-                "Referer": "https://dealer.heydealer.com/",
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
-                "X-CSRFToken": csrf_token,
-                "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
-                "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"macOS"',
-            }
+            login_headers = self.base_headers.copy()
+            login_headers["Content-Type"] = "application/json"
+            login_headers["X-CSRFToken"] = csrf_token
 
-            json_data = {
+            # Данные для логина
+            login_data = {
                 "username": self.username,
                 "password": self.password,
                 "device_type": "pc",
             }
 
-            # Выполняем авторизацию
+            # Выполняем логин
+            logger.info("Отправляю запрос авторизации...")
             response = requests.post(
                 self.login_url,
                 cookies=login_cookies,
-                headers=headers,
-                json=json_data,
-                timeout=15,
+                headers=login_headers,
+                json=login_data,
+                timeout=30,
             )
 
-            logger.info(f"Ответ авторизации: {response.status_code}")
-
             if response.status_code == 200:
-                # Получаем новые cookies из ответа
-                new_cookies = login_cookies.copy()
+                login_response = response.json()
+                user_hash_id = login_response.get("user", {}).get("hash_id")
 
-                # Обновляем cookies из ответа
-                for cookie_name, cookie_value in response.cookies.items():
-                    new_cookies[cookie_name] = cookie_value
-                    logger.info(f"Обновлен cookie: {cookie_name}")
-
-                # Проверяем что получили sessionid
-                if "sessionid" in new_cookies:
-                    logger.info("✅ Успешная авторизация! Получен sessionid")
-                    return {
-                        "cookies": new_cookies,
-                        "headers": headers,
-                        "expires_at": (datetime.now() + timedelta(hours=6)).isoformat(),
-                    }
-                else:
-                    logger.warning("Авторизация прошла, но sessionid не получен")
+                if not user_hash_id:
+                    logger.error("User hash_id не найден в ответе логина")
                     return None
+
+                logger.info(f"✅ Авторизация успешна! User hash_id: {user_hash_id}")
+
+                # Получаем все cookies из ответа
+                session_cookies = login_cookies.copy()
+                for cookie in response.cookies:
+                    session_cookies[cookie.name] = cookie.value
+
+                # Подготавливаем данные сессии
+                session_data = {
+                    "user_hash_id": user_hash_id,
+                    "cookies": session_cookies,
+                    "headers": login_headers,
+                    "created_at": datetime.now().isoformat(),
+                    "expires_at": (datetime.now() + timedelta(hours=12)).isoformat(),
+                }
+
+                # Сохраняем сессию
+                self.save_session(session_data)
+
+                return session_data
+
             else:
                 logger.error(
                     f"Ошибка авторизации: {response.status_code} - {response.text}"
@@ -132,93 +176,95 @@ class HeyDealerAuthService:
                 return None
 
         except Exception as e:
-            logger.error(f"Ошибка при авторизации: {e}")
+            logger.error(f"Исключение при авторизации: {e}")
             return None
 
-    def _save_session(self, session_data: Dict) -> None:
-        """Сохраняет данные сессии в файл"""
+    def validate_session(self, session_data: Dict) -> bool:
+        """Проверяет валидность сессии через user endpoint"""
         try:
-            os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
-            with open(self.session_file, "w") as f:
-                json.dump(session_data, f, indent=2)
+            user_hash_id = session_data.get("user_hash_id")
+            cookies = session_data.get("cookies", {})
+            headers = session_data.get("headers", {})
+
+            if not user_hash_id:
+                logger.error("User hash_id отсутствует в данных сессии")
+                return False
+
+            # Проверяем сессию через user endpoint
+            user_url = f"https://api.heydealer.com/v2/dealers/web/users/{user_hash_id}/"
+
+            response = requests.get(
+                user_url, cookies=cookies, headers=headers, timeout=30
+            )
+
+            if response.status_code == 200:
+                logger.info("✅ Сессия валидна")
+                return True
+            else:
+                logger.warning(f"Сессия невалидна: {response.status_code}")
+                return False
+
+        except Exception as e:
+            logger.error(f"Ошибка валидации сессии: {e}")
+            return False
+
+    def load_session(self) -> Optional[Dict]:
+        """Загружает сохраненную сессию"""
+        try:
+            if not os.path.exists(self.session_file):
+                logger.info("Файл сессии не найден")
+                return None
+
+            with open(self.session_file, "r", encoding="utf-8") as f:
+                session_data = json.load(f)
+
+            # Проверяем срок действия
+            expires_at = datetime.fromisoformat(session_data.get("expires_at", ""))
+            if datetime.now() > expires_at:
+                logger.warning("Сохраненная сессия истекла")
+                return None
+
+            logger.info("Сохраненная сессия загружена")
+            return session_data
+
+        except Exception as e:
+            logger.error(f"Ошибка загрузки сессии: {e}")
+            return None
+
+    def save_session(self, session_data: Dict):
+        """Сохраняет данные сессии"""
+        try:
+            with open(self.session_file, "w", encoding="utf-8") as f:
+                json.dump(session_data, f, ensure_ascii=False, indent=2)
             logger.info("Сессия сохранена")
         except Exception as e:
             logger.error(f"Ошибка сохранения сессии: {e}")
 
-    def _load_session(self) -> Optional[Dict]:
-        """Загружает данные сессии из файла"""
+    def get_valid_session(self) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """
+        Возвращает валидную сессию (cookies, headers)
+
+        Returns:
+            Tuple[cookies, headers] или (None, None) при ошибке
+        """
         try:
-            if os.path.exists(self.session_file):
-                with open(self.session_file, "r") as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.error(f"Ошибка загрузки сессии: {e}")
-        return None
+            # Пытаемся загрузить сохраненную сессию
+            session_data = self.load_session()
 
-    def _is_session_valid(self, session_data: Dict) -> bool:
-        """Проверяет валидность сессии"""
-        try:
-            expires_at = datetime.fromisoformat(session_data.get("expires_at", ""))
-            return datetime.now() < expires_at
-        except:
-            return False
+            # Если сессия есть, проверяем её валидность
+            if session_data and self.validate_session(session_data):
+                logger.info("Используем сохраненную валидную сессию")
+                return session_data.get("cookies"), session_data.get("headers")
 
-    def _test_session(self, cookies: Dict, headers: Dict) -> bool:
-        """Тестирует работоспособность сессии"""
-        try:
-            response = requests.get(
-                self.test_url,
-                params={"page": 1, "type": "auction", "is_subscribed": "false"},
-                cookies=cookies,
-                headers=headers,
-                timeout=10,
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                if isinstance(data, list) and len(data) > 0:
-                    logger.info("✅ Сессия валидна - получены данные")
-                    return True
-
-            logger.warning(f"Сессия невалидна: {response.status_code}")
-            return False
-
-        except Exception as e:
-            logger.error(f"Ошибка тестирования сессии: {e}")
-            return False
-
-    def get_valid_session(self) -> Optional[Tuple[Dict, Dict]]:
-        """Возвращает валидную сессию (cookies, headers)"""
-        try:
-            # Пробуем загрузить существующую сессию
-            session_data = self._load_session()
-
-            if session_data and self._is_session_valid(session_data):
-                cookies = session_data.get("cookies", {})
-                headers = session_data.get("headers", {})
-
-                # Тестируем сессию
-                if self._test_session(cookies, headers):
-                    logger.info("Используем существующую валидную сессию")
-                    return cookies, headers
-                else:
-                    logger.info("Существующая сессия не работает, обновляем...")
-
-            # Выполняем новую авторизацию
-            logger.info("Выполняем новую авторизацию...")
-            session_data = self._perform_login()
+            # Если сессии нет или она невалидна, создаем новую
+            logger.info("Создаю новую сессию...")
+            session_data = self.login()
 
             if session_data:
-                # Сохраняем новую сессию
-                self._save_session(session_data)
-
-                cookies = session_data.get("cookies", {})
-                headers = session_data.get("headers", {})
-
-                logger.info("✅ Получена новая валидная сессия")
-                return cookies, headers
+                logger.info("✅ Новая сессия создана успешно")
+                return session_data.get("cookies"), session_data.get("headers")
             else:
-                logger.error("Не удалось получить валидную сессию")
+                logger.error("❌ Не удалось создать новую сессию")
                 return None, None
 
         except Exception as e:

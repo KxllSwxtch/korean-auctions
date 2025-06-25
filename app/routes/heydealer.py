@@ -93,9 +93,27 @@ async def get_heydealer_cars(
         if response.status_code == 200:
             cars_data = response.json()
 
+            # Извлекаем информацию о пагинации из заголовков
+            total_count = int(response.headers.get("X-Pagination-Count", 0))
+            page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
+
+            # Если total_count = 0, это означает бесконечную прокрутку
+            if total_count == 0:
+                link_header = response.headers.get("Link", "")
+                has_next_page = 'rel="next"' in link_header
+
+                if has_next_page:
+                    estimated_total = len(cars_data) + (page * page_size)
+                else:
+                    estimated_total = len(cars_data) + ((page - 1) * page_size)
+
+                total_count = estimated_total
+
             # Парсим данные через парсер
             parser = HeyDealerParser()
-            car_list = parser.parse_car_list(cars_data)
+            car_list = parser.parse_car_list_with_pagination(
+                cars_data, total_count, page, page_size
+            )
 
             if not car_list:
                 logger.error("Не удалось распарсить данные автомобилей")
