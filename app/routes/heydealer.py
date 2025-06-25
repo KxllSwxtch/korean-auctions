@@ -120,15 +120,17 @@ async def get_heydealer_cars(
                     current_page=page,
                 )
 
-            # Нормализуем данные через парсер
-            normalized_data = parser.format_response_data(
-                cars=car_list.cars, total_count=car_list.total_count, page=page
+            # Формируем успешный ответ
+            response_obj = HeyDealerResponse(
+                success=True,
+                data=car_list,
+                message=f"Успешно получено {len(car_list.cars)} автомобилей",
+                total_count=car_list.total_count,
+                current_page=page,
             )
 
-            logger.info(
-                f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer (normalized)"
-            )
-            return normalized_data
+            logger.info(f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
+            return response_obj
         else:
             logger.error(
                 f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
