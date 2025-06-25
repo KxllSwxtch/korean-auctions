@@ -241,6 +241,7 @@ class HeyDealerParser:
             "current_page": page,
             "auction_name": "HeyDealer",
             "success": True,
+            "message": f"Успешно получено {len(normalized_cars)} автомобилей",
         }
 
     @staticmethod
