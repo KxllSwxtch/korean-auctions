@@ -41,6 +41,11 @@ async def get_heydealer_cars(
         default=False, description="Только с предыдущими ставками"
     ),
     order: str = Query(default="default", description="Порядок сортировки"),
+    # Параметры фильтрации
+    brand: Optional[str] = Query(None, description="ID марки или название"),
+    model_group: Optional[str] = Query(None, description="ID группы моделей"),
+    model: Optional[str] = Query(None, description="ID поколения"),
+    grade: Optional[str] = Query(None, description="ID конфигурации"),
     service: HeyDealerService = Depends(get_heydealer_service),
 ):
     """
@@ -80,6 +85,27 @@ async def get_heydealer_cars(
             "is_previously_bid": str(is_previously_bid).lower(),
             "order": order,
         }
+
+        # Добавляем параметры фильтрации если они указаны
+        if brand:
+            # Если передано название бренда, пытаемся найти hash_id
+            if not brand.startswith(
+                ("xo", "2o", "vg", "Bk", "lk", "re")
+            ):  # Не похоже на hash_id
+                brand_hash_id = await find_brand_by_name(brand)
+                if brand_hash_id:
+                    params["brand"] = brand_hash_id
+                else:
+                    logger.warning(f"Бренд {brand} не найден")
+            else:
+                params["brand"] = brand
+
+        if model_group:
+            params["model_group"] = model_group
+        if model:
+            params["model"] = model
+        if grade:
+            params["grade"] = grade
 
         # Выполняем запрос
         response = requests.get(
@@ -1372,3 +1398,142 @@ async def get_filtered_cars_direct(
     except Exception as e:
         logger.error(f"Ошибка в прямом эндпоинте автомобилей: {str(e)}")
         return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
+
+
+# === НОВЫЕ МАРШРУТЫ ДЛЯ СОВМЕСТИМОСТИ С FRONTEND ===
+
+
+async def find_brand_by_name(brand_name: str) -> Optional[str]:
+    """Поиск hash_id бренда по названию (на английском или корейском)"""
+    try:
+        service = HeyDealerService()
+        brands_data = await service.get_brands()
+
+        if not brands_data:
+            return None
+
+        # Словарь соответствий английских названий корейским
+        brand_mapping = {
+            "hyundai": "현대",
+            "kia": "기아",
+            "genesis": "제네시스",
+            "samsung": "삼성",
+            "chevrolet": "쉐보레",
+            "toyota": "토요타",
+            "honda": "혼다",
+            "nissan": "닛산",
+            "mazda": "마쯔다",
+            "volkswagen": "폭스바겐",
+            "bmw": "BMW",
+            "mercedes": "메르세데스-벤츠",
+            "audi": "아우디",
+            "lexus": "렉서스",
+            "infiniti": "인피니티",
+            "acura": "아큐라",
+            "cadillac": "캐딜락",
+            "lincoln": "링컨",
+            "volvo": "볼보",
+            "jaguar": "재규어",
+            "land rover": "랜드로버",
+            "porsche": "포르쉐",
+            "ferrari": "페라리",
+            "lamborghini": "람보르기니",
+            "bentley": "벤틀리",
+            "rolls royce": "롤스로이스",
+            "maserati": "마세라티",
+            "alfa romeo": "알파로메오",
+        }
+
+        # Ищем по точному совпадению
+        brand_name_lower = brand_name.lower()
+        korean_name = brand_mapping.get(brand_name_lower, brand_name)
+
+        for brand in brands_data:
+            if (
+                brand.get("name", "").lower() == brand_name_lower
+                or brand.get("name", "") == korean_name
+                or brand.get("name", "") == brand_name
+            ):
+                return brand.get("hash_id")
+
+        return None
+
+    except Exception as e:
+        logger.error(f"Ошибка поиска бренда по названию {brand_name}: {str(e)}")
+        return None
+
+
+@router.get("/brands/{brand_name}/models", response_model=HeyDealerBrandDetailResponse)
+async def get_brand_models_by_name(brand_name: str):
+    """Получение списка моделей для выбранной марки по названию"""
+    try:
+        # Находим hash_id бренда по названию
+        brand_hash_id = await find_brand_by_name(brand_name)
+
+        if not brand_hash_id:
+            return HeyDealerBrandDetailResponse(
+                success=False, data={}, message=f"Бренд {brand_name} не найден"
+            )
+
+        # Используем существующую функцию
+        return await get_brand_models(brand_hash_id)
+
+    except Exception as e:
+        logger.error(f"Ошибка в эндпоинте получения моделей по названию: {str(e)}")
+        return HeyDealerBrandDetailResponse(
+            success=False, data={}, message=f"Ошибка: {str(e)}"
+        )
+
+
+@router.get("/filters", response_model=Dict[str, Any])
+async def get_filters():
+    """Получение всех доступных фильтров для frontend"""
+    try:
+        service = HeyDealerService()
+
+        # Получаем список брендов
+        brands_data = await service.get_brands()
+
+        if not brands_data:
+            return {
+                "success": False,
+                "data": {},
+                "message": "Не удалось получить данные фильтров",
+            }
+
+        # Формируем структуру фильтров для frontend
+        filters_data = {
+            "brands": [
+                {
+                    "id": brand.get("hash_id"),
+                    "name": brand.get("name"),
+                    "count": brand.get("count", 0),
+                }
+                for brand in brands_data
+            ],
+            "fuel_types": [
+                {"id": "gasoline", "name": "Бензин"},
+                {"id": "diesel", "name": "Дизель"},
+                {"id": "hybrid", "name": "Гибрид"},
+                {"id": "electric", "name": "Электро"},
+                {"id": "lpg", "name": "ГБО"},
+            ],
+            "transmissions": [
+                {"id": "manual", "name": "Механика"},
+                {"id": "automatic", "name": "Автомат"},
+                {"id": "cvt", "name": "Вариатор"},
+            ],
+            "years": {"min": 1990, "max": 2025},
+            "price": {"min": 0, "max": 100000000},
+            "mileage": {"min": 0, "max": 500000},
+        }
+
+        return {
+            "success": True,
+            "data": filters_data,
+            "message": f"Получены фильтры с {len(brands_data)} брендами",
+        }
+
+    except Exception as e:
+        logger.error(f"Ошибка в эндпоинте фильтров: {str(e)}")
+        return {"success": False, "data": {}, "message": f"Ошибка: {str(e)}"}
