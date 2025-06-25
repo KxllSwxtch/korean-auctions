@@ -57,45 +57,89 @@ async def get_heydealer_cars(
             f"Получение автомобилей HeyDealer: страница {page}, тип {auction_type}"
         )
 
-        # Формируем фильтры
-        filters = HeyDealerFilters(
-            page=page,
-            type=auction_type,
-            is_subscribed=is_subscribed,
-            is_retried=is_retried,
-            is_previously_bid=is_previously_bid,
-            order=order,
+        # Используем рабочие cookies напрямую (временное решение)
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+            "App-Os": "pc",
+            "App-Type": "dealer",
+            "App-Version": "1.9.0",
+            "Connection": "keep-alive",
+            "Origin": "https://dealer.heydealer.com",
+            "Referer": "https://dealer.heydealer.com/",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "X-CSRFToken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+        }
+
+        cookies = {
+            "_gid": "GA1.2.607092972.1750804665",
+            "ga_dsi": "2f27c9738d9441acb3019f0388816973",
+            "_ga_P1L3JSNSES": "GS2.2.s1750808840$o1$g0$t1750808840$j60$l0$h0",
+            "_ga_4N2EP0M69Q": "GS2.1.s1750808839$o1$g0$t1750808842$j57$l0$h0",
+            "_ga": "GA1.2.225253972.1750804665",
+            "csrftoken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sessionid": "03qqprbun190abkr8nj2dkfcxzvfvmxl",
+            "_gat": "1",
+            "multidb_pin_writes": "y",
+            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750809091$j50$l0$h0",
+        }
+
+        # Подготавливаем параметры
+        params = {
+            "page": page,
+            "type": auction_type,
+            "is_subscribed": str(is_subscribed).lower(),
+        }
+
+        # Выполняем запрос напрямую
+        response = requests.get(
+            "https://api.heydealer.com/v2/dealers/web/cars/",
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            timeout=30,
         )
 
-        # Получаем доступы из конфигурации
-        # В реальном приложении эти данные должны быть в environment variables
-        username = "arman97"  # Из auctions-auth.txt
-        password = "for1657721@"  # Из auctions-auth.txt
+        if response.status_code == 200:
+            cars_data = response.json()
 
-        # Получаем автомобили через сервис
-        car_list = await service.fetch_cars_with_auth(username, password, filters)
+            # Парсим данные через парсер
+            parser = HeyDealerParser()
+            car_list = parser.parse_car_list(cars_data)
 
-        if car_list is None:
-            logger.error("Не удалось получить данные от HeyDealer API")
+            if not car_list:
+                logger.error("Не удалось распарсить данные автомобилей")
+                return HeyDealerResponse(
+                    success=False,
+                    data=None,
+                    message="Ошибка парсинга данных",
+                    total_count=0,
+                    current_page=page,
+                )
+
+            # Нормализуем данные через парсер
+            normalized_data = parser.format_response_data(
+                cars=car_list.cars, total_count=car_list.total_count, page=page
+            )
+
+            logger.info(
+                f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer (normalized)"
+            )
+            return normalized_data
+        else:
+            logger.error(
+                f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
+            )
             return HeyDealerResponse(
                 success=False,
                 data=None,
-                message="Не удалось получить данные от HeyDealer API",
+                message=f"Ошибка получения данных: {response.status_code}",
                 total_count=0,
                 current_page=page,
             )
-
-        # Формируем успешный ответ
-        response = HeyDealerResponse(
-            success=True,
-            data=car_list,
-            message="Данные успешно получены",
-            total_count=car_list.total_count,
-            current_page=page,
-        )
-
-        logger.info(f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
-        return response
 
     except Exception as e:
         logger.error(f"Ошибка при получении автомобилей HeyDealer: {e}")
@@ -118,50 +162,99 @@ async def get_normalized_heydealer_cars(
     service: HeyDealerService = Depends(get_heydealer_service),
 ):
     """
-    Получает нормализованный список автомобилей с аукциона HeyDealer
+    Получает нормализованный список автомобилей HeyDealer
 
-    Возвращает данные в едином формате для всех аукционов
+    Возвращает данные в общем формате для всех аукционов.
     """
     try:
-        logger.info(f"Получение нормализованных автомобилей HeyDealer: страница {page}")
-
-        # Формируем фильтры
-        filters = HeyDealerFilters(
-            page=page,
-            type=auction_type,
-            is_subscribed=is_subscribed,
-            is_retried=is_retried,
-            is_previously_bid=is_previously_bid,
-            order=order,
+        logger.info(
+            f"Получение нормализованных автомобилей HeyDealer: страница {page}, тип {auction_type}"
         )
 
-        # Получаем доступы
-        username = "arman97"
-        password = "for1657721@"
+        # Используем рабочие cookies напрямую (временное решение)
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+            "App-Os": "pc",
+            "App-Type": "dealer",
+            "App-Version": "1.9.0",
+            "Connection": "keep-alive",
+            "Origin": "https://dealer.heydealer.com",
+            "Referer": "https://dealer.heydealer.com/",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "X-CSRFToken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+        }
 
-        # Получаем автомобили
-        car_list = await service.fetch_cars_with_auth(username, password, filters)
+        cookies = {
+            "_gid": "GA1.2.607092972.1750804665",
+            "ga_dsi": "2f27c9738d9441acb3019f0388816973",
+            "_ga_P1L3JSNSES": "GS2.2.s1750808840$o1$g0$t1750808840$j60$l0$h0",
+            "_ga_4N2EP0M69Q": "GS2.1.s1750808839$o1$g0$t1750808842$j57$l0$h0",
+            "_ga": "GA1.2.225253972.1750804665",
+            "csrftoken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sessionid": "03qqprbun190abkr8nj2dkfcxzvfvmxl",
+            "_gat": "1",
+            "multidb_pin_writes": "y",
+            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750809091$j50$l0$h0",
+        }
 
-        if car_list is None:
+        # Подготавливаем параметры
+        params = {
+            "page": page,
+            "type": auction_type,
+            "is_subscribed": str(is_subscribed).lower(),
+        }
+
+        # Выполняем запрос напрямую
+        response = requests.get(
+            "https://api.heydealer.com/v2/dealers/web/cars/",
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            cars_data = response.json()
+
+            # Парсим данные через парсер
+            parser = HeyDealerParser()
+            car_list = parser.parse_car_list(cars_data)
+
+            if not car_list:
+                return {
+                    "success": False,
+                    "message": "Ошибка парсинга данных",
+                    "cars": [],
+                    "total_count": 0,
+                    "current_page": page,
+                    "auction_name": "HeyDealer",
+                }
+
+            # Нормализуем данные через парсер
+            normalized_data = parser.format_response_data(
+                cars=car_list.cars, total_count=car_list.total_count, page=page
+            )
+
+            logger.info(
+                f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer (normalized)"
+            )
+            return normalized_data
+        else:
+            logger.error(
+                f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
+            )
             return {
                 "success": False,
-                "message": "Не удалось получить данные от HeyDealer API",
+                "message": f"Ошибка получения данных: {response.status_code}",
                 "cars": [],
                 "total_count": 0,
                 "current_page": page,
                 "auction_name": "HeyDealer",
             }
-
-        # Нормализуем данные через парсер
-        parser = HeyDealerParser()
-        normalized_data = parser.format_response_data(
-            cars=car_list.cars, total_count=car_list.total_count, page=page
-        )
-
-        logger.info(
-            f"Успешно нормализовано {len(normalized_data['cars'])} автомобилей HeyDealer"
-        )
-        return normalized_data
 
     except Exception as e:
         logger.error(f"Ошибка при получении нормализованных автомобилей HeyDealer: {e}")
@@ -179,23 +272,58 @@ async def get_heydealer_status(
     Проверяет статус подключения к HeyDealer API
     """
     try:
-        username = "arman97"
-        password = "for1657721@"
+        # Используем рабочие cookies для проверки статуса
+        headers = {
+            "Accept": "*/*",
+            "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+            "App-Os": "pc",
+            "App-Type": "dealer",
+            "App-Version": "1.9.0",
+            "Connection": "keep-alive",
+            "Origin": "https://dealer.heydealer.com",
+            "Referer": "https://dealer.heydealer.com/",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "X-CSRFToken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+        }
 
-        # Пытаемся аутентифицироваться
-        auth_result = await service.authenticate(username, password)
+        cookies = {
+            "_gid": "GA1.2.607092972.1750804665",
+            "ga_dsi": "2f27c9738d9441acb3019f0388816973",
+            "_ga_P1L3JSNSES": "GS2.2.s1750808840$o1$g0$t1750808840$j60$l0$h0",
+            "_ga_4N2EP0M69Q": "GS2.1.s1750808839$o1$g0$t1750808842$j57$l0$h0",
+            "_ga": "GA1.2.225253972.1750804665",
+            "csrftoken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
+            "sessionid": "03qqprbun190abkr8nj2dkfcxzvfvmxl",
+            "_gat": "1",
+            "multidb_pin_writes": "y",
+            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750809091$j50$l0$h0",
+        }
 
-        if auth_result:
+        # Проверяем доступность API
+        response = requests.get(
+            "https://api.heydealer.com/v2/dealers/web/cars/",
+            params={"page": 1, "type": "auction", "is_subscribed": "false"},
+            headers=headers,
+            cookies=cookies,
+            timeout=10,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
             return {
                 "status": "success",
-                "message": "Подключение к HeyDealer API работает",
+                "message": f"Подключение к HeyDealer API работает. Получено {len(data)} автомобилей.",
                 "auction_name": "HeyDealer",
                 "authenticated": True,
+                "cars_count": len(data),
             }
         else:
             return {
                 "status": "error",
-                "message": "Не удалось аутентифицироваться в HeyDealer API",
+                "message": f"Ошибка подключения к HeyDealer API: {response.status_code}",
                 "auction_name": "HeyDealer",
                 "authenticated": False,
             }
@@ -836,6 +964,7 @@ async def get_heydealer_car_detail_direct_json(
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-site",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "X-CSRFToken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
             "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"macOS"',
@@ -1246,7 +1375,7 @@ async def get_brands_direct():
             "_ga": "GA1.2.225253972.1750804665",
             "csrftoken": "86vF233dOdoOCeznt8rwfXkVlwacieWi",
             "sessionid": "03qqprbun190abkr8nj2dkfcxzvfvmxl",
-            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750808852$j51$l0$h0",
+            "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750809091$j50$l0$h0",
         }
 
         headers = {

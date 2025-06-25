@@ -14,6 +14,7 @@ from app.models.heydealer import (
     HeyDealerDetailedCar,
 )
 from app.parsers.heydealer_parser import HeyDealerParser
+from app.services.heydealer_auth_service import heydealer_auth
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,18 @@ class HeyDealerService:
         self._session_id = metadata.get("session_id")
         self._csrf_token = metadata.get("csrf_token")
         self._cookies = session_data.get("cookies", {})
+
+    async def ensure_authenticated(self) -> bool:
+        """Обеспечивает аутентификацию (использует автоматический сервис)"""
+        try:
+            headers, cookies = heydealer_auth.get_headers_and_cookies()
+            if headers and cookies:
+                self._cookies = cookies
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Ошибка при обеспечении аутентификации: {e}")
+            return False
 
     async def get_user_info(self, user_hash_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -534,4 +547,83 @@ class HeyDealerService:
 
         except Exception as e:
             logger.error(f"Ошибка при получении автомобилей: {str(e)}")
+            return []
+
+    async def get_cars_with_auto_auth(
+        self, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Получает автомобили с автоматической авторизацией
+
+        Args:
+            filters: Фильтры для поиска
+
+        Returns:
+            Список автомобилей
+        """
+        try:
+            # Получаем действующую сессию
+            headers, cookies = await heydealer_auth.get_headers_and_cookies_async()
+
+            if not headers or not cookies:
+                logger.error("Не удалось получить действующую сессию HeyDealer")
+                return []
+
+            # Подготавливаем параметры
+            params = {
+                "page": filters.get("page", 1) if filters else 1,
+                "type": "auction",
+                "is_subscribed": "false",
+            }
+
+            # Добавляем дополнительные фильтры
+            if filters:
+                for key, value in filters.items():
+                    if key != "page" and value is not None:
+                        params[key] = value
+
+            # Выполняем запрос
+            response = await self.http_client.get(
+                url=f"{self.base_url}/v2/dealers/web/cars/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(f"✅ Получено {len(data)} автомобилей HeyDealer")
+                return data
+            elif response.status_code == 401:
+                # Сессия устарела, пробуем обновить
+                logger.warning("Сессия устарела, обновляем...")
+                headers, cookies = await heydealer_auth.get_headers_and_cookies_async(
+                    force_refresh=True
+                )
+
+                if headers and cookies:
+                    response = await self.http_client.get(
+                        url=f"{self.base_url}/v2/dealers/web/cars/",
+                        params=params,
+                        headers=headers,
+                        cookies=cookies,
+                    )
+
+                    if response.status_code == 200:
+                        data = response.json()
+                        logger.info(
+                            f"✅ Получено {len(data)} автомобилей HeyDealer после обновления сессии"
+                        )
+                        return data
+
+                logger.error("Не удалось авторизоваться в HeyDealer")
+                return []
+            else:
+                logger.error(
+                    f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
+                )
+                return []
+
+        except Exception as e:
+            logger.error(f"Исключение при получении автомобилей HeyDealer: {e}")
             return []
