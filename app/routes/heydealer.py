@@ -88,17 +88,19 @@ async def get_heydealer_cars(
 
         # Добавляем параметры фильтрации если они указаны (и не пустые)
         if brand and brand.strip():
-            # Если передано название бренда, пытаемся найти hash_id
-            if not brand.startswith(
-                ("xo", "2o", "vg", "Bk", "lk", "re")
-            ):  # Не похоже на hash_id
+            # Проверяем, является ли brand hash_id (6 символов, содержит буквы и цифры)
+            if len(brand) == 6 and brand.replace("_", "").replace("-", "").isalnum():
+                # Это hash_id, используем как есть
+                params["brand"] = brand
+                logger.info(f"Используем brand hash_id: {brand}")
+            else:
+                # Это название бренда, пытаемся найти hash_id
                 brand_hash_id = await find_brand_by_name(brand)
                 if brand_hash_id:
                     params["brand"] = brand_hash_id
+                    logger.info(f"Найден hash_id для бренда {brand}: {brand_hash_id}")
                 else:
                     logger.warning(f"Бренд {brand} не найден")
-            else:
-                params["brand"] = brand
 
         if model_group and model_group.strip():
             params["model_group"] = model_group
