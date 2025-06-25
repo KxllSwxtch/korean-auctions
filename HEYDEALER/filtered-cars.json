@@ -1,0 +1,95 @@
+[
+  {
+    "hash_id": "lO5Mm70n",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "BMW 5시리즈 (G60) 530e M 스포츠",
+      "model_part_name": "BMW 5시리즈 (G60)",
+      "grade_part_name": "530e M 스포츠",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281699_2a10e0b0-2a72-430f-a90b-4beeebfbe949.jpeg",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281699_2a10e0b0-2a72-430f-a90b-4beeebfbe949.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281698_726cb6a6-6e24-475e-bfa1-01c6a3425d8b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281713_b703c4c9-0e8a-46c3-9af8-f13cdb476fdc.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281716_afe5a0d0-3b6a-4375-86c9-b31513193fc4.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281711_75a4667c-f4d4-4660-b316-754bfb3de743.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281705_84fdf13b-1329-42c1-be0a-83ef1148a5c4.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281723_baf1017d-93bd-4c40-874d-a7df15a3c2db.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281724_9f5acee2-be0a-4074-9e31-26766f02ab55.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281703_7837821a-840f-40a2-b46b-ed2e5cee4230.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281708_d143d5b6-5064-44ab-92d7-d0bbc014adc3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281701_dcd74a5b-d4cf-4353-bb67-d75e46eb2720.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281702_deee9420-6f90-4481-9bec-a43dca80e6fd.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281717_ef79d06c-8936-4d8f-8aa2-acfb8d64afdd.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281712_0d449589-555c-416f-b5ea-c52e0c5ad14c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281718_60828ae8-26a2-49ec-92b7-170f11efae8f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281719_6ef70546-a78b-41b3-83ee-767f9663354a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281714_0c2b89f5-647a-46c1-b1e9-3348edf5dba2.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281704_04fd0a05-9914-40f4-8b85-4a1436260664.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281707_6cd5ecce-d459-443b-be04-da4185972d94.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281710_1763ed8b-d898-4fd5-b381-6d3ec6c1d177.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281721_43a25031-78a5-431c-ad29-d9b8e3d8428b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281706_c0e7dcb6-8cc9-43aa-8da8-f008a89b3d9e.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281700_555eeeca-9659-46fc-bd1f-2ba9b62f9ec7.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281709_2d2d23c4-7b46-440a-8e9c-85e56387e791.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281715_89dc6ed7-d4fb-41b2-b98f-50f93315e7ce.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281720_bc85b7e7-08c8-4aca-bd0c-580ed914e50a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88281722_ea7e1e26-34fa-4131-b65c-63a425d2f613.jpg"
+      ],
+      "car_number": "261조6984",
+      "year": 2025,
+      "initial_registration_date": "2024-12-27 00:00:00",
+      "mileage": 4990,
+      "interior_info": {
+        "text": "코퍼 브라운 메리노 가죽",
+        "codes": ["#A06956"]
+      },
+      "location": "경기도 화성시",
+      "short_location": "경기 화성시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 11:10:08",
+      "end_at": "2025-06-26 11:10:08",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 9,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  }
+]

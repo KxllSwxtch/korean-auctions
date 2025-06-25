@@ -12,6 +12,8 @@ from app.routes import (
     enhanced_lotte,
     glovis_detail,
     glovis_windows_auth,
+    heydealer,
+    heydealer_filters,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -58,8 +60,11 @@ app.include_router(
 app.include_router(
     glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]
 )
+app.include_router(heydealer.router, prefix="/api/v1", tags=["HeyDealer Auction"])
 app.include_router(
-    glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]
+    heydealer_filters.router,
+    prefix="/api/v1/heydealer/filters",
+    tags=["HeyDealer Filters"],
 )
 
 

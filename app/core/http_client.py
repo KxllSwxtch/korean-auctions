@@ -15,11 +15,19 @@ logger = get_logger("async_http_client")
 class AsyncHttpResponse:
     """Класс для представления HTTP ответа"""
 
-    def __init__(self, status_code: int, text: str, headers: Dict[str, str], url: str):
+    def __init__(
+        self,
+        status_code: int,
+        text: str,
+        headers: Dict[str, str],
+        url: str,
+        cookies: Optional[Dict[str, str]] = None,
+    ):
         self.status_code = status_code
         self.text = text
         self.headers = headers
         self.url = url
+        self.cookies = cookies or {}
 
     def json(self) -> Any:
         """Парсинг JSON ответа"""
@@ -92,6 +100,9 @@ class AsyncHttpClient:
                     text=text,
                     headers=dict(response.headers),
                     url=str(response.url),
+                    cookies={
+                        cookie.key: cookie.value for cookie in response.cookies.values()
+                    },
                 )
 
         except asyncio.TimeoutError:
@@ -149,6 +160,9 @@ class AsyncHttpClient:
                     text=text,
                     headers=dict(response.headers),
                     url=str(response.url),
+                    cookies={
+                        cookie.key: cookie.value for cookie in response.cookies.values()
+                    },
                 )
 
         except asyncio.TimeoutError:

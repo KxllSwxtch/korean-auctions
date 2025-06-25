@@ -1,0 +1,1703 @@
+[
+  {
+    "hash_id": "n7YgkrJl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "GV80 2.5T 가솔린 AWD",
+      "model_part_name": "GV80",
+      "grade_part_name": "2.5T 가솔린 AWD",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/68_19972cb1-b44b-49f6-a3c0-63297c3445dd.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311545_fb2f609a-eeae-43e6-a4ae-67c5bf8b8352.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311545_fb2f609a-eeae-43e6-a4ae-67c5bf8b8352.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311547_2cd747fb-8dee-4c56-a0e2-469342bd017e.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311546_8fd02a55-85c8-4960-be1d-7d76e739903a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311549_1050e64c-9d72-4ee5-aec3-605e5ad6dbd0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88311548_b47744ef-d61d-4e51-9604-fd251586b51f.JPEG"
+      ],
+      "car_number": "",
+      "year": 2023,
+      "initial_registration_date": "2023-06-30 00:00:00",
+      "mileage": 36900,
+      "interior_info": {
+        "text": "듄 베이지+울트라마린 블루, 천연 가죽, SDS1",
+        "codes": ["#E0AD76", "#27405F"]
+      },
+      "location": "충청남도 아산시",
+      "short_location": "충남 아산시",
+      "short_location_first_part_name": "충남",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 13:16:05",
+      "end_at": "2025-06-26 13:16:05",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 27,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "ykgpvp4y",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "BMW X1 (F48) xDrive 20i 어드밴티지",
+      "model_part_name": "BMW X1 (F48)",
+      "grade_part_name": "xDrive 20i 어드밴티지",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325150_0a9bd97e-4dc2-4e7d-ac7f-2ebb9ba4800e.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325150_0a9bd97e-4dc2-4e7d-ac7f-2ebb9ba4800e.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325148_13586419-675d-4eb7-b889-29ace70090b8.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325151_47edb518-d037-4100-b6f1-8a44bff4f209.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325149_d5ca42bb-bbc5-4de6-ab5c-4dc6609ffa0d.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/20/87958963_3051ca05-9266-41c4-a0b8-9efcdec93364.jpeg"
+      ],
+      "car_number": "",
+      "year": 2020,
+      "initial_registration_date": "2020-06-18 00:00:00",
+      "mileage": 38000,
+      "interior_info": {
+        "text": "블랙 인조 가죽",
+        "codes": ["#000000"]
+      },
+      "location": "경기도 하남시",
+      "short_location": "경기 하남시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 13:57:45",
+      "end_at": "2025-06-26 13:57:45",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 13,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "Q8B6qazy",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "벤츠 CLS클래스 (C257) CLS450 4MATIC AMG Line",
+      "model_part_name": "벤츠 CLS클래스 (C257)",
+      "grade_part_name": "CLS450 4MATIC AMG Line",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/31_2e506e87-38bf-4b05-8b6a-a86907f5a872.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331874_53dc7464-d620-47ab-9698-4109ac50275a.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331874_53dc7464-d620-47ab-9698-4109ac50275a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331875_eec3c3f5-54f2-446e-aafe-bc5417104a20.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331876_1e1869f3-7285-4f93-9eb6-cb185fd08ccb.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331877_de7ef5fb-afcf-4eb9-8d02-cd3fcb4d24ef.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331878_4a76db28-f4dd-430d-874d-9bd9e7d0e423.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88331879_85d34c6a-ee27-4b1e-bdbb-5d9bb406d8af.jpeg"
+      ],
+      "car_number": "",
+      "year": 2021,
+      "initial_registration_date": "2021-01-27 00:00:00",
+      "mileage": 52622,
+      "interior_info": {
+        "text": "베이지 나파 가죽",
+        "codes": ["#FDFBED"]
+      },
+      "location": "제주특별자치도 제주시",
+      "short_location": "제주 제주시",
+      "short_location_first_part_name": "제주",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:39:04",
+      "end_at": "2025-06-26 14:39:04",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 13,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "ykgp18ky",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "벤츠 GLB클래스 (X247) GLB250 4MATIC",
+      "model_part_name": "벤츠 GLB클래스 (X247)",
+      "grade_part_name": "GLB250 4MATIC",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/31_2e506e87-38bf-4b05-8b6a-a86907f5a872.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308204_c96f64bf-00e5-482e-b8c1-975980d5bfb5.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308204_c96f64bf-00e5-482e-b8c1-975980d5bfb5.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308203_4fd45209-dac9-4445-8f3a-5379e05ac523.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308207_5a76100d-a725-430f-9cbf-1528bf5f693d.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308206_10c42225-7ef8-40ce-bfb5-e830de85f332.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308209_af4820a4-068b-4f7a-8592-ccaf192cebf6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88308208_bea2632f-bb3d-4884-94ce-e87a79688d51.jpeg"
+      ],
+      "car_number": "",
+      "year": 2023,
+      "initial_registration_date": "2023-05-26 00:00:00",
+      "mileage": 27798,
+      "interior_info": {
+        "text": "브라운 가죽",
+        "codes": ["#C69B70"]
+      },
+      "location": "서울특별시 성북구",
+      "short_location": "서울 성북구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 12:59:05",
+      "end_at": "2025-06-26 12:59:05",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 10,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "lZJ33m7l",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "BMW X7 (G07) xDrive 40i M 스포츠",
+      "model_part_name": "BMW X7 (G07)",
+      "grade_part_name": "xDrive 40i M 스포츠",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320735_09ec8f9e-93ec-4864-bedb-b4fd76b10ae6.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320735_09ec8f9e-93ec-4864-bedb-b4fd76b10ae6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320734_43f9c8ab-db69-4bcc-b04d-5eb907e75524.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320733_a5e4629d-d5a8-4e9f-a073-82debc6264cc.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320732_22160f5c-5b2c-4ce4-bc9e-87740c7973d9.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320731_235707a3-a1f2-474a-9876-dab7e3e6a64b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/carimage/2025/06/24/2699030_1562955a-f820-4637-80da-adad4c569eb1.jpg"
+      ],
+      "car_number": "",
+      "year": 2021,
+      "initial_registration_date": "2021-03-30 00:00:00",
+      "mileage": 52100,
+      "interior_info": {
+        "text": "아이보리 메리노 가죽",
+        "codes": ["#F7F7F5"]
+      },
+      "location": "전라남도 구례군",
+      "short_location": "전남 구례군",
+      "short_location_first_part_name": "전남",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 13:57:12",
+      "end_at": "2025-06-26 13:57:12",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 12,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "ljvo9YRl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "리얼 뉴 콜로라도 3.6 Z71-X 4WD",
+      "model_part_name": "리얼 뉴 콜로라도",
+      "grade_part_name": "3.6 Z71-X 4WD",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/44_b1e0e389-b1ce-46f7-8b27-b565b63cc6d6.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325699_f7d66771-423a-437a-866a-2d9138611912.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325699_f7d66771-423a-437a-866a-2d9138611912.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325703_2f803e75-96b7-4d24-b30d-37838eba11bf.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325696_788c7c1d-36cd-4014-8866-3dcbdec3cdd4.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325695_6ab31eb9-3aab-450a-bd70-e62ebea4c274.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325694_e91e0396-a426-4897-a6bc-a1f2684689c9.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325702_a5edf5ee-6f68-4d8b-a11c-552f77b061b2.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325691_08afc8cb-45e7-486c-8503-4bc224911c76.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325679_945d7f20-5287-4699-a71d-1efc4224b042.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325689_a88eb6ed-ed06-4577-8940-224f70eab012.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325709_9dcac2ea-3998-4e78-a5a1-873fa17d7d14.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325683_d0962259-cdd7-4235-9921-2513aeacdaba.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325707_01ae443f-ca8a-484f-85e1-e0e5c405ab52.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325676_9815ac19-08a4-4f97-bb62-62562475143b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325681_4fd6a7ba-2575-416f-a94c-dc121ba917b5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329488_9d4cb667-e910-4b64-9f7f-ea8371f7d8f7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325673_d15cc943-b9f0-4dd8-8987-4c19412ca2c5.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325672_60475e33-0f8c-480b-af0f-acb21b1060c5.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325675_20adf600-cdff-4aa2-8de3-4cd4b6625745.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329482_cd2431a8-33a1-45d9-9b8e-b92bba3fc1e1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325678_31a3c325-090f-405f-a429-15a66f6c57dd.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325682_2c10ca66-064d-4072-8e8e-9ed3be30cec9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325686_3e5b49ff-ffec-42ff-821e-3d51981f31ff.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325674_263dc5b8-d990-48dc-9bc2-ea98c40de998.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325684_8191d848-f2bf-4f39-abdd-843552e08713.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325688_a8425030-0d77-4c2a-b719-89f6c2f34dbb.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325671_fdd25955-5625-4d5d-bc47-855e04737abe.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329495_03d8b3c2-1ca7-4cc4-8e9b-23c72116c592.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325677_29d4f6fb-a0ea-4b86-b3d1-17fe42d92f97.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325698_4bc7a432-cfcb-4cf1-a663-ca95c73a017d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325685_6b4a047d-05ca-4b42-b055-f369371ed728.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329490_61529e0f-da9a-4fc9-a22a-f85ced055378.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329493_4cfe2c4f-f4f1-4ddf-997f-da8bec114c04.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325693_afec0776-c299-4585-b49c-c1f01abe1126.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325704_0f9665e0-7e98-468b-9f77-9741f36a32c2.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325690_bb47e6a7-5006-4636-8410-dae24ff19369.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88325705_3fb47cd3-9424-4d13-8e7d-0c80540961b5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329486_0506853b-4d32-4b95-8138-bd9e9a038ae8.JPEG"
+      ],
+      "car_number": "",
+      "year": 2022,
+      "initial_registration_date": "2022-03-25 00:00:00",
+      "mileage": 64367,
+      "interior_info": {
+        "text": "검정(미스티 블루 액센트)",
+        "codes": ["#000000"]
+      },
+      "location": "제주특별자치도 제주시",
+      "short_location": "제주 제주시",
+      "short_location_first_part_name": "제주",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 14:33:08",
+      "end_at": "2025-06-26 14:33:08",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 6,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "yBJDDWEy",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "지프 그랜드 체로키 3.6 리미티드 WK2",
+      "model_part_name": "지프 그랜드 체로키",
+      "grade_part_name": "3.6 리미티드 WK2",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/20_279bab2e-aa57-4add-bad7-5614ef66a95d.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289029_5738b068-b002-49e6-a5e2-3cde765a3a59.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289029_5738b068-b002-49e6-a5e2-3cde765a3a59.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289030_e9f77012-c674-43d1-90d9-6edd04e6094b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289032_602e0882-488e-4a39-945d-9dabde29eb2c.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289031_af7af319-e6e4-452e-8a49-fab5a2bae58b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88289033_ab108f64-077e-4c48-8e0b-c0c75183fa4e.JPEG"
+      ],
+      "car_number": "",
+      "year": 2019,
+      "initial_registration_date": "2019-02-12 00:00:00",
+      "mileage": 79300,
+      "interior_info": {
+        "text": "검정, 가죽",
+        "codes": ["#000000"]
+      },
+      "location": "서울특별시 성동구",
+      "short_location": "서울 성동구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:42:37",
+      "end_at": "2025-06-26 14:42:37",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 14,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "n00DDX1n",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "아우디 Q7 (4M) 45 TDI 콰트로 프리미엄",
+      "model_part_name": "아우디 Q7 (4M)",
+      "grade_part_name": "45 TDI 콰트로 프리미엄",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/56_231b2abe-c9e2-453f-9ec3-fca3bb97100d.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290569_264649aa-a196-4563-b409-9a90b910b393.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290569_264649aa-a196-4563-b409-9a90b910b393.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290570_19759e77-3490-4c15-8d9f-860e5e4a2b61.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290572_6310cd45-70c2-4ef6-9a36-132e476caca1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290571_cbc022da-6a83-416f-87c9-050bc505f87e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88290573_dd26a05a-6254-428b-9424-d76296da15c1.JPEG"
+      ],
+      "car_number": "",
+      "year": 2021,
+      "initial_registration_date": "2021-07-09 00:00:00",
+      "mileage": 48500,
+      "interior_info": {
+        "text": "검정 가죽",
+        "codes": ["#000000"]
+      },
+      "location": "경기도 성남시",
+      "short_location": "경기 성남시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:45:04",
+      "end_at": "2025-06-26 14:45:04",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 14,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "Q6ADzAbn",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "벤츠 GLS클래스 (X167) GLS 400d 4MATIC",
+      "model_part_name": "벤츠 GLS클래스 (X167)",
+      "grade_part_name": "GLS 400d 4MATIC",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/31_2e506e87-38bf-4b05-8b6a-a86907f5a872.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332807_259455f8-6e70-4bf1-8dd9-0ae5e116f14d.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332807_259455f8-6e70-4bf1-8dd9-0ae5e116f14d.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332808_88d5255d-ce56-43af-9ddf-3890d0eef838.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332816_ae719eae-7f98-427c-a7bb-dc59f6113101.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332809_200336b2-5675-4ce0-9b89-ee8d461f9044.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332814_ddb51ec9-a56c-460b-bb3d-e966f61f988c.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332810_97c3501d-90d0-4a1b-b67f-8a8808810a54.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88332812_f1f0e7a6-ac60-420f-947d-d0f5281d2590.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/carimage/2025/06/24/2699311_61d005b9-240a-4cf7-b745-8b4130731bbe.jpg"
+      ],
+      "car_number": "",
+      "year": 2020,
+      "initial_registration_date": "2022-03-03 00:00:00",
+      "mileage": 48000,
+      "interior_info": {
+        "text": "블랙 가죽",
+        "codes": ["#151515"]
+      },
+      "location": "서울특별시 강남구",
+      "short_location": "서울 강남구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:43:13",
+      "end_at": "2025-06-26 14:43:13",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 2,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "ljvW3Xvl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "더 뉴 팰리세이드 디젤 2.2 4WD 캘리그래피 (7인승)",
+      "model_part_name": "더 뉴 팰리세이드",
+      "grade_part_name": "디젤 2.2 4WD 캘리그래피 (7인승)",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320446_c5383be6-c111-4388-bc13-c1bea60c4503.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320446_c5383be6-c111-4388-bc13-c1bea60c4503.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320448_aadc2983-ec00-4445-a26a-6f85c24f4ff0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320447_bb4cd798-68f5-442d-8dbf-ffa07a8b4c18.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320449_d877dad4-a18f-48a8-811f-2b7e4bedbebc.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320453_351ce324-b248-4827-89f7-42bcd105580a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320450_00e79419-f034-47ec-8814-60564e9271d3.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320451_f037b190-9152-4d63-ab33-3255a8a406f0.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320452_34a333fe-426f-4493-9462-4e45b3c97261.jpeg"
+      ],
+      "car_number": "",
+      "year": 2023,
+      "initial_registration_date": "2023-06-05 00:00:00",
+      "mileage": 36300,
+      "interior_info": {
+        "text": "브라운, 나파 가죽",
+        "codes": ["#594B49"]
+      },
+      "location": "경기도 여주시",
+      "short_location": "경기 여주시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 13:56:07",
+      "end_at": "2025-06-26 13:56:07",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 20,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "yM4V348l",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "BMW X3 (G01) xDrive 20i M 스포츠",
+      "model_part_name": "BMW X3 (G01)",
+      "grade_part_name": "xDrive 20i M 스포츠",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305419_55067c2c-9ea4-4825-8351-c44a7ef8f35c.jpeg",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305419_55067c2c-9ea4-4825-8351-c44a7ef8f35c.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305427_ac4f1ddd-9b11-41e5-a95c-4b1cc2df8121.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305421_866bce2d-4da8-4814-9d5e-7169adf7f1f0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305428_9d26df88-9eee-43e4-85da-8568fcc038f1.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305424_abfd5028-6280-4508-880a-409613f48264.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305450_9e3a8b62-198f-48c4-b401-3c9c331aa384.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305407_375f148f-a81c-421e-8142-e92984b7b461.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305416_0fc73501-46b4-4da7-8531-21469de76248.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305426_38a86e57-78f6-4ef4-9150-4297c4992c82.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305449_e9f6ff2b-c3e1-4cb2-839c-920a3da10e6c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305451_84d9d667-6d95-4def-9a38-3f1498d011cc.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305452_d4ea188d-33cf-431d-8647-852f3e7c8d81.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305413_2900857f-aa22-45b0-bba6-a18483adbc02.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305411_552fbbc9-3986-41c3-882c-5c66475c96c6.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305420_f3237ba9-bf60-4ac7-9f66-a6f53049ecf7.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305415_37a52064-6800-47aa-8509-ca1ee00317f3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305409_673fa0ad-8942-4e06-b669-1a281acc8d14.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305414_43a38cc3-eb6e-4f74-a619-ce816a12e7c6.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305417_7aa70bd1-3516-45d6-a8e2-212b7e902fec.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305418_f9a2bb8a-f944-49bb-a103-d7136b83af04.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305422_d2abf9cc-bc2c-422b-9c50-9c67ae8de16e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305448_f2d2d347-c7bd-4b8d-a121-ea95bf45d55f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305454_ca2486ac-12d5-4502-9334-ef43a4b167e5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305406_171dc863-dd8f-444f-9082-cda07385ff94.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305408_f9fb9d7c-63d4-4f27-8d59-b8aaa4373eae.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305410_7979823e-c882-4e25-a0e5-f4b49d158487.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305412_03ff9fc1-6fca-4eeb-82cd-64e1972fa8e0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305453_e3824799-7d60-4bc0-9716-55e148f59299.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305423_d918dd96-277c-4824-b460-c075d244f1ec.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305425_1146914e-52a0-4ddf-8779-d76cf8811eac.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305447_aae0071f-9269-451c-a0ee-7ec00c98083a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88305405_9f77f824-2b2a-4228-9436-549321164808.jpg"
+      ],
+      "car_number": "377어8723",
+      "year": 2023,
+      "initial_registration_date": "2023-05-30 00:00:00",
+      "mileage": 20858,
+      "interior_info": {
+        "text": "모카 브라운 천연 가죽",
+        "codes": ["#6B5347"]
+      },
+      "location": "서울특별시 송파구",
+      "short_location": "서울 송파구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 12:48:10",
+      "end_at": "2025-06-26 12:48:10",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 10,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "lZJ3Vj5l",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "BMW X7 (G07) xDrive 40i 디자인 퓨어 엑셀런스 6인승",
+      "model_part_name": "BMW X7 (G07)",
+      "grade_part_name": "xDrive 40i 디자인 퓨어 엑셀런스 6인승",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329669_f1a5b0be-357c-4dbd-9b31-2a025d7f6030.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329669_f1a5b0be-357c-4dbd-9b31-2a025d7f6030.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329679_0b2a74ec-af8c-42bf-9b60-5e33a5b4a21c.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329672_7066a88c-617d-4a79-a82d-1155cdf6e7b9.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329677_949b26a9-7b07-434d-9649-fe0f4ecc3f4a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329694_85ecb97d-696c-4521-87b3-9bd34bf0709f.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329695_51ff8726-fb49-4853-840f-4a42f6bd8e9c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329678_9120fdff-36ad-4c7f-8b19-a931766cffca.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329698_da16e356-ca3d-46ed-ad1b-569961800b6a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329699_c4886ffb-bef7-4984-87a2-b044e58a83d7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329693_3e7a9488-6522-4b7b-8ce6-47418868f35d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329674_b4ff6859-e2f6-42b6-bedb-ddefcc8065ac.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329684_02bab188-5a01-46e9-85cc-11ed3e0d7bd7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329671_fa252160-1a2d-4962-9be8-34d5c6a773d9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329689_23ae900c-c346-4cef-8bca-4553f84b6a67.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329670_094a7267-b57b-48da-958a-996e7ec3f7e8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329685_9690af5f-eab1-4b9a-8abc-f2b0873d3456.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329690_b7c25ee8-dcfd-433c-a2de-5b5599a2126d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329673_d4aa830a-5415-4947-a904-22b6ae9d028c.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329668_9c810635-a982-400a-8ed0-69c3d25f5460.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329682_33b42f2e-23eb-4553-8382-d9cda68fc10d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329680_18fc0629-6299-488a-afae-59dfd462c75d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329676_9af6ea31-ca35-4a34-b80f-9bee559eb149.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329696_2f416de3-1e82-434b-92c5-79fb62a35ba9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329683_819f71fd-b4fc-4253-b800-d817e86dd32e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329688_05e9bd17-d3b3-4e90-8ca8-6aab907bb692.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329691_2a8dd097-9c1d-4e70-870d-81fd292b5cd8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329681_820736c2-2fae-4211-9180-81ffc3586121.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329686_462aa2f4-c192-49bf-a080-85d2475b10c7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329687_9c72000f-5b7d-4cfe-a2f3-992084987445.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329675_83ed4479-014b-440d-b76e-05daf12a2935.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329692_bfec564c-282e-4252-a581-6b14835f5528.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88329697_84f338eb-b998-422e-b2e7-9391b9a29b39.jpg"
+      ],
+      "car_number": "",
+      "year": 2022,
+      "initial_registration_date": "2022-03-29 00:00:00",
+      "mileage": 20413,
+      "interior_info": {
+        "text": "아이보리 메리노 가죽",
+        "codes": ["#F7F7F5"]
+      },
+      "location": "서울특별시 강동구",
+      "short_location": "서울 강동구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 14:30:05",
+      "end_at": "2025-06-26 14:30:05",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 28,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "n2XgK70l",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "GV80 3.5T 가솔린 AWD",
+      "model_part_name": "GV80",
+      "grade_part_name": "3.5T 가솔린 AWD",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/68_19972cb1-b44b-49f6-a3c0-63297c3445dd.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320871_ded64913-f5a6-477e-8189-ff6de19735f3.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320871_ded64913-f5a6-477e-8189-ff6de19735f3.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320870_aef67cb6-5587-4d97-9c50-f5620647e4e0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320877_a1067490-75ec-452b-9650-e338818e7300.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320874_db061cb2-7992-4a66-9be6-8e864fed6c45.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320888_0072f927-5dc6-44ac-a423-d4edec5256c0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320859_ee686131-b3ea-49bd-b059-47608eb136d9.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320860_e35c57c3-e04e-4bdf-b362-58c3e4aba0c2.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320862_5cabbdb8-63ef-4901-b006-977f7afe12bb.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320885_6e531c7d-f5d0-4a9a-826a-906b701deab9.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320892_b327ff24-905f-46dc-ada5-02a4c8daa9f6.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320894_2312f71e-9360-4160-bdbe-4d352cbaa54e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320880_afbd781b-732a-4548-a6ba-af9004cf55e1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320883_8b54261a-6b75-414d-887f-95408e653cf4.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320893_9a973ba9-9ffe-4ff4-b8da-709d725dc932.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320895_1811d0ec-799a-4206-8bda-2b661ba64f2a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320837_6aa8a423-f70e-4fd5-80bc-160bbd8cca16.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320845_dd523129-ef87-4c7a-8e9a-4d0549a22607.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320846_c426660c-ed93-4743-99a2-498eba916be1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320847_546ee3e6-1bc7-41ce-87b7-9e14873625f6.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320858_e09235ef-5541-44c3-92e7-40e457aeb2c5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320866_b420e028-857b-4d84-994c-1f2dd93a6f71.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320861_bda0c334-c021-4524-8ace-0cd742096a18.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320852_4b55164b-cd20-473e-af72-1d64135856b1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320886_a5344a27-b3b2-45aa-b825-bd3408bce779.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320848_157b6ee4-0a16-4bdb-811c-abb563b8e734.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320882_87997433-1b63-45ef-abdb-df6e796dfd89.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320896_d4095aa0-3abb-48af-b2b5-1dbb48ba168b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320897_eec2306c-7fdf-4bfa-93c5-d8a1f8783792.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320839_f815b022-3be8-4367-8791-990021e86f57.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320840_139c966c-91da-4b1a-bda0-cb6cc673d271.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320842_35811108-b6a7-49c3-8da9-dc8d940b920a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320849_c3a68e72-549b-4f7b-97f8-2c30e8f2b06c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320856_15a39480-4f6c-499d-9c11-4d1b597b9e45.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320863_2246acb6-e818-4467-b1d5-87704cb82d72.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320869_64a5c3a7-93db-41fe-b909-41e4a0dfd77e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320884_ba5ee291-67a5-4ebd-94ae-6480e0314979.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320890_a24e9e34-deac-48d7-a94f-45fe026f9101.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320857_5365f5e8-da27-47a7-b1fd-8b2825671fbe.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320867_18126ab1-a7fe-4601-9e67-9c28f0450710.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320854_748cd52f-624c-4690-8c80-a044c7929609.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320873_644318d7-5d99-43ae-87e0-74cead080c45.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320891_4ad6a139-3d8e-4897-b1f2-b7d4166abc0f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320878_dccadc17-a73b-48ab-8e4f-6c9e035af8fd.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320850_1339b197-9e20-48bf-a37f-2f103acb9111.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320851_d7314a93-3903-4394-9939-bf94044f27da.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320887_86e826c4-6bb5-4192-964d-2f0e054dedd9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320853_b8fe2336-348d-49e7-8d57-d8be20b1e15f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320855_19a282fc-e055-44d2-94e5-f236d1e7e740.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320865_547457ab-aa62-485d-b44b-ae773b957555.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320872_55b71916-e6af-45dd-b360-d89ccd48d793.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320875_0a17cfa3-3908-476a-9b76-53b3b4d4a1f8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320876_3dd647c1-c6dd-47dd-b0d2-405646ea7955.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320879_9344ad31-1126-4be2-905c-03910ce52320.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320881_0f5b2a46-063f-4e1c-87e5-726d5970ea52.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320864_ea36eeb5-ea7e-4d12-abe5-050164e9ebbb.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320868_723395e2-df10-4459-9afe-9706a577d738.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88320889_53594320-33aa-4b28-9dd9-544750b88d65.jpg"
+      ],
+      "car_number": "",
+      "year": 2023,
+      "initial_registration_date": "2023-07-12 00:00:00",
+      "mileage": 32524,
+      "interior_info": {
+        "text": "듄 베이지+울트라마린 블루, 천연 가죽, SDS1",
+        "codes": ["#E0AD76", "#27405F"]
+      },
+      "location": "서울특별시 강남구",
+      "short_location": "서울 강남구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 14:02:04",
+      "end_at": "2025-06-26 14:02:04",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 4,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "QrgVV5bl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "람보르기니 아벤타도르 S LP740-4",
+      "model_part_name": "람보르기니 아벤타도르",
+      "grade_part_name": "S LP740-4",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/4_b58dcb49-d733-4b08-a119-bb049299b28a.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274929_63a323de-5f3b-45a6-ae36-35033ba86b46.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274929_63a323de-5f3b-45a6-ae36-35033ba86b46.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274930_b25560aa-0fea-4bae-9cc3-2b98e89f3cf8.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274926_668b82a8-6d9b-4af8-8d9a-994d7d1b73b0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274928_3646eb36-9ce5-4683-ae2b-2c8d18027313.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522910_d6e519bb-f93e-458f-8836-b9a9adb5de7a.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522911_dafc3756-6bef-4cef-8059-cae692a9c46a.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522912_e7f5a259-8c74-4bef-b036-1defd0a22206.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522913_0a6d7463-4824-4c4a-b2d4-b2f9cced1bd7.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88274925_ed3ce544-fe01-48aa-b690-5b359825e85c.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522915_8d82383d-91cf-4a5c-b9de-636a04fda01c.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522914_4e5eaf31-e0a1-40fc-afcf-6de3c0f13335.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/05/10/83522916_49795a70-64af-4679-a41f-60ec1699abb4.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/carimage/2025/05/10/2518363_5f44f86b-6c44-4c37-b72c-06d6623ad089.JPG"
+      ],
+      "car_number": "",
+      "year": 2017,
+      "initial_registration_date": "2019-12-02 00:00:00",
+      "mileage": 28000,
+      "interior_info": null,
+      "location": "부산광역시 해운대구",
+      "short_location": "부산 해운대구",
+      "short_location_first_part_name": "부산",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:01:28",
+      "end_at": "2025-06-26 14:01:28",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 10,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        },
+        {
+          "text": "재경매",
+          "short_text": "재경매",
+          "style": "gray"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "lGGXz8kl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "지프 랭글러 (JL) 2.0 오버랜드 파워 탑 4도어",
+      "model_part_name": "지프 랭글러 (JL)",
+      "grade_part_name": "2.0 오버랜드 파워 탑 4도어",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/20_279bab2e-aa57-4add-bad7-5614ef66a95d.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336297_0b629304-c045-48d1-89a3-90102f09f14c.jpeg",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336297_0b629304-c045-48d1-89a3-90102f09f14c.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336317_d5c5b4a4-bc98-4b01-b403-beb304229e86.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336318_f5cec1c2-f6e2-4ab3-a0ae-b5ea7ce46457.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336319_e4f3a69c-f96d-419a-a5f6-40a361d06350.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784505_d5a1bd82-0730-49e9-a43e-b650c7951568.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784497_f5aba928-ad22-4280-bb40-4a67d9094834.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336325_1dee9bb9-787b-4429-9e31-5f07b0e9627b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784500_a64849bf-5f2e-4328-8c4b-01ed94e66f99.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784491_e50a745b-d555-489c-bb05-67273fa1c053.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784494_463479b2-8975-40e1-afd0-1dba58d4d770.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784499_40727736-932c-46f4-8086-89b8e310dac7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784480_9a89a381-b419-43a6-91e0-1f604e366631.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784498_224a009d-2d3b-41df-9e3c-2eb0df8deab6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784496_7657464d-fe4a-4f1a-86fd-0d54d6306c69.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88336306_e9f24c9b-158a-4675-89a8-af5a87c4ce74.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784492_a39ab12f-c67e-4888-9a80-d34054fc05e4.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784508_da4f6c43-51ea-403c-9e83-b92b961995a0.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784495_7da42d6a-3074-47c2-ad58-f645bd069e59.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784501_7eab0f41-1bda-4875-9de4-d296b0c5e67b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784493_ef8929d0-ca54-4783-a2a6-63b1c12456c6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784506_469a2fb4-442e-4120-ab09-49c9f1d19b01.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784482_01d011ce-eeff-4c29-ab84-4763f5e5112b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784483_0f5b80a5-f221-44c7-afb9-8247695f7e8c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784484_a47b1df5-8d70-434c-8447-18749257b1cb.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784481_c4619926-5ee1-4b85-849b-735e3cfad819.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784489_6f5072f7-e622-4f16-91e2-4b222756737d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784490_52b1c5ff-d8df-4a5a-829c-059f9468a19e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784503_17123678-fd16-4b2f-9531-51e658889fe3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/19/87784504_a206bf87-adde-4819-a459-a1f1f099ed89.jpg"
+      ],
+      "car_number": "",
+      "year": 2022,
+      "initial_registration_date": "2022-06-23 00:00:00",
+      "mileage": 54077,
+      "interior_info": {
+        "text": "가죽, 검정",
+        "codes": ["#000000"]
+      },
+      "location": "경기도 성남시",
+      "short_location": "경기 성남시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "fixed_price"
+    },
+    "auction": {
+      "auction_type": "fixed_price_zero",
+      "approved_at": "2025-06-24 14:42:01",
+      "end_at": "2025-07-01 14:42:01",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 150,
+      "bids_count": 1,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        },
+        {
+          "text": "재경매",
+          "short_text": "재경매",
+          "style": "gray"
+        }
+      ],
+      "desired_price": 4700,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "ywm5pROQ",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "포드 익스플로러 6세대 3.0 플래티넘 4WD",
+      "model_part_name": "포드 익스플로러 6세대",
+      "grade_part_name": "3.0 플래티넘 4WD",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/30_d42a4aca-2ce9-493c-b60b-db8ea0efdab8.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316332_970d0d24-859b-4dfa-b53b-3558580ec124.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316332_970d0d24-859b-4dfa-b53b-3558580ec124.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316329_45233c06-7084-41a0-b5c3-01b43ee1ff59.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316331_5de772de-fece-4588-8b74-756c1eb8eca0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316330_a3abc8b7-0a98-4579-8ad7-86c75abdf8e2.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88316333_09aba068-bc10-4a9d-bb67-0ebd65e60bbe.JPEG"
+      ],
+      "car_number": "306누1727",
+      "year": 2022,
+      "initial_registration_date": "2022-12-22 00:00:00",
+      "mileage": 44000,
+      "interior_info": {
+        "text": "에보니 블랙",
+        "codes": ["#000000"]
+      },
+      "location": "전북특별자치도 전주시",
+      "short_location": "전북 전주시",
+      "short_location_first_part_name": "전북",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 13:37:13",
+      "end_at": "2025-06-26 13:37:13",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 7,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "yLGYeD8l",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "더 뉴 K9 2세대 3.8 AWD 베스트 셀렉션 I",
+      "model_part_name": "더 뉴 K9 2세대",
+      "grade_part_name": "3.8 AWD 베스트 셀렉션 I",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306355_94b0b035-0cfd-40b5-aa22-644a84a6eb95.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306355_94b0b035-0cfd-40b5-aa22-644a84a6eb95.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306356_cb486ff5-d513-4f05-8a55-4718eb57606a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306352_b6a21036-bea9-437c-b3f0-5ed6bc9ca028.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306354_a898cf1c-f65e-454e-b5c0-7c7f6e9077b0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306357_33dce8f8-0f16-43db-aa28-65f16f4a8256.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306353_874deee2-a8fa-4d3c-8cfc-76609948f65f.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88306351_b3e159f3-27ad-4f03-80e9-eca4dbc0a564.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/18/87618456_ca9e896e-764b-4a77-9886-77212c772ac7.jpeg"
+      ],
+      "car_number": "",
+      "year": 2023,
+      "initial_registration_date": "2023-10-20 00:00:00",
+      "mileage": 33000,
+      "interior_info": {
+        "text": "검정, 천연 가죽",
+        "codes": ["#000000"]
+      },
+      "location": "경상남도 함안군",
+      "short_location": "경남 함안군",
+      "short_location_first_part_name": "경남",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 12:49:09",
+      "end_at": "2025-06-26 12:49:09",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 17,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        },
+        {
+          "text": "재경매",
+          "short_text": "재경매",
+          "style": "gray"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "nNa4qmky",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "싼타페 TM 디젤 2.2 4WD 프레스티지 (5인승)",
+      "model_part_name": "싼타페 TM",
+      "grade_part_name": "디젤 2.2 4WD 프레스티지 (5인승)",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295723_21f5abff-92e2-4285-85c3-a3275253a3b7.JPEG",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295723_21f5abff-92e2-4285-85c3-a3275253a3b7.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295734_ad77c0e4-1b0b-4d18-865c-f9e14ee291c2.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295728_f71ed310-90e1-4556-aad2-1bbc423811ba.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295730_f9b064a4-4f84-4c2a-ba5a-1ba5b56e2e53.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295735_8ad7a0d6-8725-43f2-9c34-035e7a154272.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295721_fa4a2b09-bde3-49bb-b5d2-e5200524bfd0.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295724_6e1cecd8-0181-4394-a862-f17842a90dfe.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295725_5adc3c23-431b-4770-926c-86fa6795942c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295709_f8bc954a-fe5a-4083-9a3a-1d156c606942.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295720_d65c4637-1b80-44bb-98a2-590cd24a0034.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295729_8bfbe121-1210-4754-a862-674ca67585c5.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295733_722e6e6f-7100-4acb-851b-a9a6cd7c594e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295705_e43f4590-fe44-4726-bfc1-0f746ca8d7bc.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295707_642d9fae-e172-46f3-91ad-9e9632905a94.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295719_bd3dcde7-70dc-43a2-8ab7-b1a89e4c09ce.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295722_bfb9725b-9c11-4958-a057-8aee00d038e9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295727_f3e34d1f-bbf2-4b1d-bd5a-3e5edbb062a0.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295714_fdd5433f-7791-4458-8f0f-f2d693ba3d67.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295718_f3bbef96-ccc3-4428-a545-9a7c9e236dd1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295717_28003a21-80fb-4b1d-a4ce-7aa03613f606.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295712_7988dd46-e3b0-405f-ab87-ea37c1f8060a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295732_ec977d37-e083-4506-8eaf-6e8f58efff8e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295716_1b93ed7f-b058-4abe-8e69-45b5ce1bf929.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295726_b81a8716-206d-4fdd-bb60-a248d188f188.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295731_63768c0a-6392-49b1-96fe-8a4fdd69a8de.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295736_73f2f088-62d2-46e0-94ef-1b22c415b186.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295706_c6311e2b-c2e3-41e8-a7cf-41c9ffc48579.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295711_76aa634f-9218-4ff6-9bc3-6a8f2efff099.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295708_796a3a2e-d15a-4c69-abd2-98625dadca51.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295737_545c2af5-b228-4e92-adb7-3a345a548997.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295710_510abec4-c762-473e-8bda-e7d98280f76f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295713_6d34fde6-9809-4e59-bb78-a0f50015a731.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88295715_e7e0bf5b-a24e-4daa-8c6b-c84fe12310d4.JPEG"
+      ],
+      "car_number": "",
+      "year": 2019,
+      "initial_registration_date": "2018-08-31 00:00:00",
+      "mileage": 63079,
+      "interior_info": {
+        "text": "다크 베이지, 천연 가죽",
+        "codes": ["#C8B893"]
+      },
+      "location": "서울특별시 중랑구",
+      "short_location": "서울 중랑구",
+      "short_location_first_part_name": "서울",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "customer"
+    },
+    "auction": {
+      "auction_type": "customer_zero",
+      "approved_at": "2025-06-24 13:42:06",
+      "end_at": "2025-06-26 13:42:06",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 50,
+      "bids_count": 49,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "n7YDz0zl",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "지프 글래디에이터 3.6 루비콘",
+      "model_part_name": "지프 글래디에이터",
+      "grade_part_name": "3.6 루비콘",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/20_279bab2e-aa57-4add-bad7-5614ef66a95d.PNG",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334904_839c6e35-41ec-4f53-9bfd-f4d049c1acdf.jpeg",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334904_839c6e35-41ec-4f53-9bfd-f4d049c1acdf.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008158_cca0a3b6-c392-45da-b4c0-dad3ce7d0385.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334903_b1adb457-cb53-4b4d-a8e1-e4ab2be93627.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334901_b6772145-34c7-4c1f-a700-56534efbaaf6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334865_4f26d4db-96c0-4434-974d-ccbb282ec779.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88334866_84791f57-92ac-4554-bff5-6c18edcb4b02.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008178_fafd252c-1855-411f-b913-f1a35ab8bbfd.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008176_0ad36d62-eaa4-4ae8-ab0f-7e17b250e82e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008193_ebf550f4-a5e4-493b-8292-3dec2b26c840.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008162_64b2080d-0c49-4009-ab2d-8c6dcb632256.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008171_09bc4991-9696-424e-a992-372999e91c2d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008172_f5d8285a-b0c3-48b9-8ff2-cac53d35deff.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008141_e6a92ba7-2534-4d50-82ae-c735a31f225f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008143_1c1d8696-c92c-48fe-ab7d-5896808c5dfe.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008168_90cd63e9-3f96-4766-870f-601186b517cb.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008186_fa5bc65d-d467-4f58-9401-a5f3f111a178.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008175_ebe150bf-fbf5-4c62-9828-ea32be1252e8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008164_e2af30c3-3b71-4330-8439-327fb8b21135.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008190_a9c58851-48c7-4d4f-bfab-6df4c8d29219.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008191_6cb463b3-f3dd-4ecd-ad62-db0067f3f1cd.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008180_621e42e4-80ec-4a34-8f0e-124719871fe2.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008183_cdee9fea-9bfb-4a4c-a354-53b97cedc88c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008188_61afe3a9-7a64-4f3f-908d-58d5f8139cf1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008166_75bd0f04-0ed9-4910-85b0-b0e58b6aaa2b.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008170_7b05492d-9948-4e1f-9f1c-36457a680c08.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008153_fb9b44db-1844-430f-9bdd-f8b0f102c4e6.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008155_d48ef5f7-007b-4aa7-81cd-351b189478a7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008174_ca34a767-0a5e-4cf7-a096-97245e34fd62.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008144_d25a3af9-0186-4b68-a679-b6ac4da40d8d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008152_30ad0145-c1b8-4683-8b38-c58aa0b3f328.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008154_93b56c2a-88f8-4449-b9fe-765c22446da0.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008147_b86fe1b3-cf76-42e0-a39b-17013c1310b1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008137_887457ec-9caa-4f7a-9cee-f73cea6974da.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008140_13286c82-8a5d-41ac-9c02-41814e63f412.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008145_c91c57f3-2fd5-4903-8ea9-ba2ab8cdfa49.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008146_139cc2ee-da79-4964-b366-a5ee36540380.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008167_42be2e6a-649c-4466-b620-4bd568627e13.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008177_ee64a65d-78dc-4e0d-b54d-a4200103dd54.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008148_7017069f-322a-48b3-87f3-949e542e9bda.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008149_b9e4ff16-6e2c-4e61-925b-3f94290694c3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008150_02fb8940-d45a-45aa-a1b1-4f5d14b3a411.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008151_cb793c21-0b24-4e87-a875-1a9f184791ef.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008595_f72fce5d-9229-4844-9361-acba4c33213a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008163_9ef74add-0534-4715-91ed-dbef43845d85.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008165_87da69d3-ca79-4b49-8293-8ebc013db514.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008169_9c1e7177-cca2-4a4c-813e-73ad8e8dd737.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008173_f03d91a2-555a-4a58-8658-dd1678daee3f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/21/88008272_35ce2629-5dba-4414-b876-2551064f95e3.JPEG"
+      ],
+      "car_number": "807부2891",
+      "year": 2021,
+      "initial_registration_date": "2022-01-07 00:00:00",
+      "mileage": 67367,
+      "interior_info": null,
+      "location": "충청북도 청주시",
+      "short_location": "충북 청주시",
+      "short_location_first_part_name": "충북",
+      "is_pre_inspected": true,
+      "dealer_zero_type": null,
+      "zero_type": "fixed_price"
+    },
+    "auction": {
+      "auction_type": "fixed_price_zero",
+      "approved_at": "2025-06-24 14:37:02",
+      "end_at": "2025-07-01 14:37:02",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 150,
+      "bids_count": 1,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        },
+        {
+          "text": "재경매",
+          "short_text": "재경매",
+          "style": "gray"
+        }
+      ],
+      "desired_price": 4500,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  },
+  {
+    "hash_id": "n1pDr8Yy",
+    "status": "approved",
+    "status_display": "경매 중",
+    "detail": {
+      "full_name": "더 뉴 렉스턴 스포츠 칸 디젤 2.2 4WD 프레스티지",
+      "model_part_name": "더 뉴 렉스턴 스포츠 칸",
+      "grade_part_name": "디젤 2.2 4WD 프레스티지",
+      "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2023/06/20/3_a81f4d2e-2cc0-4892-8bad-2fbc3083d99f.png",
+      "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330386_b5d6f62f-5794-467a-9f00-9472c89216e9.jpeg",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330386_b5d6f62f-5794-467a-9f00-9472c89216e9.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330391_a74e58aa-c486-426a-9162-1da454f13a69.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330390_dd072791-f789-4063-b2f2-1f3e3cf76014.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330378_6f533d3b-6613-4ff8-8fcf-10f2c498a4a1.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330376_47e1e66d-7538-4ce4-99ed-1ed53ee5a55a.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330379_d9fac1d0-12d4-48a9-813f-614d0a7dea06.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330388_6de743e5-35dd-4ea0-abcd-547742721ff6.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330387_4dbd5bc1-a6f0-4571-9ace-43a2943d0793.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330392_4cfed9af-af08-4190-9599-cc7edc88d1c1.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330375_5d8140e1-e6d5-4c59-9a80-853f5892717f.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330385_d7aab804-94c5-4cc2-8e95-97bee188b498.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330383_4cc93b89-4ceb-4409-9716-f2b51e35ad2f.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330380_b4a2eca2-0cb3-4d8d-b0b6-a0aba03ab241.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330381_162ff338-dd7e-4d77-a5d7-0433860e495e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330382_261c281f-01e4-45db-a219-72224c33f7f8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330384_be424506-01ec-4f60-adef-ac0149180fb2.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330377_2751a53e-75dc-45b6-a851-e3465e5a46c4.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330374_3ef86380-12b8-4a4c-bfb2-c23b7b838688.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2025/06/24/88330389_5a6c1c4c-18f9-4180-bd15-f0cb2fd721c6.jpg"
+      ],
+      "car_number": "",
+      "year": 2022,
+      "initial_registration_date": "2022-09-27 00:00:00",
+      "mileage": 65594,
+      "interior_info": {
+        "text": "검정, 인조 가죽",
+        "codes": ["#000000"]
+      },
+      "location": "경기도 양주시",
+      "short_location": "경기 양주시",
+      "short_location_first_part_name": "경기",
+      "is_pre_inspected": false,
+      "dealer_zero_type": null,
+      "zero_type": null
+    },
+    "auction": {
+      "auction_type": "self",
+      "approved_at": "2025-06-24 14:33:09",
+      "end_at": "2025-06-26 14:33:09",
+      "ended_at": null,
+      "invalid_at": null,
+      "expire_at": null,
+      "expired_at": null,
+      "selected_at": null,
+      "max_bids_count": 30,
+      "bids_count": 15,
+      "selected_bid": null,
+      "highest_bid": null,
+      "my_bid": null,
+      "my_bid_price": null,
+      "is_visited": false,
+      "is_starred": false,
+      "is_additional_information": false,
+      "has_previous_bid": false,
+      "category": "normal",
+      "tags": [
+        {
+          "text": "완무 (보험0건)",
+          "short_text": "완무 (보험0건)",
+          "style": "blue"
+        },
+        {
+          "text": "1인소유",
+          "short_text": "1인소유",
+          "style": "sky_blue"
+        }
+      ],
+      "desired_price": null,
+      "previous_desired_price_diff": null
+    },
+    "etc": {
+      "is_associate_member_bid_unavailable": false
+    }
+  }
+]

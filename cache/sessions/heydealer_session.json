@@ -1,0 +1,18 @@
+{
+  "cookies": {
+    "_ga": "GA1.2.225253972.1750804665",
+    "_gid": "GA1.2.607092972.1750804665",
+    "ga_dsi": "2f27c9738d9441acb3019f0388816973",
+    "_gat": "1",
+    "_ga_D0D36Y0VSC": "GS2.2.s1750804665$o1$g1$t1750805823$j45$l0$h0",
+    "csrftoken": "klWN1tkPYv1zfqRD4896GeiNAWAJq3dJ",
+    "sessionid": "ko1cvchz7aq48k9dnq6vhzhxv7qalhyi"
+  },
+  "timestamp": "2025-06-25T08:16:13.846434",
+  "metadata": {
+    "user_hash_id": "jQdE8874",
+    "session_id": "ko1cvchz7aq48k9dnq6vhzhxv7qalhyi",
+    "csrf_token": "o5a42wvHb1aN5gHbtgWTcu0io-JitOMmJnCsGjkxL3Y",
+    "authenticated_at": "2025-06-25T08:16:13.846417"
+  }
+}
