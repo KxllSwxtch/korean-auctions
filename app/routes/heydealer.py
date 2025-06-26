@@ -42,10 +42,14 @@ async def get_heydealer_cars(
     ),
     order: str = Query(default="default", description="Порядок сортировки"),
     # Параметры фильтрации
-    brand: Optional[str] = Query(None, description="ID марки или название"),
-    model_group: Optional[str] = Query(None, description="ID группы моделей"),
-    model: Optional[str] = Query(None, description="ID поколения"),
-    grade: Optional[str] = Query(None, description="ID конфигурации"),
+    brand: Optional[str] = Query(
+        None, description="Hash ID марки (6 символов) или название"
+    ),
+    model_group: Optional[str] = Query(
+        None, description="Hash ID группы моделей (6 символов)"
+    ),
+    model: Optional[str] = Query(None, description="Hash ID поколения (6 символов)"),
+    grade: Optional[str] = Query(None, description="Hash ID конфигурации (6 символов)"),
     service: HeyDealerService = Depends(get_heydealer_service),
 ):
     """
@@ -94,20 +98,48 @@ async def get_heydealer_cars(
                 params["brand"] = brand
                 logger.info(f"Используем brand hash_id: {brand}")
             else:
-                # Это название бренда, пытаемся найти hash_id
+                # Для обратной совместимости пытаемся найти hash_id по названию
                 brand_hash_id = await find_brand_by_name(brand)
                 if brand_hash_id:
                     params["brand"] = brand_hash_id
                     logger.info(f"Найден hash_id для бренда {brand}: {brand_hash_id}")
                 else:
-                    logger.warning(f"Бренд {brand} не найден")
+                    logger.warning(
+                        f"Бренд {brand} не найден. Используйте hash_id из 6 символов"
+                    )
 
         if model_group and model_group.strip():
-            params["model_group"] = model_group
+            # Принимаем только hash_id (как в оригинальном API HeyDealer)
+            if (
+                len(model_group) == 6
+                and model_group.replace("_", "").replace("-", "").isalnum()
+            ):
+                params["model_group"] = model_group
+                logger.info(f"Используем model_group hash_id: {model_group}")
+            else:
+                logger.warning(
+                    f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
+                )
+                # Не добавляем неверный параметр
         if model and model.strip():
-            params["model"] = model
+            # Принимаем только hash_id для model (поколение)
+            if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
+                params["model"] = model
+                logger.info(f"Используем model hash_id: {model}")
+            else:
+                logger.warning(
+                    f"Неверный формат model: {model}. Ожидается hash_id из 6 символов"
+                )
+
         if grade and grade.strip():
-            params["grade"] = grade
+            # Принимаем только hash_id для grade (конфигурация)
+            if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
+                params["grade"] = grade
+                logger.info(f"Используем grade hash_id: {grade}")
+            else:
+                logger.warning(
+                    f"Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
+                )
 
         # Выполняем запрос
         response = requests.get(
