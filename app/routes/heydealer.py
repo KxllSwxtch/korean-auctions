@@ -31,7 +31,7 @@ def get_heydealer_service() -> HeyDealerService:
     return HeyDealerService()
 
 
-@router.get("/cars", response_model=HeyDealerResponse)
+@router.get("/cars")
 async def get_heydealer_cars(
     page: int = Query(default=1, description="Номер страницы"),
     auction_type: str = Query(default="auction", description="Тип аукциона"),
@@ -185,17 +185,35 @@ async def get_heydealer_cars(
                     current_page=page,
                 )
 
-            # Формируем успешный ответ
+            # Нормализуем данные через парсер для правильного отображения
+            normalized_data = parser.format_response_data(
+                cars=car_list.cars, total_count=car_list.total_count, page=page
+            )
+
+            # Формируем успешный ответ в формате HeyDealerResponse
             response_obj = HeyDealerResponse(
                 success=True,
-                data=car_list,
+                data=car_list,  # Оставляем для совместимости с моделью
                 message=f"Успешно получено {len(car_list.cars)} автомобилей",
                 total_count=car_list.total_count,
                 current_page=page,
             )
 
             logger.info(f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
-            return response_obj
+
+            # Возвращаем нормализованные данные вместо Pydantic объектов
+            return {
+                "success": True,
+                "data": {
+                    "cars": normalized_data["cars"],
+                    "total_count": normalized_data["total_count"],
+                    "page": normalized_data["current_page"],
+                },
+                "message": normalized_data["message"],
+                "total_count": normalized_data["total_count"],
+                "current_page": normalized_data["current_page"],
+                "pagination": normalized_data["pagination"],
+            }
         else:
             logger.error(
                 f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
