@@ -20,6 +20,7 @@ from app.models.heydealer import (
 from app.services.heydealer_service import HeyDealerService
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
+from app.services.heydealer_client_filter import client_filter
 
 logger = logging.getLogger(__name__)
 
@@ -419,11 +420,13 @@ async def get_filtered_cars(
 
         if not cookies or not headers:
             logger.error("Не удалось получить валидную сессию HeyDealer")
-            return HeyDealerListResponse(
-                success=False,
-                data=[],
-                message="Ошибка авторизации HeyDealer",
-            )
+            return {
+                "success": False,
+                "data": {"cars": [], "total_count": 0, "page": page},
+                "message": "Ошибка авторизации HeyDealer",
+                "total_count": 0,
+                "current_page": page,
+            }
 
         # Подготавливаем параметры
         params = {
@@ -435,15 +438,49 @@ async def get_filtered_cars(
             "order": order,
         }
 
-        # Добавляем фильтры (только если они не пустые)
+        # Добавляем фильтры (только если они не пустые и валидные)
         if brand and brand.strip():
-            params["brand"] = brand
+            # Проверяем формат hash_id для brand
+            if len(brand) == 6 and brand.replace("_", "").replace("-", "").isalnum():
+                params["brand"] = brand
+                logger.info(f"Используем brand hash_id: {brand}")
+            else:
+                logger.warning(
+                    f"Неверный формат brand: {brand}. Ожидается hash_id из 6 символов"
+                )
+
         if model_group and model_group.strip():
-            params["model_group"] = model_group
+            # Проверяем формат hash_id для model_group
+            if (
+                len(model_group) == 6
+                and model_group.replace("_", "").replace("-", "").isalnum()
+            ):
+                params["model_group"] = model_group
+                logger.info(f"Используем model_group hash_id: {model_group}")
+            else:
+                logger.warning(
+                    f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
+                )
+
         if model and model.strip():
-            params["model"] = model
+            # Проверяем формат hash_id для model
+            if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
+                params["model"] = model
+                logger.info(f"Используем model hash_id: {model}")
+            else:
+                logger.warning(
+                    f"Неверный формат model: {model}. Ожидается hash_id из 6 символов"
+                )
+
         if grade and grade.strip():
-            params["grade"] = grade
+            # Проверяем формат hash_id для grade
+            if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
+                params["grade"] = grade
+                logger.info(f"Используем grade hash_id: {grade}")
+            else:
+                logger.warning(
+                    f"Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
+                )
         if min_year:
             params["min_year"] = min_year
         if max_year:
@@ -464,6 +501,9 @@ async def get_filtered_cars(
             params["location"] = location
 
         logger.info(f"Параметры фильтрации: {params}")
+        print(
+            f"🔍 DEBUG: Отправляемые параметры: {params}"
+        )  # Временный отладочный вывод
 
         # Выполняем запрос
         response = requests.get(
@@ -581,26 +621,94 @@ async def get_filtered_cars(
                     logger.error(f"Ошибка обработки автомобиля: {e}")
                     continue
 
-            return HeyDealerListResponse(
-                success=True,
-                data=normalized_cars,
-                message=f"Получено {len(normalized_cars)} автомобилей с фильтрами",
-            )
+            # Применяем клиентскую фильтрацию
+            filter_params = {
+                "model_group": model_group,
+                "model": model,
+                "grade": grade,
+                "min_year": min_year,
+                "max_year": max_year,
+                "min_price": min_price,
+                "max_price": max_price,
+                "min_mileage": min_mileage,
+                "max_mileage": max_mileage,
+                "fuel": fuel,
+                "transmission": transmission,
+            }
+
+            # Удаляем None значения
+            filter_params = {k: v for k, v in filter_params.items() if v is not None}
+
+            # Применяем фильтры
+            original_count = len(normalized_cars)
+            if filter_params:
+                logger.info(f"Применяем клиентские фильтры: {filter_params}")
+                normalized_cars = client_filter.apply_all_filters(
+                    normalized_cars, filter_params
+                )
+                logger.info(
+                    f"Результат фильтрации: {original_count} -> {len(normalized_cars)}"
+                )
+
+            # Извлекаем информацию о пагинации из заголовков
+            total_count = int(response.headers.get("X-Pagination-Count", 0))
+            page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
+
+            # Если total_count = 0, это означает бесконечную прокрутку
+            if total_count == 0:
+                link_header = response.headers.get("Link", "")
+                has_next_page = 'rel="next"' in link_header
+
+                if has_next_page:
+                    estimated_total = len(normalized_cars) + (page * page_size)
+                else:
+                    estimated_total = len(normalized_cars) + ((page - 1) * page_size)
+
+                total_count = estimated_total
+
+            # Обновляем total_count после клиентской фильтрации
+            if filter_params:
+                total_count = len(normalized_cars)
+
+            # Возвращаем структуру, совместимую с /cars endpoint
+            return {
+                "success": True,
+                "data": {
+                    "cars": normalized_cars,
+                    "total_count": total_count,
+                    "page": page,
+                },
+                "message": f"Получено {len(normalized_cars)} автомобилей с фильтрами",
+                "total_count": total_count,
+                "current_page": page,
+                "pagination": {
+                    "current_page": page,
+                    "total_count": total_count,
+                    "page_size": page_size,
+                    "has_next": len(normalized_cars) == page_size,
+                },
+            }
         else:
             logger.error(
                 f"Ошибка получения отфильтрованных автомобилей: {response.status_code} - {response.text}"
             )
-            return HeyDealerListResponse(
-                success=False,
-                data=[],
-                message=f"Ошибка получения данных: {response.status_code}",
-            )
+            return {
+                "success": False,
+                "data": {"cars": [], "total_count": 0, "page": page},
+                "message": f"Ошибка получения данных: {response.status_code}",
+                "total_count": 0,
+                "current_page": page,
+            }
 
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте фильтрации автомобилей: {str(e)}")
-        return HeyDealerListResponse(
-            success=False, data=[], message=f"Ошибка: {str(e)}"
-        )
+        return {
+            "success": False,
+            "data": {"cars": [], "total_count": 0, "page": page},
+            "message": f"Ошибка: {str(e)}",
+            "total_count": 0,
+            "current_page": page,
+        }
 
 
 @router.get("/cars/{car_hash_id}")
