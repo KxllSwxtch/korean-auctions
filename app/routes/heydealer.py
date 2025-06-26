@@ -1114,11 +1114,12 @@ async def get_model_generations(model_group_hash_id: str):
         model_data = await service.get_model_generations(model_group_hash_id)
 
         if model_data:
-            return HeyDealerModelDetailResponse(
-                success=True,
-                data=model_data,
-                message=f"Получены поколения для модели {model_group_hash_id}",
-            )
+            # Парсим данные через парсер
+            from app.parsers.heydealer_parser import HeyDealerParser
+
+            parser = HeyDealerParser()
+            parsed_response = parser.parse_model_detail(model_data)
+            return parsed_response
         else:
             return HeyDealerModelDetailResponse(
                 success=False, data={}, message="Не удалось получить список поколений"
@@ -1139,11 +1140,12 @@ async def get_model_configurations(model_hash_id: str):
         config_data = await service.get_model_configurations(model_hash_id)
 
         if config_data:
-            return HeyDealerGradeDetailResponse(
-                success=True,
-                data=config_data,
-                message=f"Получены конфигурации для поколения {model_hash_id}",
-            )
+            # Парсим данные через парсер
+            from app.parsers.heydealer_parser import HeyDealerParser
+
+            parser = HeyDealerParser()
+            parsed_response = parser.parse_grade_detail(config_data)
+            return parsed_response
         else:
             return HeyDealerGradeDetailResponse(
                 success=False,
