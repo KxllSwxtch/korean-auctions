@@ -695,5 +695,5 @@ class HeyDealerListResponse(BaseModel):
     """Ответ со списком автомобилей"""
 
     success: bool
-    data: List[HeyDealerCar]
+    data: List[Dict[str, Any]]  # Изменено для поддержки нормализованных данных
     message: str

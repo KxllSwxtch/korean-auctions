@@ -243,25 +243,36 @@ class HeyDealerParser:
 
             return {
                 "id": getattr(car, "hash_id", None),
+                "hash_id": getattr(car, "hash_id", None),
                 "lot_number": getattr(car, "hash_id", None),
                 "auction_name": "HeyDealer",
                 "title": detail.full_name if detail else None,
                 "model": detail.full_name if detail else None,
+                "model_part_name": detail.model_part_name if detail else None,
+                "grade_part_name": detail.grade_part_name if detail else None,
                 "year": detail.year if detail else None,
                 "mileage": detail.mileage if detail else None,
                 "location": detail.short_location if detail else None,
+                "full_location": detail.location if detail else None,
                 "status": getattr(car, "status_display", None),
                 "auction_type": auction.auction_type if auction else None,
                 "end_time": auction.end_at if auction else None,
+                "approved_at": auction.approved_at if auction else None,
                 "current_price": auction.desired_price if auction else None,
                 "price": auction.desired_price if auction else None,
+                "desired_price": auction.desired_price if auction else None,
                 "bid_count": auction.bids_count if auction else 0,
                 "max_bids": auction.max_bids_count if auction else 0,
                 "images": detail.image_urls if detail and detail.image_urls else [],
+                "image_urls": detail.image_urls if detail and detail.image_urls else [],
                 "main_image": detail.main_image_url if detail else None,
+                "main_image_url": detail.main_image_url if detail else None,
                 "brand_image": detail.brand_image_url if detail else None,
+                "brand_image_url": detail.brand_image_url if detail else None,
                 "interior": interior_info.text if interior_info else None,
+                "interior_info": interior_info.text if interior_info else None,
                 "is_inspected": detail.is_pre_inspected if detail else False,
+                "is_pre_inspected": detail.is_pre_inspected if detail else False,
                 "tags": (
                     [tag.text for tag in auction.tags]
                     if auction and auction.tags
@@ -271,7 +282,20 @@ class HeyDealerParser:
                 "registration_date": (
                     detail.initial_registration_date if detail else None
                 ),
+                "initial_registration_date": (
+                    detail.initial_registration_date if detail else None
+                ),
                 "fuel_type": None,  # Добавляем для совместимости с тестами
+                "fuel": None,  # Будет извлекаться из сырых данных
+                "fuel_display": None,  # Будет извлекаться из сырых данных
+                "transmission": None,  # Будет извлекаться из сырых данных
+                "transmission_display": None,  # Будет извлекаться из сырых данных
+                "dealer_zero_type": detail.dealer_zero_type if detail else None,
+                "zero_type": detail.zero_type if detail else None,
+                "category": auction.category if auction else None,
+                "has_previous_bid": auction.has_previous_bid if auction else False,
+                "is_starred": auction.is_starred if auction else False,
+                "is_visited": auction.is_visited if auction else False,
             }
         except Exception as e:
             logger.error(

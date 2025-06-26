@@ -392,7 +392,7 @@ async def get_heydealer_status(
         }
 
 
-@router.get("/cars/filtered", response_model=HeyDealerListResponse)
+@router.get("/cars/filtered")
 async def get_filtered_cars(
     page: int = Query(1, description="Номер страницы"),
     order: str = Query("default", description="Сортировка"),
@@ -478,12 +478,113 @@ async def get_filtered_cars(
             cars_data = response.json()
             logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
 
-            # Парсим данные в модели Pydantic
-            cars = [HeyDealerCar(**car) for car in cars_data]
+            # Парсим данные через парсер для нормализации
+            from app.parsers.heydealer_parser import HeyDealerParser
+
+            parser = HeyDealerParser()
+
+            # Создаем Pydantic объекты и нормализуем данные
+            normalized_cars = []
+            for car_data in cars_data:
+                try:
+                    # Создаем Pydantic объект
+                    pydantic_car = HeyDealerCar(**car_data)
+
+                    # Нормализуем данные через парсер
+                    normalized_car = parser.normalize_car_data(pydantic_car)
+
+                    # Дополняем данными из сырого API ответа (для полей, которых нет в Pydantic)
+                    detail_data = car_data.get("detail", {})
+
+                    # Извлекаем данные о топливе и трансмиссии из названия и других полей
+                    title = normalized_car.get("title", "")
+                    grade_part_name = normalized_car.get("grade_part_name", "")
+
+                    # Определяем тип топлива из названия
+                    fuel_type = None
+                    fuel_display = None
+                    if "가솔린" in title or "가솔린" in grade_part_name:
+                        fuel_type = "gasoline"
+                        fuel_display = "Бензин"
+                    elif "디젤" in title or "디젤" in grade_part_name:
+                        fuel_type = "diesel"
+                        fuel_display = "Дизель"
+                    elif "하이브리드" in title or "하이브리드" in grade_part_name:
+                        fuel_type = "hybrid"
+                        fuel_display = "Гибрид"
+                    elif "전기" in title or "전기" in grade_part_name or "EV" in title:
+                        fuel_type = "electric"
+                        fuel_display = "Электро"
+                    elif "LPG" in title or "LPI" in title:
+                        fuel_type = "lpg"
+                        fuel_display = "ГБО"
+
+                    # Определяем тип трансмиссии из названия
+                    transmission_type = None
+                    transmission_display = None
+                    if (
+                        "AWD" in title
+                        or "AWD" in grade_part_name
+                        or "4WD" in title
+                        or "4WD" in grade_part_name
+                    ):
+                        transmission_type = "awd"
+                        transmission_display = "Полный привод"
+                    elif (
+                        "2WD" in title
+                        or "2WD" in grade_part_name
+                        or "FWD" in title
+                        or "FWD" in grade_part_name
+                    ):
+                        transmission_type = "fwd"
+                        transmission_display = "Передний привод"
+                    elif "RWD" in title or "RWD" in grade_part_name:
+                        transmission_type = "rwd"
+                        transmission_display = "Задний привод"
+
+                    # Пытаемся определить коробку передач (это сложнее, так как в названии не всегда указано)
+                    gear_type = None
+                    gear_display = None
+                    if "수동" in title:  # Ручная
+                        gear_type = "manual"
+                        gear_display = "Механика"
+                    elif "자동" in title:  # Автоматическая
+                        gear_type = "automatic"
+                        gear_display = "Автомат"
+                    elif "CVT" in title:
+                        gear_type = "cvt"
+                        gear_display = "Вариатор"
+                    else:
+                        # По умолчанию считаем автоматической для современных автомобилей
+                        gear_type = "automatic"
+                        gear_display = "Автомат"
+
+                    normalized_car.update(
+                        {
+                            "fuel": fuel_type,
+                            "fuel_display": fuel_display,
+                            "fuel_type": fuel_type,
+                            "transmission": transmission_type,
+                            "transmission_display": transmission_display,
+                            "gear": gear_type,
+                            "gear_display": gear_display,
+                            "payment": detail_data.get("payment"),
+                            "payment_display": detail_data.get("payment_display"),
+                            "color": detail_data.get("color"),
+                            "accident": detail_data.get("accident"),
+                            "accident_display": detail_data.get("accident_display"),
+                        }
+                    )
+
+                    normalized_cars.append(normalized_car)
+                except Exception as e:
+                    logger.error(f"Ошибка обработки автомобиля: {e}")
+                    continue
+
             return HeyDealerListResponse(
                 success=True,
-                data=cars,
-                message=f"Получено {len(cars)} автомобилей с фильтрами",
+                data=normalized_cars,
+                message=f"Получено {len(normalized_cars)} автомобилей с фильтрами",
             )
         else:
             logger.error(
