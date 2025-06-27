@@ -706,3 +706,88 @@ class HeyDealerListResponse(BaseModel):
     success: bool
     data: List[Dict[str, Any]]  # Изменено для поддержки нормализованных данных
     message: str
+
+
+# === МОДЕЛИ ДЛЯ ТЕХНИЧЕСКОГО ЛИСТА (ACCIDENT REPAIRS) ===
+
+
+class MaxReductionRatio(BaseModel):
+    """Максимальные коэффициенты снижения цены"""
+
+    exchange: float = Field(..., description="Коэффициент для замены")
+    weld: float = Field(..., description="Коэффициент для сварки")
+
+
+class AccidentRepairDetail(BaseModel):
+    """Детальная информация о ремонте части автомобиля"""
+
+    part: str = Field(..., description="Часть автомобиля (bumper_front, hood, etc.)")
+    part_display: str = Field(..., description="Отображаемое название части")
+    repair: str = Field(..., description="Тип ремонта (none, exchange, weld)")
+    repair_display: str = Field(..., description="Отображаемый тип ремонта")
+    position: List[int] = Field(..., description="Позиция на схеме [x, y]")
+    category: str = Field(
+        ..., description="Категория части (frame, outer_panel_rank_1, etc.)"
+    )
+    max_reduction_ratio: MaxReductionRatio = Field(
+        ..., description="Максимальные коэффициенты снижения цены"
+    )
+    max_reduction_ratio_for_zero: MaxReductionRatio = Field(
+        ..., description="Коэффициенты для zero аукциона"
+    )
+
+
+class AccidentRepairsResponse(BaseModel):
+    """Ответ API с техническим листом автомобиля"""
+
+    type: Optional[str] = Field(None, description="Тип схемы повреждений")
+    image_url: str = Field(..., description="URL схемы автомобиля")
+    image_width: int = Field(..., description="Ширина изображения схемы")
+    accident_repairs: List[AccidentRepairDetail] = Field(
+        ..., description="Список деталей и их состояние"
+    )
+
+
+class AccidentRepairsFullResponse(BaseModel):
+    """Полный ответ с техническим листом"""
+
+    success: bool = Field(..., description="Успешность выполнения запроса")
+    data: Optional[AccidentRepairsResponse] = Field(
+        None, description="Данные технического листа"
+    )
+    message: str = Field(..., description="Сообщение о результате")
+    timestamp: str = Field(..., description="Время выполнения запроса")
+
+
+# === РАСШИРЕННЫЕ МОДЕЛИ ДЛЯ АВТОМОБИЛЕЙ С ТЕХНИЧЕСКИМ ЛИСТОМ ===
+
+
+class CarWithAccidentRepairs(BaseModel):
+    """Автомобиль с техническим листом"""
+
+    # Базовая информация об автомобиле
+    hash_id: str = Field(..., description="Уникальный ID автомобиля")
+    status: str = Field(..., description="Статус автомобиля")
+    status_display: str = Field(..., description="Отображаемый статус")
+    full_name: Optional[str] = Field(None, description="Полное название автомобиля")
+    brand_name: Optional[str] = Field(None, description="Название бренда")
+    year: Optional[int] = Field(None, description="Год выпуска")
+    mileage: Optional[int] = Field(None, description="Пробег")
+    main_image_url: Optional[str] = Field(None, description="URL основного изображения")
+    desired_price: Optional[int] = Field(None, description="Желаемая цена")
+
+    # Технический лист
+    accident_repairs: Optional[AccidentRepairsResponse] = Field(
+        None, description="Технический лист автомобиля"
+    )
+
+
+class CarWithAccidentRepairsResponse(BaseModel):
+    """Ответ с автомобилем и техническим листом"""
+
+    success: bool = Field(..., description="Успешность выполнения запроса")
+    data: Optional[CarWithAccidentRepairs] = Field(
+        None, description="Данные автомобиля с техническим листом"
+    )
+    message: str = Field(..., description="Сообщение о результате")
+    timestamp: str = Field(..., description="Время выполнения запроса")

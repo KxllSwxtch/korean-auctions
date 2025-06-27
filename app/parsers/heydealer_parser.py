@@ -1058,7 +1058,15 @@ class HeyDealerParser:
     def parse_available_filters(
         self, filters_data: Dict[str, Any]
     ) -> "HeyDealerFiltersResponse":
-        """Парсинг доступных фильтров"""
+        """
+        Парсит доступные фильтры
+
+        Args:
+            filters_data: Данные фильтров от API
+
+        Returns:
+            Обработанные фильтры
+        """
         from app.models.heydealer import (
             HeyDealerFiltersResponse,
             HeyDealerAvailableFilters,
@@ -1069,133 +1077,220 @@ class HeyDealerParser:
         )
 
         try:
-            # Парсим фильтры по времени одобрения
+
+            def parse_simple_filters(filter_list):
+                """Парсит простые фильтры"""
+                if not filter_list:
+                    return []
+
+                return [
+                    FilterOption(name=item.get("name", ""), value=item.get("value", ""))
+                    for item in filter_list
+                ]
+
+            # Парсим фильтры по дате одобрения
             approved_at_filters = []
-            for item in filters_data.get("approved_at", []):
+            for approved_at in filters_data.get("approved_at", []):
                 approved_at_filters.append(
                     ApprovedAtFilter(
-                        min_approved_at=item.get("min_approved_at"),
-                        max_approved_at=item.get("max_approved_at"),
-                        count=item.get("count"),
-                        key=item.get("key", ""),
-                        title=item.get("title", ""),
-                        description=item.get("description"),
+                        min_approved_at=approved_at.get("min_approved_at"),
+                        max_approved_at=approved_at.get("max_approved_at"),
+                        count=approved_at.get("count"),
+                        key=approved_at.get("key", ""),
+                        title=approved_at.get("title", ""),
+                        description=approved_at.get("description"),
                     )
                 )
 
             # Парсим диапазон годов
             year_data = filters_data.get("year", {})
             year_range = YearRange(
-                min=year_data.get("min", 1990), max=year_data.get("max", 2025)
+                min=year_data.get("min", 1990), max=year_data.get("max", 2024)
             )
 
             # Парсим фильтры местоположения
             location_filters = []
-            for item in filters_data.get("location_first_part", []):
-                if item:  # Пропускаем пустые объекты
-                    location_filters.append(
-                        LocationFilter(value=item.get("value"), name=item.get("name"))
+            for location in filters_data.get("location_first_part", []):
+                location_filters.append(
+                    LocationFilter(
+                        value=location.get("value"), name=location.get("name")
                     )
+                )
 
-            # Парсим простые фильтры
-            def parse_simple_filters(filter_list):
-                return [
-                    FilterOption(name=item["name"], value=item["value"])
-                    for item in filter_list
-                ]
-
-            transmission_filters = parse_simple_filters(
-                filters_data.get("transmission", [])
-            )
-            payment_filters = parse_simple_filters(filters_data.get("payment", []))
-            car_type_filters = parse_simple_filters(filters_data.get("car_type", []))
-            car_segment_filters = parse_simple_filters(
-                filters_data.get("car_segment", [])
-            )
-            fuel_filters = parse_simple_filters(filters_data.get("fuel", []))
-            mileage_group_filters = parse_simple_filters(
-                filters_data.get("mileage_group", [])
-            )
-            accident_group_filters = parse_simple_filters(
-                filters_data.get("accident_group", [])
-            )
-            accident_repairs_summary_filters = parse_simple_filters(
-                filters_data.get("accident_repairs_summary", [])
-            )
-            wheel_drive_filters = parse_simple_filters(
-                filters_data.get("wheel_drive", [])
-            )
-            my_car_accident_cost_filters = parse_simple_filters(
-                filters_data.get("my_car_accident_cost", [])
-            )
-            owner_change_record_filters = parse_simple_filters(
-                filters_data.get("owner_change_record", [])
-            )
-            use_record_filters = parse_simple_filters(
-                filters_data.get("use_record", [])
-            )
-            special_accident_record_filters = parse_simple_filters(
-                filters_data.get("special_accident_record", [])
-            )
-            operation_availability_filters = parse_simple_filters(
-                filters_data.get("operation_availability", [])
-            )
-
-            # Пробег (список чисел)
-            mileage_list = filters_data.get("mileage", [])
-
-            # Создаем объект с доступными фильтрами
+            # Создаем основной объект фильтров
             available_filters = HeyDealerAvailableFilters(
                 approved_at=approved_at_filters,
                 year=year_range,
                 location_first_part=location_filters,
-                transmission=transmission_filters,
-                payment=payment_filters,
-                car_type=car_type_filters,
-                car_segment=car_segment_filters,
-                fuel=fuel_filters,
-                mileage=mileage_list,
-                mileage_group=mileage_group_filters,
-                accident_group=accident_group_filters,
-                accident_repairs_summary=accident_repairs_summary_filters,
-                wheel_drive=wheel_drive_filters,
-                my_car_accident_cost=my_car_accident_cost_filters,
-                owner_change_record=owner_change_record_filters,
-                use_record=use_record_filters,
-                special_accident_record=special_accident_record_filters,
-                operation_availability=operation_availability_filters,
+                transmission=parse_simple_filters(filters_data.get("transmission", [])),
+                payment=parse_simple_filters(filters_data.get("payment", [])),
+                car_type=parse_simple_filters(filters_data.get("car_type", [])),
+                car_segment=parse_simple_filters(filters_data.get("car_segment", [])),
+                fuel=parse_simple_filters(filters_data.get("fuel", [])),
+                mileage=filters_data.get("mileage", []),
+                mileage_group=parse_simple_filters(
+                    filters_data.get("mileage_group", [])
+                ),
+                accident_group=parse_simple_filters(
+                    filters_data.get("accident_group", [])
+                ),
+                accident_repairs_summary=parse_simple_filters(
+                    filters_data.get("accident_repairs_summary", [])
+                ),
+                wheel_drive=parse_simple_filters(filters_data.get("wheel_drive", [])),
+                my_car_accident_cost=parse_simple_filters(
+                    filters_data.get("my_car_accident_cost", [])
+                ),
+                owner_change_record=parse_simple_filters(
+                    filters_data.get("owner_change_record", [])
+                ),
+                use_record=parse_simple_filters(filters_data.get("use_record", [])),
+                special_accident_record=parse_simple_filters(
+                    filters_data.get("special_accident_record", [])
+                ),
+                operation_availability=parse_simple_filters(
+                    filters_data.get("operation_availability", [])
+                ),
             )
 
-            logger.info("Парсинг доступных фильтров завершен успешно")
             return HeyDealerFiltersResponse(
-                success=True,
-                data=available_filters,
-                message="Доступные фильтры успешно получены",
+                success=True, data=available_filters, message="Фильтры успешно получены"
             )
 
         except Exception as e:
-            logger.error(f"Ошибка при парсинге доступных фильтров: {str(e)}")
+            logger.error(f"Ошибка парсинга фильтров: {e}")
+            from app.models.heydealer import HeyDealerFiltersResponse
+
             return HeyDealerFiltersResponse(
-                success=False,
-                data=HeyDealerAvailableFilters(
-                    approved_at=[],
-                    year=YearRange(min=1990, max=2025),
-                    location_first_part=[],
-                    transmission=[],
-                    payment=[],
-                    car_type=[],
-                    car_segment=[],
-                    fuel=[],
-                    mileage=[],
-                    mileage_group=[],
-                    accident_group=[],
-                    accident_repairs_summary=[],
-                    wheel_drive=[],
-                    my_car_accident_cost=[],
-                    owner_change_record=[],
-                    use_record=[],
-                    special_accident_record=[],
-                    operation_availability=[],
-                ),
-                message=str(e),
+                success=False, data=None, message=f"Ошибка парсинга фильтров: {e}"
             )
+
+    @staticmethod
+    def parse_accident_repairs(raw_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Парсит данные технического листа (accident repairs) автомобиля
+
+        Args:
+            raw_data: Сырые данные технического листа от API
+
+        Returns:
+            Обработанные данные технического листа или None при ошибке
+        """
+        from app.models.heydealer import (
+            AccidentRepairsResponse,
+            AccidentRepairDetail,
+            MaxReductionRatio,
+        )
+
+        try:
+            if not raw_data:
+                logger.warning("Получены пустые данные технического листа")
+                return None
+
+            # Парсим основную информацию
+            parsed_repairs = []
+
+            for repair_data in raw_data.get("accident_repairs", []):
+                try:
+                    # Парсим коэффициенты снижения цены
+                    max_reduction_ratio = MaxReductionRatio(
+                        exchange=repair_data.get("max_reduction_ratio", {}).get(
+                            "exchange", 0.0
+                        ),
+                        weld=repair_data.get("max_reduction_ratio", {}).get(
+                            "weld", 0.0
+                        ),
+                    )
+
+                    max_reduction_ratio_for_zero = MaxReductionRatio(
+                        exchange=repair_data.get(
+                            "max_reduction_ratio_for_zero", {}
+                        ).get("exchange", 0.0),
+                        weld=repair_data.get("max_reduction_ratio_for_zero", {}).get(
+                            "weld", 0.0
+                        ),
+                    )
+
+                    # Создаем деталь ремонта
+                    repair_detail = AccidentRepairDetail(
+                        part=repair_data.get("part", ""),
+                        part_display=repair_data.get("part_display", ""),
+                        repair=repair_data.get("repair", "none"),
+                        repair_display=repair_data.get("repair_display", "없음"),
+                        position=repair_data.get("position", [0, 0]),
+                        category=repair_data.get("category", ""),
+                        max_reduction_ratio=max_reduction_ratio,
+                        max_reduction_ratio_for_zero=max_reduction_ratio_for_zero,
+                    )
+
+                    parsed_repairs.append(repair_detail)
+
+                except Exception as e:
+                    logger.error(
+                        f"Ошибка парсинга части {repair_data.get('part', 'unknown')}: {e}"
+                    )
+                    continue
+
+            # Создаем финальный ответ
+            accident_repairs_response = AccidentRepairsResponse(
+                type=raw_data.get("type"),
+                image_url=raw_data.get("image_url", ""),
+                image_width=raw_data.get("image_width", 420),
+                accident_repairs=parsed_repairs,
+            )
+
+            # Конвертируем в словарь для совместимости
+            return accident_repairs_response.model_dump()
+
+        except Exception as e:
+            logger.error(f"Ошибка парсинга технического листа: {e}")
+            return None
+
+    @staticmethod
+    def parse_car_with_accident_repairs(
+        car_data: Optional[Dict[str, Any]],
+        accident_repairs_data: Optional[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Парсит данные автомобиля вместе с техническим листом
+
+        Args:
+            car_data: Данные автомобиля
+            accident_repairs_data: Данные технического листа
+
+        Returns:
+            Комбинированные данные или None при ошибке
+        """
+        from app.models.heydealer import CarWithAccidentRepairs
+
+        try:
+            if not car_data:
+                logger.error("Отсутствуют данные автомобиля")
+                return None
+
+            # Парсим технический лист если есть
+            parsed_accident_repairs = None
+            if accident_repairs_data:
+                parsed_accident_repairs = HeyDealerParser.parse_accident_repairs(
+                    accident_repairs_data
+                )
+
+            # Создаем комбинированную модель
+            car_with_repairs = CarWithAccidentRepairs(
+                hash_id=car_data.get("hash_id", ""),
+                status=car_data.get("status", ""),
+                status_display=car_data.get("status_display", ""),
+                full_name=car_data.get("full_name"),
+                brand_name=car_data.get("brand_name"),
+                year=car_data.get("year"),
+                mileage=car_data.get("mileage"),
+                main_image_url=car_data.get("main_image_url"),
+                desired_price=car_data.get("desired_price"),
+                accident_repairs=parsed_accident_repairs,
+            )
+
+            return car_with_repairs.model_dump()
+
+        except Exception as e:
+            logger.error(f"Ошибка парсинга автомобиля с техническим листом: {e}")
+            return None

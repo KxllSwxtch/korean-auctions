@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 import logging
 import requests
 import json
+from datetime import datetime
 
 from app.models.heydealer import (
     HeyDealerResponse,
@@ -1893,3 +1894,344 @@ async def get_model_generations_by_name(model_group_name: str):
         return HeyDealerModelDetailResponse(
             success=False, data={}, message=f"Ошибка: {str(e)}"
         )
+
+
+@router.get("/cars/{car_hash_id}/debug")
+async def get_car_debug(car_hash_id: str):
+    """Отладочная информация об автомобиле"""
+    try:
+        service = HeyDealerService()
+
+        # Получаем детальные данные
+        car_detail = await service.get_car_detail(car_hash_id)
+        if not car_detail:
+            raise HTTPException(status_code=404, detail="Автомобиль не найден")
+
+        # Формируем отладочную информацию
+        debug_info = {
+            "hash_id": car_hash_id,
+            "status": car_detail.status,
+            "detail_keys": list(car_detail.detail.__dict__.keys()),
+            "auction_keys": list(car_detail.auction.__dict__.keys()),
+            "etc_keys": list(car_detail.etc.__dict__.keys()),
+            "has_detail": bool(car_detail.detail),
+            "has_auction": bool(car_detail.auction),
+            "has_etc": bool(car_detail.etc),
+        }
+
+        return {
+            "success": True,
+            "data": debug_info,
+            "message": "Отладочная информация получена",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения отладочной информации: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# === НОВЫЕ ЭНДПОИНТЫ ДЛЯ ТЕХНИЧЕСКОГО ЛИСТА ===
+
+
+@router.get("/cars/{car_hash_id}/accident-repairs")
+async def get_car_accident_repairs(car_hash_id: str):
+    """
+    Получает технический лист (accident repairs) для автомобиля
+
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+
+    Returns:
+        Технический лист с информацией о состоянии всех частей автомобиля
+    """
+    try:
+        service = HeyDealerService()
+
+        # Получаем технический лист
+        accident_repairs = await service.get_accident_repairs(car_hash_id)
+        if not accident_repairs:
+            raise HTTPException(
+                status_code=404, detail="Технический лист для автомобиля не найден"
+            )
+
+        # Парсим данные
+        parsed_data = HeyDealerParser.parse_accident_repairs(accident_repairs)
+        if not parsed_data:
+            raise HTTPException(
+                status_code=500, detail="Ошибка парсинга технического листа"
+            )
+
+        return {
+            "success": True,
+            "data": parsed_data,
+            "message": "Технический лист успешно получен",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения технического листа для {car_hash_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cars/{car_hash_id}/with-accident-repairs")
+async def get_car_with_accident_repairs(car_hash_id: str):
+    """
+    Получает детальную информацию об автомобиле вместе с техническим листом
+
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+
+    Returns:
+        Полная информация об автомобиле включая технический лист
+    """
+    try:
+        service = HeyDealerService()
+
+        # Получаем комбинированные данные
+        combined_data = await service.get_car_with_accident_repairs(car_hash_id)
+        if not combined_data:
+            raise HTTPException(
+                status_code=404, detail="Автомобиль или его технический лист не найден"
+            )
+
+        # Парсим комбинированные данные
+        parsed_data = HeyDealerParser.parse_car_with_accident_repairs(
+            combined_data, combined_data.get("accident_repairs")
+        )
+        if not parsed_data:
+            raise HTTPException(
+                status_code=500,
+                detail="Ошибка парсинга данных автомобиля с техническим листом",
+            )
+
+        return {
+            "success": True,
+            "data": parsed_data,
+            "message": "Данные автомобиля с техническим листом успешно получены",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Ошибка получения данных автомобиля {car_hash_id} с техническим листом: {e}"
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cars/{car_hash_id}/accident-repairs/raw")
+async def get_car_accident_repairs_raw(car_hash_id: str):
+    """
+    Получает сырые данные технического листа (для отладки)
+
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+
+    Returns:
+        Необработанные данные технического листа от API
+    """
+    try:
+        service = HeyDealerService()
+
+        # Получаем сырые данные
+        raw_data = await service.get_accident_repairs(car_hash_id)
+        if not raw_data:
+            raise HTTPException(
+                status_code=404, detail="Технический лист для автомобиля не найден"
+            )
+
+        return {
+            "success": True,
+            "data": raw_data,
+            "message": "Сырые данные технического листа получены",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Ошибка получения сырых данных технического листа для {car_hash_id}: {e}"
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cars/{car_hash_id}/accident-repairs/summary")
+async def get_car_accident_repairs_summary(car_hash_id: str):
+    """
+    Получает краткую сводку по техническому листу автомобиля
+
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+
+    Returns:
+        Краткая сводка о состоянии автомобиля
+    """
+    try:
+        service = HeyDealerService()
+
+        # Получаем технический лист
+        accident_repairs = await service.get_accident_repairs(car_hash_id)
+        if not accident_repairs:
+            raise HTTPException(
+                status_code=404, detail="Технический лист для автомобиля не найден"
+            )
+
+        # Анализируем данные для создания сводки
+        repairs_list = accident_repairs.get("accident_repairs", [])
+
+        summary = {
+            "total_parts": len(repairs_list),
+            "parts_with_repairs": 0,
+            "parts_with_exchange": 0,
+            "parts_with_weld": 0,
+            "frame_parts_damaged": 0,
+            "outer_panel_parts_damaged": 0,
+            "critical_damage": False,
+            "max_reduction_ratio": 0.0,
+            "damaged_parts": [],
+        }
+
+        for part in repairs_list:
+            repair_type = part.get("repair", "none")
+            category = part.get("category", "")
+
+            if repair_type != "none":
+                summary["parts_with_repairs"] += 1
+                summary["damaged_parts"].append(
+                    {
+                        "part": part.get("part_display", part.get("part", "")),
+                        "repair": part.get("repair_display", repair_type),
+                        "category": category,
+                    }
+                )
+
+                if repair_type == "exchange":
+                    summary["parts_with_exchange"] += 1
+                elif repair_type == "weld":
+                    summary["parts_with_weld"] += 1
+
+                if "frame" in category:
+                    summary["frame_parts_damaged"] += 1
+                    summary["critical_damage"] = True
+                elif "outer_panel" in category:
+                    summary["outer_panel_parts_damaged"] += 1
+
+                # Находим максимальный коэффициент снижения
+                max_ratio = part.get("max_reduction_ratio", {})
+                exchange_ratio = max_ratio.get("exchange", 0.0)
+                weld_ratio = max_ratio.get("weld", 0.0)
+                current_max = max(exchange_ratio, weld_ratio)
+
+                if current_max > summary["max_reduction_ratio"]:
+                    summary["max_reduction_ratio"] = current_max
+
+        # Определяем общее состояние
+        if summary["parts_with_repairs"] == 0:
+            summary["condition"] = "excellent"
+            summary["condition_display"] = "Отличное состояние"
+        elif summary["critical_damage"]:
+            summary["condition"] = "poor"
+            summary["condition_display"] = "Плохое состояние (повреждения рамы)"
+        elif summary["parts_with_repairs"] > 3:
+            summary["condition"] = "fair"
+            summary["condition_display"] = "Удовлетворительное состояние"
+        else:
+            summary["condition"] = "good"
+            summary["condition_display"] = "Хорошее состояние"
+
+        return {
+            "success": True,
+            "data": summary,
+            "message": "Сводка по техническому листу успешно создана",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Ошибка создания сводки технического листа для {car_hash_id}: {e}"
+        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cars/{car_hash_id}/accident-repairs/demo")
+async def get_car_accident_repairs_demo(car_hash_id: str):
+    """
+    Демонстрационный эндпоинт с тестовыми данными технического листа
+
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+
+    Returns:
+        Пример структуры данных технического листа
+    """
+    try:
+        # Используем данные из предоставленного файла
+        demo_data = {
+            "type": None,
+            "image_url": "https://heydealer-api.s3.amazonaws.com/static-dj42/img/v2/categorized_accident/dealers/web/accident_repairs_front_panel.fd308c17aee5.png",
+            "image_width": 420,
+            "accident_repairs": [
+                {
+                    "part": "bumper_front",
+                    "part_display": "앞범퍼 또는 라이트",
+                    "repair": "none",
+                    "repair_display": "없음",
+                    "position": [148, 12],
+                    "category": "etc",
+                    "max_reduction_ratio": {"exchange": 0.0, "weld": 0.0},
+                    "max_reduction_ratio_for_zero": {"exchange": 0.0, "weld": 0.0},
+                },
+                {
+                    "part": "hood",
+                    "part_display": "본넷",
+                    "repair": "none",
+                    "repair_display": "없음",
+                    "position": [148, 72],
+                    "category": "outer_panel_rank_1",
+                    "max_reduction_ratio": {"exchange": 0.04, "weld": 0.04},
+                    "max_reduction_ratio_for_zero": {"exchange": 0.03, "weld": 0.02},
+                },
+                {
+                    "part": "trunk_lid",
+                    "part_display": "트렁크 도어",
+                    "repair": "exchange",
+                    "repair_display": "교환",
+                    "position": [148, 240],
+                    "category": "outer_panel_rank_1",
+                    "max_reduction_ratio": {"exchange": 0.03, "weld": 0.03},
+                    "max_reduction_ratio_for_zero": {"exchange": 0.02, "weld": 0.02},
+                },
+            ],
+        }
+
+        # Парсим демо-данные
+        parsed_data = HeyDealerParser.parse_accident_repairs(demo_data)
+        if not parsed_data:
+            raise HTTPException(
+                status_code=500, detail="Ошибка парсинга демонстрационных данных"
+            )
+
+        return {
+            "success": True,
+            "data": parsed_data,
+            "message": f"Демонстрационный технический лист для автомобиля {car_hash_id}",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            "note": "Это демонстрационные данные для показа структуры технического листа",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            f"Ошибка создания демонстрационного технического листа для {car_hash_id}: {e}"
+        )
+        raise HTTPException(status_code=500, detail=str(e))

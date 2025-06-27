@@ -12,6 +12,10 @@ from app.models.heydealer import (
     HeyDealerFilters,
     HeyDealerCarList,
     HeyDealerDetailedCar,
+    AccidentRepairsResponse,
+    AccidentRepairsFullResponse,
+    CarWithAccidentRepairs,
+    CarWithAccidentRepairsResponse,
 )
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
@@ -630,33 +634,47 @@ class HeyDealerService:
         self, filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Получает автомобили с автоматической авторизацией
+        Получает список автомобилей с автоматической аутентификацией
 
         Args:
-            filters: Фильтры для поиска
+            filters: Параметры фильтрации
 
         Returns:
-            Список автомобилей
+            Список автомобилей или пустой список в случае ошибки
         """
         try:
-            # Получаем действующую сессию
-            headers, cookies = await heydealer_auth.get_headers_and_cookies_async()
-
+            # Получаем заголовки и куки от сервиса аутентификации
+            headers, cookies = heydealer_auth.get_headers_and_cookies()
             if not headers or not cookies:
-                logger.error("Не удалось получить действующую сессию HeyDealer")
+                logger.error("❌ Не удалось получить данные аутентификации")
                 return []
 
-            # Подготавливаем параметры
+            # Подготавливаем параметры запроса
             params = {
                 "page": filters.get("page", 1) if filters else 1,
-                "type": "auction",
-                "is_subscribed": "false",
+                "type": filters.get("type", "auction") if filters else "auction",
+                "is_subscribed": (
+                    ("true" if filters.get("is_subscribed", False) else "false")
+                    if filters
+                    else "false"
+                ),
+                "is_retried": (
+                    ("true" if filters.get("is_retried", False) else "false")
+                    if filters
+                    else "false"
+                ),
+                "is_previously_bid": (
+                    ("true" if filters.get("is_previously_bid", False) else "false")
+                    if filters
+                    else "false"
+                ),
+                "order": filters.get("order", "default") if filters else "default",
             }
 
-            # Добавляем дополнительные фильтры
+            # Добавляем остальные фильтры, если они есть
             if filters:
                 for key, value in filters.items():
-                    if key != "page" and value is not None:
+                    if key not in params and value is not None:
                         params[key] = value
 
             # Выполняем запрос
@@ -669,38 +687,114 @@ class HeyDealerService:
 
             if response.status_code == 200:
                 data = response.json()
-                logger.info(f"✅ Получено {len(data)} автомобилей HeyDealer")
-                return data
-            elif response.status_code == 401:
-                # Сессия устарела, пробуем обновить
-                logger.warning("Сессия устарела, обновляем...")
-                headers, cookies = await heydealer_auth.get_headers_and_cookies_async(
-                    force_refresh=True
-                )
-
-                if headers and cookies:
-                    response = await self.http_client.get(
-                        url=f"{self.base_url}/v2/dealers/web/cars/",
-                        params=params,
-                        headers=headers,
-                        cookies=cookies,
-                    )
-
-                    if response.status_code == 200:
-                        data = response.json()
-                        logger.info(
-                            f"✅ Получено {len(data)} автомобилей HeyDealer после обновления сессии"
-                        )
-                        return data
-
-                logger.error("Не удалось авторизоваться в HeyDealer")
-                return []
+                # Нормализуем данные для возврата
+                normalized_cars = self.parser.normalize_cars(data.get("cars", []))
+                return normalized_cars
             else:
                 logger.error(
-                    f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
+                    f"❌ Ошибка при получении автомобилей: {response.status_code} - {response.text}"
                 )
                 return []
 
         except Exception as e:
-            logger.error(f"Исключение при получении автомобилей HeyDealer: {e}")
+            logger.error(f"❌ Исключение при получении автомобилей: {e}")
             return []
+
+    async def get_accident_repairs(self, car_hash_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Получает технический лист (accident repairs) для автомобиля
+
+        Args:
+            car_hash_id: Hash ID автомобиля
+
+        Returns:
+            Данные технического листа или None в случае ошибки
+        """
+        try:
+            # Получаем заголовки и куки от сервиса аутентификации
+            headers, cookies = heydealer_auth.get_headers_and_cookies()
+            if not headers or not cookies:
+                logger.error(
+                    "❌ Не удалось получить данные аутентификации для технического листа"
+                )
+                return None
+
+            # Подготавливаем параметры запроса
+            params = {
+                "car": car_hash_id,
+            }
+
+            # Выполняем запрос к API технического листа
+            response = await self.http_client.get(
+                url=f"{self.base_url}/v2/dealers/web/accident_repairs_for_auction/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info(
+                    f"✅ Успешно получен технический лист для автомобиля {car_hash_id}"
+                )
+                return data
+            else:
+                logger.error(
+                    f"❌ Ошибка при получении технического листа для {car_hash_id}: {response.status_code} - {response.text}"
+                )
+                return None
+
+        except Exception as e:
+            logger.error(
+                f"❌ Исключение при получении технического листа для {car_hash_id}: {e}"
+            )
+            return None
+
+    async def get_car_with_accident_repairs(
+        self, car_hash_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Получает детальную информацию об автомобиле вместе с техническим листом
+
+        Args:
+            car_hash_id: Hash ID автомобиля
+
+        Returns:
+            Комбинированные данные автомобиля и технического листа
+        """
+        try:
+            # Получаем основную информацию об автомобиле
+            car_detail = await self.get_car_detail(car_hash_id)
+            if not car_detail:
+                logger.error(
+                    f"❌ Не удалось получить детальную информацию об автомобиле {car_hash_id}"
+                )
+                return None
+
+            # Получаем технический лист
+            accident_repairs = await self.get_accident_repairs(car_hash_id)
+
+            # Комбинируем данные
+            combined_data = {
+                "hash_id": car_hash_id,
+                "status": car_detail.status,
+                "status_display": car_detail.status_display,
+                "full_name": car_detail.detail.full_name,
+                "brand_name": car_detail.detail.brand_name,
+                "year": car_detail.detail.year,
+                "mileage": car_detail.detail.mileage,
+                "main_image_url": car_detail.detail.main_image_url,
+                "desired_price": car_detail.auction.desired_price,
+                "accident_repairs": accident_repairs,
+            }
+
+            logger.info(
+                f"✅ Успешно получены данные автомобиля {car_hash_id} с техническим листом"
+            )
+            return combined_data
+
+        except Exception as e:
+            logger.error(
+                f"❌ Исключение при получении данных автомобиля {car_hash_id} с техническим листом: {e}"
+            )
+            return None

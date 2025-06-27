@@ -1,0 +1,631 @@
+{
+  "type": null,
+  "image_url": "https://heydealer-api.s3.amazonaws.com/static-dj42/img/v2/categorized_accident/dealers/web/accident_repairs_front_panel.fd308c17aee5.png",
+  "image_width": 420,
+  "accident_repairs": [
+    {
+      "part": "bumper_front",
+      "part_display": "앞범퍼 또는 라이트",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 12],
+      "category": "etc",
+      "max_reduction_ratio": {
+        "exchange": 0.0,
+        "weld": 0.0
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.0,
+        "weld": 0.0
+      }
+    },
+    {
+      "part": "bumper_rear",
+      "part_display": "뒷범퍼 또는 라이트",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 279],
+      "category": "etc",
+      "max_reduction_ratio": {
+        "exchange": 0.0,
+        "weld": 0.0
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.0,
+        "weld": 0.0
+      }
+    },
+    {
+      "part": "hood",
+      "part_display": "본넷",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 72],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.04,
+        "weld": 0.04
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.03,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "roof_panel",
+      "part_display": "루프패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 168],
+      "category": "outer_panel_rank_2",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "trunk_lid",
+      "part_display": "트렁크 도어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 240],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "fender_front_driver",
+      "part_display": "운전석 앞휀다",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [44, 80],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "fender_front_passenger",
+      "part_display": "조수석 앞휀다",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [376, 80],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "fender_rear_driver",
+      "part_display": "운전석 뒤휀다",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [44, 232],
+      "category": "outer_panel_rank_2",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "fender_rear_passenger",
+      "part_display": "조수석 뒤휀다",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [376, 232],
+      "category": "outer_panel_rank_2",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "side_sil_pannel_driver",
+      "part_display": "운전석 사이드실패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [16, 144],
+      "category": "outer_panel_rank_2",
+      "max_reduction_ratio": {
+        "exchange": 0.04,
+        "weld": 0.04
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.03,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "side_sil_pannel_passenger",
+      "part_display": "조수석 사이드실패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [404, 144],
+      "category": "outer_panel_rank_2",
+      "max_reduction_ratio": {
+        "exchange": 0.04,
+        "weld": 0.04
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.03,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "door_front_driver",
+      "part_display": "운전석 앞 도어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [40, 128],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "door_rear_driver",
+      "part_display": "운전석 뒤 도어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [40, 172],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "door_front_passenger",
+      "part_display": "조수석 앞 도어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [380, 128],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "door_rear_passenger",
+      "part_display": "조수석 뒤 도어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [380, 172],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.02,
+        "weld": 0.02
+      }
+    },
+    {
+      "part": "a_pillar_driver",
+      "part_display": "운전석 A 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [76, 128],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "a_pillar_passenger",
+      "part_display": "조수석 A 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [344, 128],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "b_pillar_driver",
+      "part_display": "운전석 B 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [68, 154],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "b_pillar_passenger",
+      "part_display": "조수석 B 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [352, 154],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "c_pillar_driver",
+      "part_display": "운전석 C 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [80, 184],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "c_pillar_passenger",
+      "part_display": "조수석 C 필러",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [342, 184],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "inside_panel_front_driver",
+      "part_display": "운전석 인사이드패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [238, 76],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "inside_panel_front_passenger",
+      "part_display": "조수석 인사이드패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [304, 76],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "wheel_house_front_driver",
+      "part_display": "운전석 앞 휠하우스",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [238, 100],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.07,
+        "weld": 0.07
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.06,
+        "weld": 0.04
+      }
+    },
+    {
+      "part": "wheel_house_front_passenger",
+      "part_display": "조수석 앞 휠하우스",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [304, 100],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.07,
+        "weld": 0.07
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.06,
+        "weld": 0.04
+      }
+    },
+    {
+      "part": "wheel_house_rear_driver",
+      "part_display": "운전석 뒤 휠하우스",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [240, 192],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "wheel_house_rear_passenger",
+      "part_display": "조수석 뒤 휠하우스",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [304, 192],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "side_member_front_driver",
+      "part_display": "운전석 앞 사이드멤버",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [258, 88],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "side_member_front_passenger",
+      "part_display": "조수석 앞 사이드멤버",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [284, 88],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "side_member_rear_driver",
+      "part_display": "운전석 뒤 사이드멤버",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [240, 216],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "side_member_rear_passenger",
+      "part_display": "조수석 뒤 사이드멤버",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [304, 216],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "front_panel",
+      "part_display": "프론트패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 48],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "radiator_support",
+      "part_display": "라디에이터 서포트",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [148, 48],
+      "category": "outer_panel_rank_1",
+      "max_reduction_ratio": {
+        "exchange": 0.03,
+        "weld": 0.03
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.0,
+        "weld": 0.0
+      }
+    },
+    {
+      "part": "cross_member",
+      "part_display": "크로스멤버",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 113],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "dash_panel",
+      "part_display": "대쉬패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 128],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "floor_panel",
+      "part_display": "플로어패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 156],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "package_tray",
+      "part_display": "패키지트레이",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 188],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "trunk_floor",
+      "part_display": "트렁크플로어",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 216],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    },
+    {
+      "part": "rear_panel",
+      "part_display": "리어패널",
+      "repair": "none",
+      "repair_display": "없음",
+      "position": [272, 248],
+      "category": "frame",
+      "max_reduction_ratio": {
+        "exchange": 0.05,
+        "weld": 0.05
+      },
+      "max_reduction_ratio_for_zero": {
+        "exchange": 0.04,
+        "weld": 0.03
+      }
+    }
+  ]
+}
