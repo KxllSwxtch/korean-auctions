@@ -763,11 +763,20 @@ class HeyDealerParser:
             logger.info(f"Year: {detail_data.get('year')}")
             logger.info(f"Mileage: {detail_data.get('mileage')}")
 
-            # Парсим детальную информацию напрямую
+            # Парсим interior_info если есть
+            interior_info = None
+            if detail_data.get("interior_info"):
+                interior_info = InteriorInfo(
+                    text=detail_data.get("interior_info", {}).get("text", ""),
+                    codes=detail_data.get("interior_info", {}).get("codes", []),
+                )
+
+            # Парсим детальную информацию напрямую с ВСЕМИ полями
             detail = CarDetail(
                 full_name=detail_data.get("full_name", ""),
                 model_part_name=detail_data.get("model_part_name", ""),
                 grade_part_name=detail_data.get("grade_part_name", ""),
+                brand_name=detail_data.get("brand_name", ""),
                 brand_image_url=detail_data.get("brand_image_url", ""),
                 main_image_url=detail_data.get("main_image_url", ""),
                 image_urls=detail_data.get("image_urls", []),
@@ -777,10 +786,13 @@ class HeyDealerParser:
                     "initial_registration_date", ""
                 ),
                 mileage=detail_data.get("mileage", 0),
-                interior_info=InteriorInfo(
-                    text=detail_data.get("interior_info", {}).get("text", ""),
-                    codes=detail_data.get("interior_info", {}).get("codes", []),
-                ),
+                color=detail_data.get("color", ""),
+                interior=detail_data.get("interior", ""),
+                interior_info=interior_info,
+                fuel=detail_data.get("fuel", ""),
+                fuel_display=detail_data.get("fuel_display", ""),
+                transmission=detail_data.get("transmission", ""),
+                transmission_display=detail_data.get("transmission_display", ""),
                 location=detail_data.get("location", ""),
                 short_location=detail_data.get("short_location", ""),
                 short_location_first_part_name=detail_data.get(

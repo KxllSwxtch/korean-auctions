@@ -44,6 +44,7 @@ class CarDetail(BaseModel):
     full_name: Optional[str] = Field(None, description="Полное название автомобиля")
     model_part_name: Optional[str] = Field(None, description="Название модели")
     grade_part_name: Optional[str] = Field(None, description="Название комплектации")
+    brand_name: Optional[str] = Field(None, description="Название бренда")
     brand_image_url: Optional[str] = Field(None, description="URL изображения бренда")
     main_image_url: Optional[str] = Field(None, description="URL основного изображения")
     image_urls: List[str] = Field(
@@ -55,8 +56,16 @@ class CarDetail(BaseModel):
         None, description="Дата первичной регистрации"
     )
     mileage: Optional[int] = Field(None, description="Пробег в км")
+    color: Optional[str] = Field(None, description="Цвет")
+    interior: Optional[str] = Field(None, description="Интерьер")
     interior_info: Optional[InteriorInfo] = Field(
         None, description="Информация об интерьере"
+    )
+    fuel: Optional[str] = Field(None, description="Тип топлива")
+    fuel_display: Optional[str] = Field(None, description="Отображение типа топлива")
+    transmission: Optional[str] = Field(None, description="Коробка передач")
+    transmission_display: Optional[str] = Field(
+        None, description="Отображение коробки передач"
     )
     location: Optional[str] = Field(None, description="Полное местоположение")
     short_location: Optional[str] = Field(None, description="Короткое местоположение")
