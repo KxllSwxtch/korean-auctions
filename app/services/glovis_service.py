@@ -505,7 +505,7 @@ class GlovisService:
                     }
                 )
 
-            logger.debug(f"� Найдено {len(models)} моделей для {manufacturer}")
+            logger.debug(f"🏭 Найдено {len(models)} моделей для {manufacturer}")
             return models
 
         except Exception as e:
@@ -886,7 +886,7 @@ class GlovisService:
                         "total_count": result.total_count,
                     }
 
-            return None
+                return None
 
         except Exception as e:
             logger.error(f"❌ Ошибка запроса к SSANCAR API: {e}")

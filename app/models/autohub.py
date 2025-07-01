@@ -50,6 +50,12 @@ class AutohubCar(BaseModel):
     parking_number: str = Field(..., description="Номер парковочного места")
     lane: Optional[str] = Field(None, description="Номер полосы")
 
+    # Информация об аукционе (для формирования ссылок на детальную страницу)
+    auction_date: Optional[str] = Field(None, description="Дата аукциона (YYYY-MM-DD)")
+    auction_title: Optional[str] = Field(None, description="Название аукциона")
+    auction_code: Optional[str] = Field(None, description="Код аукциона")
+    receive_code: Optional[str] = Field(None, description="Код получения")
+
     # Основная информация об автомобиле
     title: str = Field(..., description="Название автомобиля")
     year: int = Field(..., description="Год выпуска")

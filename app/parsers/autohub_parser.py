@@ -46,6 +46,10 @@ class AutohubParser:
             soup = BeautifulSoup(html_content, "html.parser")
             cars = []
 
+            # Извлекаем информацию об аукционе из страницы
+            auction_info = self._extract_auction_info(soup)
+            logger.info(f"Извлечена информация об аукционе: {auction_info}")
+
             # Ищем все блоки с автомобилями
             car_blocks = soup.find_all("div", class_="car_one")
 
@@ -53,7 +57,7 @@ class AutohubParser:
 
             for block in car_blocks:
                 try:
-                    car_data = self._parse_single_car(block)
+                    car_data = self._parse_single_car(block, auction_info)
                     if car_data:
                         cars.append(car_data)
                 except Exception as e:
@@ -67,12 +71,115 @@ class AutohubParser:
             logger.error(f"Ошибка при парсинге списка автомобилей: {e}")
             return []
 
-    def _parse_single_car(self, car_block: Tag) -> Optional[AutohubCar]:
+    def _extract_auction_info(self, soup: BeautifulSoup) -> Dict[str, Optional[str]]:
+        """
+        Извлекает информацию об аукционе из HTML страницы
+
+        Args:
+            soup: BeautifulSoup объект страницы
+
+        Returns:
+            Dict: Информация об аукционе
+        """
+        auction_info = {
+            "auction_date": None,
+            "auction_title": None,
+            "auction_code": None,
+            "receive_code": None,
+        }
+
+        try:
+            # Пытаемся найти информацию об аукционе в скрытых полях формы
+            hidden_inputs = soup.find_all("input", type="hidden")
+            for input_field in hidden_inputs:
+                name = input_field.get("name", "")
+                value = input_field.get("value", "")
+
+                if "StartDt" in name or "AucDate" in name:
+                    auction_info["auction_date"] = value
+                elif "AucTitle" in name or "title" in name.lower():
+                    auction_info["auction_title"] = value
+                elif "AucCode" in name:
+                    auction_info["auction_code"] = value
+                elif "receivecd" in name.lower() or "receiveCd" in name:
+                    auction_info["receive_code"] = value
+
+            # Пытаемся найти информацию в заголовке страницы
+            title_element = soup.find("title")
+            if title_element and not auction_info["auction_title"]:
+                title_text = title_element.get_text(strip=True)
+                # Извлекаем название аукциона из заголовка
+                if "경매" in title_text or "auction" in title_text.lower():
+                    auction_info["auction_title"] = title_text
+
+            # Пытаемся найти информацию в элементах страницы
+            auction_info_element = soup.find(
+                "div", class_=lambda x: x and "auction" in x.lower()
+            )
+            if auction_info_element:
+                text = auction_info_element.get_text(strip=True)
+                # Ищем дату в формате YYYY-MM-DD или YYYY/MM/DD
+                date_match = re.search(r"(\d{4}[-/]\d{2}[-/]\d{2})", text)
+                if date_match and not auction_info["auction_date"]:
+                    auction_info["auction_date"] = date_match.group(1).replace("/", "-")
+
+            # Ищем информацию в JavaScript переменных
+            script_tags = soup.find_all("script")
+            for script in script_tags:
+                if script.string:
+                    script_content = script.string
+
+                    # Ищем JavaScript переменные с информацией об аукционе
+                    patterns = {
+                        "auction_date": [
+                            r'auc_date\s*[:=]\s*["\']([^"\']+)["\']',
+                            r'startDt\s*[:=]\s*["\']([^"\']+)["\']',
+                        ],
+                        "auction_title": [
+                            r'auc_title\s*[:=]\s*["\']([^"\']+)["\']',
+                            r'aucTitle\s*[:=]\s*["\']([^"\']+)["\']',
+                        ],
+                        "auction_code": [
+                            r'auc_code\s*[:=]\s*["\']([^"\']+)["\']',
+                            r'aucCode\s*[:=]\s*["\']([^"\']+)["\']',
+                        ],
+                        "receive_code": [
+                            r'receive_code\s*[:=]\s*["\']([^"\']+)["\']',
+                            r'receivecd\s*[:=]\s*["\']([^"\']+)["\']',
+                        ],
+                    }
+
+                    for key, pattern_list in patterns.items():
+                        if not auction_info[key]:  # Если еще не найдено
+                            for pattern in pattern_list:
+                                match = re.search(
+                                    pattern, script_content, re.IGNORECASE
+                                )
+                                if match:
+                                    auction_info[key] = match.group(1)
+                                    break
+
+            # Логируем найденную информацию
+            found_info = {k: v for k, v in auction_info.items() if v}
+            if found_info:
+                logger.info(f"Найдена информация об аукционе: {found_info}")
+            else:
+                logger.warning("Информация об аукционе не найдена в HTML")
+
+        except Exception as e:
+            logger.error(f"Ошибка при извлечении информации об аукционе: {e}")
+
+        return auction_info
+
+    def _parse_single_car(
+        self, car_block: Tag, auction_info: Dict[str, Optional[str]] = None
+    ) -> Optional[AutohubCar]:
         """
         Парсит информацию об одном автомобиле
 
         Args:
             car_block: BeautifulSoup элемент с информацией об автомобиле
+            auction_info: Информация об аукционе
 
         Returns:
             AutohubCar: Данные об автомобиле
@@ -97,6 +204,9 @@ class AutohubParser:
             status_info = self._extract_status_info(car_block)
             image_url = self._extract_main_image(car_block)
 
+            # Используем информацию об аукционе, если она доступна
+            auction_data = auction_info or {}
+
             # Создаем объект автомобиля
             car = AutohubCar(
                 car_id=car_id,
@@ -106,6 +216,11 @@ class AutohubParser:
                 car_number=identifiers.get("car_number", ""),
                 parking_number=identifiers.get("parking_number", ""),
                 lane=identifiers.get("lane"),
+                # Информация об аукционе
+                auction_date=auction_data.get("auction_date"),
+                auction_title=auction_data.get("auction_title"),
+                auction_code=auction_data.get("auction_code"),
+                receive_code=auction_data.get("receive_code"),
                 # Основная информация
                 year=car_info.get("year", 0),
                 mileage=car_info.get("mileage", ""),
