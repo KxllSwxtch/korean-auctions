@@ -1051,3 +1051,264 @@ async def get_session_info(
     except Exception as e:
         logger.error(f"Ошибка при получении информации о сессии: {e}")
         return {"success": False, "message": f"Ошибка: {str(e)}", "data": None}
+
+
+# =============================================================================
+# SSANCAR FILTER ENDPOINTS
+# =============================================================================
+
+
+@router.get("/filters/ssancar/manufacturers")
+async def get_ssancar_manufacturers(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """
+    Получить список производителей SSANCAR
+
+    Возвращает полный список производителей автомобилей с количеством доступных моделей.
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/filters/ssancar/manufacturers
+    ```
+
+    **Ответ включает:**
+    - Код производителя
+    - Название производителя (корейское и английское)
+    - Количество доступных автомобилей
+    - Статус доступности
+    """
+    try:
+        glovis_logger.info("🏭 Запрос списка производителей SSANCAR")
+
+        result = await service.get_ssancar_manufacturers()
+
+        if result.get("success"):
+            glovis_logger.info(
+                f"✅ Получено {result.get('total_count', 0)} производителей SSANCAR"
+            )
+        else:
+            glovis_logger.error(
+                f"❌ Ошибка получения производителей SSANCAR: {result.get('message')}"
+            )
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(
+            f"❌ Неожиданная ошибка при получении производителей SSANCAR: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/filters/ssancar/models/{manufacturer_code}")
+async def get_ssancar_models(
+    manufacturer_code: str, service: GlovisService = Depends(get_glovis_service)
+):
+    """
+    Получить список моделей SSANCAR для выбранного производителя
+
+    **Параметры:**
+    - **manufacturer_code**: Код производителя (например, HYUNDAI, KIA)
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/filters/ssancar/models/HYUNDAI
+    GET /api/v1/glovis/filters/ssancar/models/BMW
+    ```
+
+    **Ответ включает:**
+    - Код модели
+    - Название модели
+    - Код производителя
+    - Количество доступных автомобилей
+    """
+    try:
+        glovis_logger.info(
+            f"🚗 Запрос моделей SSANCAR для производителя {manufacturer_code}"
+        )
+
+        result = await service.get_ssancar_models(manufacturer_code)
+
+        if result.get("success"):
+            glovis_logger.info(
+                f"✅ Получено {result.get('total_count', 0)} моделей SSANCAR"
+            )
+        else:
+            glovis_logger.error(
+                f"❌ Ошибка получения моделей SSANCAR: {result.get('message')}"
+            )
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(f"❌ Неожиданная ошибка при получении моделей SSANCAR: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.get("/filters/ssancar/options")
+async def get_ssancar_filter_options(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """
+    Получить все доступные опции фильтрации SSANCAR
+
+    Возвращает полный набор доступных фильтров для поиска автомобилей.
+
+    **Пример использования:**
+    ```
+    GET /api/v1/glovis/filters/ssancar/options
+    ```
+
+    **Ответ включает:**
+    - Список производителей
+    - Типы топлива
+    - Цвета
+    - Типы трансмиссии
+    - Оценки состояния
+    - Недели аукциона
+    - Диапазоны годов и цен
+    """
+    try:
+        glovis_logger.info("🔧 Запрос опций фильтрации SSANCAR")
+
+        result = await service.get_ssancar_filter_options()
+
+        if result.get("success"):
+            glovis_logger.info("✅ Опции фильтрации SSANCAR получены")
+        else:
+            glovis_logger.error(
+                f"❌ Ошибка получения опций фильтрации SSANCAR: {result.get('message')}"
+            )
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(
+            f"❌ Неожиданная ошибка при получении опций фильтрации SSANCAR: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+@router.post("/filters/ssancar/search")
+async def search_ssancar_cars_with_filters(
+    filters: Dict[str, Any] = Body(..., description="Фильтры поиска"),
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """
+    Поиск автомобилей SSANCAR с расширенными фильтрами
+
+    **Тело запроса:**
+    ```json
+    {
+        "week_number": 1,
+        "manufacturer": "HYUNDAI",
+        "model": "Sonata",
+        "fuel": "gasoline",
+        "color": "white",
+        "year_from": 2020,
+        "year_to": 2024,
+        "price_from": 5000,
+        "price_to": 30000,
+        "transmission": "AT",
+        "condition_grade": "A/1",
+        "search_text": "하이브리드",
+        "page": 1,
+        "page_size": 15
+    }
+    ```
+
+    **Поддерживаемые фильтры:**
+    - **week_number**: Номер недели аукциона (1-4)
+    - **manufacturer**: Код производителя
+    - **model**: Модель автомобиля
+    - **fuel**: Тип топлива (gasoline, diesel, hybrid, electric, lpg)
+    - **color**: Цвет автомобиля
+    - **year_from/year_to**: Диапазон годов выпуска
+    - **price_from/price_to**: Диапазон цен ($)
+    - **transmission**: Тип трансмиссии (AT, MT, CVT)
+    - **condition_grade**: Оценка состояния (A/1, A/2, B/1, и т.д.)
+    - **engine_volume_from/engine_volume_to**: Объем двигателя (cc)
+    - **mileage_from/mileage_to**: Пробег (км)
+    - **search_text**: Текст для поиска
+    - **page**: Номер страницы
+    - **page_size**: Размер страницы (1-100)
+
+    **Пример использования:**
+    ```
+    POST /api/v1/glovis/filters/ssancar/search
+    Content-Type: application/json
+
+    {
+        "manufacturer": "HYUNDAI",
+        "year_from": 2020,
+        "page": 1
+    }
+    ```
+    """
+    try:
+        glovis_logger.info(f"🔍 Поиск автомобилей SSANCAR с фильтрами")
+
+        result = await service.search_ssancar_cars_with_filters(filters)
+
+        if result.get("success"):
+            glovis_logger.info(
+                f"✅ Найдено {result.get('total_count', 0)} автомобилей "
+                f"(страница {result.get('current_page', 1)}/{result.get('total_pages', 1)})"
+            )
+        else:
+            glovis_logger.error(f"❌ Ошибка поиска SSANCAR: {result.get('message')}")
+
+        return result
+
+    except Exception as e:
+        glovis_logger.error(
+            f"❌ Неожиданная ошибка при поиске SSANCAR с фильтрами: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Внутренняя ошибка сервера: {str(e)}"
+        )
+
+
+# =============================================================================
+# COMPATIBILITY ENDPOINTS (for backward compatibility)
+# =============================================================================
+
+
+@router.get("/filters/ssancar-manufacturers", include_in_schema=False)
+async def get_ssancar_manufacturers_compat(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Backward compatibility endpoint"""
+    return await get_ssancar_manufacturers(service)
+
+
+@router.get("/filters/ssancar-models/{manufacturer_code}", include_in_schema=False)
+async def get_ssancar_models_compat(
+    manufacturer_code: str, service: GlovisService = Depends(get_glovis_service)
+):
+    """Backward compatibility endpoint"""
+    return await get_ssancar_models(manufacturer_code, service)
+
+
+@router.get("/filters/ssancar-options", include_in_schema=False)
+async def get_ssancar_filter_options_compat(
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Backward compatibility endpoint"""
+    return await get_ssancar_filter_options(service)
+
+
+@router.post("/filters/ssancar-search", include_in_schema=False)
+async def search_ssancar_cars_with_filters_compat(
+    filters: Dict[str, Any] = Body(...),
+    service: GlovisService = Depends(get_glovis_service),
+):
+    """Backward compatibility endpoint"""
+    return await search_ssancar_cars_with_filters(filters, service)

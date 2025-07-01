@@ -4,6 +4,8 @@
 
 import asyncio
 import time
+import json
+import os
 from typing import List, Optional, Dict, Any
 import requests
 from requests.adapters import HTTPAdapter
@@ -11,7 +13,17 @@ from urllib3.util.retry import Retry
 from fake_useragent import UserAgent
 from datetime import datetime, timedelta
 
-from app.models.glovis import GlovisCar, GlovisResponse, GlovisError, SSANCARFilters
+from app.models.glovis import (
+    GlovisCar,
+    GlovisResponse,
+    GlovisError,
+    SSANCARFilters,
+    SSANCARManufacturersResponse,
+    SSANCARModelsResponse,
+    SSANCARFilterOptionsResponse,
+    SSANCARFilteredCarsResponse,
+    SSANCARAdvancedFilters,
+)
 from app.parsers.glovis_parser import GlovisParser
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -32,6 +44,9 @@ class GlovisService:
         self._authenticated = False
         self._session_created_at = None
         self._session_timeout = 3600  # 1 час
+
+        # Загружаем данные carList из SSANCAR
+        self._carlist_data = self._load_carlist_data()
 
         # SSANCAR специфичные cookies и headers
         self._default_cookies = {
@@ -359,3 +374,530 @@ class GlovisService:
                 logger.info("🧹 Сессия SSANCAR закрыта")
         except:
             pass
+
+    def _load_carlist_data(self) -> Dict[str, Any]:
+        """Загружает данные carList из извлеченного JSON файла"""
+        try:
+            # Путь к файлу с данными carList
+            carlist_path = os.path.join(os.getcwd(), "ssancar_carlist.json")
+
+            if not os.path.exists(carlist_path):
+                logger.warning(
+                    f"⚠️ Файл {carlist_path} не найден, используем пустые данные"
+                )
+                return self._get_fallback_carlist_data()
+
+            with open(carlist_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            logger.info(
+                f"✅ Загружены данные carList: {len(data.get('korean_to_english_manufacturers', {}))} производителей"
+            )
+            return data
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при загрузке carList: {e}")
+            return self._get_fallback_carlist_data()
+
+    def _get_fallback_carlist_data(self) -> Dict[str, Any]:
+        """Возвращает fallback данные если основные не загрузились"""
+        return {
+            "korean_to_english_manufacturers": {
+                "현대": "HYUNDAI",
+                "기아": "KIA",
+                "BMW": "BMW",
+                "벤츠": "BENZ",
+                "아우디": "AUDI",
+            },
+            "english_to_korean_manufacturers": {
+                "HYUNDAI": "현대",
+                "KIA": "기아",
+                "BMW": "BMW",
+                "BENZ": "벤츠",
+                "AUDI": "아우디",
+            },
+            "english_model_to_code": {},
+            "korean_model_to_code": {},
+            "full_carlist": {},
+        }
+
+    # =============================================================================
+    # МАППИНГ ДАННЫХ ДЛЯ SSANCAR
+    # =============================================================================
+
+    def _convert_manufacturer_to_korean(self, english_code: str) -> str:
+        """Конвертируем английский код производителя в корейский для SSANCAR"""
+        # Используем данные из carList
+        mapping = self._carlist_data.get("english_to_korean_manufacturers", {})
+        korean_name = mapping.get(english_code, english_code)
+        logger.debug(f"🔄 Маппинг производителя: {english_code} -> {korean_name}")
+        return korean_name
+
+    def _convert_fuel_to_korean(self, english_fuel: str) -> str:
+        """Конвертируем английское название топлива в корейское для SSANCAR"""
+        mapping = {
+            "Gasoline": "휘발유",
+            "Diesel": "경유",
+            "LPG": "LPG",
+            "Gasol/Hybrid": "하이브리드",
+            "Electric": "전기",
+            "Hydrogen": "수소",
+        }
+        korean_fuel = mapping.get(english_fuel, english_fuel)
+        logger.debug(f"🔄 Маппинг топлива: {english_fuel} -> {korean_fuel}")
+        return korean_fuel
+
+    def _convert_color_to_korean(self, english_color: str) -> str:
+        """Конвертируем английское название цвета в корейское для SSANCAR"""
+        mapping = {
+            "Black": "검정",
+            "White": "흰",
+            "Gray": "회",
+            "Silver": "은",
+            "Pearl": "펄",
+            "Blue": "파란",
+            "Sky": "하늘",
+            "Red": "빨강",
+            "Yellow": "노란색",
+            "Orange": "오렌지",
+            "Brown": "갈",
+            "Gold": "금",
+            "Green": "녹",
+        }
+        korean_color = mapping.get(english_color, english_color)
+        logger.debug(f"🔄 Маппинг цвета: {english_color} -> {korean_color}")
+        return korean_color
+
+    def _convert_model_to_code(self, manufacturer: str, model_name: str) -> str:
+        """Конвертируем название модели в код для SSANCAR API"""
+        # Используем данные из carList
+        models_mapping = self._carlist_data.get("english_model_to_code", {}).get(
+            manufacturer, {}
+        )
+        model_code = models_mapping.get(model_name, "")
+        logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {model_code}")
+        return model_code
+
+    def get_models_for_manufacturer(self, manufacturer: str) -> List[Dict[str, str]]:
+        """Получает список моделей для указанного производителя из carList"""
+        try:
+            # Получаем корейское название производителя
+            korean_manufacturer = self._convert_manufacturer_to_korean(manufacturer)
+
+            # Получаем модели из carList
+            carlist = self._carlist_data.get("full_carlist", {})
+            models_data = carlist.get(korean_manufacturer, [])
+
+            # Формируем ответ в формате API
+            models = []
+            for model in models_data:
+                models.append(
+                    {
+                        "code": model.get("no", ""),
+                        "name": model.get("e_name", ""),
+                        "name_en": model.get("e_name", ""),
+                        "name_kr": model.get("name", ""),
+                        "manufacturer_code": manufacturer,
+                        "count": 0,  # Значение по умолчанию для совместимости
+                    }
+                )
+
+            logger.debug(f"� Найдено {len(models)} моделей для {manufacturer}")
+            return models
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения моделей для {manufacturer}: {e}")
+            return []
+
+    def get_all_manufacturers_from_carlist(self) -> List[Dict[str, str]]:
+        """Получает все производители из carList"""
+        try:
+            korean_to_english = self._carlist_data.get(
+                "korean_to_english_manufacturers", {}
+            )
+            manufacturers = []
+
+            for korean_name, english_name in korean_to_english.items():
+                # Получаем количество моделей для производителя
+                carlist = self._carlist_data.get("full_carlist", {})
+                model_count = len(carlist.get(korean_name, []))
+
+                manufacturers.append(
+                    {
+                        "code": english_name,
+                        "name": english_name,
+                        "name_en": english_name,
+                        "name_kr": korean_name,
+                        "model_count": model_count,
+                        "count": 0,  # Значение по умолчанию для совместимости
+                        "enabled": True,  # Значение по умолчанию для совместимости
+                    }
+                )
+
+            logger.debug(f"🏭 Найдено {len(manufacturers)} производителей в carList")
+            return manufacturers
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения производителей из carList: {e}")
+            return []
+
+    # =============================================================================
+    # SSANCAR FILTER METHODS
+    # =============================================================================
+
+    async def get_ssancar_manufacturers(self) -> dict:
+        """
+        Получить список производителей SSANCAR из carList данных
+        """
+        from app.models.glovis import SSANCARManufacturersResponse
+
+        try:
+            logger.info("🏭 Получение списка производителей SSANCAR из carList")
+
+            # Получаем производителей из carList
+            manufacturers = self.get_all_manufacturers_from_carlist()
+
+            response = SSANCARManufacturersResponse(
+                success=True,
+                message=f"Получено {len(manufacturers)} производителей SSANCAR из carList",
+                manufacturers=manufacturers,
+                total_count=len(manufacturers),
+            )
+
+            logger.info(
+                f"✅ Возвращено {len(manufacturers)} производителей SSANCAR из carList"
+            )
+            return response.model_dump()
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения производителей SSANCAR: {e}")
+
+            return SSANCARManufacturersResponse(
+                success=False,
+                message=f"Ошибка получения производителей: {str(e)}",
+                manufacturers=[],
+                total_count=0,
+            ).model_dump()
+
+    async def get_ssancar_models(self, manufacturer_code: str) -> dict:
+        """
+        Получить список моделей для указанного производителя SSANCAR из carList
+        """
+        try:
+            from app.models.glovis import SSANCARModelsResponse
+
+            logger.info(
+                f"🚗 Получение моделей SSANCAR для производителя {manufacturer_code} из carList"
+            )
+
+            # Получаем модели из carList
+            models = self.get_models_for_manufacturer(manufacturer_code)
+
+            response = SSANCARModelsResponse(
+                success=True,
+                message=f"Получено {len(models)} моделей для {manufacturer_code} из carList",
+                models=models,
+                manufacturer_code=manufacturer_code,
+                total_count=len(models),
+            )
+
+            logger.info(
+                f"✅ Возвращено {len(models)} моделей для {manufacturer_code} из carList"
+            )
+            return response.model_dump()
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения моделей SSANCAR: {e}")
+            from app.models.glovis import SSANCARModelsResponse
+
+            return SSANCARModelsResponse(
+                success=False,
+                message=f"Ошибка получения моделей: {str(e)}",
+                models=[],
+                manufacturer_code=manufacturer_code,
+                total_count=0,
+            ).model_dump()
+
+    async def get_ssancar_filter_options(self) -> dict:
+        """
+        Получить все доступные опции фильтрации SSANCAR
+        """
+        try:
+            from app.models.glovis import SSANCARFilterOptionsResponse
+
+            logger.info("🔧 Получение опций фильтрации SSANCAR")
+
+            # Получаем статические данные
+            manufacturers = self.parser.get_static_manufacturers()
+            fuel_types = self.parser.get_static_fuel_types()
+            colors = self.parser.get_static_colors()
+            transmissions = self.parser.get_static_transmissions()
+            condition_grades = self.parser.get_static_condition_grades()
+            weeks = self.parser.get_static_weeks()
+
+            # Анализируем доступные данные для определения диапазонов
+            year_range = {"min": 1990, "max": 2025}
+            price_range = {"min": 0, "max": 100000}
+
+            try:
+                # Получаем данные для анализа диапазонов
+                params = {"weekNo": "1", "list": "100", "pages": "0"}
+                api_data = await self._make_request_to_ssancar(params)
+
+                if api_data and "cars" in api_data:
+                    analysis = self.parser.analyze_car_data_for_filters(
+                        api_data["cars"]
+                    )
+
+                    if analysis["years"]["min"] != 9999:
+                        year_range = analysis["years"]
+
+                    if analysis["prices"]["min"] != float("inf"):
+                        price_range = analysis["prices"]
+
+                    # Обновляем счетчики производителей
+                    updated_manufacturers = self.parser.parse_manufacturers_from_cars(
+                        api_data["cars"]
+                    )
+                    if updated_manufacturers:
+                        manufacturers = updated_manufacturers
+
+            except Exception as e:
+                logger.warning(
+                    f"⚠️ Не удалось проанализировать данные для фильтров: {e}"
+                )
+
+            response = SSANCARFilterOptionsResponse(
+                success=True,
+                message="Опции фильтрации SSANCAR получены",
+                manufacturers=manufacturers,
+                fuel_types=fuel_types,
+                colors=colors,
+                transmissions=transmissions,
+                condition_grades=condition_grades,
+                weeks=weeks,
+                year_range=year_range,
+                price_range=price_range,
+            )
+
+            logger.info("✅ Опции фильтрации SSANCAR получены")
+            return response.model_dump()
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения опций фильтрации SSANCAR: {e}")
+            from app.models.glovis import SSANCARFilterOptionsResponse
+
+            return SSANCARFilterOptionsResponse(
+                success=False,
+                message=f"Ошибка получения опций фильтрации: {str(e)}",
+                manufacturers=[],
+                fuel_types=[],
+                colors=[],
+                transmissions=[],
+                condition_grades=[],
+                weeks=[],
+                year_range={"min": 1990, "max": 2025},
+                price_range={"min": 0, "max": 100000},
+            ).model_dump()
+
+    async def search_ssancar_cars_with_filters(self, filters: dict) -> dict:
+        """
+        Поиск автомобилей SSANCAR с применением фильтров
+        """
+        import time
+
+        start_time = time.time()
+
+        try:
+            from app.models.glovis import (
+                SSANCARFilteredCarsResponse,
+                SSANCARAdvancedFilters,
+            )
+
+            logger.info(f"🔍 Поиск автомобилей SSANCAR с фильтрами: {filters}")
+
+            # Преобразуем фильтры в модель для валидации
+            filter_model = SSANCARAdvancedFilters(**filters)
+
+            # Подготавливаем параметры для API SSANCAR
+            api_params = self._convert_filters_to_ssancar_params(filter_model)
+
+            # Выполняем запрос к SSANCAR API
+            api_data = await self._make_request_to_ssancar(api_params)
+
+            cars = []
+            total_count = 0
+
+            if api_data and api_data.get("success"):
+                cars = api_data.get("cars", [])
+                total_count = api_data.get("total_count", len(cars))
+
+            # Вычисляем пагинацию
+            page_size = filter_model.page_size or 15
+            current_page = filter_model.page or 1
+            total_pages = max(1, (total_count + page_size - 1) // page_size)
+
+            response = SSANCARFilteredCarsResponse(
+                success=True,
+                message=f"Найдено {total_count} автомобилей",
+                applied_filters=filter_model,
+                cars=cars,
+                total_count=total_count,
+                current_page=current_page,
+                page_size=page_size,
+                total_pages=total_pages,
+                has_next_page=current_page < total_pages,
+                has_prev_page=current_page > 1,
+                request_duration=time.time() - start_time,
+            )
+
+            logger.info(
+                f"✅ Найдено {total_count} автомобилей "
+                f"(страница {current_page}/{total_pages})"
+            )
+
+            return response.model_dump()
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка поиска автомобилей SSANCAR с фильтрами: {e}")
+            from app.models.glovis import (
+                SSANCARFilteredCarsResponse,
+                SSANCARAdvancedFilters,
+            )
+
+            # Создаем пустые фильтры при ошибке
+            empty_filters = SSANCARAdvancedFilters()
+
+            return SSANCARFilteredCarsResponse(
+                success=False,
+                message=f"Ошибка поиска: {str(e)}",
+                applied_filters=empty_filters,
+                cars=[],
+                total_count=0,
+                current_page=1,
+                page_size=15,
+                total_pages=1,
+                has_next_page=False,
+                has_prev_page=False,
+                request_duration=time.time() - start_time,
+            ).model_dump()
+
+    def _convert_filters_to_ssancar_params(self, filters) -> dict:
+        """
+        Преобразует фильтры в параметры API SSANCAR
+        """
+        params = {
+            "list": str(filters.page_size or 15),
+            "pages": str(
+                (filters.page or 1) - 1
+            ),  # SSANCAR использует 0-based pagination
+        }
+
+        # Основные фильтры
+        if filters.week_number:
+            params["weekNo"] = str(filters.week_number)
+        else:
+            params["weekNo"] = "1"  # По умолчанию 1-я неделя
+
+        if filters.manufacturer:
+            # Конвертируем английский код в корейский для SSANCAR
+            korean_manufacturer = self._convert_manufacturer_to_korean(
+                filters.manufacturer
+            )
+            params["maker"] = korean_manufacturer
+
+        if filters.model:
+            # Если модель передается как название, конвертируем в код
+            if filters.manufacturer and not filters.model.isdigit():
+                model_code = self.convert_model_to_code(
+                    filters.manufacturer, filters.model
+                )
+                params["model"] = model_code if model_code else filters.model
+            else:
+                params["model"] = filters.model
+
+        if filters.fuel:
+            # Конвертируем английское название топлива в корейское
+            korean_fuel = self._convert_fuel_to_korean(filters.fuel)
+            params["fuel"] = korean_fuel
+
+        if filters.color:
+            # Конвертируем английское название цвета в корейское
+            korean_color = self._convert_color_to_korean(filters.color)
+            params["color"] = korean_color
+
+        # Диапазоны
+        if filters.year_from:
+            params["yearFrom"] = str(filters.year_from)
+
+        if filters.year_to:
+            params["yearTo"] = str(filters.year_to)
+
+        if filters.price_from:
+            params["priceFrom"] = str(filters.price_from)
+
+        if filters.price_to:
+            params["priceTo"] = str(filters.price_to)
+
+        # Дополнительные фильтры
+        if hasattr(filters, "transmission") and filters.transmission:
+            params["transmission"] = filters.transmission
+
+        if hasattr(filters, "condition_grade") and filters.condition_grade:
+            params["condition"] = filters.condition_grade
+
+        if hasattr(filters, "search_text") and filters.search_text:
+            params["searchText"] = filters.search_text
+
+        logger.info(f"🔧 Преобразованы параметры SSANCAR: {params}")
+        return params
+
+    async def _make_request_to_ssancar(self, params: dict) -> Optional[dict]:
+        """
+        Выполняет запрос к SSANCAR API и возвращает результат
+
+        Args:
+            params: Параметры запроса
+
+        Returns:
+            Optional[dict]: Результат запроса или None при ошибке
+        """
+        try:
+            logger.info(f"🌐 Запрос к SSANCAR API с параметрами: {params}")
+
+            # Выполняем запрос к SSANCAR
+            response = await self._fetch_car_list(SSANCARFilters(**params))
+
+            if response:
+                # Парсим ответ
+                result = self.parser.parse_car_list(
+                    response,
+                    page=int(params.get("pages", 0)),
+                    week_no=params.get("weekNo", "1"),
+                )
+
+                if result.success:
+                    return {
+                        "success": True,
+                        "cars": [car.model_dump() for car in result.cars],
+                        "total_count": result.total_count,
+                    }
+
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка запроса к SSANCAR API: {e}")
+            return None
+
+    # =============================================================================
+    # CARLIST METHODS - Working with real SSANCAR data
+    # =============================================================================
+
+    def convert_model_to_code(self, manufacturer: str, model_name: str) -> str:
+        """Конвертируем название модели в код для SSANCAR API"""
+        models_mapping = self._carlist_data.get("english_model_to_code", {}).get(
+            manufacturer, {}
+        )
+        model_code = models_mapping.get(model_name, "")
+        logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {model_code}")
+        return model_code

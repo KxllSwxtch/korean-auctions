@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -240,3 +240,187 @@ class SSANCARFilters(BaseModel):
                 "no": "",
             }
         }
+
+
+# =============================================================================
+# SSANCAR FILTER MODELS
+# =============================================================================
+
+
+class SSANCARManufacturer(BaseModel):
+    """Модель производителя SSANCAR"""
+
+    code: str = Field(..., description="Код производителя")
+    name: str = Field(..., description="Название производителя")
+    name_en: Optional[str] = Field(None, description="Название на английском")
+    name_kr: Optional[str] = Field(None, description="Название на корейском")
+    model_count: int = Field(0, description="Количество моделей производителя")
+    count: int = Field(0, description="Количество доступных автомобилей")
+    enabled: bool = Field(True, description="Доступен ли для выбора")
+
+
+class SSANCARModel(BaseModel):
+    """Модель автомобиля SSANCAR"""
+
+    code: str = Field(..., description="Код модели")
+    name: str = Field(..., description="Название модели")
+    name_en: Optional[str] = Field(None, description="Название на английском")
+    name_kr: Optional[str] = Field(None, description="Название на корейском")
+    manufacturer_code: str = Field(..., description="Код производителя")
+    count: int = Field(0, description="Количество доступных автомобилей")
+
+
+class SSANCARFuelType(BaseModel):
+    """Тип топлива SSANCAR"""
+
+    code: str = Field(..., description="Код типа топлива")
+    name: str = Field(..., description="Название типа топлива")
+
+
+class SSANCARColor(BaseModel):
+    """Цвет автомобиля SSANCAR"""
+
+    code: str = Field(..., description="Код цвета")
+    name: str = Field(..., description="Название цвета")
+
+
+class SSANCARTransmission(BaseModel):
+    """Тип трансмиссии SSANCAR"""
+
+    code: str = Field(..., description="Код трансмиссии")
+    name: str = Field(..., description="Название трансмиссии")
+
+
+class SSANCARConditionGrade(BaseModel):
+    """Оценка состояния SSANCAR"""
+
+    code: str = Field(..., description="Код состояния")
+    name: str = Field(..., description="Описание состояния")
+
+
+class SSANCARWeek(BaseModel):
+    """Неделя аукциона SSANCAR"""
+
+    number: int = Field(..., description="Номер недели (1-4)")
+    name: str = Field(..., description="Описание недели")
+    active: bool = Field(True, description="Активна ли неделя")
+
+
+class SSANCARAdvancedFilters(BaseModel):
+    """Расширенные фильтры SSANCAR с дополнительными опциями"""
+
+    # Основные фильтры SSANCAR
+    week_number: Optional[int] = Field(1, description="Номер недели аукциона (1-4)")
+    manufacturer: Optional[str] = Field(None, description="Код производителя")
+    model: Optional[str] = Field(None, description="Модель автомобиля")
+    fuel: Optional[str] = Field(None, description="Тип топлива")
+    color: Optional[str] = Field(None, description="Цвет автомобиля")
+
+    # Диапазоны (делаем int для удобства API)
+    year_from: Optional[int] = Field(None, description="Год от")
+    year_to: Optional[int] = Field(None, description="Год до")
+    price_from: Optional[int] = Field(None, description="Цена от ($)")
+    price_to: Optional[int] = Field(None, description="Цена до ($)")
+
+    # Дополнительные фильтры
+    transmission: Optional[str] = Field(None, description="Тип трансмиссии")
+    condition_grade: Optional[str] = Field(None, description="Оценка состояния")
+    engine_volume_from: Optional[int] = Field(
+        None, description="Объем двигателя от (cc)"
+    )
+    engine_volume_to: Optional[int] = Field(None, description="Объем двигателя до (cc)")
+    mileage_from: Optional[int] = Field(None, description="Пробег от (км)")
+    mileage_to: Optional[int] = Field(None, description="Пробег до (км)")
+
+    # Текстовый поиск
+    search_text: Optional[str] = Field(None, description="Поиск по названию/номеру")
+
+    # Пагинация
+    page: Optional[int] = Field(1, description="Номер страницы", ge=1)
+    page_size: Optional[int] = Field(15, description="Размер страницы", ge=1, le=100)
+
+    # Сортировка
+    sort_by: Optional[str] = Field("default", description="Поле сортировки")
+    sort_order: Optional[str] = Field(
+        "asc", description="Порядок сортировки (asc/desc)"
+    )
+
+
+# =============================================================================
+# RESPONSE MODELS FOR SSANCAR FILTERS
+# =============================================================================
+
+
+class SSANCARManufacturersResponse(BaseModel):
+    """Ответ со списком производителей SSANCAR"""
+
+    success: bool = Field(True, description="Успешность операции")
+    message: str = Field("Список производителей получен", description="Сообщение")
+    manufacturers: List[SSANCARManufacturer] = Field(default_factory=list)
+    total_count: int = Field(0, description="Общее количество производителей")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class SSANCARModelsResponse(BaseModel):
+    """Ответ со списком моделей SSANCAR"""
+
+    success: bool = Field(True, description="Успешность операции")
+    message: str = Field("Список моделей получен", description="Сообщение")
+    models: List[SSANCARModel] = Field(default_factory=list)
+    manufacturer_code: Optional[str] = Field(None, description="Код производителя")
+    total_count: int = Field(0, description="Общее количество моделей")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class SSANCARFilterOptionsResponse(BaseModel):
+    """Ответ с опциями фильтрации SSANCAR"""
+
+    success: bool = Field(True, description="Успешность операции")
+    message: str = Field("Опции фильтрации получены", description="Сообщение")
+
+    # Списки фильтров
+    manufacturers: List[SSANCARManufacturer] = Field(default_factory=list)
+    fuel_types: List[SSANCARFuelType] = Field(default_factory=list)
+    colors: List[SSANCARColor] = Field(default_factory=list)
+    transmissions: List[SSANCARTransmission] = Field(default_factory=list)
+    condition_grades: List[SSANCARConditionGrade] = Field(default_factory=list)
+    weeks: List[SSANCARWeek] = Field(default_factory=list)
+
+    # Диапазоны
+    year_range: Dict[str, int] = Field(
+        default_factory=lambda: {"min": 1990, "max": 2025}
+    )
+    price_range: Dict[str, int] = Field(
+        default_factory=lambda: {"min": 0, "max": 100000}
+    )
+
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class SSANCARFilteredCarsResponse(BaseModel):
+    """Ответ с отфильтрованными автомобилями SSANCAR"""
+
+    success: bool = Field(True, description="Успешность операции")
+    message: str = Field("Автомобили найдены", description="Сообщение")
+
+    # Примененные фильтры
+    applied_filters: SSANCARAdvancedFilters = Field(
+        ..., description="Примененные фильтры"
+    )
+
+    # Результаты
+    cars: List[GlovisCar] = Field(default_factory=list)
+    total_count: int = Field(0, description="Общее количество найденных автомобилей")
+
+    # Пагинация
+    current_page: int = Field(1, description="Текущая страница")
+    page_size: int = Field(15, description="Размер страницы")
+    total_pages: int = Field(0, description="Общее количество страниц")
+    has_next_page: bool = Field(False, description="Есть ли следующая страница")
+    has_prev_page: bool = Field(False, description="Есть ли предыдущая страница")
+
+    # Метаданные
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    request_duration: Optional[float] = Field(
+        None, description="Время выполнения запроса"
+    )
