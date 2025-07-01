@@ -14,6 +14,7 @@ from app.routes import (
     glovis_windows_auth,
     heydealer,
     heydealer_filters,
+    ssancar_detail,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -65,6 +66,11 @@ app.include_router(
     heydealer_filters.router,
     prefix="/api/v1/heydealer/filters",
     tags=["HeyDealer Filters"],
+)
+app.include_router(
+    ssancar_detail.router,
+    prefix="/api/v1",
+    tags=["SSANCAR Car Details"],
 )
 
 

@@ -424,3 +424,82 @@ class SSANCARFilteredCarsResponse(BaseModel):
     request_duration: Optional[float] = Field(
         None, description="Время выполнения запроса"
     )
+
+
+# =============================================================================
+# SSANCAR CAR DETAIL MODELS
+# =============================================================================
+
+
+class SSANCARCarDetail(BaseModel):
+    """Детальная информация об автомобиле SSANCAR"""
+
+    # Основная информация
+    car_no: str = Field(..., description="Номер автомобиля SSANCAR")
+    stock_no: str = Field(..., description="Номер лота (Stock NO)")
+    car_name: str = Field(..., description="Полное название автомобиля")
+    brand: Optional[str] = Field(None, description="Бренд автомобиля")
+    model: Optional[str] = Field(None, description="Модель автомобиля")
+
+    # Технические характеристики
+    year: Optional[int] = Field(None, description="Год выпуска")
+    transmission: Optional[str] = Field(None, description="Коробка передач")
+    fuel_type: Optional[str] = Field(None, description="Тип топлива")
+    engine_volume: Optional[str] = Field(None, description="Объем двигателя")
+    mileage: Optional[str] = Field(None, description="Пробег")
+    condition_grade: Optional[str] = Field(None, description="Оценка состояния")
+
+    # Цена и аукцион
+    starting_price: Optional[str] = Field(None, description="Стартовая цена")
+    currency: str = Field("USD", description="Валюта")
+
+    # Фотографии
+    images: List[str] = Field(default_factory=list, description="URLs фотографий")
+    main_image: Optional[str] = Field(None, description="URL главной фотографии")
+
+    # Дополнительная информация
+    auction_date: Optional[str] = Field(None, description="Дата аукциона")
+    auction_time_remaining: Optional[str] = Field(None, description="Оставшееся время")
+    upload_date: Optional[str] = Field(None, description="Дата загрузки")
+    auction_start_date: Optional[str] = Field(None, description="Дата начала аукциона")
+
+    # Ссылки
+    detail_url: Optional[str] = Field(None, description="URL детальной страницы")
+    manager_url: Optional[str] = Field(None, description="URL страницы менеджеров")
+
+    # Метаданные
+    parsed_at: datetime = Field(
+        default_factory=datetime.now, description="Время парсинга"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "car_no": "1515765",
+                "stock_no": "2001",
+                "car_name": "[HYUNDAI] NewClick 1.4 i Deluxe",
+                "brand": "HYUNDAI",
+                "model": "NewClick 1.4 i Deluxe",
+                "year": 2010,
+                "transmission": "A/T",
+                "fuel_type": "Gasoline",
+                "engine_volume": "1,399cc",
+                "mileage": "72,698 Km",
+                "condition_grade": "A/1",
+                "starting_price": "1,541$~",
+                "currency": "USD",
+                "images": ["https://img-auction.autobell.co.kr/..."],
+                "main_image": "https://img-auction.autobell.co.kr/...",
+            }
+        }
+
+
+class SSANCARCarDetailResponse(BaseModel):
+    """Ответ с детальной информацией об автомобиле SSANCAR"""
+
+    success: bool = Field(True, description="Успешность операции")
+    message: str = Field("Детальная информация получена", description="Сообщение")
+    car_detail: Optional[SSANCARCarDetail] = Field(
+        None, description="Детали автомобиля"
+    )
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())

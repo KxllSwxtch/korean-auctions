@@ -23,8 +23,11 @@ from app.models.glovis import (
     SSANCARFilterOptionsResponse,
     SSANCARFilteredCarsResponse,
     SSANCARAdvancedFilters,
+    SSANCARCarDetail,
+    SSANCARCarDetailResponse,
 )
 from app.parsers.glovis_parser import GlovisParser
+from app.parsers.ssancar_detail_parser import parse_ssancar_car_detail
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -901,3 +904,105 @@ class GlovisService:
         model_code = models_mapping.get(model_name, "")
         logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {model_code}")
         return model_code
+
+    # =============================================================================
+    # SSANCAR CAR DETAIL METHODS
+    # =============================================================================
+
+    async def get_ssancar_car_detail(self, car_no: str) -> SSANCARCarDetailResponse:
+        """
+        Получает детальную информацию об автомобиле SSANCAR
+
+        Args:
+            car_no: Номер автомобиля SSANCAR
+
+        Returns:
+            SSANCARCarDetailResponse: Детальная информация об автомобиле
+        """
+        try:
+            logger.info(f"🚗 Получение детальной информации для автомобиля {car_no}")
+
+            # Формируем URL для детальной страницы
+            detail_url = f"{self.base_url}/page/car_view.php"
+
+            # Параметры запроса
+            params = {"car_no": car_no}
+
+            # Устанавливаем специальные headers для GET запроса
+            headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Referer": "https://www.ssancar.com/bbs/board.php?bo_table=list",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": self._default_headers["User-Agent"],
+                "sec-ch-ua": self._default_headers["sec-ch-ua"],
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": self._default_headers["sec-ch-ua-platform"],
+            }
+
+            # Выполняем запрос
+            response = self.session.get(
+                detail_url, params=params, headers=headers, timeout=30
+            )
+
+            if response.status_code != 200:
+                logger.error(
+                    f"❌ HTTP ошибка {response.status_code} при запросе детальной страницы"
+                )
+                return SSANCARCarDetailResponse(
+                    success=False,
+                    message=f"HTTP ошибка {response.status_code}",
+                    car_detail=None,
+                )
+
+            # Парсим HTML
+            car_detail = parse_ssancar_car_detail(response.text, car_no)
+
+            if car_detail:
+                logger.info(f"✅ Успешно получена детальная информация для {car_no}")
+                logger.info(f"   📝 Название: {car_detail.car_name}")
+                logger.info(f"   📸 Изображений: {len(car_detail.images)}")
+                logger.info(f"   💰 Цена: {car_detail.starting_price}")
+
+                return SSANCARCarDetailResponse(
+                    success=True,
+                    message="Детальная информация получена успешно",
+                    car_detail=car_detail,
+                )
+            else:
+                logger.warning(
+                    f"⚠️ Не удалось распарсить детальную страницу для {car_no}"
+                )
+                return SSANCARCarDetailResponse(
+                    success=False,
+                    message="Не удалось распарсить детальную страницу",
+                    car_detail=None,
+                )
+
+        except requests.exceptions.Timeout:
+            logger.error(f"⏰ Таймаут при запросе детальной страницы для {car_no}")
+            return SSANCARCarDetailResponse(
+                success=False, message="Таймаут запроса", car_detail=None
+            )
+
+        except requests.exceptions.RequestException as e:
+            logger.error(
+                f"🌐 Ошибка сети при запросе детальной страницы для {car_no}: {e}"
+            )
+            return SSANCARCarDetailResponse(
+                success=False, message=f"Ошибка сети: {str(e)}", car_detail=None
+            )
+
+        except Exception as e:
+            logger.error(
+                f"🚫 Неожиданная ошибка при получении деталей для {car_no}: {e}"
+            )
+            return SSANCARCarDetailResponse(
+                success=False, message=f"Неожиданная ошибка: {str(e)}", car_detail=None
+            )
