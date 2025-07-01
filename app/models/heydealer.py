@@ -791,3 +791,157 @@ class CarWithAccidentRepairsResponse(BaseModel):
     )
     message: str = Field(..., description="Сообщение о результате")
     timestamp: str = Field(..., description="Время выполнения запроса")
+
+
+class HeyDealerCarWithTechSheet(BaseModel):
+    """Автомобиль HeyDealer с интегрированным техническим листом"""
+
+    # Основные данные автомобиля
+    hash_id: str = Field(..., description="Уникальный ID автомобиля")
+    status: str = Field(..., description="Статус автомобиля")
+    status_display: str = Field(..., description="Отображаемый статус")
+
+    # Основная информация об автомобиле
+    full_name: Optional[str] = Field(None, description="Полное название автомобиля")
+    model_part_name: Optional[str] = Field(None, description="Название модели")
+    grade_part_name: Optional[str] = Field(None, description="Название комплектации")
+    brand_name: Optional[str] = Field(None, description="Название бренда")
+    brand_image_url: Optional[str] = Field(None, description="URL изображения бренда")
+    main_image_url: Optional[str] = Field(None, description="URL основного изображения")
+    image_urls: List[str] = Field(
+        default_factory=list, description="URLs всех изображений"
+    )
+    image_groups: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Группы изображений"
+    )
+
+    # Технические характеристики
+    car_number: Optional[str] = Field(None, description="Номер автомобиля")
+    year: Optional[int] = Field(None, description="Год выпуска")
+    initial_registration_date: Optional[str] = Field(
+        None, description="Дата первичной регистрации"
+    )
+    mileage: Optional[int] = Field(None, description="Пробег в км")
+    color: Optional[str] = Field(None, description="Цвет")
+    interior: Optional[str] = Field(None, description="Интерьер")
+    color_info: Optional[Dict[str, Any]] = Field(None, description="Информация о цвете")
+    interior_info: Optional[Dict[str, Any]] = Field(
+        None, description="Информация об интерьере"
+    )
+
+    # Местоположение и условия
+    location: Optional[str] = Field(None, description="Полное местоположение")
+    short_location: Optional[str] = Field(None, description="Короткое местоположение")
+    payment: Optional[str] = Field(None, description="Способ оплаты")
+    payment_display: Optional[str] = Field(
+        None, description="Отображение способа оплаты"
+    )
+    fuel: Optional[str] = Field(None, description="Тип топлива")
+    fuel_display: Optional[str] = Field(None, description="Отображение типа топлива")
+    transmission: Optional[str] = Field(None, description="Коробка передач")
+    transmission_display: Optional[str] = Field(
+        None, description="Отображение коробки передач"
+    )
+
+    # Состояние автомобиля
+    accident: Optional[str] = Field(None, description="Информация об авариях")
+    accident_display: Optional[str] = Field(
+        None, description="Отображение информации об авариях"
+    )
+    accident_repairs_summary: Optional[str] = Field(
+        None, description="Сводка по ремонту"
+    )
+    accident_repairs_summary_display: Optional[str] = Field(
+        None, description="Отображение сводки по ремонту"
+    )
+    condition_data: Optional[Dict[str, Any]] = Field(
+        None, description="Данные о состоянии"
+    )
+    condition_description: Optional[str] = Field(None, description="Описание состояния")
+    inspected_condition: Optional[Dict[str, Any]] = Field(
+        None, description="Проверенное состояние"
+    )
+
+    # Опции и описания
+    is_advanced_options: Optional[bool] = Field(
+        None, description="Есть ли расширенные опции"
+    )
+    advanced_options: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Расширенные опции"
+    )
+    description: Optional[str] = Field(None, description="Описание")
+    car_description: Optional[str] = Field(None, description="Описание автомобиля")
+    customer_comment: Optional[str] = Field(None, description="Комментарий клиента")
+    inspector_comment: Optional[str] = Field(None, description="Комментарий инспектора")
+    comment: Optional[str] = Field(None, description="Общий комментарий")
+
+    # История автомобиля
+    carhistory_summary: Optional[Dict[str, Any]] = Field(
+        None, description="Сводка истории автомобиля"
+    )
+    vehicle_information: Optional[Dict[str, Any]] = Field(
+        None, description="Информация о транспортном средстве"
+    )
+
+    # Информация об аукционе
+    auction_type: Optional[str] = Field(None, description="Тип аукциона")
+    visits_count: Optional[int] = Field(None, description="Количество просмотров")
+    approved_at: Optional[str] = Field(None, description="Время одобрения")
+    end_at: Optional[str] = Field(None, description="Время окончания")
+    bids_count: Optional[int] = Field(None, description="Текущее количество ставок")
+    max_bids_count: Optional[int] = Field(
+        None, description="Максимальное количество ставок"
+    )
+    desired_price: Optional[int] = Field(None, description="Желаемая цена")
+    highest_bid: Optional[Dict[str, Any]] = Field(
+        None, description="Самая высокая ставка"
+    )
+    is_starred: Optional[bool] = Field(None, description="Добавлен ли в избранное")
+    category: Optional[str] = Field(None, description="Категория аукциона")
+    zero_auction_message: Optional[str] = Field(
+        None, description="Сообщение zero аукциона"
+    )
+    previous_auction_result: Optional[Dict[str, Any]] = Field(
+        None, description="Результат предыдущего аукциона"
+    )
+
+    # Дополнительная информация
+    etc: Optional[Dict[str, Any]] = Field(None, description="Дополнительная информация")
+    is_pre_inspected: Optional[bool] = Field(
+        None, description="Предварительно проверен"
+    )
+    zero_type: Optional[str] = Field(None, description="Тип zero аукциона")
+    standard_new_car_price: Optional[int] = Field(
+        None, description="Стандартная цена нового авто"
+    )
+
+    # ТЕХНИЧЕСКИЙ ЛИСТ (интегрированный)
+    accident_repairs_data: Optional[AccidentRepairsResponse] = Field(
+        None, description="Данные технического листа автомобиля"
+    )
+    accident_repairs_available: bool = Field(
+        default=False, description="Доступен ли технический лист"
+    )
+    accident_repairs_error: Optional[str] = Field(
+        None, description="Ошибка при получении технического листа"
+    )
+
+
+class HeyDealerCarWithTechSheetResponse(BaseModel):
+    """Ответ с автомобилем и интегрированным техническим листом"""
+
+    success: bool = Field(..., description="Успешность выполнения запроса")
+    data: Optional[HeyDealerCarWithTechSheet] = Field(
+        None, description="Данные автомобиля с техническим листом"
+    )
+    message: str = Field(..., description="Сообщение о результате")
+    timestamp: str = Field(..., description="Время выполнения запроса")
+    total_requests: int = Field(
+        default=2, description="Общее количество выполненных запросов"
+    )
+    car_request_success: bool = Field(
+        default=True, description="Успешность запроса данных автомобиля"
+    )
+    accident_repairs_request_success: bool = Field(
+        default=False, description="Успешность запроса технического листа"
+    )

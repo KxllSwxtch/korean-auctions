@@ -17,6 +17,9 @@ from app.models.heydealer import (
     HeyDealerListResponse,
     HeyDealerCar,
     HeyDealerBrand,
+    HeyDealerCarWithTechSheet,
+    HeyDealerCarWithTechSheetResponse,
+    AccidentRepairsResponse,
 )
 from app.services.heydealer_service import HeyDealerService
 from app.parsers.heydealer_parser import HeyDealerParser
@@ -712,17 +715,246 @@ async def get_filtered_cars(
         }
 
 
-@router.get("/cars/{car_hash_id}")
-async def get_heydealer_car_detail_final_working(
+@router.get("/cars/{car_hash_id}", response_model=HeyDealerCarWithTechSheetResponse)
+async def get_heydealer_car_detail_with_tech_sheet(
+    car_hash_id: str = Path(..., description="Hash ID автомобиля"),
+    service: HeyDealerService = Depends(get_heydealer_service),
+):
+    """
+    Получает детальную информацию об автомобиле HeyDealer с интегрированным техническим листом
+
+    - **car_hash_id**: Уникальный идентификатор автомобиля (hash_id)
+
+    Этот эндпоинт выполняет два запроса параллельно:
+    1. Получение детальной информации об автомобиле
+    2. Получение данных технического листа (accident repairs)
+
+    Возвращает объединенные данные в одном JSON объекте.
+    """
+    try:
+        logger.info(
+            f"Получение детальной информации об автомобиле с техническим листом: {car_hash_id}"
+        )
+
+        # Используем автоматический сервис авторизации
+        cookies, headers = heydealer_auth.get_valid_session()
+
+        if not cookies or not headers:
+            logger.error("Не удалось получить валидную сессию HeyDealer")
+            return HeyDealerCarWithTechSheetResponse(
+                success=False,
+                data=None,
+                message="Ошибка авторизации HeyDealer",
+                timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+                total_requests=0,
+                car_request_success=False,
+                accident_repairs_request_success=False,
+            )
+
+        # Выполняем два запроса параллельно
+        detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
+        accident_repairs_url = f"https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/{car_hash_id}/"
+
+        # Параллельные запросы для лучшей производительности
+        import asyncio
+        import aiohttp
+
+        async def fetch_car_details():
+            try:
+                response = requests.get(
+                    detail_url, headers=headers, cookies=cookies, timeout=30
+                )
+                return response.status_code, (
+                    response.json() if response.status_code == 200 else None
+                )
+            except Exception as e:
+                logger.error(f"Ошибка получения данных автомобиля: {e}")
+                return 500, None
+
+        async def fetch_accident_repairs():
+            try:
+                response = requests.get(
+                    accident_repairs_url, headers=headers, cookies=cookies, timeout=30
+                )
+                return response.status_code, (
+                    response.json() if response.status_code == 200 else None
+                )
+            except Exception as e:
+                logger.error(f"Ошибка получения технического листа: {e}")
+                return 500, None
+
+        # Выполняем запросы параллельно
+        car_status, car_data = await fetch_car_details()
+        repairs_status, repairs_data = await fetch_accident_repairs()
+
+        # Проверяем успешность основного запроса
+        if car_status != 200 or not car_data:
+            logger.error(f"Ошибка получения детальной информации: {car_status}")
+            return HeyDealerCarWithTechSheetResponse(
+                success=False,
+                data=None,
+                message=f"Ошибка получения данных автомобиля: {car_status}",
+                timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+                total_requests=2,
+                car_request_success=False,
+                accident_repairs_request_success=repairs_status == 200,
+            )
+
+        # Извлекаем данные автомобиля
+        detail_section = car_data.get("detail", {})
+        auction_section = car_data.get("auction", {})
+        etc_section = car_data.get("etc", {})
+
+        # Обрабатываем данные технического листа
+        accident_repairs_data = None
+        accident_repairs_available = False
+        accident_repairs_error = None
+
+        if repairs_status == 200 and repairs_data:
+            try:
+                # Парсим данные технического листа через наш парсер
+                from app.parsers.heydealer_parser import HeyDealerParser
+
+                parser = HeyDealerParser()
+                accident_repairs_data = parser.parse_accident_repairs(repairs_data)
+                accident_repairs_available = True
+                logger.info(f"Технический лист успешно получен для {car_hash_id}")
+            except Exception as e:
+                logger.error(f"Ошибка парсинга технического листа: {e}")
+                accident_repairs_error = f"Ошибка парсинга технического листа: {str(e)}"
+        else:
+            accident_repairs_error = (
+                f"Ошибка получения технического листа: {repairs_status}"
+            )
+            logger.warning(
+                f"Не удалось получить технический лист для {car_hash_id}: {repairs_status}"
+            )
+
+        # Создаем объединенный объект данных
+        combined_car_data = HeyDealerCarWithTechSheet(
+            # Основные данные автомобиля
+            hash_id=car_data.get("hash_id"),
+            status=car_data.get("status"),
+            status_display=car_data.get("status_display"),
+            # Основная информация об автомобиле
+            full_name=detail_section.get("full_name"),
+            model_part_name=detail_section.get("model_part_name"),
+            grade_part_name=detail_section.get("grade_part_name"),
+            brand_name=detail_section.get("brand_name"),
+            brand_image_url=detail_section.get("brand_image_url"),
+            main_image_url=detail_section.get("main_image_url"),
+            image_urls=detail_section.get("image_urls", []),
+            image_groups=detail_section.get("image_groups") or [],
+            # Технические характеристики
+            car_number=detail_section.get("car_number"),
+            year=detail_section.get("year"),
+            initial_registration_date=detail_section.get("initial_registration_date"),
+            mileage=detail_section.get("mileage"),
+            color=detail_section.get("color"),
+            interior=detail_section.get("interior"),
+            color_info=detail_section.get("color_info"),
+            interior_info=detail_section.get("interior_info"),
+            # Местоположение и условия
+            location=detail_section.get("location"),
+            short_location=detail_section.get("short_location"),
+            payment=detail_section.get("payment"),
+            payment_display=detail_section.get("payment_display"),
+            fuel=detail_section.get("fuel"),
+            fuel_display=detail_section.get("fuel_display"),
+            transmission=detail_section.get("transmission"),
+            transmission_display=detail_section.get("transmission_display"),
+            # Состояние автомобиля
+            accident=detail_section.get("accident"),
+            accident_display=detail_section.get("accident_display"),
+            accident_repairs_summary=detail_section.get("accident_repairs_summary"),
+            accident_repairs_summary_display=detail_section.get(
+                "accident_repairs_summary_display"
+            ),
+            condition_data=detail_section.get("condition_data"),
+            condition_description=detail_section.get("condition_description"),
+            inspected_condition=detail_section.get("inspected_condition"),
+            # Опции и описания
+            is_advanced_options=detail_section.get("is_advanced_options"),
+            advanced_options=detail_section.get("advanced_options") or [],
+            description=detail_section.get("description"),
+            car_description=detail_section.get("car_description"),
+            customer_comment=detail_section.get("customer_comment"),
+            inspector_comment=detail_section.get("inspector_comment"),
+            comment=detail_section.get("comment"),
+            # История автомобиля
+            carhistory_summary=detail_section.get("carhistory_summary"),
+            vehicle_information=detail_section.get("vehicle_information"),
+            # Информация об аукционе
+            auction_type=auction_section.get("auction_type"),
+            visits_count=auction_section.get("visits_count"),
+            approved_at=auction_section.get("approved_at"),
+            end_at=auction_section.get("end_at"),
+            bids_count=auction_section.get("bids_count"),
+            max_bids_count=auction_section.get("max_bids_count"),
+            desired_price=auction_section.get("desired_price"),
+            highest_bid=auction_section.get("highest_bid"),
+            is_starred=auction_section.get("is_starred"),
+            category=auction_section.get("category"),
+            zero_auction_message=auction_section.get("zero_auction_message"),
+            previous_auction_result=auction_section.get("previous_auction_result"),
+            # Дополнительная информация
+            etc=etc_section,
+            is_pre_inspected=detail_section.get("is_pre_inspected"),
+            zero_type=detail_section.get("zero_type"),
+            standard_new_car_price=detail_section.get("standard_new_car_price"),
+            # Технический лист
+            accident_repairs_data=accident_repairs_data,
+            accident_repairs_available=accident_repairs_available,
+            accident_repairs_error=accident_repairs_error,
+        )
+
+        # Формируем успешный ответ
+        return HeyDealerCarWithTechSheetResponse(
+            success=True,
+            data=combined_car_data,
+            message=f"Детальная информация об автомобиле успешно получена"
+            + (
+                f" с техническим листом"
+                if accident_repairs_available
+                else f" (технический лист недоступен)"
+            ),
+            timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            total_requests=2,
+            car_request_success=True,
+            accident_repairs_request_success=accident_repairs_available,
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
+        )
+        return HeyDealerCarWithTechSheetResponse(
+            success=False,
+            data=None,
+            message=f"Внутренняя ошибка сервера: {str(e)}",
+            timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            total_requests=0,
+            car_request_success=False,
+            accident_repairs_request_success=False,
+        )
+
+
+@router.get("/cars/{car_hash_id}/basic")
+async def get_heydealer_car_detail_basic(
     car_hash_id: str = Path(..., description="Hash ID автомобиля"),
 ):
     """
-    Получает детальную информацию об автомобиле HeyDealer
+    Получает только базовую детальную информацию об автомобиле HeyDealer (без технического листа)
+
+    Этот эндпоинт предназначен для случаев, когда нужны только данные автомобиля
+    без дополнительной нагрузки на получение технического листа.
 
     - **car_hash_id**: Уникальный идентификатор автомобиля (hash_id)
     """
     try:
-        logger.info(f"Получение детальной информации об автомобиле: {car_hash_id}")
+        logger.info(
+            f"Получение базовой детальной информации об автомобиле: {car_hash_id}"
+        )
 
         # Используем автоматический сервис авторизации
         cookies, headers = heydealer_auth.get_valid_session()
@@ -831,7 +1063,7 @@ async def get_heydealer_car_detail_final_working(
                         "standard_new_car_price"
                     ),
                 },
-                "message": "Детальная информация успешно получена",
+                "message": "Базовая детальная информация успешно получена",
                 "timestamp": detail_response.headers.get("Date", ""),
             }
 
@@ -848,7 +1080,7 @@ async def get_heydealer_car_detail_final_working(
 
     except Exception as e:
         logger.error(
-            f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
+            f"Ошибка при получении базовой детальной информации об автомобиле {car_hash_id}: {e}"
         )
         return {"success": False, "error": f"Внутренняя ошибка сервера: {str(e)}"}
 

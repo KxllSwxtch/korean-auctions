@@ -1,3 +1,7 @@
+"""
+Парсер HTML данных аукциона SSANCAR (используем имя Glovis для API совместимости)
+"""
+
 import re
 from typing import List, Optional, Dict, Any
 from bs4 import BeautifulSoup, Tag
@@ -7,50 +11,84 @@ from app.models.glovis import (
     GlovisResponse,
     GlovisLocation,
     GlovisCarCondition,
+    GlovisError,
 )
 from app.models.glovis_filters import GlovisManufacturer, GlovisModel, GlovisDetailModel
 from app.core.logging import get_logger
 
-logger = get_logger("glovis_parser")
+logger = get_logger("ssancar_parser")
 
 
 class GlovisParser:
-    """Парсер HTML данных аукциона Hyundai Glovis"""
+    """Парсер HTML данных аукциона SSANCAR (сохраняем имя для совместимости)"""
 
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str = "https://www.ssancar.com"):
         self.base_url = base_url.rstrip("/")
 
-    def parse_car_list(self, html_content: str, page: int = 1) -> GlovisResponse:
+    def parse_car_list(
+        self, html_content: str, page: int = 0, week_no: str = "2"
+    ) -> GlovisResponse:
         """
-        Парсит HTML страницу со списком автомобилей
+        Парсит HTML страницу со списком автомобилей SSANCAR
 
         Args:
-            html_content: HTML содержимое страницы
-            page: Номер текущей страницы
+            html_content: HTML содержимое ответа от SSANCAR
+            page: Номер текущей страницы (начинается с 0)
+            week_no: Номер недели аукциона
 
         Returns:
             GlovisResponse: Объект с распарсенными данными
         """
         try:
-            soup = BeautifulSoup(html_content, "html.parser")
-
-            # Извлекаем общее количество автомобилей
-            total_count = self._extract_total_count(soup)
-
-            # Извлекаем список автомобилей
-            cars = self._extract_cars(soup)
-
-            # Вычисляем пагинацию
-            page_size = 18  # По умолчанию Glovis показывает 18 автомобилей на странице
-            total_pages = (
-                (total_count + page_size - 1) // page_size if total_count > 0 else 1
+            logger.info(
+                f"🔍 Парсинг списка автомобилей SSANCAR (страница {page}, неделя {week_no})"
             )
-            has_next_page = page < total_pages
-            has_prev_page = page > 1
+
+            soup = BeautifulSoup(html_content, "html.parser")
+            cars = []
+
+            # Ищем все элементы <li> с автомобилями
+            car_items = soup.find_all("li")
+
+            if not car_items:
+                logger.warning("⚠️ Не найдено автомобилей в HTML")
+                return GlovisResponse(
+                    success=True,
+                    message="Автомобили не найдены",
+                    total_count=0,
+                    cars=[],
+                    current_page=page,
+                    page_size=15,
+                    week_number=week_no,
+                    source="SSANCAR",
+                )
+
+            for item in car_items:
+                try:
+                    car = self._parse_single_car(item)
+                    if car:
+                        # Добавляем информацию о странице и неделе
+                        car.auction_number = week_no
+                        cars.append(car)
+                except Exception as e:
+                    logger.warning(f"⚠️ Ошибка парсинга автомобиля: {e}")
+                    continue
+
+            total_count = len(cars)
+            page_size = 15  # Стандартный размер страницы SSANCAR
+
+            # Рассчитываем пагинацию
+            total_pages = None
+            has_next_page = (
+                total_count == page_size
+            )  # Если получили полную страницу, может быть следующая
+            has_prev_page = page > 0
+
+            logger.info(f"✅ Успешно распарсено {total_count} автомобилей")
 
             return GlovisResponse(
                 success=True,
-                message=f"Успешно загружено {len(cars)} автомобилей из {total_count}",
+                message=f"Успешно получено {total_count} автомобилей",
                 total_count=total_count,
                 cars=cars,
                 current_page=page,
@@ -58,230 +96,335 @@ class GlovisParser:
                 total_pages=total_pages,
                 has_next_page=has_next_page,
                 has_prev_page=has_prev_page,
+                week_number=week_no,
+                source="SSANCAR",
             )
 
         except Exception as e:
-            logger.error(f"Ошибка при парсинге списка автомобилей: {e}")
+            logger.error(f"❌ Ошибка парсинга списка автомобилей: {e}")
             return GlovisResponse(
                 success=False,
                 message=f"Ошибка парсинга: {str(e)}",
                 total_count=0,
                 cars=[],
+                current_page=page,
+                page_size=15,
+                week_number=week_no,
+                source="SSANCAR",
             )
 
-    def _extract_total_count(self, soup: BeautifulSoup) -> int:
-        """Извлекает общее количество автомобилей"""
+    def _parse_single_car(self, item: Tag) -> Optional[GlovisCar]:
+        """
+        Парсит один элемент автомобиля из HTML структуры SSANCAR
+
+        Args:
+            item: BeautifulSoup Tag с информацией об автомобиле
+
+        Returns:
+            Optional[GlovisCar]: Объект автомобиля или None если не удалось распарсить
+        """
         try:
-            # Ищем элемент с общим количеством: <span class="total"> 총<span> 10</span>대</span>
-            total_element = soup.find("span", class_="total")
-            if total_element:
-                # Ищем вложенный span с числом
-                count_span = total_element.find("span")
-                if count_span:
-                    count_text = count_span.get_text().strip()
-                    # Убираем запятые из числа
-                    count_text = count_text.replace(",", "")
-                    return int(count_text)
-
-            logger.warning("Не удалось найти общее количество автомобилей")
-            return 0
-
-        except Exception as e:
-            logger.error(f"Ошибка при извлечении общего количества: {e}")
-            return 0
-
-    def _extract_cars(self, soup: BeautifulSoup) -> List[GlovisCar]:
-        """Извлекает список автомобилей из HTML"""
-        cars = []
-
-        try:
-            # Ищем все элементы с классом "item"
-            car_items = soup.find_all("div", class_="item")
-
-            for item in car_items:
-                try:
-                    car = self._parse_car_item(item)
-                    if car:
-                        cars.append(car)
-                except Exception as e:
-                    logger.error(f"Ошибка при парсинге автомобиля: {e}")
-                    continue
-
-        except Exception as e:
-            logger.error(f"Ошибка при извлечении списка автомобилей: {e}")
-
-        return cars
-
-    def _parse_car_item(self, item: Tag) -> Optional[GlovisCar]:
-        """Парсит отдельный элемент автомобиля"""
-        try:
-            # Ищем ссылку с атрибутами
-            btn_view = item.find("a", class_="btn_view")
-            if not btn_view:
+            # Ищем ссылку на детальную страницу
+            link = item.find("a", href=True)
+            if not link:
                 return None
 
-            # Извлекаем внутренние идентификаторы из атрибутов
-            gn = btn_view.get("gn", "")
-            rc = btn_view.get("rc", "")
-            acc = btn_view.get("acc", "")
-            atn = btn_view.get("atn", "")
-            prodmancd = btn_view.get("prodmancd", "")
-            reprcarcd = btn_view.get("reprcarcd", "")
-            detacarcd = btn_view.get("detacarcd", "")
-            cargradcd = btn_view.get("cargradcd", "")
+            detail_url = link.get("href", "")
+            if not detail_url or "car_view.php" not in detail_url:
+                return None
 
-            # Извлекаем номер выставки
-            entry_info = btn_view.find("div", class_="entry-info")
-            entry_number = ""
-            if entry_info:
-                entry_span = entry_info.find("span")
-                if entry_span:
-                    entry_number = entry_span.get_text().strip()
+            # Извлекаем car_no из URL
+            car_no = self._extract_car_no(detail_url)
+
+            # Ищем секцию с текстом
+            text_area = item.find("div", class_="text_area")
+            if not text_area:
+                return None
+
+            # Извлекаем Stock NO и название
+            stock_no, car_name, brand, model = self._parse_title_section(text_area)
+
+            # Извлекаем технические характеристики
+            year, transmission, fuel_type, engine_volume, mileage, condition_grade = (
+                self._parse_details_section(text_area)
+            )
+
+            # Извлекаем цену
+            starting_price = self._parse_price_section(text_area)
 
             # Извлекаем изображение
-            thumbnail = btn_view.find("div", class_="thumbnail")
-            main_image_url = None
-            if thumbnail:
-                img = thumbnail.find("img")
-                if img and img.get("src"):
-                    main_image_url = img.get("src")
+            main_image_url = self._parse_image_section(item)
 
-            # Извлекаем локацию
-            location_badge = btn_view.find("span", class_="tag-badge small")
-            location_text = (
-                location_badge.get_text().strip() if location_badge else "분당"
-            )
-
-            # Преобразуем в enum
-            location = GlovisLocation.BUNDANG  # По умолчанию
-            for loc in GlovisLocation:
-                if loc.value == location_text:
-                    location = loc
-                    break
-
-            # Извлекаем название автомобиля
-            car_name_elem = btn_view.find("span", class_="car-name")
-            car_name = car_name_elem.get_text().strip() if car_name_elem else ""
-
-            # Извлекаем опции автомобиля
-            option_div = btn_view.find("div", class_="option")
-            options = []
-            if option_div:
-                spans = option_div.find_all("span")
-                options = [span.get_text().strip() for span in spans]
-
-            # Парсим опции
-            year = int(options[0]) if len(options) > 0 and options[0].isdigit() else 0
-            transmission = options[1] if len(options) > 1 else ""
-            engine_volume = options[2] if len(options) > 2 else ""
-            mileage = options[3] if len(options) > 3 else ""
-            color = options[4] if len(options) > 4 else ""
-            fuel_type = options[5] if len(options) > 5 else ""
-            usage_type = options[6] if len(options) > 6 else ""
-            condition_grade_text = options[7] if len(options) > 7 else "A/4"
-
-            # Преобразуем оценку в enum
-            condition_grade = GlovisCarCondition.A4  # По умолчанию
-            for grade in GlovisCarCondition:
-                if grade.value == condition_grade_text:
-                    condition_grade = grade
-                    break
-
-            # Извлекаем информацию о фильтрах (номер аукциона, полоса, номер авто)
-            filter_option = btn_view.find("div", class_="filter-option")
-            auction_number = ""
-            lane = ""
-            license_plate = ""
-
-            if filter_option:
-                badges = filter_option.find_all("span", class_="tag-badge")
-                if len(badges) >= 2:
-                    # Первый badge - номер аукциона (например "747회")
-                    auction_number = badges[0].get_text().strip().replace("회", "")
-                    # Второй badge - номер автомобиля (например "339머6489")
-                    license_plate = badges[1].get_text().strip()
-                    # Полоса может быть в других местах или отсутствовать
-                    lane = badges[2].get_text().strip() if len(badges) > 2 else ""
-
-            # Извлекаем стартовую цену
-            price_box = btn_view.find("div", class_="price-box")
-            starting_price = 0
-            if price_box:
-                price_num = price_box.find("span", class_="num")
-                if price_num:
-                    price_text = price_num.get_text().strip().replace(",", "")
-                    try:
-                        starting_price = int(price_text)
-                    except ValueError:
-                        pass
-
-            return GlovisCar(
-                entry_number=entry_number,
+            # Создаем объект автомобиля
+            car = GlovisCar(
+                entry_number=stock_no,
                 car_name=car_name,
-                location=location,
-                lane=lane,
-                license_plate=license_plate,
+                brand=brand,
+                model=model,
                 year=year,
                 transmission=transmission,
+                fuel_type=fuel_type,
                 engine_volume=engine_volume,
                 mileage=mileage,
-                color=color,
-                fuel_type=fuel_type,
-                usage_type=usage_type,
                 condition_grade=condition_grade,
-                auction_number=auction_number,
                 starting_price=starting_price,
+                currency="USD",
                 main_image_url=main_image_url,
-                gn=gn,
-                rc=rc,
-                acc=acc,
-                atn=atn,
-                prodmancd=prodmancd,
-                reprcarcd=reprcarcd,
-                detacarcd=detacarcd,
-                cargradcd=cargradcd,
+                detail_url=(
+                    detail_url
+                    if detail_url.startswith("http")
+                    else f"{self.base_url}{detail_url}"
+                ),
+                car_no=car_no,
+                location=GlovisLocation.SSANCAR,
+                # Эмулируем идентификаторы для совместимости
+                gn=car_no or "",
+                rc="SSANCAR",
+                acc="1",
+                atn="1",
+                prodmancd=brand or "",
+                reprcarcd=model or "",
+                detacarcd=stock_no,
+                cargradcd=condition_grade.value if condition_grade else "",
+            )
+
+            return car
+
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка парсинга автомобиля: {e}")
+            return None
+
+    def _extract_car_no(self, detail_url: str) -> Optional[str]:
+        """Извлекает car_no из URL детальной страницы"""
+        try:
+            import re
+
+            match = re.search(r"car_no=(\d+)", detail_url)
+            return match.group(1) if match else None
+        except:
+            return None
+
+    def _parse_title_section(self, text_area: Tag) -> tuple:
+        """Парсит секцию с названием и Stock NO"""
+        try:
+            title_section = text_area.find("p", class_="tit")
+            if not title_section:
+                return "", "", "", ""
+
+            # Извлекаем Stock NO
+            stock_span = title_section.find("span", class_="num")
+            stock_no = stock_span.get_text().strip() if stock_span else ""
+
+            # Извлекаем название автомобиля
+            name_span = title_section.find("span", class_="name")
+            car_name = name_span.get_text().strip() if name_span else ""
+
+            # Извлекаем бренд и модель из названия [BRAND] Model
+            brand, model = self._extract_brand_model(car_name)
+
+            return stock_no, car_name, brand, model
+
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка парсинга заголовка: {e}")
+            return "", "", "", ""
+
+    def _extract_brand_model(self, car_name: str) -> tuple:
+        """Извлекает бренд и модель из названия [BRAND] Model"""
+        try:
+            import re
+
+            # Ищем паттерн [BRAND] Model
+            match = re.match(r"\[([^\]]+)\]\s*(.+)", car_name)
+            if match:
+                brand = match.group(1).strip()
+                model = match.group(2).strip()
+                return brand, model
+            return "", car_name
+        except:
+            return "", car_name
+
+    def _parse_details_section(self, text_area: Tag) -> tuple:
+        """Парсит секцию с техническими характеристиками"""
+        try:
+            detail_ul = text_area.find("ul", class_="detail")
+            if not detail_ul:
+                return 0, "", "", "", "", GlovisCarCondition.A4
+
+            detail_li = detail_ul.find("li")
+            if not detail_li:
+                return 0, "", "", "", "", GlovisCarCondition.A4
+
+            # Получаем все span элементы
+            spans = detail_li.find_all("span")
+
+            # Фильтруем пустые span'ы
+            span_texts = [
+                span.get_text().strip() for span in spans if span.get_text().strip()
+            ]
+
+            # Парсим данные по порядку: год, КПП, топливо, объем, пробег, оценка
+            year = 0
+            transmission = ""
+            fuel_type = ""
+            engine_volume = ""
+            mileage = ""
+            condition_grade = GlovisCarCondition.A4
+
+            if len(span_texts) >= 1:
+                try:
+                    year = int(span_texts[0])
+                except:
+                    pass
+
+            if len(span_texts) >= 2:
+                transmission = span_texts[1].strip()
+
+            if len(span_texts) >= 3:
+                fuel_type = span_texts[2].strip()
+
+            if len(span_texts) >= 4:
+                engine_volume = span_texts[3].strip()
+
+            if len(span_texts) >= 5:
+                mileage = span_texts[4].strip()
+
+            if len(span_texts) >= 6:
+                grade_text = span_texts[5].strip()
+                # Пытаемся найти соответствующую оценку
+                for grade in GlovisCarCondition:
+                    if grade.value == grade_text:
+                        condition_grade = grade
+                        break
+
+            return (
+                year,
+                transmission,
+                fuel_type,
+                engine_volume,
+                mileage,
+                condition_grade,
             )
 
         except Exception as e:
-            logger.error(f"Ошибка при парсинге элемента автомобиля: {e}")
-            return None
+            logger.warning(f"⚠️ Ошибка парсинга характеристик: {e}")
+            return 0, "", "", "", "", GlovisCarCondition.A4
 
-    def parse_pagination_info(self, html_content: str) -> Dict[str, Any]:
-        """Извлекает информацию о пагинации"""
+    def _parse_price_section(self, text_area: Tag) -> int:
+        """Парсит секцию с ценой"""
         try:
-            soup = BeautifulSoup(html_content, "html.parser")
+            price_section = text_area.find("p", class_="money")
+            if not price_section:
+                return 0
 
-            # Ищем элемент пагинации
-            paging_div = soup.find("div", id="exhibit_list_paging")
-            if not paging_div:
-                return {"current_page": 1, "total_pages": 1}
+            price_num = price_section.find("span", class_="num")
+            if not price_num:
+                return 0
 
-            # Ищем кнопки пагинации
-            numbers_div = paging_div.find("div", class_="numbers")
-            if not numbers_div:
-                return {"current_page": 1, "total_pages": 1}
-
-            # Ищем активную страницу
-            current_page = 1
-            active_button = numbers_div.find("button", class_="on")
-            if active_button:
-                try:
-                    current_page = int(active_button.get_text().strip())
-                except ValueError:
-                    pass
-
-            # Подсчитываем общее количество страниц
-            buttons = numbers_div.find_all("button")
-            total_pages = len(buttons) if buttons else 1
-
-            return {
-                "current_page": current_page,
-                "total_pages": total_pages,
-            }
+            price_text = price_num.get_text().strip().replace(",", "")
+            try:
+                return int(price_text)
+            except ValueError:
+                return 0
 
         except Exception as e:
-            logger.error(f"Ошибка при парсинге пагинации: {e}")
-            return {"current_page": 1, "total_pages": 1}
+            logger.warning(f"⚠️ Ошибка парсинга цены: {e}")
+            return 0
+
+    def _parse_image_section(self, item: Tag) -> Optional[str]:
+        """Парсит секцию с изображением"""
+        try:
+            img_area = item.find("div", class_="img_area")
+            if not img_area:
+                return None
+
+            img = img_area.find("img")
+            if not img:
+                return None
+
+            img_src = img.get("src", "")
+            if img_src and img_src != "https://www.ssancar.com/img/no_image.png":
+                return img_src
+
+            return None
+
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка парсинга изображения: {e}")
+            return None
+
+    def get_test_data(self) -> GlovisResponse:
+        """Возвращает тестовые данные для отладки"""
+        logger.info("🧪 Возвращаем тестовые данные SSANCAR")
+
+        test_cars = [
+            GlovisCar(
+                entry_number="2001",
+                car_name="[HYUNDAI] NewClick 1.4 i Deluxe",
+                brand="HYUNDAI",
+                model="NewClick 1.4 i Deluxe",
+                year=2010,
+                transmission="A/T",
+                fuel_type="Gasoline",
+                engine_volume="1,399cc",
+                mileage="72,698 Km",
+                condition_grade=GlovisCarCondition.A1,
+                starting_price=1541,
+                currency="USD",
+                main_image_url="https://img-auction.autobell.co.kr/test",
+                detail_url="https://www.ssancar.com/page/car_view.php?car_no=1515765",
+                car_no="1515765",
+                location=GlovisLocation.SSANCAR,
+                auction_number="2",
+                gn="1515765",
+                rc="SSANCAR",
+                acc="1",
+                atn="1",
+                prodmancd="HYUNDAI",
+                reprcarcd="NewClick",
+                detacarcd="2001",
+                cargradcd="A/1",
+            ),
+            GlovisCar(
+                entry_number="2002",
+                car_name="[HYUNDAI] GrandeurIG 3.0 GDi Exclusive Special",
+                brand="HYUNDAI",
+                model="GrandeurIG 3.0 GDi Exclusive Special",
+                year=2018,
+                transmission="A/T",
+                fuel_type="Gasoline",
+                engine_volume="2,999cc",
+                mileage="70,917 Km",
+                condition_grade=GlovisCarCondition.A6,
+                starting_price=12334,
+                currency="USD",
+                main_image_url="https://img-auction.autobell.co.kr/test2",
+                detail_url="https://www.ssancar.com/page/car_view.php?car_no=1515766",
+                car_no="1515766",
+                location=GlovisLocation.SSANCAR,
+                auction_number="2",
+                gn="1515766",
+                rc="SSANCAR",
+                acc="1",
+                atn="1",
+                prodmancd="HYUNDAI",
+                reprcarcd="GrandeurIG",
+                detacarcd="2002",
+                cargradcd="A/6",
+            ),
+        ]
+
+        return GlovisResponse(
+            success=True,
+            message="Тестовые данные SSANCAR",
+            total_count=len(test_cars),
+            cars=test_cars,
+            current_page=0,
+            page_size=15,
+            total_pages=1,
+            has_next_page=False,
+            has_prev_page=False,
+            week_number="2",
+            source="SSANCAR",
+        )
 
     def parse_manufacturers(self, html_content: str) -> List[GlovisManufacturer]:
         """
