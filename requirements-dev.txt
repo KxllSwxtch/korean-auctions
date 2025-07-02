@@ -1,0 +1,26 @@
+# Include production requirements
+-r requirements.txt
+
+# Development and debugging tools
+pytest
+pytest-asyncio
+pytest-cov
+httpx  # For testing
+
+# Code quality tools
+black
+isort
+flake8
+mypy
+
+# Development utilities
+rich  # Beautiful terminal output
+typer  # CLI building (for dev scripts)
+schedule  # Task scheduling (if needed for dev)
+
+# Debugging and profiling
+mitmproxy  # For HTTP debugging (dev only)
+
+# Optional development dependencies
+jupyter  # For data analysis
+ipython  # Enhanced Python shell 
