@@ -173,7 +173,7 @@
         var gubun = j$.trim(j$("input:radio[name='i_sLoginGubun']:checked", frm).val());
 
         cmAjax({
-            url: "/newfront/user/login/user_login_ajax.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679"
+            url: "/newfront/user/login/user_login_ajax.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F"
             , type: "post"
             , dataType: "json"
             , data: {
@@ -219,7 +219,7 @@
         //경매관련메뉴, 기능(출품리스트)
         if (fnCode == 'AC1' || fnCode == 'AC2' || fnCode == 'AC3' || fnCode == 'AC4' || fnCode == 'AC5') {
             cmAjax({
-                url: "/newfront/user/join/user_annual_check_ajax.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679"
+                url: "/newfront/user/join/user_annual_check_ajax.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F"
                 , type: "post"
                 , dataType: "json"
                 , success: function (data, textStatus, jqXHR) {
@@ -244,7 +244,7 @@
         } else {
             //공매관련메뉴, 기능
             cmAjax({
-                url: "/newfront/user/join/user_annual_check_ajax2.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679"
+                url: "/newfront/user/join/user_annual_check_ajax2.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F"
                 , type: "post"
                 , dataType: "json"
                 , success: function (data, textStatus, jqXHR) {
@@ -553,7 +553,7 @@ function frontModalProgress() {
     var width = "292";
     var height = "186";
     var contImg = new Image();
-    contImg.src = "/images/front/common/anibox.gif;jsessionid=9A9CCF94E046BA203A74CE9D1162B679";
+    contImg.src = "/images/front/common/anibox.gif;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F";
         OPEN_LAYER_ID = layerId;
 
         var layerBack = "bak" + layerId;
@@ -903,7 +903,7 @@ function viewVRPopupWithReceivecd(receivecd){
 	var fullpath = "";
 
 	cmAjax({
-		url : "/newfront/receive/rc/get_vr_path_ajax.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679",
+		url : "/newfront/receive/rc/get_vr_path_ajax.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F",
 		type : "POST",
 		//data : JSON.stringify(data),
 		data : data,
@@ -1034,7 +1034,7 @@ function setImagePathList(fullPath) {
 //사고이력상세
 // function fn_car_trouble(receivecd){
 // 	cmAjax({
-// 		url:"/front/onlineAuc/on/pop_car_trouble.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679"
+// 		url:"/front/onlineAuc/on/pop_car_trouble.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F"
 // 		    ,data: {receivecd : receivecd}
 // 		    ,success:function(result) {
 // 		$("#trouble_srch_layer").children().remove();
@@ -11997,7 +11997,7 @@ welcome -->
 //         $(this).tab('show')
 //     })
     $(document).on('click', '#find_address_handle', function () {
-    	$.ajax({url:"/comm/new_post_road_pop.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679",
+    	$.ajax({url:"/comm/new_post_road_pop.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F",
 			success:function(result) {
 			$("#find_address").html(result);
 		}});
@@ -12044,7 +12044,7 @@ welcome -->
 // 간편출품 신청 레이어
 //
 function receive_rc_easyout () {
-	top.window.location.replace("/newfront/receive/rc/receive_rc_list.do;jsessionid=9A9CCF94E046BA203A74CE9D1162B679");
+	top.window.location.replace("/newfront/receive/rc/receive_rc_list.do;jsessionid=7DB76C818AA339E7C76BA226C1EBFE2F");
 }
 
 // 181008 : top 공지사항 추가 시작

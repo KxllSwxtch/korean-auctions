@@ -17,6 +17,14 @@ from app.models.autohub import (
     AutohubImage,
     AutohubInspectionReport,
     AutohubInspectionItem,
+    # Новые модели для схемы деталей
+    AutohubCarDiagram,
+    AutohubCarPart,
+    CarPartCondition,
+    CarType,
+    CAR_PART_ZONES,
+    CAR_TYPE_MAPPING,
+    BACKGROUND_IMAGES,
     CONDITION_CODES,
     SEDAN_PARTS,
     CATEGORY_NAMES,
@@ -1068,3 +1076,294 @@ def parse_inspection_report(soup: BeautifulSoup) -> Optional[AutohubInspectionRe
     except Exception as e:
         logger.error(f"Ошибка при парсинге технического листа: {e}")
         return None
+
+
+def parse_car_diagram(soup: BeautifulSoup) -> Optional[AutohubCarDiagram]:
+    """
+    Парсинг схемы деталей автомобиля с информацией о повреждениях
+
+    Args:
+        soup: BeautifulSoup объект страницы автомобиля
+
+    Returns:
+        AutohubCarDiagram: Схема деталей автомобиля или None
+    """
+    try:
+        logger.info("Начинаем парсинг схемы деталей автомобиля")
+
+        # 1. Извлекаем скрытое поле с данными инспекции
+        inspresult_input = soup.find("input", {"id": "inspresult"})
+        if not inspresult_input:
+            logger.warning("Не найдено поле inspresult со схемой деталей")
+            return None
+
+        inspection_data = inspresult_input.get("value", "")
+        if not inspection_data:
+            logger.warning("Поле inspresult пустое")
+            return None
+
+        logger.info(f"Найдены данные инспекции: {inspection_data[:100]}...")
+
+        # 2. Определяем тип автомобиля из видимой схемы
+        car_type = _determine_car_type(soup)
+        background_image = BACKGROUND_IMAGES[car_type]
+
+        logger.info(f"Определен тип автомобиля: {car_type.value}")
+
+        # 3. Парсим коды состояний частей
+        condition_codes = inspection_data.split(",")
+        logger.info(f"Найдено {len(condition_codes)} кодов состояний частей")
+
+        # 4. Извлекаем позиции частей из HTML схемы
+        part_positions = _extract_part_positions(soup, car_type)
+        logger.info(f"Извлечено {len(part_positions)} позиций частей")
+
+        # 5. Создаем объекты частей автомобиля
+        parts = []
+        part_letter_map = _get_part_letter_map(car_type)
+
+        for i, condition_code in enumerate(condition_codes):
+            condition_code = condition_code.strip()
+            if not condition_code:
+                continue
+
+            try:
+                # Определяем part_id на основе индекса и типа автомобиля
+                part_info = _get_part_info_by_index(i, car_type, part_letter_map)
+                if not part_info:
+                    continue
+
+                # Получаем позицию части из HTML
+                position = part_positions.get(part_info["part_code"], {})
+
+                # Создаем объект части автомобиля
+                car_part = AutohubCarPart(
+                    part_id=part_info["part_id"],
+                    part_code=part_info["part_code"],
+                    condition=_parse_condition_code(condition_code),
+                    condition_symbol=_extract_condition_symbol(condition_code),
+                    zone=part_info["zone"],
+                    position_x=position.get("x"),
+                    position_y=position.get("y"),
+                    image_path=part_info["image_path"],
+                )
+
+                parts.append(car_part)
+
+            except Exception as e:
+                logger.error(f"Ошибка при создании части {i}: {e}")
+                continue
+
+        # 6. Создаем схему деталей
+        diagram = AutohubCarDiagram(
+            car_type=car_type, background_image=background_image, parts=parts
+        )
+
+        # 7. Вычисляем статистику
+        diagram.calculate_statistics()
+
+        logger.info(
+            f"Схема деталей создана: {diagram.total_parts} частей, "
+            f"{diagram.damaged_parts} повреждено, "
+            f"{diagram.replacement_needed} требует замены, "
+            f"{diagram.repair_needed} требует ремонта"
+        )
+
+        return diagram
+
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге схемы деталей: {e}")
+        return None
+
+
+def _determine_car_type(soup: BeautifulSoup) -> CarType:
+    """Определяет тип автомобиля из видимой схемы"""
+
+    # Проверяем какая схема активна
+    car_divs = soup.find_all("div", class_=re.compile(r"car_\d+"))
+
+    for car_div in car_divs:
+        style = car_div.get("style", "")
+        if "display:none" not in style:
+            # Активная схема найдена
+            class_name = car_div.get("class", [])
+            for cls in class_name:
+                if cls.startswith("car_"):
+                    car_number = cls.replace("car_", "")
+                    if car_number == "01":
+                        return CarType.SEDAN
+                    elif car_number == "02":
+                        return CarType.PICKUP
+                    elif car_number == "03":
+                        return CarType.TRUCK
+
+    # По умолчанию седан
+    return CarType.SEDAN
+
+
+def _extract_part_positions(
+    soup: BeautifulSoup, car_type: CarType
+) -> Dict[str, Dict[str, int]]:
+    """Извлекает координаты частей из HTML схемы"""
+
+    positions = {}
+
+    try:
+        # Ищем все элементы <li> с ID частей
+        part_elements = soup.find_all("li", id=re.compile(r"[a-z]x\d+"))
+
+        for element in part_elements:
+            part_code = element.get("id", "")
+            if not part_code:
+                continue
+
+            # Извлекаем позицию из style атрибута в <p> элементе
+            p_element = element.find("p")
+            if p_element:
+                style = p_element.get("style", "")
+                x_match = re.search(r"left:(\d+)px", style)
+                y_match = re.search(r"top:(\d+)px", style)
+
+                if x_match and y_match:
+                    positions[part_code] = {
+                        "x": int(x_match.group(1)),
+                        "y": int(y_match.group(1)),
+                    }
+
+    except Exception as e:
+        logger.error(f"Ошибка при извлечении позиций частей: {e}")
+
+    return positions
+
+
+def _get_part_letter_map(car_type: CarType) -> List[str]:
+    """Возвращает карту букв частей для типа автомобиля"""
+
+    if car_type == CarType.SEDAN:
+        # Седан: A(01-09), B(10-22), C(25-33), D(36-50)
+        return (
+            ["A"] * 9  # A01-A09 (позиции 0-8)
+            + ["B"] * 13  # B01-B13 (позиции 9-21)
+            + ["C"] * 9  # C01-C09 (позиции 22-30)
+            + ["D"] * 15  # D01-D15 (позиции 31-45)
+        )
+    elif car_type == CarType.PICKUP:
+        # Пикап: E(01-09), F(10-23), G(25-33), H(36-50)
+        return (
+            ["E"] * 9  # E01-E09
+            + ["F"] * 14  # F01-F14
+            + ["G"] * 9  # G01-G09
+            + ["H"] * 15  # H01-H15
+        )
+    elif car_type == CarType.TRUCK:
+        # Грузовик: M(01-10), N(11-24), O(25-35), P(36-40)
+        return (
+            ["M"] * 10  # M01-M10
+            + ["N"] * 14  # N01-N14
+            + ["O"] * 11  # O01-O11
+            + ["P"] * 5  # P01-P05
+        )
+
+    return []
+
+
+def _get_part_info_by_index(
+    index: int, car_type: CarType, part_letter_map: List[str]
+) -> Optional[Dict[str, str]]:
+    """Получает информацию о части по индексу"""
+
+    if index >= len(part_letter_map):
+        return None
+
+    letter = part_letter_map[index]
+    zone = CAR_PART_ZONES.get(letter, "unknown")
+
+    # Вычисляем номер части в группе
+    letter_indices = [i for i, l in enumerate(part_letter_map) if l == letter]
+    part_number = letter_indices.index(index) + 1
+
+    # Формируем идентификаторы
+    part_id = f"{letter}{part_number:02d}"
+
+    # Формируем код для HTML (например: ax010, bx015)
+    if car_type == CarType.SEDAN:
+        prefix = "ax"
+    elif car_type == CarType.PICKUP:
+        prefix = "bx"
+    else:  # TRUCK
+        prefix = "dx"
+
+    # Корректируем номер для HTML ID
+    html_number = _get_html_number_for_part(letter, part_number)
+    part_code = f"{prefix}{html_number}"
+
+    # Путь к изображению части
+    image_path = f"/images/front/car_info/{part_id}X.png"
+
+    return {
+        "part_id": part_id,
+        "part_code": part_code,
+        "zone": zone,
+        "image_path": image_path,
+    }
+
+
+def _get_html_number_for_part(letter: str, part_number: int) -> str:
+    """Преобразует номер части в HTML номер"""
+
+    # Базовая логика: для большинства частей HTML номер = номер части
+    # Но есть исключения для некоторых частей
+
+    if letter in ["A", "E", "M"]:  # Левая сторона
+        if part_number <= 9:
+            return f"0{part_number}0" if part_number <= 8 else f"01{part_number - 8}"
+        return f"0{part_number}"
+    elif letter in ["B", "F", "N"]:  # Верх
+        base = 111
+        return f"0{base + part_number - 1}"
+    elif letter in ["C", "G", "O"]:  # Правая сторона
+        base = 125
+        return f"0{base + part_number - 1}"
+    elif letter in ["D", "H", "P"]:  # Низ
+        base = 136
+        return f"0{base + part_number - 1}"
+
+    return f"0{part_number}0"
+
+
+def _parse_condition_code(code: str) -> CarPartCondition:
+    """Парсит код состояния части"""
+
+    code = code.strip()
+
+    if code == "X@@":
+        return CarPartCondition.REPLACEMENT_NEEDED
+    elif code == "@A@" or code == "A@@":
+        return CarPartCondition.ACCIDENT_DAMAGE
+    elif code == "@U@" or code == "U@@":
+        return CarPartCondition.REPAIR_NEEDED
+    elif code == "@E@" or code == "E@@":
+        return CarPartCondition.OPERATIONAL_DAMAGE
+    elif code == "@W@" or code == "W@@":
+        return CarPartCondition.WELDING_NEEDED
+    else:
+        return CarPartCondition.NORMAL
+
+
+def _extract_condition_symbol(code: str) -> str:
+    """Извлекает символ состояния из кода"""
+
+    code = code.strip()
+
+    if "X" in code:
+        return "X"
+    elif "A" in code:
+        return "A"
+    elif "U" in code:
+        return "U"
+    elif "E" in code:
+        return "E"
+    elif "W" in code:
+        return "W"
+    else:
+        return ""

@@ -15,7 +15,7 @@ from app.models.autohub import (
     AutohubCarDetailRequest,
     AutohubCarDetailResponse,
 )
-from app.parsers.autohub_parser import parse_car_detail
+from app.parsers.autohub_parser import parse_car_detail, parse_car_diagram
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -658,6 +658,36 @@ class AutohubService:
             car_detail = parse_car_detail(response.text)
 
             if car_detail:
+                # Добавляем схему деталей автомобиля
+                try:
+                    from bs4 import BeautifulSoup
+
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    car_diagram = parse_car_diagram(soup)
+
+                    if car_diagram:
+                        # Создаем расширенный объект с схемой деталей
+                        from app.models.autohub import AutohubCarDetailExtended
+
+                        extended_detail = AutohubCarDetailExtended(
+                            **car_detail.dict(), car_diagram=car_diagram
+                        )
+                        logger.info(
+                            f"✅ Схема деталей добавлена: {car_diagram.total_parts} частей"
+                        )
+
+                        return AutohubCarDetailResponse(
+                            success=True,
+                            data=extended_detail,
+                            request_params=request_params,
+                        )
+                    else:
+                        logger.warning(
+                            "Схема деталей не найдена, возвращаем базовые данные"
+                        )
+                except Exception as e:
+                    logger.error(f"Ошибка при добавлении схемы деталей: {e}")
+
                 return AutohubCarDetailResponse(
                     success=True, data=car_detail, request_params=request_params
                 )

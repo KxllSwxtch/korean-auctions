@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from datetime import datetime
 from enum import Enum
 
@@ -306,9 +306,131 @@ class AutohubCarDetailRequest(BaseModel):
 
 class AutohubCarDetailResponse(BaseModel):
     success: bool
-    data: Optional[AutohubCarDetail] = None
+    data: Optional[Union[AutohubCarDetail, "AutohubCarDetailExtended"]] = None
     error: Optional[str] = None
     request_params: AutohubCarDetailRequest
+
+
+# ===== МОДЕЛИ ДЛЯ СХЕМЫ ДЕТАЛЕЙ АВТОМОБИЛЯ =====
+
+
+class CarPartCondition(str, Enum):
+    """Состояние части автомобиля"""
+
+    NORMAL = "@@@"  # Нормальное состояние
+    REPLACEMENT_NEEDED = "X@@"  # Требует замены (красный X)
+    ACCIDENT_DAMAGE = "@A@"  # Повреждение от аварии
+    REPAIR_NEEDED = "@U@"  # Требует ремонта/шпатлевки (U)
+    OPERATIONAL_DAMAGE = "@E@"  # Повреждение от эксплуатации (E)
+    WELDING_NEEDED = "@W@"  # Требует сварки (W)
+
+
+class CarType(str, Enum):
+    """Тип автомобиля для схемы деталей"""
+
+    SEDAN = "sedan"  # Седан (car_01) - части A, B, C, D
+    PICKUP = "pickup"  # Пикап (car_02) - части E, F, G, H
+    TRUCK = "truck"  # Грузовик/минивэн (car_03) - части M, N, O, P
+
+
+class AutohubCarPart(BaseModel):
+    """Информация о части автомобиля"""
+
+    part_id: str = Field(..., description="ID части (например: A01, B01, C01)")
+    part_code: str = Field(..., description="Код части в системе (например: ax010)")
+    condition: CarPartCondition = Field(..., description="Состояние части")
+    condition_symbol: str = Field("", description="Символ состояния (X, U, A, E, W)")
+    zone: str = Field("", description="Зона автомобиля (left, top, right, bottom)")
+    position_x: Optional[int] = Field(None, description="X координата на схеме")
+    position_y: Optional[int] = Field(None, description="Y координата на схеме")
+    image_path: str = Field("", description="Путь к изображению части")
+
+    @property
+    def is_damaged(self) -> bool:
+        """Повреждена ли часть"""
+        return self.condition != CarPartCondition.NORMAL
+
+    @property
+    def needs_replacement(self) -> bool:
+        """Требует ли замены"""
+        return self.condition == CarPartCondition.REPLACEMENT_NEEDED
+
+    @property
+    def needs_repair(self) -> bool:
+        """Требует ли ремонта"""
+        return self.condition in [
+            CarPartCondition.REPAIR_NEEDED,
+            CarPartCondition.WELDING_NEEDED,
+            CarPartCondition.ACCIDENT_DAMAGE,
+            CarPartCondition.OPERATIONAL_DAMAGE,
+        ]
+
+
+class AutohubCarDiagram(BaseModel):
+    """Схема деталей автомобиля"""
+
+    car_type: CarType = Field(..., description="Тип автомобиля")
+    background_image: str = Field(..., description="Путь к фоновому изображению схемы")
+    parts: List[AutohubCarPart] = Field(
+        default_factory=list, description="Список частей автомобиля"
+    )
+
+    # Статистика
+    total_parts: int = Field(0, description="Общее количество частей")
+    damaged_parts: int = Field(0, description="Количество поврежденных частей")
+    replacement_needed: int = Field(0, description="Количество частей требующих замены")
+    repair_needed: int = Field(0, description="Количество частей требующих ремонта")
+
+    def calculate_statistics(self):
+        """Вычисляет статистику по частям"""
+        self.total_parts = len(self.parts)
+        self.damaged_parts = sum(1 for part in self.parts if part.is_damaged)
+        self.replacement_needed = sum(
+            1 for part in self.parts if part.needs_replacement
+        )
+        self.repair_needed = sum(1 for part in self.parts if part.needs_repair)
+
+
+# Константы для парсинга схемы деталей
+CAR_PART_ZONES = {
+    # Седан (car_01)
+    "A": "left",  # Левая сторона
+    "B": "top",  # Верх
+    "C": "right",  # Правая сторона
+    "D": "bottom",  # Низ
+    # Пикап (car_02)
+    "E": "left",  # Левая сторона
+    "F": "top",  # Верх
+    "G": "right",  # Правая сторона
+    "H": "bottom",  # Низ
+    # Грузовик (car_03)
+    "M": "left",  # Левая сторона
+    "N": "top",  # Верх
+    "O": "right",  # Правая сторона
+    "P": "bottom",  # Низ
+}
+
+CAR_TYPE_MAPPING = {
+    "car_01": CarType.SEDAN,
+    "car_02": CarType.PICKUP,
+    "car_03": CarType.TRUCK,
+}
+
+BACKGROUND_IMAGES = {
+    CarType.SEDAN: "/images/front/car_info/bg_car1.png",
+    CarType.PICKUP: "/images/front/car_info/bg_car2.png",
+    CarType.TRUCK: "/images/front/car_info/bg_car3.png",
+}
+
+
+# Обновляем AutohubCarDetail для включения схемы деталей
+class AutohubCarDetailExtended(AutohubCarDetail):
+    """Расширенная информация об автомобиле с схемой деталей"""
+
+    # Схема деталей автомобиля
+    car_diagram: Optional[AutohubCarDiagram] = Field(
+        None, description="Схема деталей автомобиля с повреждениями"
+    )
 
 
 # Константы для расшифровки кодов состояния
