@@ -207,6 +207,10 @@ class AutohubParser:
             # Используем информацию об аукционе, если она доступна
             auction_data = auction_info or {}
 
+            # ИСПРАВЛЕНИЕ: receive_code должен равняться car_id для каждого автомобиля
+            # вместо общего значения из auction_info
+            individual_receive_code = car_id  # Используем car_id как receive_code
+
             # Создаем объект автомобиля
             car = AutohubCar(
                 car_id=car_id,
@@ -220,7 +224,7 @@ class AutohubParser:
                 auction_date=auction_data.get("auction_date"),
                 auction_title=auction_data.get("auction_title"),
                 auction_code=auction_data.get("auction_code"),
-                receive_code=auction_data.get("receive_code"),
+                receive_code=individual_receive_code,  # Используем car_id
                 # Основная информация
                 year=car_info.get("year", 0),
                 mileage=car_info.get("mileage", ""),
