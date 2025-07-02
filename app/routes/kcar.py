@@ -64,7 +64,7 @@ async def get_kcar_cars(
         if manufacturer:
             params["MNUFTR_CD"] = manufacturer
         if model:
-            params["MODEL_CD"] = model
+            params["MODEL_GRP_CD"] = model
         if year_from:
             params["FORM_YR_ST"] = year_from
         if year_to:
