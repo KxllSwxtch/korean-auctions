@@ -321,9 +321,46 @@ class KCarService:
                 "AUC_PLC_CD": "",
             }
 
+            # Детальное логирование входящих параметров
+            logger.info("🔍 KCar Service: Анализирую переданные параметры")
+            if params:
+                logger.info(f"📋 Переданные параметры фильтрации:")
+                for key, value in params.items():
+                    logger.info(f"  {key}: {value}")
+
+                # Специальная диагностика для параметров модели
+                if "MNUFTR_CD" in params:
+                    logger.info(f"🚗 Фильтр производителя: {params['MNUFTR_CD']}")
+                if "MODEL_GRP_CD" in params:
+                    logger.info(f"🔧 Фильтр модели: {params['MODEL_GRP_CD']}")
+
+                # Проверяем маппинг UI параметров в API параметры
+                ui_manufacturer = params.get("manufacturer")
+                ui_model = params.get("model")
+                if ui_manufacturer:
+                    api_manufacturer = params.get("MNUFTR_CD", ui_manufacturer)
+                    logger.info(
+                        f"🔄 Маппинг manufacturer -> MNUFTR_CD: {ui_manufacturer} -> {api_manufacturer}"
+                    )
+                if ui_model:
+                    api_model = params.get("MODEL_GRP_CD", ui_model)
+                    logger.info(
+                        f"🔄 Маппинг model -> MODEL_GRP_CD: {ui_model} -> {api_model}"
+                    )
+            else:
+                logger.info(
+                    "📋 Параметры фильтрации не переданы, используем значения по умолчанию"
+                )
+
             # Объединяем с переданными параметрами
             if params:
                 default_params.update(params)
+
+            # Логируем финальные параметры для отправки
+            logger.info("📋 Финальные параметры для API запроса:")
+            for key, value in default_params.items():
+                if value:  # Показываем только непустые значения
+                    logger.info(f"  {key}: {value}")
 
             # URL для получения списка автомобилей
             cars_url = f"{self.base_url}/kcar/auction/getAuctionCarList_ajax.do"
@@ -677,11 +714,14 @@ class KCarService:
                         )
                         logger.debug(f"🔍 Ключи в ответе: {list(json_data.keys())}")
 
+                    # Нормализуем данные перед парсингом
+                    normalized_data = self.normalize_response_data(json_data)
+
                     # Обрабатываем данные через парсер с параметрами пагинации
                     page_number = params.get("page", 1) if params else 1
                     page_size = int(params.get("PAGE_CNT", 50)) if params else 50
                     lane_result = self.parser.parse_cars_json(
-                        json_data, page=page_number, page_size=page_size
+                        normalized_data, page=page_number, page_size=page_size
                     )
 
                     if lane_result.success and lane_result.car_list:
@@ -771,6 +811,106 @@ class KCarService:
                 success=False,
                 message=f"Ошибка получения данных: {str(e)}",
             )
+
+    def normalize_car_data(self, data: dict) -> dict:
+        """
+        Нормализация данных автомобиля для универсальной работы с разными API
+
+        Поддерживает как реальные KCar данные (CAR_LIST, CAR_NM),
+        так и демо данные (car_list, car_name)
+        """
+        try:
+            # Словарь маппинга полей: стандартное_поле -> [возможные_источники]
+            field_mapping = {
+                "CAR_ID": ["CAR_ID", "car_id"],
+                "CAR_NM": ["CAR_NM", "car_name"],
+                "CNO": ["CNO", "car_number"],
+                "THUMBNAIL": ["THUMBNAIL", "thumbnail"],
+                "THUMBNAIL_MOBILE": ["THUMBNAIL_MOBILE", "thumbnail_mobile"],
+                "AUC_STRT_PRC": ["AUC_STRT_PRC", "price", "auction_start_price"],
+                "AUC_CD": ["AUC_CD", "auction_code"],
+                "AUC_STAT_NM": ["AUC_STAT_NM", "auction_status_name"],
+                "AUC_STRT_DT": ["AUC_STRT_DT", "auction_date"],
+                "AUC_TYPE_DESC": ["AUC_TYPE_DESC", "auction_type_desc"],
+                "FORM_YR": ["FORM_YR", "year"],
+                "MILG": ["MILG", "mileage"],
+                "ENGDISPMNT": ["ENGDISPMNT", "displacement"],
+                "FUEL_CD": ["FUEL_CD", "fuel_type"],
+                "GBOX_DCD": ["GBOX_DCD", "transmission"],
+                "EXTERIOR_COLOR_NM": ["EXTERIOR_COLOR_NM", "exterior_color"],
+                "CAR_POINT": ["CAR_POINT", "car_point"],
+                "CAR_LOCT": ["CAR_LOCT", "car_location"],
+                "AUC_PLC_NM": ["AUC_PLC_NM", "auction_place_name"],
+                "EXBIT_SEQ": ["EXBIT_SEQ", "exhibit_seq"],
+            }
+
+            normalized = {}
+
+            # Нормализуем каждое поле
+            for target_field, source_fields in field_mapping.items():
+                for source_field in source_fields:
+                    if source_field in data and data[source_field] is not None:
+                        normalized[target_field] = data[source_field]
+                        break
+                else:
+                    # Если поле не найдено, используем None
+                    normalized[target_field] = None
+
+            # Копируем остальные поля как есть
+            for key, value in data.items():
+                if key not in [
+                    field for fields in field_mapping.values() for field in fields
+                ]:
+                    normalized[key] = value
+
+            return normalized
+
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка нормализации данных автомобиля: {e}")
+            return data  # Возвращаем исходные данные при ошибке
+
+    def normalize_response_data(self, response_data: dict) -> dict:
+        """
+        Нормализация ответа KCar API для универсальной работы
+
+        Поддерживает разные форматы ответов от реального API и демо данных
+        """
+        try:
+            # Получаем список автомобилей из разных возможных полей
+            cars_data = response_data.get("CAR_LIST", response_data.get("car_list", []))
+
+            # Нормализуем каждый автомобиль
+            normalized_cars = []
+            for car_data in cars_data:
+                normalized_car = self.normalize_car_data(car_data)
+                normalized_cars.append(normalized_car)
+
+            # Создаем нормализованный ответ
+            normalized_response = {
+                "CAR_LIST": normalized_cars,
+                "total_count": response_data.get("total_count", len(normalized_cars)),
+                "auctionReqVo": response_data.get("auctionReqVo"),
+                "success": response_data.get("success", True),
+                "message": response_data.get("message", ""),
+            }
+
+            # Копируем дополнительные поля
+            for key, value in response_data.items():
+                if key not in [
+                    "CAR_LIST",
+                    "car_list",
+                    "total_count",
+                    "auctionReqVo",
+                    "success",
+                    "message",
+                ]:
+                    normalized_response[key] = value
+
+            return normalized_response
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка нормализации ответа: {e}")
+            return response_data
 
     def get_test_cars(self, count: int = 10) -> KCarResponse:
         """

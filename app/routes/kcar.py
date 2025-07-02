@@ -709,3 +709,88 @@ async def get_search_filters_info():
                 "message": str(e),
             },
         )
+
+
+@router.get("/debug/filters")
+async def debug_kcar_filters(
+    manufacturer: Optional[str] = Query(
+        None, description="Код производителя для отладки"
+    ),
+    model: Optional[str] = Query(None, description="Код модели для отладки"),
+):
+    """
+    Отладочный endpoint для проверки маппинга фильтров KCar
+
+    Показывает как параметры Frontend преобразуются в параметры KCar API
+    """
+    try:
+        logger.info(
+            f"🔍 Отладка фильтров KCar: manufacturer={manufacturer}, model={model}"
+        )
+
+        # Информация о маппинге
+        debug_info = {
+            "received_params": {"manufacturer": manufacturer, "model": model},
+            "mapped_to_kcar_api": {
+                "MNUFTR_CD": manufacturer if manufacturer else "",
+                "MODEL_GRP_CD": model if model else "",
+            },
+            "known_mappings": {
+                "manufacturers": {
+                    "hyundai": "001_001",
+                    "kia": "001_002",
+                    "genesis": "001_007",
+                },
+                "hyundai_models": {
+                    "i30": "001",
+                    "sonata": "018",
+                    "avante": "019",
+                    "santafe": "017",
+                    "tucson": "032",
+                },
+            },
+            "validation": {
+                "manufacturer_valid": manufacturer is not None
+                and len(manufacturer.split("_")) == 2,
+                "model_valid": model is not None and model.isdigit(),
+                "combination_notes": [],
+            },
+        }
+
+        # Добавляем заметки о комбинации
+        if manufacturer == "001_001" and model == "001":
+            debug_info["validation"]["combination_notes"].append(
+                "✅ Hyundai i30 - корректная комбинация"
+            )
+        elif manufacturer == "001_001" and model == "018":
+            debug_info["validation"]["combination_notes"].append(
+                "✅ Hyundai Sonata - корректная комбинация"
+            )
+        elif manufacturer == "001_001" and model:
+            debug_info["validation"]["combination_notes"].append(
+                f"⚠️ Hyundai с кодом модели {model} - проверьте корректность"
+            )
+        elif manufacturer and not model:
+            debug_info["validation"]["combination_notes"].append(
+                "ℹ️ Только производитель - покажет все модели"
+            )
+
+        # Добавляем примеры URL
+        debug_info["test_urls"] = {
+            "hyundai_only": f"/api/v1/kcar/cars?manufacturer=001_001",
+            "hyundai_i30": f"/api/v1/kcar/cars?manufacturer=001_001&model=001",
+            "hyundai_sonata": f"/api/v1/kcar/cars?manufacturer=001_001&model=018",
+        }
+
+        return {
+            "debug_info": debug_info,
+            "success": True,
+            "message": "Отладочная информация о фильтрах KCar",
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Ошибка отладки фильтров KCar: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Ошибка отладки фильтров", "message": str(e)},
+        )

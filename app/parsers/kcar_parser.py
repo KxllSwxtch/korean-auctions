@@ -259,34 +259,103 @@ class KCarParser:
 
             test_cars = []
 
+            # Расширенные шаблоны автомобилей с корректными моделями
             test_templates = [
                 {
                     "CAR_ID": "KCA2025{:04d}",
-                    "CAR_NM": "현대 소나타 하이브리드 {} 모델",
+                    "CAR_NM": "현대 소나타 2.0 하이브리드 {} 모델",
                     "CNO": "{}서{:04d}",
-                    "AUC_STRT_PRC": "{}000000",
+                    "AUC_STRT_PRC": "{}200000",
                     "AUC_STAT_NM": "위클리 대기",
                     "FORM_YR": "202{}",
                     "MILG": "{}0000",
-                    "FUEL_CD": "휘발유",
+                    "FUEL_CD": "하이브리드",
                     "GBOX_DCD": "오토",
                     "EXTERIOR_COLOR_NM": "진주백",
-                    "AUC_PLC_NM": "수원경매장",
+                    "AUC_PLC_NM": "서울경매장",
                     "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "001_001",  # Hyundai
+                    "MODEL_GRP_CD": "018",  # Sonata
                 },
                 {
                     "CAR_ID": "KCA2025{:04d}",
-                    "CAR_NM": "기아 K5 2.0 LPi {} 모델",
+                    "CAR_NM": "현대 그랜저 3.3 V6 {} 모델",
                     "CNO": "{}나{:04d}",
                     "AUC_STRT_PRC": "{}500000",
                     "AUC_STAT_NM": "위클리 진행",
                     "FORM_YR": "202{}",
                     "MILG": "{}5000",
+                    "FUEL_CD": "휘발유",
+                    "GBOX_DCD": "오토",
+                    "EXTERIOR_COLOR_NM": "진주흑",
+                    "AUC_PLC_NM": "수원경매장",
+                    "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "001_001",  # Hyundai
+                    "MODEL_GRP_CD": "008",  # Grandeur
+                },
+                {
+                    "CAR_ID": "KCA2025{:04d}",
+                    "CAR_NM": "기아 K5 2.0 LPi {} 모델",
+                    "CNO": "{}다{:04d}",
+                    "AUC_STRT_PRC": "{}800000",
+                    "AUC_STAT_NM": "위클리 완료",
+                    "FORM_YR": "202{}",
+                    "MILG": "{}2000",
                     "FUEL_CD": "LPG",
                     "GBOX_DCD": "수동",
-                    "EXTERIOR_COLOR_NM": "진주흑",
+                    "EXTERIOR_COLOR_NM": "은색",
                     "AUC_PLC_NM": "안산경매장",
                     "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "002_001",  # Kia
+                    "MODEL_GRP_CD": "020",  # K5
+                },
+                {
+                    "CAR_ID": "KCA2025{:04d}",
+                    "CAR_NM": "현대 아반떼 1.6 MPI {} 모델",
+                    "CNO": "{}라{:04d}",
+                    "AUC_STRT_PRC": "{}400000",
+                    "AUC_STAT_NM": "위클리 대기",
+                    "FORM_YR": "202{}",
+                    "MILG": "{}8000",
+                    "FUEL_CD": "휘발유",
+                    "GBOX_DCD": "오토",
+                    "EXTERIOR_COLOR_NM": "흰색",
+                    "AUC_PLC_NM": "부산경매장",
+                    "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "001_001",  # Hyundai
+                    "MODEL_GRP_CD": "002",  # Avante
+                },
+                {
+                    "CAR_ID": "KCA2025{:04d}",
+                    "CAR_NM": "쌍용 렉스턴 2.2 디젤 {} 모델",
+                    "CNO": "{}마{:04d}",
+                    "AUC_STRT_PRC": "{}600000",
+                    "AUC_STAT_NM": "위클리 진행",
+                    "FORM_YR": "202{}",
+                    "MILG": "{}5000",
+                    "FUEL_CD": "경유",
+                    "GBOX_DCD": "오토",
+                    "EXTERIOR_COLOR_NM": "검은색",
+                    "AUC_PLC_NM": "광주경매장",
+                    "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "013_001",  # SsangYong
+                    "MODEL_GRP_CD": "080",  # Rexton
+                },
+                {
+                    "CAR_ID": "KCA2025{:04d}",
+                    "CAR_NM": "현대 투싼 1.6 터보 {} 모델",
+                    "CNO": "{}바{:04d}",
+                    "AUC_STRT_PRC": "{}300000",
+                    "AUC_STAT_NM": "위클리 대기",
+                    "FORM_YR": "202{}",
+                    "MILG": "{}1000",
+                    "FUEL_CD": "휘발유",
+                    "GBOX_DCD": "오토",
+                    "EXTERIOR_COLOR_NM": "회색",
+                    "AUC_PLC_NM": "대구경매장",
+                    "EXBIT_SEQ": "{}",
+                    "MNUFTR_CD": "001_001",  # Hyundai
+                    "MODEL_GRP_CD": "025",  # Tucson
                 },
             ]
 
