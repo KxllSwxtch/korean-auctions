@@ -51,11 +51,11 @@ class GlovisService:
         # Загружаем данные carList из SSANCAR
         self._carlist_data = self._load_carlist_data()
 
-        # SSANCAR специфичные cookies и headers
+        # SSANCAR специфичные cookies и headers (обновлено 2025-01-31)
         self._default_cookies = {
-            "PHPSESSID": "oiamilkeh5lc9lf3p7eoce7due",
-            "2a0d2363701f23f8a75028924a3af643": "Mi4xMzQuMTA5Ljky",
             "_gcl_au": "1.1.78877594.1751338453",
+            "PHPSESSID": "pchib2aaqvo6u2phf8sjp9f45q",
+            "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODA%3D",
             "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
         }
 
@@ -69,14 +69,36 @@ class GlovisService:
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
-            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"macOS"',
         }
 
     # Убираем зависимости от старого менеджера сессий
+
+    def _get_current_week_number(self) -> str:
+        """
+        Определяет номер недели аукциона в зависимости от текущего дня недели:
+        - Понедельник (0) и Вторник (1) → weekNo = 1
+        - Четверг (3) и Пятница (4) → weekNo = 2
+        - Остальные дни → weekNo = 1 (по умолчанию)
+        """
+        now = datetime.now()
+        weekday = now.weekday()  # 0=Понедельник, 1=Вторник, ..., 6=Воскресенье
+
+        if weekday in [0, 1]:  # Понедельник или Вторник
+            week_no = "1"
+        elif weekday in [3, 4]:  # Четверг или Пятница
+            week_no = "2"
+        else:  # Остальные дни (Среда, Суббота, Воскресенье)
+            week_no = "1"  # По умолчанию
+
+        logger.info(
+            f"📅 Текущий день недели: {now.strftime('%A')} ({weekday}), используем weekNo: {week_no}"
+        )
+        return week_no
 
     def _is_session_expired(self) -> bool:
         """Проверяет, истекла ли сессия"""
@@ -192,14 +214,21 @@ class GlovisService:
             # SSANCAR использует нумерацию с 0, Glovis с 1
             ssancar_page = max(0, page - 1) if isinstance(page, int) else 0
 
+            # Определяем weekNo: используем переданный параметр или автоматически определяем по дню недели
+            week_no = params.get("auction_number")
+            if week_no is None:
+                week_no = self._get_current_week_number()
+            else:
+                week_no = str(week_no)
+
             return SSANCARFilters(
-                week_no=str(params.get("auction_number", "2")),
+                week_no=week_no,
                 maker=params.get("car_manufacturer", ""),
                 model=params.get("search_text", ""),
                 fuel="",
                 color="",
                 year_from="2000",
-                year_to="2024",
+                year_to="2025",
                 price_from="0",
                 price_to="200000",
                 list_size="15",
@@ -320,16 +349,29 @@ class GlovisService:
         """Возвращает список аукционов SSANCAR"""
         logger.info("🏛️ Возвращаем аукционы SSANCAR")
 
+        # Получаем текущую неделю динамически
+        current_week = self._get_current_week_number()
+
+        # Создаем список аукционов с отметкой текущей недели
+        auctions = []
+        for i in range(1, 5):  # Недели 1-4
+            week_str = str(i)
+            auction = {
+                "number": week_str,
+                "name": f"Неделя {i}",
+                "status": "active",
+            }
+            # Отмечаем текущую неделю как default
+            if week_str == current_week:
+                auction["default"] = True
+            auctions.append(auction)
+
         return {
             "success": True,
             "message": "Аукционы SSANCAR",
-            "auctions": [
-                {"number": "1", "name": "Неделя 1", "status": "active"},
-                {"number": "2", "name": "Неделя 2", "status": "active"},
-                {"number": "3", "name": "Неделя 3", "status": "active"},
-                {"number": "4", "name": "Неделя 4", "status": "active"},
-            ],
+            "auctions": auctions,
             "source": "SSANCAR",
+            "current_week": current_week,
         }
 
     async def health_check(self) -> Dict[str, Any]:
