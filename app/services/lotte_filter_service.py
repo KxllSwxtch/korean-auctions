@@ -17,6 +17,9 @@ from app.models.lotte_filters import (
     LotteCarGroupsResponse,
     LotteMPriceCarsResponse,
     LotteFilterError,
+    LotteSearchRequest,
+    LotteSearchResponse,
+    LotteCarResult,
 )
 from app.parsers.lotte_filter_parser import LotteFilterParser
 
@@ -36,14 +39,15 @@ class LotteFilterService:
         self.filter_url = "/hp/auct/myp/entry/selectMultiComboVehi.do"
         self.search_url = "/hp/auct/myp/entry/selectMypEntryList.do"
 
-        # Cookies и headers из примеров
+        # Cookies и headers из примеров - обновленные значения
         self.cookies = {
             "_xm_webid_1_": "-1226978328",
-            "_gid": "GA1.2.815798424.1750559947",
+            "_gid": "GA1.2.346177550.1751701164",
             "hpAuctSaveid": "119102",
-            "JSESSIONID": "RZxv6nzZre1OygyCD1wnOjuwKM8wu1j1QUP1t14C93VyvQRtlzd8ucavnA228Wu1.UlBBQV9kb21haW4vUlBBQV9IUEdfTjIx",
+            "JSESSIONID": "jUEw5UsaMaAAMInWwGazuTRhV1LNbkgFlA2N1O14zgXGCgnOl2P8w23YFAgqhwpO.UlBBQV9kb21haW4vUlBBQV9IUEdfTjIx",
+            "_gat_gtag_UA_118654321_1": "1",
+            "_ga_BG67GSX5WV": "GS2.1.s1751707181$o12$g1$t1751708033$j59$l0$h0",
             "_ga": "GA1.1.1122542401.1749522854",
-            "_ga_BG67GSX5WV": "GS2.1.s1750565451$o9$g1$t1750566052$j60$l0$h0",
         }
 
         self.headers = {
@@ -52,13 +56,13 @@ class LotteFilterService:
             "Connection": "keep-alive",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": "https://www.lotteautoauction.net",
-            "Referer": "https://www.lotteautoauction.net/hp/auct/myp/entry/selectMypEntryList.do",
+            "Referer": "https://www.lotteautoauction.net/hp/cmm/actionMenuLinkPage.do?baseMenuNo=1010000&link=forward%3A%2Fhp%2Fauct%2Fmyp%2Fentry%2FselectMypEntryList.do&redirectMode=&popHeight=&popWidth=&subMenuNo=1010200&subSubMenuNo=",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
-            "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+            "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"macOS"',
         }
@@ -452,3 +456,134 @@ class LotteFilterService:
                 "message": f"Ошибка поиска: {str(e)}",
                 "search_params": filter_request.model_dump() if filter_request else {},
             }
+
+    def search_cars_with_parsing(
+        self, search_request: LotteSearchRequest
+    ) -> LotteSearchResponse:
+        """
+        Поиск автомобилей с полным парсингом результатов
+
+        Args:
+            search_request: Параметры поиска
+
+        Returns:
+            LotteSearchResponse с результатами поиска
+        """
+        try:
+            logger.info(f"Поиск автомобилей с парсингом: {search_request.model_dump()}")
+
+            # Подготовка данных для поиска
+            search_data = {
+                "searchPageUnit": str(search_request.per_page),
+                "pageIndex": str(search_request.page),
+                "search_grntVal": search_request.grant_val or "",
+                "search_concVal": search_request.conc_val or "",
+                "search_preVal": search_request.pre_val or "",
+                "excelDiv": search_request.excel_div or "",
+                "searchLaneDiv": search_request.lane_division or "",
+                "search_doimCd": search_request.doim_code or "",
+                "search_exhiNo": search_request.exhibition_number or "",
+                "search_fuelCd": search_request.fuel_code or "",
+                "search_trnsCd": search_request.transmission_code or "",
+                "search_startPrice": search_request.min_price or "",
+                "search_endPrice": search_request.max_price or "",
+                "search_startYyyy": search_request.min_year or "",
+                "search_endYyyy": search_request.max_year or "",
+                "search_startPrice_s": search_request.min_price or "",
+                "search_endPrice_s": search_request.max_price or "",
+            }
+
+            # Основные фильтры
+            if search_request.manufacturer_code:
+                search_data["set_search_maker"] = search_request.manufacturer_code
+
+            if search_request.model_code:
+                search_data["set_search_mdl"] = search_request.model_code
+
+            # Дата аукциона
+            if search_request.auction_date:
+                search_data["searchAuctDt"] = search_request.auction_date
+
+            # Группа автомобилей
+            if search_request.car_group_code:
+                search_data["set_search_chk_carGrp"] = search_request.car_group_code
+
+            # Выполняем поиск
+            session = self._init_session()
+
+            # Обновляем headers для поиска
+            search_headers = self.headers.copy()
+            search_headers.update(
+                {
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Sec-Fetch-Dest": "document",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-User": "?1",
+                    "Upgrade-Insecure-Requests": "1",
+                }
+            )
+
+            search_url = self.base_url + self.search_url
+
+            logger.info(f"Выполняем поиск по URL: {search_url}")
+
+            response = session.post(
+                search_url,
+                data=search_data,
+                headers=search_headers,
+                timeout=30,
+                verify=False,
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Ошибка поиска HTTP {response.status_code}")
+                return LotteSearchResponse(
+                    success=False,
+                    message=f"HTTP ошибка {response.status_code}",
+                    cars=[],
+                    total_count=0,
+                    page=search_request.page,
+                    per_page=search_request.per_page,
+                    filters_applied=search_request.model_dump(),
+                )
+
+            # Парсим HTML результаты
+            html_content = response.text
+            cars = self.parser.parse_car_search_html(html_content)
+            total_count = self.parser.extract_total_count(html_content)
+
+            # Рассчитываем пагинацию
+            total_pages = (
+                total_count + search_request.per_page - 1
+            ) // search_request.per_page
+            has_next = search_request.page < total_pages
+            has_previous = search_request.page > 1
+
+            response_data = LotteSearchResponse(
+                success=True,
+                message=f"Найдено {len(cars)} автомобилей из {total_count} общих",
+                cars=cars,
+                total_count=total_count,
+                page=search_request.page,
+                per_page=search_request.per_page,
+                total_pages=total_pages,
+                has_next=has_next,
+                has_previous=has_previous,
+                filters_applied=search_request.model_dump(),
+            )
+
+            logger.info(f"Поиск завершен: {len(cars)} автомобилей, всего {total_count}")
+            return response_data
+
+        except Exception as e:
+            logger.error(f"Ошибка поиска автомобилей с парсингом: {e}")
+            return LotteSearchResponse(
+                success=False,
+                message=f"Ошибка поиска: {str(e)}",
+                cars=[],
+                total_count=0,
+                page=search_request.page,
+                per_page=search_request.per_page,
+                filters_applied=search_request.model_dump(),
+            )

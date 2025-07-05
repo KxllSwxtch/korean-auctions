@@ -883,6 +883,22 @@ async def get_car_detail(
             f"Запрос детальной информации Lotte: div={search_mng_div_cd}, no={search_mng_no}, seq={search_exhi_regi_seq}"
         )
 
+        # 🔧 ИСПРАВЛЕНИЕ: Принудительная аутентификация перед получением деталей
+        logger.info("Проверка аутентификации перед получением деталей автомобиля...")
+        auth_result = await service._authenticate()
+        if not auth_result:
+            logger.error("Не удалось аутентифицироваться в Lotte для получения деталей")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "success": False,
+                    "message": "Ошибка аутентификации в системе Lotte",
+                    "error": "Authentication failed",
+                },
+            )
+
+        logger.info("✅ Аутентификация для деталей автомобиля успешна")
+
         # Вызываем сервис для получения детальной информации
         response = service.get_car_detail(
             search_mng_div_cd=search_mng_div_cd,

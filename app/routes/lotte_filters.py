@@ -10,6 +10,8 @@ from app.models.lotte_filters import (
     LotteCarGroupsResponse,
     LotteMPriceCarsResponse,
     LotteFilterError,
+    LotteSearchRequest,
+    LotteSearchResponse,
 )
 from app.services.lotte_filter_service import LotteFilterService
 from app.core.logging import logger
@@ -389,3 +391,100 @@ async def clear_cache(service: LotteFilterService = Depends(get_filter_service))
                 "timestamp": datetime.now().isoformat(),
             },
         )
+
+
+@router.post("/search-cars", response_model=LotteSearchResponse)
+async def search_cars_with_parsing(
+    search_request: LotteSearchRequest = Body(
+        ..., description="Параметры поиска автомобилей"
+    ),
+    service: LotteFilterService = Depends(get_filter_service),
+):
+    """
+    Поиск автомобилей с полным парсингом результатов
+
+    Выполняет поиск автомобилей на основе заданных параметров и возвращает
+    структурированные данные автомобилей с полной информацией.
+
+    Параметры поиска:
+    - manufacturer_code: Код производителя (например, "HD" для Hyundai)
+    - model_code: Код модели (например, "HD005" для Sonata)
+    - car_group_code: Код группы автомобилей (например, "HD005016")
+    - auction_date: Дата аукциона в формате YYYYMMDD (например, "20250707")
+    - min_price, max_price: Ценовой диапазон в 10,000 вон
+    - min_year, max_year: Диапазон годов выпуска
+    - fuel_code: Код типа топлива
+    - transmission_code: Код трансмиссии
+    - lane_division: Разделение по полосам
+    - exhibition_number: Выставочный номер
+    - page, per_page: Параметры пагинации
+
+    Пример запроса:
+    ```json
+    {
+        "manufacturer_code": "HD",
+        "model_code": "HD005",
+        "car_group_code": "HD005016",
+        "auction_date": "20250707",
+        "page": 1,
+        "per_page": 20
+    }
+    ```
+
+    Пример ответа:
+    ```json
+    {
+        "success": true,
+        "message": "Найдено 3 автомобилей из 3 общих",
+        "cars": [
+            {
+                "exhibition_number": "0145",
+                "car_name": "SONATA DN8 디엣지 (G)2.0 프리미엄 2WD AT",
+                "year": 2024,
+                "mileage": "64,416km",
+                "transmission": "AT",
+                "fuel_type": "Gasoline",
+                "grade": "E/C",
+                "lane": "A",
+                "start_price": "2,050만원",
+                "car_id": "searchMngDivCd=KS&searchMngNo=KS202506300160&searchExhiRegiSeq=1",
+                "detail_url": "/hp/auct/myp/entry/selectMypEntryCarDetPop.do?searchMngDivCd=KS&searchMngNo=KS202506300160&searchExhiRegiSeq=1"
+            }
+        ],
+        "total_count": 3,
+        "page": 1,
+        "per_page": 20,
+        "total_pages": 1,
+        "has_next": false,
+        "has_previous": false,
+        "filters_applied": {
+            "manufacturer_code": "HD",
+            "model_code": "HD005",
+            "car_group_code": "HD005016"
+        },
+        "timestamp": "2025-01-21T10:30:00"
+    }
+    ```
+    """
+    try:
+        logger.info(f"Поиск автомобилей с парсингом: {search_request.model_dump()}")
+
+        # Выполняем поиск с парсингом через сервис
+        response = service.search_cars_with_parsing(search_request)
+
+        if not response.success:
+            return JSONResponse(status_code=500, content=response.model_dump())
+
+        logger.info(
+            f"Поиск завершен: найдено {len(response.cars)} автомобилей из {response.total_count}"
+        )
+        return response
+
+    except Exception as e:
+        logger.error(f"Ошибка при поиске автомобилей с парсингом: {e}")
+        error_response = LotteFilterError(
+            error_code="SEARCH_CARS_ERROR",
+            message=f"Ошибка поиска автомобилей: {str(e)}",
+            timestamp=datetime.now().isoformat(),
+        )
+        return JSONResponse(status_code=500, content=error_response.model_dump())

@@ -128,3 +128,102 @@ class LotteFilterError(BaseModel):
     message: str
     details: Optional[Dict[str, Any]] = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class LotteCarResult(BaseModel):
+    """Результат поиска автомобиля Lotte"""
+
+    exhibition_number: Optional[str] = Field(None, description="Выставочный номер")
+    car_name: Optional[str] = Field(None, description="Название автомобиля")
+    year: Optional[int] = Field(None, description="Год выпуска")
+    mileage: Optional[str] = Field(None, description="Пробег")
+    transmission: Optional[str] = Field(None, description="Трансмиссия")
+    fuel_type: Optional[str] = Field(None, description="Тип топлива")
+    grade: Optional[str] = Field(None, description="Класс автомобиля")
+    auction_date: Optional[str] = Field(None, description="Дата аукциона")
+    auction_time: Optional[str] = Field(None, description="Время аукциона")
+    lane: Optional[str] = Field(None, description="Полоса аукциона")
+    start_price: Optional[str] = Field(None, description="Стартовая цена")
+    current_price: Optional[str] = Field(None, description="Текущая цена")
+    location: Optional[str] = Field(None, description="Место расположения")
+    images: Optional[List[str]] = Field(
+        default_factory=list, description="Ссылки на изображения"
+    )
+    detail_url: Optional[str] = Field(None, description="Ссылка на детали")
+    seller_comment: Optional[str] = Field(None, description="Комментарий продавца")
+
+    # Дополнительные поля для идентификации
+    car_id: Optional[str] = Field(None, description="Идентификатор автомобиля")
+    manufacture_code: Optional[str] = Field(None, description="Код производителя")
+    model_code: Optional[str] = Field(None, description="Код модели")
+
+
+class LotteSearchRequest(BaseModel):
+    """Запрос поиска автомобилей Lotte"""
+
+    # Основные параметры поиска
+    manufacturer_code: Optional[str] = Field(None, description="Код производителя")
+    model_code: Optional[str] = Field(None, description="Код модели")
+    car_group_code: Optional[str] = Field(None, description="Код группы автомобилей")
+
+    # Дата аукциона
+    auction_date: Optional[str] = Field(None, description="Дата аукциона (YYYYMMDD)")
+
+    # Ценовые фильтры
+    min_price: Optional[str] = Field(None, description="Минимальная цена")
+    max_price: Optional[str] = Field(None, description="Максимальная цена")
+
+    # Год выпуска
+    min_year: Optional[str] = Field(None, description="Минимальный год")
+    max_year: Optional[str] = Field(None, description="Максимальный год")
+
+    # Дополнительные фильтры
+    fuel_code: Optional[str] = Field(None, description="Код типа топлива")
+    transmission_code: Optional[str] = Field(None, description="Код трансмиссии")
+    lane_division: Optional[str] = Field(None, description="Разделение по полосам")
+    exhibition_number: Optional[str] = Field(None, description="Выставочный номер")
+
+    # Пагинация
+    page: int = Field(1, ge=1, description="Номер страницы")
+    per_page: int = Field(20, ge=1, le=100, description="Количество на странице")
+
+    # Дополнительные параметры для поиска
+    excel_div: Optional[str] = Field("", description="Разделение Excel")
+    grant_val: Optional[str] = Field("", description="Значение гранта")
+    conc_val: Optional[str] = Field("", description="Значение концессии")
+    pre_val: Optional[str] = Field("", description="Предварительное значение")
+    doim_code: Optional[str] = Field("", description="Код региона")
+
+
+class LotteSearchResponse(BaseModel):
+    """Ответ поиска автомобилей Lotte"""
+
+    success: bool = True
+    message: str = "Поиск автомобилей выполнен успешно"
+    cars: List[LotteCarResult] = Field(default_factory=list)
+    total_count: int = 0
+    page: int = 1
+    per_page: int = 20
+    total_pages: int = 0
+    has_next: bool = False
+    has_previous: bool = False
+    filters_applied: Optional[Dict[str, Any]] = None
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class LotteAuctionDate(BaseModel):
+    """Дата аукциона Lotte"""
+
+    date: str = Field(..., description="Дата в формате YYYYMMDD")
+    display_date: str = Field(..., description="Дата для отображения")
+    is_active: bool = Field(True, description="Активна ли дата")
+
+
+class LotteAuctionDatesResponse(BaseModel):
+    """Ответ со списком дат аукционов"""
+
+    success: bool = True
+    message: str = "Список дат аукционов получен успешно"
+    dates: List[LotteAuctionDate] = Field(default_factory=list)
+    current_date: Optional[str] = None
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())

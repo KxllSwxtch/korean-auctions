@@ -1,10 +1,14 @@
 import json
 from typing import List, Dict, Any, Optional
+from bs4 import BeautifulSoup
+import re
 from app.models.lotte_filters import (
     LotteManufacturer,
     LotteModel,
     LotteCarGroup,
     LotteMPriceCar,
+    LotteCarResult,
+    LotteSearchResponse,
 )
 from app.core.logging import logger
 
@@ -273,3 +277,248 @@ class LotteFilterParser:
         except Exception as e:
             logger.error(f"Ошибка построения данных поиска: {e}")
             return {}
+
+    def parse_car_search_html(self, html_content: str) -> List[LotteCarResult]:
+        """
+        Парсинг HTML страницы с результатами поиска автомобилей
+
+        Args:
+            html_content: HTML контент страницы
+
+        Returns:
+            Список объектов LotteCarResult
+        """
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+            cars = []
+
+            # Находим основную таблицу с автомобилями
+            main_table = soup.find("table", class_="tbl-t02")
+            if not main_table:
+                logger.warning("Не найдена основная таблица с автомобилями")
+                return []
+
+            # Находим все строки с данными автомобилей
+            tbody = main_table.find("tbody")
+            if not tbody:
+                logger.warning("Не найден tbody в таблице автомобилей")
+                return []
+
+            rows = tbody.find_all("tr")
+            logger.info(f"Найдено {len(rows)} строк с автомобилями")
+
+            for row in rows:
+                try:
+                    car_data = self._parse_car_row(row)
+                    if car_data:
+                        cars.append(car_data)
+                except Exception as e:
+                    logger.error(f"Ошибка парсинга строки автомобиля: {e}")
+                    continue
+
+            logger.info(f"Успешно спарсено {len(cars)} автомобилей")
+            return cars
+
+        except Exception as e:
+            logger.error(f"Ошибка парсинга HTML страницы: {e}")
+            return []
+
+    def _parse_car_row(self, row) -> Optional[LotteCarResult]:
+        """
+        Парсинг одной строки таблицы с автомобилем
+
+        Args:
+            row: BeautifulSoup элемент строки таблицы
+
+        Returns:
+            Объект LotteCarResult или None
+        """
+        try:
+            cells = row.find_all("td")
+            if len(cells) < 8:
+                logger.warning(f"Недостаточно ячеек в строке: {len(cells)}")
+                return None
+
+            # Извлекаем данные из ячеек
+            exhibition_number = cells[0].get_text(strip=True)
+            lane = cells[1].get_text(strip=True)
+            car_number = cells[2].get_text(strip=True)
+
+            # Название автомобиля и ссылка на детали
+            car_name_cell = cells[3]
+            car_name_link = car_name_cell.find("a")
+            car_name = (
+                car_name_link.get_text(strip=True)
+                if car_name_link
+                else car_name_cell.get_text(strip=True)
+            )
+
+            # Извлекаем параметры для деталей из onclick
+            detail_onclick = car_name_link.get("onclick", "") if car_name_link else ""
+            car_id = self._extract_car_id_from_onclick(detail_onclick)
+
+            year = cells[4].get_text(strip=True)
+            mileage = cells[5].get_text(strip=True)
+            color = cells[6].get_text(strip=True)
+            grade = cells[7].get_text(strip=True)
+            price = cells[8].get_text(strip=True) if len(cells) > 8 else None
+
+            # Создаем объект автомобиля
+            car_result = LotteCarResult(
+                exhibition_number=exhibition_number,
+                car_name=car_name,
+                year=self._parse_year(year),
+                mileage=mileage,
+                grade=grade,
+                lane=lane,
+                start_price=self._parse_price(price),
+                car_id=car_id,
+                detail_url=(
+                    f"/hp/auct/myp/entry/selectMypEntryCarDetPop.do?{car_id}"
+                    if car_id
+                    else None
+                ),
+                # Дополнительные поля
+                transmission=self._extract_transmission(car_name),
+                fuel_type=self._extract_fuel_type(car_name),
+                location=color,  # Цвет как местоположение в данном контексте
+            )
+
+            return car_result
+
+        except Exception as e:
+            logger.error(f"Ошибка парсинга строки автомобиля: {e}")
+            return None
+
+    def _extract_car_id_from_onclick(self, onclick: str) -> Optional[str]:
+        """
+        Извлечение ID автомобиля из onclick атрибута
+
+        Args:
+            onclick: Строка с JavaScript кодом
+
+        Returns:
+            ID автомобиля или None
+        """
+        try:
+            # Ищем паттерн fnPopupCarView("KS","KS202506300160","1")
+            match = re.search(
+                r'fnPopupCarView\("([^"]+)","([^"]+)","([^"]+)"\)', onclick
+            )
+            if match:
+                mng_div_cd = match.group(1)
+                mng_no = match.group(2)
+                exhi_regi_seq = match.group(3)
+                return f"searchMngDivCd={mng_div_cd}&searchMngNo={mng_no}&searchExhiRegiSeq={exhi_regi_seq}"
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка извлечения ID автомобиля: {e}")
+            return None
+
+    def _parse_year(self, year_str: str) -> Optional[int]:
+        """
+        Парсинг года выпуска
+
+        Args:
+            year_str: Строка с годом
+
+        Returns:
+            Год как число или None
+        """
+        try:
+            if year_str and year_str.isdigit():
+                return int(year_str)
+            return None
+        except Exception:
+            return None
+
+    def _parse_price(self, price_str: str) -> Optional[str]:
+        """
+        Парсинг цены
+
+        Args:
+            price_str: Строка с ценой
+
+        Returns:
+            Очищенная строка с ценой
+        """
+        try:
+            if price_str:
+                # Убираем HTML теги и лишние пробелы
+                clean_price = re.sub(r"<[^>]+>", "", price_str)
+                clean_price = re.sub(r"\s+", " ", clean_price).strip()
+                return clean_price
+            return None
+        except Exception:
+            return None
+
+    def _extract_transmission(self, car_name: str) -> Optional[str]:
+        """
+        Извлечение типа трансмиссии из названия автомобиля
+
+        Args:
+            car_name: Название автомобиля
+
+        Returns:
+            Тип трансмиссии или None
+        """
+        try:
+            if "AT" in car_name:
+                return "AT"
+            elif "MT" in car_name:
+                return "MT"
+            elif "CVT" in car_name:
+                return "CVT"
+            return None
+        except Exception:
+            return None
+
+    def _extract_fuel_type(self, car_name: str) -> Optional[str]:
+        """
+        Извлечение типа топлива из названия автомобиля
+
+        Args:
+            car_name: Название автомобиля
+
+        Returns:
+            Тип топлива или None
+        """
+        try:
+            if "TDI" in car_name or "DIESEL" in car_name.upper():
+                return "Diesel"
+            elif "HYBRID" in car_name.upper():
+                return "Hybrid"
+            elif "ELECTRIC" in car_name.upper() or "EV" in car_name:
+                return "Electric"
+            else:
+                return "Gasoline"
+        except Exception:
+            return None
+
+    def extract_total_count(self, html_content: str) -> int:
+        """
+        Извлечение общего количества автомобилей из HTML
+
+        Args:
+            html_content: HTML контент страницы
+
+        Returns:
+            Общее количество автомобилей
+        """
+        try:
+            soup = BeautifulSoup(html_content, "html.parser")
+
+            # Ищем текст с общим количеством
+            total_text = soup.find(
+                "span", string=lambda text: text and "대의 차량이 있습니다" in text
+            )
+            if total_text:
+                # Извлекаем число из текста
+                match = re.search(r"총 <em>(\d+)</em>대의", str(total_text.parent))
+                if match:
+                    return int(match.group(1))
+
+            return 0
+        except Exception as e:
+            logger.error(f"Ошибка извлечения общего количества: {e}")
+            return 0
