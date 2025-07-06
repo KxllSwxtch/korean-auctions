@@ -24,6 +24,7 @@ from app.parsers.lotte_parser import (
     LotteParser,
     parse_lotte_car_detail,
 )
+from app.core.session_manager import SessionManager
 
 
 class LotteService:
@@ -36,6 +37,7 @@ class LotteService:
         self.authenticated = False
         self.cache = {}
         self.cache_ttl = 300  # 5 минут
+        self.session_manager = SessionManager()  # Для сохранения сессий
 
         # URLs для различных страниц
         self.urls = {
@@ -54,6 +56,9 @@ class LotteService:
         ]
 
         logger.info("Инициализирован сервис Lotte")
+        
+        # Пытаемся восстановить сессию
+        self._restore_session()
 
     def _init_session(self) -> requests.Session:
         """Инициализация HTTP сессии с настройками"""
@@ -94,10 +99,10 @@ class LotteService:
             session = self._init_session()
 
             # Логин и пароль из конфига
-            login = "119102"  # Из auctions-auth.txt
-            password = "for1234@"  # Из auctions-auth.txt
+            login = settings.lotte_username
+            password = settings.lotte_password
 
-            logger.info("Начинаем аутентификацию в Lotte")
+            logger.info(f"Начинаем аутентификацию в Lotte для пользователя: {login}")
 
             # Шаг 1: Получаем страницу логина для получения cookies и сессии
             login_page_url = urljoin(self.base_url, self.urls["login"])
@@ -107,9 +112,11 @@ class LotteService:
                 logger.error(
                     f"Не удалось получить страницу логина: {response.status_code}"
                 )
+                logger.error(f"Response headers: {response.headers}")
                 return False
 
-            logger.info("Страница логина получена, cookies установлены")
+            logger.info(f"Страница логина получена (статус: {response.status_code})")
+            logger.debug(f"Cookies после получения страницы логина: {session.cookies.get_dict()}")
 
             # Шаг 2: Проверяем логин данные через AJAX
             login_check_url = urljoin(self.base_url, self.urls["login_check"])
@@ -136,10 +143,14 @@ class LotteService:
                 login_check_url, data=login_check_data, timeout=30, verify=False
             )
 
+            logger.debug(f"Отправка проверки логина на: {login_check_url}")
+            logger.debug(f"Данные для проверки: {login_check_data}")
+            
             if check_response.status_code != 200:
                 logger.error(
                     f"Ошибка при проверке логина: HTTP {check_response.status_code}"
                 )
+                logger.error(f"Response text: {check_response.text[:500]}")
                 return False
 
             # Анализируем ответ проверки логина
@@ -179,14 +190,27 @@ class LotteService:
                     )
 
                     # Проверяем финальный ответ (должен быть редирект или успешная страница)
+                    logger.debug(f"Финальный логин статус: {final_response.status_code}")
+                    logger.debug(f"Финальный логин headers: {final_response.headers}")
+                    
                     if final_response.status_code in [200, 302, 303]:
                         self.authenticated = True
                         logger.info("✅ Аутентификация в Lotte успешна!")
+                        logger.debug(f"Cookies после аутентификации: {session.cookies.get_dict()}")
+                        
+                        # Сохраняем сессию для дальнейшего использования
+                        if "JSESSIONID" in session.cookies:
+                            logger.info(f"JSESSIONID получен: {session.cookies['JSESSIONID'][:20]}...")
+                        
+                        # Сохраняем cookies в файл
+                        self._save_session()
+                        
                         return True
                     else:
                         logger.error(
                             f"Ошибка финального логина: HTTP {final_response.status_code}"
                         )
+                        logger.error(f"Response text: {final_response.text[:500]}")
                         return False
 
                 else:
@@ -292,8 +316,10 @@ class LotteService:
         try:
             # Аутентификация если нужно
             if not self.authenticated:
+                logger.info("Требуется аутентификация для получения списка автомобилей")
                 auth_success = await self._authenticate()
                 if not auth_success:
+                    logger.error("Не удалось аутентифицироваться для получения автомобилей")
                     raise Exception("Не удалось аутентифицироваться")
 
             # Получаем страницу с автомобилями с пагинацией
@@ -301,13 +327,35 @@ class LotteService:
 
             if not cars_response:
                 logger.warning("Пустой ответ от сервера при запросе автомобилей")
-                return []
+                # Пробуем переаутентифицироваться
+                logger.info("Пробуем переаутентифицироваться...")
+                self.authenticated = False
+                auth_success = await self._authenticate()
+                if auth_success:
+                    logger.info("Переаутентификация успешна, повторяем запрос...")
+                    cars_response = await self._fetch_cars_page(limit, offset)
+                    if not cars_response:
+                        logger.error("Все еще пустой ответ после переаутентификации")
+                        return []
+                else:
+                    return []
 
             # Парсим автомобили (пагинация уже применена на сервере)
             cars = self._parse_cars(cars_response.text)
             logger.info(
                 f"Найдено {len(cars)} автомобилей на странице (пагинация на сервере)"
             )
+            
+            # Если не нашли автомобили, проверяем, может быть сессия истекла
+            if len(cars) == 0 and 'login' in cars_response.text.lower():
+                logger.warning("Похоже, сессия истекла, пробуем переаутентифицироваться...")
+                self.authenticated = False
+                auth_success = await self._authenticate()
+                if auth_success:
+                    cars_response = await self._fetch_cars_page(limit, offset)
+                    if cars_response:
+                        cars = self._parse_cars(cars_response.text)
+                        logger.info(f"После переаутентификации найдено {len(cars)} автомобилей")
 
             return cars
 
@@ -506,6 +554,13 @@ class LotteService:
             if auction_date:
                 # Форматируем дату в формат YYYYMMDD
                 auction_date_str = auction_date.auction_date.replace("-", "")
+                logger.info(f"Используем дату аукциона: {auction_date.auction_date} -> {auction_date_str}")
+            else:
+                # Если не удалось получить дату, используем сегодняшнюю
+                from datetime import datetime
+                today = datetime.now()
+                auction_date_str = today.strftime("%Y%m%d")
+                logger.warning(f"Не удалось получить дату аукциона, используем сегодня: {auction_date_str}")
 
             # Формируем payload для POST запроса
             payload = {
@@ -535,6 +590,7 @@ class LotteService:
                 f"POST запрос к {cars_url} с пагинацией: page={page_index}, limit={limit}"
             )
             logger.info(f"Дата аукциона для запроса: {auction_date_str}")
+            logger.debug(f"Полный payload запроса: {payload}")
 
             response = session.post(
                 cars_url,
@@ -547,13 +603,22 @@ class LotteService:
                 },
             )
 
+            logger.info(f"Статус ответа: {response.status_code}")
+            
             if response.status_code == 200:
                 logger.info(f"✅ Получен ответ: {len(response.text)} символов")
+                # Проверяем, содержит ли ответ таблицу с автомобилями
+                if 'tbl-t02' in response.text:
+                    logger.info("✅ Найдена таблица с автомобилями")
+                else:
+                    logger.warning("⚠️ Таблица с автомобилями не найдена в ответе")
+                    logger.debug(f"Начало ответа: {response.text[:1000]}")
                 return response
             else:
                 logger.error(
                     f"Ошибка получения страницы автомобилей: {response.status_code}"
                 )
+                logger.error(f"Response text: {response.text[:500]}")
                 return None
         except Exception as e:
             logger.error(f"Ошибка при запросе страницы автомобилей: {e}")
@@ -692,3 +757,35 @@ class LotteService:
             return LotteCarResponse(
                 success=False, message=f"Внутренняя ошибка: {str(e)}", error=str(e)
             )
+    
+    def _save_session(self):
+        """Сохраняет текущую сессию в файл"""
+        try:
+            if self.session and self.authenticated:
+                session_data = {
+                    'cookies': dict(self.session.cookies),
+                    'authenticated': self.authenticated,
+                    'base_url': self.base_url
+                }
+                self.session_manager.save_session('lotte', session_data)
+                logger.info("Сессия Lotte сохранена")
+        except Exception as e:
+            logger.error(f"Ошибка при сохранении сессии: {e}")
+    
+    def _restore_session(self):
+        """Восстанавливает сессию из файла"""
+        try:
+            session_data = self.session_manager.load_session('lotte')
+            if session_data:
+                self.session = self._init_session()
+                # Восстанавливаем cookies
+                for name, value in session_data.get('cookies', {}).items():
+                    self.session.cookies.set(name, value)
+                self.authenticated = session_data.get('authenticated', False)
+                logger.info(f"Сессия Lotte восстановлена, authenticated={self.authenticated}")
+                
+                # Проверяем, что сессия все еще валидна
+                if self.authenticated and 'JSESSIONID' in self.session.cookies:
+                    logger.info(f"JSESSIONID восстановлен: {self.session.cookies['JSESSIONID'][:20]}...")
+        except Exception as e:
+            logger.error(f"Ошибка при восстановлении сессии: {e}")

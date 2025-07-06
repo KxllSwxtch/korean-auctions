@@ -43,8 +43,19 @@ class LotteParser:
             # Ищем блок с датой аукциона
             auction_date_block = soup.find("p", class_="auction-date")
             if not auction_date_block:
-                self.logger.warning("Не найден блок с датой аукциона")
-                return None
+                self.logger.warning("Не найден блок с датой аукциона class='auction-date'")
+                # Пробуем альтернативные способы поиска
+                auction_date_block = soup.find("p", {"class": lambda x: x and "auction" in str(x).lower()})
+                if not auction_date_block:
+                    # Ищем текст по содержимому
+                    for p in soup.find_all("p"):
+                        if "경매예정일" in p.get_text():
+                            auction_date_block = p
+                            break
+                    
+                if not auction_date_block:
+                    self.logger.error("Не удалось найти дату аукциона на странице")
+                    return None
 
             # Извлекаем дату из текста
             date_text = auction_date_block.get_text(strip=True)
@@ -103,16 +114,27 @@ class LotteParser:
             # Ищем таблицу с автомобилями
             table = soup.find("table", class_="tbl-t02")
             if not table:
-                self.logger.warning("Не найдена таблица с автомобилями")
-                return cars
+                self.logger.warning("Не найдена таблица с автомобилями class='tbl-t02'")
+                # Пробуем альтернативные селекторы
+                table = soup.find("table", {"class": lambda x: x and "tbl" in x})
+                if not table:
+                    self.logger.error("Не найдена ни одна таблица с автомобилями")
+                    # Логируем доступные таблицы для отладки
+                    all_tables = soup.find_all("table")
+                    self.logger.debug(f"Найдено таблиц на странице: {len(all_tables)}")
+                    for idx, tbl in enumerate(all_tables[:3]):
+                        self.logger.debug(f"Таблица {idx}: class={tbl.get('class', 'no-class')}")
+                    return cars
 
             tbody = table.find("tbody")
             if not tbody:
                 self.logger.warning("Не найден tbody в таблице")
-                return cars
-
-            rows = tbody.find_all("tr")
-            self.logger.info(f"Найдено {len(rows)} строк с автомобилями")
+                # Пробуем найти строки прямо в таблице
+                rows = table.find_all("tr")
+            else:
+                rows = tbody.find_all("tr")
+                
+            self.logger.info(f"Найдено {len(rows)} строк в таблице")
 
             for row in rows:
                 try:
@@ -235,11 +257,17 @@ class LotteParser:
         try:
             cells = row.find_all(["td", "th"])
             if len(cells) < 10:
+                self.logger.debug(f"Пропускаем строку: недостаточно ячеек ({len(cells)} < 10)")
                 return None
 
             # Извлекаем данные из onclick атрибута ссылки
             link = row.find("a", class_="a_list")
+            if not link:
+                # Пробуем найти любую ссылку с onclick
+                link = row.find("a", {"onclick": lambda x: x and "fnPopupCarView" in x})
+                
             if not link or "onclick" not in link.attrs:
+                self.logger.debug("Не найдена ссылка с onclick в строке")
                 return None
 
             onclick = link["onclick"]
@@ -248,6 +276,7 @@ class LotteParser:
             match = re.search(pattern, onclick)
 
             if not match:
+                self.logger.debug(f"Не удалось извлечь данные из onclick: {onclick}")
                 return None
 
             searchMngDivCd = match.group(1)

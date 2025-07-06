@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     glovis_username: str = "7552"
     glovis_password: str = "for7721@"
 
+    # Настройки для Lotte
+    lotte_base_url: str = "https://www.lotteautoauction.net"
+    
+    # Учётные данные для Lotte
+    lotte_username: str = "119102"
+    lotte_password: str = "for1234@"
+
     # User Agent для запросов
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
