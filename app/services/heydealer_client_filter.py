@@ -207,6 +207,31 @@ class HeyDealerClientFilter:
         )
         return filtered_cars
 
+    def filter_cars_by_grade(
+        self, cars: List[Dict[str, Any]], grade_hash_id: str
+    ) -> List[Dict[str, Any]]:
+        """Фильтрует автомобили по конфигурации (grade)"""
+        if not grade_hash_id or len(grade_hash_id) != 6:
+            return cars
+
+        filtered_cars = []
+
+        for car in cars:
+            # Проверяем grade_hash_id в данных автомобиля
+            car_grade = car.get("grade_hash_id", "")
+            
+            # Также проверяем вложенные данные grade если есть
+            if not car_grade and isinstance(car.get("grade"), dict):
+                car_grade = car["grade"].get("hash_id", "")
+            
+            if car_grade == grade_hash_id:
+                filtered_cars.append(car)
+
+        logger.info(
+            f"Фильтрация по конфигурации {grade_hash_id}: {len(cars)} -> {len(filtered_cars)}"
+        )
+        return filtered_cars
+
     def apply_all_filters(
         self, cars: List[Dict[str, Any]], filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
@@ -217,6 +242,12 @@ class HeyDealerClientFilter:
         if filters.get("model_group"):
             filtered_cars = self.filter_cars_by_model_group(
                 filtered_cars, filters["model_group"]
+            )
+
+        # Фильтр по конфигурации (grade)
+        if filters.get("grade"):
+            filtered_cars = self.filter_cars_by_grade(
+                filtered_cars, filters["grade"]
             )
 
         # Фильтр по году

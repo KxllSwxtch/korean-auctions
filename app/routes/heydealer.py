@@ -71,6 +71,9 @@ async def get_heydealer_cars(
         logger.info(
             f"Получение автомобилей HeyDealer: страница {page}, тип {auction_type}"
         )
+        logger.info(
+            f"Параметры фильтров: brand={brand}, model_group={model_group}, model={model}, grade={grade}"
+        )
 
         # Используем автоматический сервис авторизации
         cookies, headers = heydealer_auth.get_valid_session()
@@ -140,13 +143,14 @@ async def get_heydealer_cars(
             # Принимаем только hash_id для grade (конфигурация)
             if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
                 params["grade"] = grade
-                logger.info(f"Используем grade hash_id: {grade}")
+                logger.info(f"✅ Используем grade hash_id: {grade} для фильтрации")
             else:
                 logger.warning(
-                    f"Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
+                    f"⚠️ Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
                 )
 
         # Выполняем запрос
+        logger.info(f"📡 Отправка запроса к HeyDealer API с параметрами: {params}")
         response = requests.get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
@@ -204,7 +208,9 @@ async def get_heydealer_cars(
                 current_page=page,
             )
 
-            logger.info(f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
+            logger.info(f"✅ Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
+            if grade:
+                logger.info(f"🔍 Фильтрация по grade={grade} применена на стороне API")
 
             # Возвращаем нормализованные данные вместо Pydantic объектов
             return {
