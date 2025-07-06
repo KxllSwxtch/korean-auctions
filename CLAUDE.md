@@ -24,6 +24,7 @@
 - Use session pooling or caching where it improves performance
 - Always make sure to follow all the security protocols/rules so that there is no chance to exploit the project
 - Always break down the task into smaller chunks for a better and optimized solution
+- Remember to always activate venv (source venv/bin/activate) before running any code here
 
 **prohibited:**
 
