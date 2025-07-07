@@ -50,6 +50,7 @@ async def get_glovis_cars(
     ),
     search_text: Optional[str] = Query(None, description="Текст для поиска"),
     car_manufacturer: Optional[str] = Query(None, description="Код производителя"),
+    car_model: Optional[str] = Query(None, description="Модель автомобиля"),
     auction_number: Optional[str] = Query(None, description="Номер аукциона"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ) -> GlovisResponse:
@@ -62,6 +63,7 @@ async def get_glovis_cars(
     - **search_type**: Тип поиска (exhino или carno)
     - **search_text**: Текст для поиска
     - **car_manufacturer**: Код производителя автомобиля
+    - **car_model**: Модель автомобиля
     - **auction_number**: Номер аукциона
 
     **Пример использования:**
@@ -83,6 +85,8 @@ async def get_glovis_cars(
             params["search_text"] = search_text
         if car_manufacturer:
             params["car_manufacturer"] = car_manufacturer
+        if car_model:
+            params["car_model"] = car_model
         if auction_number:
             params["auction_number"] = auction_number
 

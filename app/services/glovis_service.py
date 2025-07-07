@@ -165,6 +165,9 @@ class GlovisService:
 
             # Конвертируем параметры Glovis в параметры SSANCAR
             ssancar_filters = self._convert_glovis_params_to_ssancar(params)
+            
+            # Логируем преобразованные параметры
+            logger.info(f"🔧 Преобразованные параметры SSANCAR: {ssancar_filters.model_dump()}")
 
             # Выполняем запрос к SSANCAR
             response = await self._fetch_car_list(ssancar_filters)
@@ -221,10 +224,31 @@ class GlovisService:
             else:
                 week_no = str(week_no)
 
+            # Конвертируем производителя в корейский
+            manufacturer = params.get("car_manufacturer", "")
+            if manufacturer:
+                manufacturer = self._convert_manufacturer_to_korean(manufacturer)
+
+            # Обрабатываем модель
+            model = ""
+            if params.get("car_model"):
+                # Если передана модель, конвертируем в код
+                model_name = params.get("car_model")
+                if params.get("car_manufacturer") and not model_name.isdigit():
+                    model_code = self.convert_model_to_code(
+                        params.get("car_manufacturer"), model_name
+                    )
+                    model = model_code if model_code else model_name
+                else:
+                    model = model_name
+            elif params.get("search_text"):
+                # Fallback на search_text для обратной совместимости
+                model = params.get("search_text", "")
+
             return SSANCARFilters(
                 week_no=week_no,
-                maker=params.get("car_manufacturer", ""),
-                model=params.get("search_text", ""),
+                maker=manufacturer,
+                model=model,
                 fuel="",
                 color="",
                 year_from="2000",
