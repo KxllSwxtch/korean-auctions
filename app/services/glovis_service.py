@@ -922,7 +922,7 @@ class GlovisService:
         Преобразует фильтры в параметры API SSANCAR
         """
         params = {
-            "list": str(filters.page_size or 15),
+            "list_size": str(filters.page_size or 15),
             "pages": str(
                 (filters.page or 1) - 1
             ),  # SSANCAR использует 0-based pagination
@@ -930,9 +930,9 @@ class GlovisService:
 
         # Основные фильтры
         if filters.week_number:
-            params["weekNo"] = str(filters.week_number)
+            params["week_no"] = str(filters.week_number)
         else:
-            params["weekNo"] = "1"  # По умолчанию 1-я неделя
+            params["week_no"] = "1"  # По умолчанию 1-я неделя
 
         if filters.manufacturer:
             # Конвертируем английский код в корейский для SSANCAR
@@ -961,18 +961,18 @@ class GlovisService:
             korean_color = self._convert_color_to_korean(filters.color)
             params["color"] = korean_color
 
-        # Диапазоны
+        # Диапазоны - используем snake_case для соответствия модели SSANCARFilters
         if filters.year_from:
-            params["yearFrom"] = str(filters.year_from)
+            params["year_from"] = str(filters.year_from)
 
         if filters.year_to:
-            params["yearTo"] = str(filters.year_to)
+            params["year_to"] = str(filters.year_to)
 
         if filters.price_from:
-            params["priceFrom"] = str(filters.price_from)
+            params["price_from"] = str(filters.price_from)
 
         if filters.price_to:
-            params["priceTo"] = str(filters.price_to)
+            params["price_to"] = str(filters.price_to)
 
         # Дополнительные фильтры
         if hasattr(filters, "transmission") and filters.transmission:
@@ -983,6 +983,9 @@ class GlovisService:
 
         if hasattr(filters, "search_text") and filters.search_text:
             params["searchText"] = filters.search_text
+
+        # Добавляем обязательный параметр no (пустая строка по умолчанию)
+        params["no"] = ""
 
         logger.info(f"🔧 Преобразованы параметры SSANCAR: {params}")
         return params
@@ -1008,7 +1011,7 @@ class GlovisService:
                 result = self.parser.parse_car_list(
                     response,
                     page=int(params.get("pages", 0)),
-                    week_no=params.get("weekNo", "1"),
+                    week_no=params.get("week_no", "1"),
                 )
 
                 if result.success:
