@@ -236,16 +236,28 @@ class GlovisParser:
             return "", "", "", ""
 
     def _extract_brand_model(self, car_name: str) -> tuple:
-        """Извлекает бренд и модель из названия [BRAND] Model"""
+        """Извлекает бренд и модель из названия"""
         try:
-            import re
-
-            # Ищем паттерн [BRAND] Model
-            match = re.match(r"\[([^\]]+)\]\s*(.+)", car_name)
-            if match:
-                brand = match.group(1).strip()
-                model = match.group(2).strip()
-                return brand, model
+            # В SSANCAR названия имеют формат: "INTERACTIVE K5 (G) 2.0 Signature"
+            # где K5 - это модель KIA
+            
+            # Определяем бренд по модели
+            if "K5" in car_name:
+                return "KIA", car_name
+            elif "SONATA" in car_name:
+                return "HYUNDAI", car_name
+            elif "GRANDEUR" in car_name:
+                return "HYUNDAI", car_name
+            elif "AVANTE" in car_name:
+                return "HYUNDAI", car_name
+            elif "PALISADE" in car_name:
+                return "HYUNDAI", car_name
+            elif "SPORTAGE" in car_name:
+                return "KIA", car_name
+            elif "SORENTO" in car_name:
+                return "KIA", car_name
+            
+            # Если не удалось определить, возвращаем пустой бренд
             return "", car_name
         except:
             return "", car_name
@@ -269,7 +281,7 @@ class GlovisParser:
                 span.get_text().strip() for span in spans if span.get_text().strip()
             ]
 
-            # Парсим данные по порядку: год, КПП, топливо, объем, пробег, оценка
+            # Парсим данные по порядку из HTML: год, пробег, КПП, цвет, топливо, оценка
             year = 0
             transmission = ""
             fuel_type = ""
@@ -277,6 +289,7 @@ class GlovisParser:
             mileage = ""
             condition_grade = GlovisCarCondition.A4
 
+            # В SSANCAR порядок: Year, Mileage (Km), Transmission, Color, Fuel Type, Grade
             if len(span_texts) >= 1:
                 try:
                     year = int(span_texts[0])
@@ -284,18 +297,23 @@ class GlovisParser:
                     pass
 
             if len(span_texts) >= 2:
-                transmission = span_texts[1].strip()
+                # Пробег (например: "67,321 Km")
+                mileage = span_texts[1].strip()
 
             if len(span_texts) >= 3:
-                fuel_type = span_texts[2].strip()
+                # КПП (Automatic, Manual и т.д.)
+                transmission = span_texts[2].strip()
 
             if len(span_texts) >= 4:
-                engine_volume = span_texts[3].strip()
+                # Цвет (пропускаем, так как он не используется в основной модели)
+                pass
 
             if len(span_texts) >= 5:
-                mileage = span_texts[4].strip()
+                # Тип топлива (Gasoline, Diesel и т.д.)
+                fuel_type = span_texts[4].strip()
 
             if len(span_texts) >= 6:
+                # Оценка состояния (D/C, A/1 и т.д.)
                 grade_text = span_texts[5].strip()
                 # Пытаемся найти соответствующую оценку
                 for grade in GlovisCarCondition:

@@ -1,9 +1,9 @@
 import requests
 
 cookies = {
-    "PHPSESSID": "oiamilkeh5lc9lf3p7eoce7due",
-    "2a0d2363701f23f8a75028924a3af643": "Mi4xMzQuMTA5Ljky",
     "_gcl_au": "1.1.78877594.1751338453",
+    "PHPSESSID": "lqqfmskmrn3m0sgdqjh8vnblbk",
+    "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODA%3D",
     "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
 }
 
@@ -13,28 +13,28 @@ headers = {
     "Connection": "keep-alive",
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "Origin": "https://www.ssancar.com",
-    "Referer": "https://www.ssancar.com/bbs/board.php?bo_table=list&maker=%ED%98%84%EB%8C%80&model=545&no=&fuel=%ED%9C%98%EB%B0%9C%EC%9C%A0&color=%ED%9D%B0&year_from=2000&year_to=2019&price_from=7000&price_to=50000",
+    "Referer": "https://www.ssancar.com/bbs/board.php?bo_table=list&maker=%EA%B8%B0%EC%95%84&model=568&no=&fuel=%ED%9C%98%EB%B0%9C%EC%9C%A0&color=&year_from=2021&year_to=2025&price_from=3000&price_to=16000",
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-origin",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
     "X-Requested-With": "XMLHttpRequest",
-    "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"macOS"',
-    # 'Cookie': 'PHPSESSID=oiamilkeh5lc9lf3p7eoce7due; 2a0d2363701f23f8a75028924a3af643=Mi4xMzQuMTA5Ljky; _gcl_au=1.1.78877594.1751338453; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D',
+    # 'Cookie': '_gcl_au=1.1.78877594.1751338453; PHPSESSID=lqqfmskmrn3m0sgdqjh8vnblbk; 2a0d2363701f23f8a75028924a3af643=Mi4xMzUuNjYuODA%3D; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D',
 }
 
 data = {
-    "weekNo": "2",
-    "maker": "현대",
-    "model": "545",
+    "weekNo": "1",
+    "maker": "기아",
+    "model": "568",
     "fuel": "휘발유",
     "color": "",
-    "yearFrom": "2000",
-    "yearTo": "2019",
-    "priceFrom": "7000",
-    "priceTo": "50000",
+    "yearFrom": "2021",
+    "yearTo": "2025",
+    "priceFrom": "3000",
+    "priceTo": "16000",
     "list": "15",
     "pages": "0",
     "no": "",

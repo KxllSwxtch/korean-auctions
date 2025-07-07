@@ -52,6 +52,15 @@ async def get_glovis_cars(
     car_manufacturer: Optional[str] = Query(None, description="Код производителя"),
     car_model: Optional[str] = Query(None, description="Модель автомобиля"),
     auction_number: Optional[str] = Query(None, description="Номер аукциона"),
+    fuel_type: Optional[str] = Query(None, description="Тип топлива"),
+    color: Optional[str] = Query(None, description="Цвет автомобиля"),
+    transmission: Optional[str] = Query(None, description="Тип трансмиссии"),
+    year_from: Optional[int] = Query(None, description="Год выпуска от"),
+    year_to: Optional[int] = Query(None, description="Год выпуска до"),
+    price_from: Optional[int] = Query(None, description="Цена от (USD)"),
+    price_to: Optional[int] = Query(None, description="Цена до (USD)"),
+    mileage_from: Optional[int] = Query(None, description="Пробег от (км)"),
+    mileage_to: Optional[int] = Query(None, description="Пробег до (км)"),
     background_tasks: BackgroundTasks = BackgroundTasks(),
 ) -> GlovisResponse:
     """
@@ -65,6 +74,15 @@ async def get_glovis_cars(
     - **car_manufacturer**: Код производителя автомобиля
     - **car_model**: Модель автомобиля
     - **auction_number**: Номер аукциона
+    - **fuel_type**: Тип топлива (Gasoline, Diesel, LPG, Electric, Hybrid)
+    - **color**: Цвет автомобиля (White, Black, Silver, Gray, Red, Blue, etc.)
+    - **transmission**: Тип трансмиссии (AT, MT, CVT)
+    - **year_from**: Год выпуска от
+    - **year_to**: Год выпуска до
+    - **price_from**: Цена от (USD)
+    - **price_to**: Цена до (USD)
+    - **mileage_from**: Пробег от (км)
+    - **mileage_to**: Пробег до (км)
 
     **Пример использования:**
     ```
@@ -89,6 +107,24 @@ async def get_glovis_cars(
             params["car_model"] = car_model
         if auction_number:
             params["auction_number"] = auction_number
+        if fuel_type:
+            params["fuel_type"] = fuel_type
+        if color:
+            params["color"] = color
+        if transmission:
+            params["transmission"] = transmission
+        if year_from:
+            params["year_from"] = year_from
+        if year_to:
+            params["year_to"] = year_to
+        if price_from:
+            params["price_from"] = price_from
+        if price_to:
+            params["price_to"] = price_to
+        if mileage_from:
+            params["mileage_from"] = mileage_from
+        if mileage_to:
+            params["mileage_to"] = mileage_to
 
         # Получаем данные
         result = await glovis_service.get_car_list(params)

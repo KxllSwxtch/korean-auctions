@@ -51,10 +51,10 @@ class GlovisService:
         # Загружаем данные carList из SSANCAR
         self._carlist_data = self._load_carlist_data()
 
-        # SSANCAR специфичные cookies и headers (обновлено 2025-01-31)
+        # SSANCAR специфичные cookies и headers (обновлено 2025-07-07)
         self._default_cookies = {
             "_gcl_au": "1.1.78877594.1751338453",
-            "PHPSESSID": "pchib2aaqvo6u2phf8sjp9f45q",
+            "PHPSESSID": "lqqfmskmrn3m0sgdqjh8vnblbk",
             "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODA%3D",
             "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
         }
@@ -212,6 +212,8 @@ class GlovisService:
     ) -> SSANCARFilters:
         """Конвертирует параметры Glovis API в параметры SSANCAR"""
         try:
+            logger.info(f"🔄 Конвертация параметров Glovis в SSANCAR: {params}")
+            
             # Извлекаем параметры из Glovis запроса
             page = params.get("page", 1)
             # SSANCAR использует нумерацию с 0, Glovis с 1
@@ -245,20 +247,43 @@ class GlovisService:
                 # Fallback на search_text для обратной совместимости
                 model = params.get("search_text", "")
 
-            return SSANCARFilters(
-                week_no=week_no,
-                maker=manufacturer,
-                model=model,
-                fuel="",
-                color="",
-                year_from="2000",
-                year_to="2025",
-                price_from="0",
-                price_to="200000",
-                list_size="15",
-                pages=str(ssancar_page),
-                no="",
-            )
+            # Build filters with default values
+            filter_params = {
+                "week_no": week_no,
+                "maker": manufacturer,
+                "model": model,
+                "fuel": "",
+                "color": "",
+                "year_from": "2000",  # Default year from
+                "year_to": "2025",    # Default year to
+                "price_from": "0",    # Default price from
+                "price_to": "200000", # Default price to
+                "list_size": "15",
+                "pages": str(ssancar_page),
+                "no": "",
+            }
+            
+            # Add optional filters if provided
+            if params.get("fuel_type"):
+                filter_params["fuel"] = self._convert_fuel_to_korean(params.get("fuel_type"))
+            
+            if params.get("color"):
+                filter_params["color"] = self._convert_color_to_korean(params.get("color"))
+            
+            if params.get("year_from"):
+                filter_params["year_from"] = str(params.get("year_from"))
+                
+            if params.get("year_to"):
+                filter_params["year_to"] = str(params.get("year_to"))
+                
+            if params.get("price_from"):
+                filter_params["price_from"] = str(params.get("price_from"))
+                
+            if params.get("price_to"):
+                filter_params["price_to"] = str(params.get("price_to"))
+            
+            logger.info(f"📋 Финальные параметры фильтров SSANCAR: {filter_params}")
+            return SSANCARFilters(**filter_params)
         except Exception as e:
             logger.warning(
                 f"⚠️ Ошибка конвертации параметров: {e}, используем значения по умолчанию"
@@ -286,7 +311,9 @@ class GlovisService:
                 "no": filters.no,
             }
 
-            logger.debug(f"📊 Данные запроса: {data}")
+            logger.info(f"📊 Данные запроса: {data}")
+            logger.info(f"📋 Cookies: {dict(self.session.cookies)}")
+            logger.info(f"📋 Headers: {self.session.headers}")
 
             # Выполняем запрос
             response = self.session.post(self.api_url, data=data, timeout=30)
