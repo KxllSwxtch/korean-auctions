@@ -140,15 +140,32 @@ class GlovisService:
         # Настройка headers
         session.headers.update(self._default_headers)
 
+        # Очищаем существующие cookies перед установкой новых
+        session.cookies.clear()
+        
         # Устанавливаем cookies
         for name, value in self._default_cookies.items():
-            session.cookies.set(name, value)
+            session.cookies.set(name, value, domain=".ssancar.com", path="/")
 
         # Отключаем проверку SSL сертификатов для стабильности
         session.verify = False
 
         logger.info("✅ Сессия SSANCAR создана успешно")
         return session
+    
+    def _update_cookies_from_response(self, response: requests.Response) -> None:
+        """Безопасно обновляет cookies из ответа сервера"""
+        try:
+            # Requests автоматически обрабатывает Set-Cookie заголовки
+            # Но мы добавим дополнительную проверку на дубликаты
+            if hasattr(response, 'cookies') and response.cookies:
+                for cookie in response.cookies:
+                    # Удаляем старую версию cookie если она есть
+                    self.session.cookies.set(cookie.name, cookie.value, 
+                                           domain=cookie.domain or ".ssancar.com",
+                                           path=cookie.path or "/")
+        except Exception as e:
+            logger.warning(f"⚠️ Ошибка при обновлении cookies из ответа: {e}")
 
     async def get_car_list(self, params: Dict[str, Any]) -> GlovisResponse:
         """
@@ -312,11 +329,33 @@ class GlovisService:
             }
 
             logger.info(f"📊 Данные запроса: {data}")
-            logger.info(f"📋 Cookies: {dict(self.session.cookies)}")
+            
+            # Безопасное логирование cookies с обработкой дубликатов
+            try:
+                cookie_dict = {}
+                for cookie in self.session.cookies:
+                    # Если есть дубликаты, берем последнее значение
+                    cookie_dict[cookie.name] = cookie.value
+                logger.info(f"📋 Cookies: {cookie_dict}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось вывести cookies: {e}")
+                
             logger.info(f"📋 Headers: {self.session.headers}")
 
-            # Выполняем запрос
-            response = self.session.post(self.api_url, data=data, timeout=30)
+            # Выполняем запрос с обработкой возможных ошибок cookies
+            try:
+                response = self.session.post(self.api_url, data=data, timeout=30)
+            except requests.exceptions.RequestException as e:
+                # Если ошибка связана с cookies, пытаемся пересоздать сессию
+                if "multiple cookies" in str(e).lower():
+                    logger.warning("⚠️ Обнаружены дублирующиеся cookies, пересоздаю сессию")
+                    self._session = None
+                    response = self.session.post(self.api_url, data=data, timeout=30)
+                else:
+                    raise
+            
+            # Обновляем cookies из ответа
+            self._update_cookies_from_response(response)
 
             if response.status_code == 200:
                 logger.info("✅ Данные от SSANCAR получены успешно")
