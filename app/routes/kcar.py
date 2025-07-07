@@ -621,7 +621,15 @@ async def search_cars(filters: KCarSearchFilters):
     """
     try:
         logger.info(f"🔍 Запрос расширенного поиска автомобилей KCar")
-        logger.debug(f"🔍 Параметры поиска: {filters.model_dump()}")
+        logger.info(f"📊 Полученные параметры поиска:")
+        logger.info(f"  - manufacturer_code: {filters.manufacturer_code}")
+        logger.info(f"  - model_group_code: {filters.model_group_code}")
+        logger.info(f"  - model_code: {filters.model_code}")
+        logger.info(f"  - year_from: {filters.year_from}")
+        logger.info(f"  - year_to: {filters.year_to}")
+        logger.info(f"  - auction_type: {filters.auction_type}")
+        logger.info(f"  - lane_type: {filters.lane_type}")
+        logger.debug(f"🔍 Все параметры поиска: {filters.model_dump()}")
 
         result = kcar_service.search_cars(filters)
 

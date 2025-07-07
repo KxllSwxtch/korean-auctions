@@ -1471,7 +1471,11 @@ class KCarService:
         """
         try:
             logger.info(f"🔍 Расширенный поиск автомобилей KCar с фильтрами")
-            logger.debug(f"🔍 Фильтры: {filters.model_dump()}")
+            logger.info(f"📊 Полученные фильтры в сервисе:")
+            logger.info(f"  - manufacturer_code: {filters.manufacturer_code}")
+            logger.info(f"  - model_group_code: {filters.model_group_code}")
+            logger.info(f"  - model_code: {filters.model_code}")
+            logger.debug(f"🔍 Все фильтры: {filters.model_dump()}")
 
             if not self.authenticated:
                 logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
@@ -1530,8 +1534,10 @@ class KCarService:
                 )
                 data["MNUFTR_CD"] = api_manufacturer_code
             if filters.model_group_code:
+                logger.info(f"  - Установлен MODEL_GRP_CD: {filters.model_group_code}")
                 data["MODEL_GRP_CD"] = filters.model_group_code
             if filters.model_code:
+                logger.info(f"  - Установлен MODEL_CD: {filters.model_code}")
                 data["MODEL_CD"] = filters.model_code
             if filters.year_from:
                 data["FORM_YR_ST"] = filters.year_from
@@ -1568,7 +1574,13 @@ class KCarService:
             url = f"{self.base_url}/kcar/auction/getAuctionCarList_ajax.do"
 
             logger.info(f"📡 Отправляю запрос расширенного поиска: {url}")
-            logger.debug(f"🔍 Параметры поиска: {data}")
+            logger.info(f"📊 Ключевые параметры запроса:")
+            logger.info(f"  - MNUFTR_CD: {data.get('MNUFTR_CD', '')}")
+            logger.info(f"  - MODEL_GRP_CD: {data.get('MODEL_GRP_CD', '')}")
+            logger.info(f"  - MODEL_CD: {data.get('MODEL_CD', '')}")
+            logger.info(f"  - AUC_TYPE: {data.get('AUC_TYPE', '')}")
+            logger.info(f"  - LANE_TYPE: {data.get('LANE_TYPE', '')}")
+            logger.debug(f"🔍 Все параметры поиска: {data}")
 
             response = self.session.post(url, data=data, headers=headers)
 
@@ -1577,6 +1589,16 @@ class KCarService:
                     json_data = response.json()
                     logger.debug(f"📥 Получен JSON ответ поиска")
 
+                    # Проверяем что вернул API
+                    if "CAR_LIST" in json_data:
+                        car_count = len(json_data["CAR_LIST"])
+                        logger.info(f"📥 API вернул {car_count} автомобилей")
+                        if car_count > 0:
+                            first_car = json_data["CAR_LIST"][0]
+                            logger.info(f"  Первый автомобиль: {first_car.get('CAR_NM', 'N/A')}")
+                    else:
+                        logger.warning("⚠️ CAR_LIST не найден в ответе API")
+                    
                     # Парсим ответ
                     result = self.parser.parse_search_json(json_data)
 
