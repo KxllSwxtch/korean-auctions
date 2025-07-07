@@ -287,16 +287,16 @@ class GlovisService:
             if params.get("color"):
                 filter_params["color"] = self._convert_color_to_korean(params.get("color"))
             
-            if params.get("year_from"):
+            if params.get("year_from") is not None:
                 filter_params["year_from"] = str(params.get("year_from"))
                 
-            if params.get("year_to"):
+            if params.get("year_to") is not None:
                 filter_params["year_to"] = str(params.get("year_to"))
                 
-            if params.get("price_from"):
+            if params.get("price_from") is not None:
                 filter_params["price_from"] = str(params.get("price_from"))
                 
-            if params.get("price_to"):
+            if params.get("price_to") is not None:
                 filter_params["price_to"] = str(params.get("price_to"))
             
             logger.info(f"📋 Финальные параметры фильтров SSANCAR: {filter_params}")
@@ -962,16 +962,16 @@ class GlovisService:
             params["color"] = korean_color
 
         # Диапазоны - используем snake_case для соответствия модели SSANCARFilters
-        if filters.year_from:
+        if filters.year_from is not None:
             params["year_from"] = str(filters.year_from)
 
-        if filters.year_to:
+        if filters.year_to is not None:
             params["year_to"] = str(filters.year_to)
 
-        if filters.price_from:
+        if filters.price_from is not None:
             params["price_from"] = str(filters.price_from)
 
-        if filters.price_to:
+        if filters.price_to is not None:
             params["price_to"] = str(filters.price_to)
 
         # Дополнительные фильтры
