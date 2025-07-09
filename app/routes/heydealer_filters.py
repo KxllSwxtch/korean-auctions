@@ -125,6 +125,16 @@ async def get_brand_models(brand_hash_id: str):
 async def get_model_generations(model_group_hash_id: str):
     """Получить поколения для указанной группы моделей"""
     try:
+        logger.info(f"🔍 Запрос поколений для model_group: {model_group_hash_id}")
+        
+        # Проверяем формат hash_id
+        if not model_group_hash_id or len(model_group_hash_id) != 6:
+            logger.error(f"❌ Неверный формат model_group_hash_id: {model_group_hash_id}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Неверный формат model_group_hash_id. Ожидается 6 символов, получено: {model_group_hash_id}"
+            )
+        
         # Используем автоматический сервис авторизации
         cookies, headers = heydealer_auth.get_valid_session()
         
@@ -142,22 +152,31 @@ async def get_model_generations(model_group_hash_id: str):
             "is_previously_bid": "false",
             "model_group": model_group_hash_id,
         }
+        
+        url = f"https://api.heydealer.com/v2/dealers/web/car_meta/model_groups/{model_group_hash_id}/"
+        logger.info(f"📡 Отправка запроса к HeyDealer: {url}")
+        logger.info(f"📋 Параметры: {params}")
 
         response = requests.get(
-            f"https://api.heydealer.com/v2/dealers/web/car_meta/model_groups/{model_group_hash_id}/",
+            url,
             params=params,
             headers=headers,
             cookies=cookies,
             timeout=30,
         )
+        
+        logger.info(f"📊 Статус ответа: {response.status_code}")
 
         if response.status_code != 200:
+            logger.error(f"❌ Ошибка HeyDealer API: {response.text}")
             raise HTTPException(
                 status_code=response.status_code,
                 detail=f"HeyDealer API error: {response.status_code}",
             )
 
         response_data = response.json()
+        logger.info(f"✅ Получен ответ с {len(response_data.get('models', []))} поколениями")
+        
         return parser.parse_model_detail(response_data)
 
     except requests.RequestException as e:

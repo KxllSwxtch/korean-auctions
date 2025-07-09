@@ -116,19 +116,22 @@ async def get_heydealer_cars(
                         f"Бренд {brand} не найден. Используйте hash_id из 6 символов"
                     )
 
+        # Обработка model_group - используем для клиентской фильтрации
+        needs_client_filter = False
         if model_group and model_group.strip():
             # Принимаем только hash_id (как в оригинальном API HeyDealer)
             if (
                 len(model_group) == 6
                 and model_group.replace("_", "").replace("-", "").isalnum()
             ):
-                params["model_group"] = model_group
-                logger.info(f"Используем model_group hash_id: {model_group}")
+                # HeyDealer API не поддерживает model_group, нужна клиентская фильтрация
+                logger.info(f"🔧 model_group ({model_group}) будет применен через клиентскую фильтрацию")
+                needs_client_filter = True
+                # Не добавляем model_group в params, так как API его не поддерживает
             else:
                 logger.warning(
                     f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
                 )
-                # Не добавляем неверный параметр
         if model and model.strip():
             # Принимаем только hash_id для model (поколение)
             if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
@@ -176,7 +179,16 @@ async def get_heydealer_cars(
             logger.info(f"📊 Получено автомобилей: {len(cars_data)}")
             if cars_data and len(cars_data) > 0:
                 first_car = cars_data[0]
-                logger.info(f"🚗 Пример первого автомобиля: brand={first_car.get('detail', {}).get('brand_name', 'N/A')}, model={first_car.get('detail', {}).get('model_part_name', 'N/A')}")
+                car_detail = first_car.get('detail', {})
+                logger.info(f"🚗 Пример первого автомобиля: full_name={car_detail.get('full_name', 'N/A')}, model_part={car_detail.get('model_part_name', 'N/A')}")
+                
+                # Проверяем, применились ли фильтры
+                if model_group:
+                    # Проверяем первые несколько машин
+                    logger.info(f"🔍 Проверка применения фильтра model_group={model_group}:")
+                    for i, car in enumerate(cars_data[:5]):
+                        car_model = car.get('detail', {}).get('model_part_name', '')
+                        logger.info(f"  Авто {i+1}: {car_model}")
 
             # Извлекаем информацию о пагинации из заголовков
             total_count = int(response.headers.get("X-Pagination-Count", 0))
@@ -193,6 +205,15 @@ async def get_heydealer_cars(
                     estimated_total = len(cars_data) + ((page - 1) * page_size)
 
                 total_count = estimated_total
+
+            # Применяем клиентскую фильтрацию если нужно
+            if needs_client_filter and model_group:
+                logger.info(f"🔍 Применяем клиентскую фильтрацию по model_group={model_group}")
+                cars_data = client_filter.filter_cars_by_model_group(cars_data, model_group)
+                logger.info(f"📊 После фильтрации осталось {len(cars_data)} автомобилей")
+                
+                # Обновляем total_count после фильтрации
+                total_count = len(cars_data)
 
             # Парсим данные через парсер
             parser = HeyDealerParser()

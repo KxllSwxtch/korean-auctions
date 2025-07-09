@@ -1,0 +1,65 @@
+{
+  "hash_id": "aMKrwk",
+  "name": "5시리즈",
+  "count": 276,
+  "is_subscribed": null,
+  "has_subscription": null,
+  "models": [
+    {
+      "hash_id": "o2QMk3",
+      "name": "5시리즈 (G60)",
+      "start_date": "202309",
+      "end_date": null,
+      "count": 35,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "23ryQ4",
+      "name": "5시리즈 (G30)",
+      "start_date": "201701",
+      "end_date": "202309",
+      "count": 165,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "koe6zp",
+      "name": "5시리즈 (F10)",
+      "start_date": "201004",
+      "end_date": "201612",
+      "count": 73,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "n3MlR4",
+      "name": "5시리즈 (E60)",
+      "start_date": "200309",
+      "end_date": "201004",
+      "count": 2,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "ep8l6p",
+      "name": "5시리즈 (E39)",
+      "start_date": "199501",
+      "end_date": "200309",
+      "count": 1,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "Y3GlJo",
+      "name": "5시리즈 (E34)",
+      "start_date": "198801",
+      "end_date": "199612",
+      "count": 0,
+      "is_subscribed": null
+    },
+    {
+      "hash_id": "qpRJ7p",
+      "name": "5시리즈 (E28)",
+      "start_date": "198101",
+      "end_date": "198812",
+      "count": 0,
+      "is_subscribed": null
+    }
+  ]
+}

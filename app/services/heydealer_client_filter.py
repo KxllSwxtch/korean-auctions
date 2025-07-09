@@ -45,8 +45,61 @@ class HeyDealerClientFilter:
     def filter_cars_by_model_group(
         self, cars: List[Dict[str, Any]], model_group_hash_id: str
     ) -> List[Dict[str, Any]]:
-        """Фильтрует автомобили по модели"""
-        if not model_group_hash_id or model_group_hash_id not in self.model_mappings:
+        """
+        Фильтрует автомобили по model_group (группе моделей)
+        Поскольку HeyDealer API не поддерживает фильтрацию по model_group,
+        мы фильтруем на стороне клиента
+        """
+        if not model_group_hash_id:
+            return cars
+        
+        logger.info(f"Применяем клиентскую фильтрацию по model_group: {model_group_hash_id}")
+        
+        # Сначала получаем все generation IDs для этой model_group
+        from app.services.heydealer_model_mapper import HeyDealerModelMapper
+        generation_ids = HeyDealerModelMapper.get_generation_ids_for_model_group(model_group_hash_id)
+        
+        if not generation_ids:
+            logger.warning(f"Не найдены generation IDs для model_group {model_group_hash_id}")
+            # Пробуем фильтровать по старому методу с маппингами
+            if model_group_hash_id in self.model_mappings:
+                return self._filter_by_model_mapping(cars, model_group_hash_id)
+            return cars
+        
+        # Фильтруем автомобили, у которых model hash_id есть в списке generation_ids
+        filtered_cars = []
+        for car in cars:
+            # Нужно найти model hash_id в данных автомобиля
+            # Это может быть в разных местах в зависимости от структуры данных
+            car_model_id = None
+            
+            # Попробуем найти model ID в разных местах
+            if isinstance(car, dict):
+                # Вариант 1: прямое поле model
+                car_model_id = car.get('model', {}).get('hash_id') if isinstance(car.get('model'), dict) else None
+                
+                # Вариант 2: в detail
+                if not car_model_id and 'detail' in car:
+                    detail = car['detail']
+                    car_model_id = detail.get('model', {}).get('hash_id') if isinstance(detail.get('model'), dict) else None
+                
+                # Вариант 3: model_hash_id прямо в car
+                if not car_model_id:
+                    car_model_id = car.get('model_hash_id')
+            
+            # Проверяем, соответствует ли model_id одному из generation_ids
+            if car_model_id and car_model_id in generation_ids:
+                filtered_cars.append(car)
+                logger.debug(f"Автомобиль прошел фильтр: model_id={car_model_id}")
+        
+        logger.info(f"Отфильтровано {len(filtered_cars)} из {len(cars)} автомобилей")
+        return filtered_cars
+    
+    def _filter_by_model_mapping(
+        self, cars: List[Dict[str, Any]], model_group_hash_id: str
+    ) -> List[Dict[str, Any]]:
+        """Старый метод фильтрации по маппингам"""
+        if model_group_hash_id not in self.model_mappings:
             return cars
 
         model_keywords = self.model_mappings[model_group_hash_id]
