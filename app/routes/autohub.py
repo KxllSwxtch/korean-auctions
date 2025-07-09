@@ -10,6 +10,20 @@ from app.models.autohub import (
     AutohubCarDetailRequest,
     AutohubCarDetailResponse,
 )
+from app.models.autohub_filters import (
+    AutohubSearchRequest,
+    AutohubManufacturersResponse,
+    AutohubModelsResponse,
+    AutohubGenerationsResponse,
+    AutohubAuctionSessionsResponse,
+    AutohubFilterInfo,
+    AUTOHUB_MANUFACTURERS,
+    AUTOHUB_MILEAGE_OPTIONS,
+    AUTOHUB_PRICE_OPTIONS,
+    AutohubFuelType,
+    AutohubAuctionResult,
+    AutohubLane,
+)
 from app.services.autohub_service import autohub_service, AutohubService
 from app.core.logging import get_logger
 
@@ -468,6 +482,253 @@ async def set_auth_cookies(cookies: dict):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при установке cookies: {str(e)}",
+        )
+
+
+@router.post("/search", response_model=AutohubResponse)
+async def search_cars(
+    search_params: AutohubSearchRequest,
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Расширенный поиск автомобилей с фильтрами
+    
+    Поддерживает все фильтры с сайта AutoHub:
+    - Производитель, модель, поколение
+    - Тип топлива, расширенная гарантия
+    - Диапазон года выпуска
+    - Диапазон пробега
+    - Диапазон цен
+    - Статус аукциона и полоса
+    - Поиск по номерам
+    - SOH диагностика
+    """
+    try:
+        logger.info("Расширенный поиск автомобилей с фильтрами")
+        
+        response = await service.search_cars(search_params)
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.error or "Ошибка при поиске автомобилей",
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/manufacturers", response_model=AutohubManufacturersResponse)
+async def get_manufacturers(
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Получает список всех производителей
+    
+    Returns:
+        Список производителей с кодами и названиями
+    """
+    try:
+        logger.info("Получение списка производителей")
+        
+        response = service.get_manufacturers()
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message,
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+
+
+@router.get("/models/{manufacturer_code}", response_model=AutohubModelsResponse)
+async def get_models(
+    manufacturer_code: str,
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Получает список моделей для указанного производителя
+    
+    Args:
+        manufacturer_code: Код производителя (например, 'KA' для Kia)
+        
+    Returns:
+        Список моделей с кодами и названиями
+    """
+    try:
+        logger.info(f"Получение моделей для производителя {manufacturer_code}")
+        
+        response = await service.get_models(manufacturer_code)
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message,
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/generations/{model_code}", response_model=AutohubGenerationsResponse)
+async def get_generations(
+    model_code: str,
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Получает список поколений для указанной модели
+    
+    Args:
+        model_code: Код модели (например, 'KA01')
+        
+    Returns:
+        Список поколений с кодами и названиями
+    """
+    try:
+        logger.info(f"Получение поколений для модели {model_code}")
+        
+        response = await service.get_generations(model_code)
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message,
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/auction-sessions", response_model=AutohubAuctionSessionsResponse)
+async def get_auction_sessions(
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Получает список активных сессий аукциона
+    
+    Returns:
+        Список сессий с информацией о датах и номерах аукционов
+    """
+    try:
+        logger.info("Получение списка сессий аукциона")
+        
+        response = await service.get_auction_sessions()
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message,
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/filters/info")
+async def get_filters_info():
+    """
+    Получает информацию о доступных фильтрах
+    
+    Returns:
+        Подробная информация о всех доступных фильтрах и их значениях
+    """
+    try:
+        filter_info = AutohubFilterInfo(
+            manufacturers=[
+                {"code": m.code, "name": m.name, "name_en": m.name_en or m.name}
+                for m in AUTOHUB_MANUFACTURERS
+            ],
+            fuel_types=[
+                {"code": ft.value, "name": name}
+                for ft, name in [
+                    (AutohubFuelType.ALL, "전체"),
+                    (AutohubFuelType.GASOLINE, "휘발유"),
+                    (AutohubFuelType.DIESEL, "경유"),
+                    (AutohubFuelType.LPG, "LPG"),
+                    (AutohubFuelType.HYBRID, "하이브리드"),
+                    (AutohubFuelType.ELECTRIC, "전기"),
+                    (AutohubFuelType.OTHER, "기타"),
+                ]
+            ],
+            lanes=[
+                {"code": lane.value, "name": name}
+                for lane, name in [
+                    (AutohubLane.ALL, "전체"),
+                    (AutohubLane.A, "A레인"),
+                    (AutohubLane.B, "B레인"),
+                    (AutohubLane.C, "C레인"),
+                    (AutohubLane.D, "D레인"),
+                ]
+            ],
+            auction_results=[
+                {"code": result.value, "name": name}
+                for result, name in [
+                    (AutohubAuctionResult.ALL, "전체"),
+                    (AutohubAuctionResult.SOLD, "낙찰 & 후상담낙찰"),
+                    (AutohubAuctionResult.UNSOLD, "유찰 & 낙찰취소"),
+                    (AutohubAuctionResult.NOT_HELD, "미실시"),
+                ]
+            ],
+            year_range={"min": 1990, "max": 2025},
+            mileage_options=AUTOHUB_MILEAGE_OPTIONS,
+            price_options=AUTOHUB_PRICE_OPTIONS,
+        )
+        
+        return {
+            "success": True,
+            "message": "Информация о фильтрах получена успешно",
+            "filters": filter_info,
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
         )
 
 

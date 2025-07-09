@@ -15,6 +15,18 @@ from app.models.autohub import (
     AutohubCarDetailRequest,
     AutohubCarDetailResponse,
 )
+from app.models.autohub_filters import (
+    AutohubSearchRequest,
+    AutohubManufacturer,
+    AutohubModel,
+    AutohubGeneration,
+    AutohubAuctionSession,
+    AutohubManufacturersResponse,
+    AutohubModelsResponse,
+    AutohubGenerationsResponse,
+    AutohubAuctionSessionsResponse,
+    AUTOHUB_MANUFACTURERS,
+)
 from app.parsers.autohub_parser import parse_car_detail, parse_car_diagram
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -717,6 +729,226 @@ class AutohubService:
         """Установка cookies для аутентификации"""
         self.session.cookies.update(cookies)
         logger.info("Установлены cookies для аутентификации в Autohub")
+
+    async def search_cars(self, search_params: AutohubSearchRequest) -> AutohubResponse:
+        """
+        Расширенный поиск автомобилей с фильтрами
+        
+        Args:
+            search_params: Параметры поиска и фильтрации
+            
+        Returns:
+            AutohubResponse: Ответ с найденными автомобилями
+        """
+        try:
+            logger.info("Начинаем расширенный поиск автомобилей с фильтрами")
+            
+            # Преобразуем параметры в формат AutoHub
+            autohub_params = search_params.to_autohub_params()
+            
+            logger.info(f"Параметры поиска: {autohub_params}")
+            
+            # Инициализируем сессию
+            session_initialized = await self._initialize_session()
+            if not session_initialized:
+                return AutohubResponse(
+                    success=False,
+                    error="Не удалось инициализировать сессию с Autohub",
+                    data=[],
+                )
+            
+            # Выполняем POST запрос с фильтрами
+            url = self.settings.autohub_list_url
+            
+            # Добавляем headers для POST запроса
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": self.settings.autohub_base_url,
+            }
+            
+            response = self.session.post(
+                url,
+                data=autohub_params,
+                headers=headers,
+                timeout=self.settings.request_timeout,
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+            
+            # Проверяем кодировку
+            if response.encoding is None or response.encoding == "ISO-8859-1":
+                response.encoding = "utf-8"
+                
+            # Для отладки сохраняем полученный HTML
+            with open("debug_search_response.html", "w", encoding="utf-8") as f:
+                f.write(response.text)
+            logger.info("HTML ответ сохранён в debug_search_response.html для анализа")
+            
+            # Парсим результаты
+            cars = self.parser.parse_car_list(response.text)
+            
+            logger.info(f"Найдено {len(cars)} автомобилей с фильтрами")
+            
+            # Пытаемся извлечь общее количество записей
+            total_count = self._extract_total_count_from_html(response.text)
+            
+            return AutohubResponse(
+                success=True,
+                data=cars,
+                total_count=total_count or len(cars),
+                page=search_params.page,
+                limit=search_params.page_size,
+            )
+            
+        except Exception as e:
+            error_msg = f"Ошибка при поиске автомобилей: {str(e)}"
+            logger.error(error_msg)
+            return AutohubResponse(success=False, error=error_msg, data=[])
+
+    def get_manufacturers(self) -> AutohubManufacturersResponse:
+        """
+        Получает список производителей
+        
+        Returns:
+            AutohubManufacturersResponse: Список производителей
+        """
+        try:
+            logger.info("Получение списка производителей AutoHub")
+            
+            return AutohubManufacturersResponse(
+                success=True,
+                message="Список производителей получен успешно",
+                manufacturers=AUTOHUB_MANUFACTURERS,
+                total_count=len(AUTOHUB_MANUFACTURERS),
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении производителей: {e}")
+            return AutohubManufacturersResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                manufacturers=[],
+                total_count=0,
+            )
+
+    async def get_models(self, manufacturer_code: str) -> AutohubModelsResponse:
+        """
+        Получает список моделей для производителя
+        
+        Args:
+            manufacturer_code: Код производителя
+            
+        Returns:
+            AutohubModelsResponse: Список моделей
+        """
+        try:
+            logger.info(f"Получение моделей для производителя {manufacturer_code}")
+            
+            # Здесь должен быть реальный запрос к AutoHub для получения моделей
+            # Пока возвращаем заглушку
+            models = []
+            
+            # TODO: Реализовать парсинг моделей с сайта AutoHub
+            # URL для AJAX запроса моделей обычно выглядит как:
+            # /newfront/common/selectbox/getCarName1List.do
+            
+            return AutohubModelsResponse(
+                success=True,
+                message=f"Список моделей для {manufacturer_code} получен успешно",
+                models=models,
+                manufacturer_code=manufacturer_code,
+                total_count=len(models),
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении моделей: {e}")
+            return AutohubModelsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                models=[],
+                manufacturer_code=manufacturer_code,
+                total_count=0,
+            )
+
+    async def get_generations(self, model_code: str) -> AutohubGenerationsResponse:
+        """
+        Получает список поколений для модели
+        
+        Args:
+            model_code: Код модели
+            
+        Returns:
+            AutohubGenerationsResponse: Список поколений
+        """
+        try:
+            logger.info(f"Получение поколений для модели {model_code}")
+            
+            # Здесь должен быть реальный запрос к AutoHub для получения поколений
+            # Пока возвращаем заглушку
+            generations = []
+            
+            # TODO: Реализовать парсинг поколений с сайта AutoHub
+            # URL для AJAX запроса поколений обычно выглядит как:
+            # /newfront/common/selectbox/getCarName2List.do
+            
+            return AutohubGenerationsResponse(
+                success=True,
+                message=f"Список поколений для {model_code} получен успешно",
+                generations=generations,
+                model_code=model_code,
+                total_count=len(generations),
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении поколений: {e}")
+            return AutohubGenerationsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                generations=[],
+                model_code=model_code,
+                total_count=0,
+            )
+
+    async def get_auction_sessions(self) -> AutohubAuctionSessionsResponse:
+        """
+        Получает список активных сессий аукциона
+        
+        Returns:
+            AutohubAuctionSessionsResponse: Список сессий
+        """
+        try:
+            logger.info("Получение списка сессий аукциона")
+            
+            # Здесь должен быть реальный запрос к AutoHub для получения сессий
+            # Пока возвращаем примерные данные
+            sessions = [
+                AutohubAuctionSession(
+                    auction_no="1332",
+                    auction_date="2025-07-09",
+                    auction_code="AC202507020001",
+                    auction_title="안성 2025/07/09 1332회차 경매",
+                    is_active=True,
+                )
+            ]
+            
+            # TODO: Реализовать парсинг сессий с сайта AutoHub
+            
+            return AutohubAuctionSessionsResponse(
+                success=True,
+                message="Список сессий аукциона получен успешно",
+                sessions=sessions,
+                current_session=sessions[0] if sessions else None,
+                total_count=len(sessions),
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении сессий аукциона: {e}")
+            return AutohubAuctionSessionsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                sessions=[],
+                total_count=0,
+            )
 
 
 # Глобальный экземпляр сервиса

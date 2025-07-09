@@ -151,6 +151,12 @@ async def get_heydealer_cars(
 
         # Выполняем запрос
         logger.info(f"📡 Отправка запроса к HeyDealer API с параметрами: {params}")
+        
+        # Создаем полный URL для логирования
+        from urllib.parse import urlencode
+        full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
+        logger.info(f"🔍 Полный URL запроса: {full_url}")
+        
         response = requests.get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
@@ -158,9 +164,19 @@ async def get_heydealer_cars(
             cookies=cookies,
             timeout=30,
         )
+        
+        # Логируем статус и первые несколько машин для отладки
+        logger.info(f"📊 Статус ответа: {response.status_code}")
+        logger.info(f"📊 Заголовки пагинации: Count={response.headers.get('X-Pagination-Count', 'N/A')}, PageSize={response.headers.get('X-Pagination-Page-Size', 'N/A')}")
 
         if response.status_code == 200:
             cars_data = response.json()
+            
+            # Логируем количество и примеры машин для отладки
+            logger.info(f"📊 Получено автомобилей: {len(cars_data)}")
+            if cars_data and len(cars_data) > 0:
+                first_car = cars_data[0]
+                logger.info(f"🚗 Пример первого автомобиля: brand={first_car.get('detail', {}).get('brand_name', 'N/A')}, model={first_car.get('detail', {}).get('model_part_name', 'N/A')}")
 
             # Извлекаем информацию о пагинации из заголовков
             total_count = int(response.headers.get("X-Pagination-Count", 0))
