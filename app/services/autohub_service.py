@@ -755,13 +755,16 @@ class AutohubService:
                     data=[],
                 )
             
-            # Если нет auction_code, получаем текущую активную сессию
-            if not search_params.auction_code:
-                logger.info("Auction code не указан, получаем активную сессию")
+            # Если нет информации об аукционе, получаем текущую активную сессию
+            if not search_params.auction_code or not search_params.auction_no or not search_params.auction_date:
+                logger.info("Информация об аукционе не полная, получаем активную сессию")
                 sessions_response = await self.get_auction_sessions()
                 if sessions_response.success and sessions_response.current_session:
-                    search_params.auction_code = sessions_response.current_session.auction_code
-                    logger.info(f"Используем активную сессию: {search_params.auction_code}")
+                    current_session = sessions_response.current_session
+                    search_params.auction_code = current_session.auction_code
+                    search_params.auction_no = current_session.auction_no
+                    search_params.auction_date = current_session.auction_date
+                    logger.info(f"Используем активную сессию: {current_session.auction_code}, номер: {current_session.auction_no}, дата: {current_session.auction_date}")
             
             # Преобразуем параметры в формат AutoHub
             autohub_params = search_params.to_autohub_params()

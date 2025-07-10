@@ -822,18 +822,37 @@ function frontModalProgress() {
 
 <form id="frm_reload" name="frm_reload" method="post" action="/newfront/receive/rc/receive_rc_list.do">
 
-    <textarea name="i_iPageSize" style="display:none;">5</textarea>
+    <textarea name="i_parkingNoYn0" style="display:none;">Y</textarea>
     <textarea name="i_parkingNoYn" style="display:none;">Y</textarea>
+    <textarea name="i_entryNoYn0" style="display:none;">ALL</textarea>
+    <textarea name="i_sMakerCodeD" style="display:none;"></textarea>
+    <textarea name="i_sMakerCodeD1" style="display:none;"></textarea>
+    <textarea name="i_sReturnParam" style="display:none;"></textarea>
+    <textarea name="i_sStartDt" style="display:none;">2025-07-09</textarea>
+    <textarea name="i_sAucCode" style="display:none;">AC202507020001</textarea>
+    <textarea name="i_sAucNoTempStr" style="display:none;"></textarea>
+    <textarea name="i_sSortFlag" style="display:none;">entry</textarea>
+    <textarea name="i_sMainModel" style="display:none;"></textarea>
+    <textarea name="noSelect" style="display:none;">E</textarea>
+    <textarea name="i_sActionFlag" style="display:none;"></textarea>
+    <textarea name="i_sohYn" style="display:none;">ALL</textarea>
+    <textarea name="i_bojeongYn" style="display:none;">ALL</textarea>
+    <textarea name="i_entryNoYn" style="display:none;">ALL</textarea>
+    <textarea name="receivecd" style="display:none;"></textarea>
+    <textarea name="i_sCarName1CodeD" style="display:none;"></textarea>
+    <textarea name="i_sAucNoTemp1" style="display:none;">1332@@2025-07-09@@AC202507020001</textarea>
+    <textarea name="i_iPageSize" style="display:none;">5</textarea>
+    <textarea name="i_sAucNoTemp2" style="display:none;">1332@@2025-07-09@@AC202507020001</textarea>
     <textarea name="pageFlag" style="display:none;">Y</textarea>
     <textarea name="listTabActiveIdx" style="display:none;">1</textarea>
     <textarea name="i_iNowPageNo" style="display:none;">1</textarea>
-    <textarea name="i_sohYn" style="display:none;">ALL</textarea>
-    <textarea name="i_sAucCode" style="display:none;">AC202507020001</textarea>
+    <textarea name="i_sNo" style="display:none;"></textarea>
+    <textarea name="entrySort" style="display:none;">entry</textarea>
+    <textarea name="i_sReceiveCd" style="display:none;"></textarea>
     <textarea name="i_sReturnUrl" style="display:none;">/newfront/receive/rc/receive_rc_list.do</textarea>
-    <textarea name="i_bojeongYn" style="display:none;">ALL</textarea>
     <textarea name="tabActiveIdx" style="display:none;">2</textarea>
-    <textarea name="i_entryNoYn" style="display:none;">ALL</textarea>
-    <textarea name="i_sSortFlag" style="display:none;">entry</textarea>
+    <textarea name="i_sAucNo" style="display:none;">1332</textarea>
+    <textarea name="i_sCarName1CodeD1" style="display:none;"></textarea>
 </form>
 
 
@@ -865,8 +884,8 @@ function frontModalProgress() {
 <input type="hidden" id="i_sActionFlag"		name="i_sActionFlag" 	value="" />
 <input type="hidden" id="i_sReceiveCd"		name="i_sReceiveCd"		value="" />
 <input type="hidden" id="pageFlag"		    name="pageFlag"	        value="Y" />
-<input type="hidden" id="i_sAucNo"		    name="i_sAucNo"		    value="" />
-<input type="hidden" id="i_sStartDt"		name="i_sStartDt"	    value="" />
+<input type="hidden" id="i_sAucNo"		    name="i_sAucNo"		    value="1332" />
+<input type="hidden" id="i_sStartDt"		name="i_sStartDt"	    value="2025-07-09" />
 <input type="hidden" id="i_sAucTitle"		name="i_sAucTitle"	    value="" />
 <input type="hidden" id="i_sAucCode"		name="i_sAucCode"	    value="" />
 <input type="hidden" id="i_sSortFlag"		name="i_sSortFlag"	    value="entry" />
@@ -932,7 +951,7 @@ function frontModalProgress() {
 							<div></div>
 							<div class="col-md-3 col-sm-6">
 								<select name="noSelect" id="noSelect">
-									<option value="E" >출품번호</option>
+									<option value="E" selected=selected>출품번호</option>
 									<option value="C" >차량번호</option>
 								</select>
 							</div>
@@ -1353,7 +1372,7 @@ function frontModalProgress() {
             </div>
             <div class="col-lg-2 col-md-3 col-sm-12 mobile_bottom_space">
                 <select name="entrySort" id="entrySort" title="출품리스트 소팅 조건" onchange="javascript:entrySortSearch(this);">
-                    <option value="entry" >회차-출품번호 오름순</option>
+                    <option value="entry" selected="select">회차-출품번호 오름순</option>
                     <option value="parkingno" >회차-주차번호 오름순</option>
                     <option value="year" >연식 내림순</option>
                     <option value="amt" >시작가 오름순</option>
