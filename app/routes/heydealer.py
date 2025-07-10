@@ -116,18 +116,17 @@ async def get_heydealer_cars(
                         f"Бренд {brand} не найден. Используйте hash_id из 6 символов"
                     )
 
-        # Обработка model_group - используем для клиентской фильтрации
-        needs_client_filter = False
-        if model_group and model_group.strip():
+        # Обработка model_group - расширяем до generation IDs
+        needs_model_group_expansion = False
+        if model_group and model_group.strip() and not model:
             # Принимаем только hash_id (как в оригинальном API HeyDealer)
             if (
                 len(model_group) == 6
                 and model_group.replace("_", "").replace("-", "").isalnum()
             ):
-                # HeyDealer API не поддерживает model_group, нужна клиентская фильтрация
-                logger.info(f"🔧 model_group ({model_group}) будет применен через клиентскую фильтрацию")
-                needs_client_filter = True
-                # Не добавляем model_group в params, так как API его не поддерживает
+                # HeyDealer API не поддерживает model_group напрямую
+                needs_model_group_expansion = True
+                logger.info(f"🔧 model_group ({model_group}) будет расширен до generation IDs")
             else:
                 logger.warning(
                     f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
@@ -152,28 +151,104 @@ async def get_heydealer_cars(
                     f"⚠️ Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
                 )
 
-        # Выполняем запрос
-        logger.info(f"📡 Отправка запроса к HeyDealer API с параметрами: {params}")
+        # Если нужно расширение model_group
+        if needs_model_group_expansion:
+            from app.services.heydealer_model_mapper import HeyDealerModelMapper
+            
+            generation_ids = HeyDealerModelMapper.get_generation_ids_for_model_group(model_group)
+            
+            if not generation_ids:
+                logger.warning(f"Не найдены generation IDs для model_group {model_group}")
+                return HeyDealerResponse(
+                    success=True,
+                    data=HeyDealerCarList(cars=[], total_count=0, page=page),
+                    message=f"Не найдены поколения для модели {model_group}",
+                    total_count=0,
+                    current_page=page,
+                )
+            
+            # Делаем запросы для каждого generation
+            all_cars = []
+            for gen_id in generation_ids:
+                gen_params = params.copy()
+                gen_params["model"] = gen_id
+                
+                logger.info(f"Запрос для generation {gen_id}")
+                gen_response = requests.get(
+                    "https://api.heydealer.com/v2/dealers/web/cars/",
+                    params=gen_params,
+                    headers=headers,
+                    cookies=cookies,
+                    timeout=30,
+                )
+                
+                if gen_response.status_code == 200:
+                    gen_cars = gen_response.json()
+                    all_cars.extend(gen_cars)
+                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
+            
+            cars_data = all_cars
+            total_count = len(cars_data)
+            
+            # Применяем пагинацию к объединенным результатам
+            page_size = 20
+            start_index = (page - 1) * page_size
+            end_index = start_index + page_size
+            cars_data = cars_data[start_index:end_index]
+            
+            logger.info(f"Всего получено {total_count} автомобилей для model_group {model_group}")
+        else:
+            # Обычный запрос
+            logger.info(f"📡 Отправка запроса к HeyDealer API с параметрами: {params}")
+            
+            # Создаем полный URL для логирования
+            from urllib.parse import urlencode
+            full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
+            logger.info(f"🔍 Полный URL запроса: {full_url}")
+            
+            response = requests.get(
+                "https://api.heydealer.com/v2/dealers/web/cars/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
+                timeout=30,
+            )
         
-        # Создаем полный URL для логирования
-        from urllib.parse import urlencode
-        full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
-        logger.info(f"🔍 Полный URL запроса: {full_url}")
-        
-        response = requests.get(
-            "https://api.heydealer.com/v2/dealers/web/cars/",
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            timeout=30,
-        )
-        
-        # Логируем статус и первые несколько машин для отладки
-        logger.info(f"📊 Статус ответа: {response.status_code}")
-        logger.info(f"📊 Заголовки пагинации: Count={response.headers.get('X-Pagination-Count', 'N/A')}, PageSize={response.headers.get('X-Pagination-Page-Size', 'N/A')}")
+        # Обрабатываем результаты
+        if not needs_model_group_expansion:
+            # Логируем статус и первые несколько машин для отладки
+            logger.info(f"📊 Статус ответа: {response.status_code}")
+            logger.info(f"📊 Заголовки пагинации: Count={response.headers.get('X-Pagination-Count', 'N/A')}, PageSize={response.headers.get('X-Pagination-Page-Size', 'N/A')}")
 
-        if response.status_code == 200:
-            cars_data = response.json()
+            if response.status_code == 200:
+                cars_data = response.json()
+                
+                # Извлекаем информацию о пагинации из заголовков
+                total_count = int(response.headers.get("X-Pagination-Count", 0))
+                page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
+
+                # Если total_count = 0, это означает бесконечную прокрутку
+                if total_count == 0:
+                    link_header = response.headers.get("Link", "")
+                    has_next_page = 'rel="next"' in link_header
+
+                    if has_next_page:
+                        estimated_total = len(cars_data) + (page * page_size)
+                    else:
+                        estimated_total = len(cars_data) + ((page - 1) * page_size)
+
+                    total_count = estimated_total
+            else:
+                logger.error(
+                    f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
+                )
+                return HeyDealerResponse(
+                    success=False,
+                    data=None,
+                    message=f"Ошибка получения данных: {response.status_code}",
+                    total_count=0,
+                    current_page=page,
+                )
             
             # Логируем количество и примеры машин для отладки
             logger.info(f"📊 Получено автомобилей: {len(cars_data)}")
@@ -190,89 +265,53 @@ async def get_heydealer_cars(
                         car_model = car.get('detail', {}).get('model_part_name', '')
                         logger.info(f"  Авто {i+1}: {car_model}")
 
-            # Извлекаем информацию о пагинации из заголовков
-            total_count = int(response.headers.get("X-Pagination-Count", 0))
-            page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
+        # Парсим данные через парсер (для обоих случаев)
+        parser = HeyDealerParser()
+        car_list = parser.parse_car_list_with_pagination(
+            cars_data, total_count, page, page_size
+        )
 
-            # Если total_count = 0, это означает бесконечную прокрутку
-            if total_count == 0:
-                link_header = response.headers.get("Link", "")
-                has_next_page = 'rel="next"' in link_header
-
-                if has_next_page:
-                    estimated_total = len(cars_data) + (page * page_size)
-                else:
-                    estimated_total = len(cars_data) + ((page - 1) * page_size)
-
-                total_count = estimated_total
-
-            # Применяем клиентскую фильтрацию если нужно
-            if needs_client_filter and model_group:
-                logger.info(f"🔍 Применяем клиентскую фильтрацию по model_group={model_group}")
-                cars_data = client_filter.filter_cars_by_model_group(cars_data, model_group)
-                logger.info(f"📊 После фильтрации осталось {len(cars_data)} автомобилей")
-                
-                # Обновляем total_count после фильтрации
-                total_count = len(cars_data)
-
-            # Парсим данные через парсер
-            parser = HeyDealerParser()
-            car_list = parser.parse_car_list_with_pagination(
-                cars_data, total_count, page, page_size
-            )
-
-            if not car_list:
-                logger.error("Не удалось распарсить данные автомобилей")
-                return HeyDealerResponse(
-                    success=False,
-                    data=None,
-                    message="Ошибка парсинга данных",
-                    total_count=0,
-                    current_page=page,
-                )
-
-            # Нормализуем данные через парсер для правильного отображения
-            normalized_data = parser.format_response_data(
-                cars=car_list.cars, total_count=car_list.total_count, page=page
-            )
-
-            # Формируем успешный ответ в формате HeyDealerResponse
-            response_obj = HeyDealerResponse(
-                success=True,
-                data=car_list,  # Оставляем для совместимости с моделью
-                message=f"Успешно получено {len(car_list.cars)} автомобилей",
-                total_count=car_list.total_count,
-                current_page=page,
-            )
-
-            logger.info(f"✅ Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
-            if grade:
-                logger.info(f"🔍 Фильтрация по grade={grade} применена на стороне API")
-
-            # Возвращаем нормализованные данные вместо Pydantic объектов
-            return {
-                "success": True,
-                "data": {
-                    "cars": normalized_data["cars"],
-                    "total_count": normalized_data["total_count"],
-                    "page": normalized_data["current_page"],
-                },
-                "message": normalized_data["message"],
-                "total_count": normalized_data["total_count"],
-                "current_page": normalized_data["current_page"],
-                "pagination": normalized_data["pagination"],
-            }
-        else:
-            logger.error(
-                f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
-            )
+        if not car_list:
+            logger.error("Не удалось распарсить данные автомобилей")
             return HeyDealerResponse(
                 success=False,
                 data=None,
-                message=f"Ошибка получения данных: {response.status_code}",
+                message="Ошибка парсинга данных",
                 total_count=0,
                 current_page=page,
             )
+
+        # Нормализуем данные через парсер для правильного отображения
+        normalized_data = parser.format_response_data(
+            cars=car_list.cars, total_count=car_list.total_count, page=page
+        )
+
+        # Формируем успешный ответ в формате HeyDealerResponse
+        response_obj = HeyDealerResponse(
+            success=True,
+            data=car_list,  # Оставляем для совместимости с моделью
+            message=f"Успешно получено {len(car_list.cars)} автомобилей",
+            total_count=car_list.total_count,
+            current_page=page,
+        )
+
+        logger.info(f"✅ Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
+        if grade:
+            logger.info(f"🔍 Фильтрация по grade={grade} применена на стороне API")
+
+        # Возвращаем нормализованные данные вместо Pydantic объектов
+        return {
+            "success": True,
+            "data": {
+                "cars": normalized_data["cars"],
+                "total_count": normalized_data["total_count"],
+                "page": normalized_data["current_page"],
+            },
+            "message": normalized_data["message"],
+            "total_count": normalized_data["total_count"],
+            "current_page": normalized_data["current_page"],
+            "pagination": normalized_data["pagination"],
+        }
 
     except Exception as e:
         logger.error(f"Ошибка при получении автомобилей HeyDealer: {e}")
@@ -456,6 +495,7 @@ async def get_filtered_cars(
     max_mileage: Optional[int] = Query(None, description="Максимальный пробег"),
     fuel: Optional[str] = Query(None, description="Тип топлива"),
     transmission: Optional[str] = Query(None, description="Тип КПП"),
+    wheel_drive: Optional[str] = Query(None, description="Тип привода (например: 2WD,4WD)"),
     location: Optional[str] = Query(None, description="Местоположение"),
 ):
     """Получение отфильтрованного списка автомобилей"""
@@ -496,14 +536,18 @@ async def get_filtered_cars(
                     f"Неверный формат brand: {brand}. Ожидается hash_id из 6 символов"
                 )
 
-        if model_group and model_group.strip():
+        # Обработка model_group - НЕ добавляем в params, так как API не поддерживает
+        needs_model_group_expansion = False
+        if model_group and model_group.strip() and not model:
             # Проверяем формат hash_id для model_group
             if (
                 len(model_group) == 6
                 and model_group.replace("_", "").replace("-", "").isalnum()
             ):
-                params["model_group"] = model_group
-                logger.info(f"Используем model_group hash_id: {model_group}")
+                # HeyDealer API не поддерживает model_group напрямую
+                # Нужно будет сделать отдельные запросы для каждого generation
+                needs_model_group_expansion = True
+                logger.info(f"Model_group {model_group} будет расширен до generation IDs")
             else:
                 logger.warning(
                     f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
@@ -544,208 +588,211 @@ async def get_filtered_cars(
             params["fuel"] = fuel
         if transmission and transmission.strip():
             params["transmission"] = transmission
+        if wheel_drive and wheel_drive.strip():
+            # Wheel drive should be sent as a list
+            wheel_drive_values = [v.strip() for v in wheel_drive.split(',') if v.strip()]
+            if wheel_drive_values:
+                params["wheel_drive"] = wheel_drive_values
+                logger.info(f"Используем wheel_drive: {wheel_drive_values}")
         if location and location.strip():
             params["location"] = location
 
         logger.info(f"Параметры фильтрации: {params}")
-        print(
-            f"🔍 DEBUG: Отправляемые параметры: {params}"
-        )  # Временный отладочный вывод
-
-        # Выполняем запрос
-        response = requests.get(
-            "https://api.heydealer.com/v2/dealers/web/cars/",
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            timeout=30,
-        )
-
-        if response.status_code == 200:
-            cars_data = response.json()
-            logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
-
-            # Парсим данные через парсер для нормализации
-            from app.parsers.heydealer_parser import HeyDealerParser
-
-            parser = HeyDealerParser()
-
-            # Создаем Pydantic объекты и нормализуем данные
-            normalized_cars = []
-            for car_data in cars_data:
-                try:
-                    # Создаем Pydantic объект
-                    pydantic_car = HeyDealerCar(**car_data)
-
-                    # Нормализуем данные через парсер
-                    normalized_car = parser.normalize_car_data(pydantic_car)
-
-                    # Дополняем данными из сырого API ответа (для полей, которых нет в Pydantic)
-                    detail_data = car_data.get("detail", {})
-
-                    # Извлекаем данные о топливе и трансмиссии из названия и других полей
-                    title = normalized_car.get("title", "")
-                    grade_part_name = normalized_car.get("grade_part_name", "")
-
-                    # Определяем тип топлива из названия
-                    fuel_type = None
-                    fuel_display = None
-                    if "가솔린" in title or "가솔린" in grade_part_name:
-                        fuel_type = "gasoline"
-                        fuel_display = "Бензин"
-                    elif "디젤" in title or "디젤" in grade_part_name:
-                        fuel_type = "diesel"
-                        fuel_display = "Дизель"
-                    elif "하이브리드" in title or "하이브리드" in grade_part_name:
-                        fuel_type = "hybrid"
-                        fuel_display = "Гибрид"
-                    elif "전기" in title or "전기" in grade_part_name or "EV" in title:
-                        fuel_type = "electric"
-                        fuel_display = "Электро"
-                    elif "LPG" in title or "LPI" in title:
-                        fuel_type = "lpg"
-                        fuel_display = "ГБО"
-
-                    # Определяем тип трансмиссии из названия
-                    transmission_type = None
-                    transmission_display = None
-                    if (
-                        "AWD" in title
-                        or "AWD" in grade_part_name
-                        or "4WD" in title
-                        or "4WD" in grade_part_name
-                    ):
-                        transmission_type = "awd"
-                        transmission_display = "Полный привод"
-                    elif (
-                        "2WD" in title
-                        or "2WD" in grade_part_name
-                        or "FWD" in title
-                        or "FWD" in grade_part_name
-                    ):
-                        transmission_type = "fwd"
-                        transmission_display = "Передний привод"
-                    elif "RWD" in title or "RWD" in grade_part_name:
-                        transmission_type = "rwd"
-                        transmission_display = "Задний привод"
-
-                    # Пытаемся определить коробку передач (это сложнее, так как в названии не всегда указано)
-                    gear_type = None
-                    gear_display = None
-                    if "수동" in title:  # Ручная
-                        gear_type = "manual"
-                        gear_display = "Механика"
-                    elif "자동" in title:  # Автоматическая
-                        gear_type = "automatic"
-                        gear_display = "Автомат"
-                    elif "CVT" in title:
-                        gear_type = "cvt"
-                        gear_display = "Вариатор"
-                    else:
-                        # По умолчанию считаем автоматической для современных автомобилей
-                        gear_type = "automatic"
-                        gear_display = "Автомат"
-
-                    normalized_car.update(
-                        {
-                            "fuel": fuel_type,
-                            "fuel_display": fuel_display,
-                            "fuel_type": fuel_type,
-                            "transmission": transmission_type,
-                            "transmission_display": transmission_display,
-                            "gear": gear_type,
-                            "gear_display": gear_display,
-                            "payment": detail_data.get("payment"),
-                            "payment_display": detail_data.get("payment_display"),
-                            "color": detail_data.get("color"),
-                            "accident": detail_data.get("accident"),
-                            "accident_display": detail_data.get("accident_display"),
-                        }
-                    )
-
-                    normalized_cars.append(normalized_car)
-                except Exception as e:
-                    logger.error(f"Ошибка обработки автомобиля: {e}")
-                    continue
-
-            # Применяем клиентскую фильтрацию
-            filter_params = {
-                "model_group": model_group,
-                "model": model,
-                "grade": grade,
-                "min_year": min_year,
-                "max_year": max_year,
-                "min_price": min_price,
-                "max_price": max_price,
-                "min_mileage": min_mileage,
-                "max_mileage": max_mileage,
-                "fuel": fuel,
-                "transmission": transmission,
-            }
-
-            # Удаляем None значения
-            filter_params = {k: v for k, v in filter_params.items() if v is not None}
-
-            # Применяем фильтры
-            original_count = len(normalized_cars)
-            if filter_params:
-                logger.info(f"Применяем клиентские фильтры: {filter_params}")
-                normalized_cars = client_filter.apply_all_filters(
-                    normalized_cars, filter_params
-                )
-                logger.info(
-                    f"Результат фильтрации: {original_count} -> {len(normalized_cars)}"
-                )
-
-            # Извлекаем информацию о пагинации из заголовков
-            total_count = int(response.headers.get("X-Pagination-Count", 0))
-            page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
-
-            # Если total_count = 0, это означает бесконечную прокрутку
-            if total_count == 0:
-                link_header = response.headers.get("Link", "")
-                has_next_page = 'rel="next"' in link_header
-
-                if has_next_page:
-                    estimated_total = len(normalized_cars) + (page * page_size)
-                else:
-                    estimated_total = len(normalized_cars) + ((page - 1) * page_size)
-
-                total_count = estimated_total
-
-            # Обновляем total_count после клиентской фильтрации
-            if filter_params:
-                total_count = len(normalized_cars)
-
-            # Возвращаем структуру, совместимую с /cars endpoint
-            return {
-                "success": True,
-                "data": {
-                    "cars": normalized_cars,
-                    "total_count": total_count,
-                    "page": page,
-                },
-                "message": f"Получено {len(normalized_cars)} автомобилей с фильтрами",
-                "total_count": total_count,
-                "current_page": page,
-                "pagination": {
+        
+        # Если нужно расширение model_group
+        if needs_model_group_expansion:
+            from app.services.heydealer_model_mapper import HeyDealerModelMapper
+            
+            generation_ids = HeyDealerModelMapper.get_generation_ids_for_model_group(model_group)
+            
+            if not generation_ids:
+                logger.warning(f"Не найдены generation IDs для model_group {model_group}")
+                return {
+                    "success": True,
+                    "data": {"cars": [], "total_count": 0, "page": page},
+                    "message": f"Не найдены поколения для модели {model_group}",
+                    "total_count": 0,
                     "current_page": page,
-                    "total_count": total_count,
-                    "page_size": page_size,
-                    "has_next": len(normalized_cars) == page_size,
-                },
-            }
+                }
+            
+            # Делаем запросы для каждого generation
+            all_cars = []
+            for gen_id in generation_ids:
+                gen_params = params.copy()
+                gen_params["model"] = gen_id
+                
+                logger.info(f"Запрос для generation {gen_id}")
+                gen_response = requests.get(
+                    "https://api.heydealer.com/v2/dealers/web/cars/",
+                    params=gen_params,
+                    headers=headers,
+                    cookies=cookies,
+                    timeout=30,
+                )
+                
+                if gen_response.status_code == 200:
+                    gen_cars = gen_response.json()
+                    all_cars.extend(gen_cars)
+                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
+            
+            cars_data = all_cars
+            logger.info(f"Всего получено {len(cars_data)} автомобилей для model_group {model_group}")
         else:
-            logger.error(
-                f"Ошибка получения отфильтрованных автомобилей: {response.status_code} - {response.text}"
+            # Обычный запрос
+            response = requests.get(
+                "https://api.heydealer.com/v2/dealers/web/cars/",
+                params=params,
+                headers=headers,
+                cookies=cookies,
+                timeout=30,
             )
-            return {
-                "success": False,
-                "data": {"cars": [], "total_count": 0, "page": page},
-                "message": f"Ошибка получения данных: {response.status_code}",
-                "total_count": 0,
+            
+            if response.status_code != 200:
+                logger.error(f"Ошибка API: {response.status_code}")
+                return {
+                    "success": False,
+                    "data": {"cars": [], "total_count": 0, "page": page},
+                    "message": f"Ошибка получения данных: {response.status_code}",
+                    "total_count": 0,
+                    "current_page": page,
+                }
+                
+            cars_data = response.json()
+        
+        # Теперь обрабатываем полученные данные
+        logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
+
+        # Парсим данные через парсер для нормализации
+        from app.parsers.heydealer_parser import HeyDealerParser
+
+        parser = HeyDealerParser()
+
+        # Создаем Pydantic объекты и нормализуем данные
+        normalized_cars = []
+        for car_data in cars_data:
+            try:
+                # Создаем Pydantic объект
+                pydantic_car = HeyDealerCar(**car_data)
+
+                # Нормализуем данные через парсер
+                normalized_car = parser.normalize_car_data(pydantic_car)
+
+                # Дополняем данными из сырого API ответа (для полей, которых нет в Pydantic)
+                detail_data = car_data.get("detail", {})
+
+                # Извлекаем данные о топливе и трансмиссии из названия и других полей
+                title = normalized_car.get("title", "")
+                grade_part_name = normalized_car.get("grade_part_name", "")
+
+                # Определяем тип топлива из названия
+                fuel_type = None
+                fuel_display = None
+                if "가솔린" in title or "가솔린" in grade_part_name:
+                    fuel_type = "gasoline"
+                    fuel_display = "Бензин"
+                elif "디젤" in title or "디젤" in grade_part_name:
+                    fuel_type = "diesel"
+                    fuel_display = "Дизель"
+                elif "하이브리드" in title or "하이브리드" in grade_part_name:
+                    fuel_type = "hybrid"
+                    fuel_display = "Гибрид"
+                elif "전기" in title or "전기" in grade_part_name or "EV" in title:
+                    fuel_type = "electric"
+                    fuel_display = "Электро"
+                elif "LPG" in title or "LPI" in title:
+                    fuel_type = "lpg"
+                    fuel_display = "ГБО"
+
+                # Определяем тип трансмиссии из названия
+                transmission_type = None
+                transmission_display = None
+                if (
+                    "AWD" in title
+                    or "AWD" in grade_part_name
+                    or "4WD" in title
+                    or "4WD" in grade_part_name
+                ):
+                    transmission_type = "awd"
+                    transmission_display = "Полный привод"
+                elif (
+                    "2WD" in title
+                    or "2WD" in grade_part_name
+                    or "FWD" in title
+                    or "FWD" in grade_part_name
+                ):
+                    transmission_type = "fwd"
+                    transmission_display = "Передний привод"
+                elif "RWD" in title or "RWD" in grade_part_name:
+                    transmission_type = "rwd"
+                    transmission_display = "Задний привод"
+
+                # Пытаемся определить коробку передач (это сложнее, так как в названии не всегда указано)
+                gear_type = None
+                gear_display = None
+                if "수동" in title:  # Ручная
+                    gear_type = "manual"
+                    gear_display = "Механика"
+                elif "자동" in title:  # Автоматическая
+                    gear_type = "automatic"
+                    gear_display = "Автомат"
+                elif "CVT" in title:
+                    gear_type = "cvt"
+                    gear_display = "Вариатор"
+                else:
+                    # По умолчанию считаем автоматической для современных автомобилей
+                    gear_type = "automatic"
+                    gear_display = "Автомат"
+
+                normalized_car.update(
+                    {
+                        "fuel": fuel_type,
+                        "fuel_display": fuel_display,
+                        "fuel_type": fuel_type,
+                        "transmission": transmission_type,
+                        "transmission_display": transmission_display,
+                        "gear": gear_type,
+                        "gear_display": gear_display,
+                        "payment": detail_data.get("payment"),
+                        "payment_display": detail_data.get("payment_display"),
+                        "color": detail_data.get("color"),
+                        "accident": detail_data.get("accident"),
+                        "accident_display": detail_data.get("accident_display"),
+                    }
+                )
+
+                normalized_cars.append(normalized_car)
+            except Exception as e:
+                logger.error(f"Ошибка обработки автомобиля: {e}")
+                continue
+
+        # Применяем пагинацию если нужно
+        total_count = len(normalized_cars)
+        page_size = 20
+        
+        # Если это расширение model_group, применяем пагинацию к объединенным результатам
+        if needs_model_group_expansion:
+            start_index = (page - 1) * page_size
+            end_index = start_index + page_size
+            normalized_cars = normalized_cars[start_index:end_index]
+
+        # Возвращаем структуру, совместимую с /cars endpoint
+        return {
+            "success": True,
+            "data": {
+                "cars": normalized_cars,
+                "total_count": total_count,
+                "page": page,
+            },
+            "message": f"Получено {len(normalized_cars)} автомобилей с фильтрами",
+            "total_count": total_count,
+            "current_page": page,
+            "pagination": {
                 "current_page": page,
-            }
+                "total_count": total_count,
+                "page_size": page_size,
+                "has_next": len(normalized_cars) == page_size,
+            },
+        }
 
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте фильтрации автомобилей: {str(e)}")

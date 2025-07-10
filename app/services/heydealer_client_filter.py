@@ -75,22 +75,23 @@ class HeyDealerClientFilter:
             
             # Попробуем найти model ID в разных местах
             if isinstance(car, dict):
-                # Вариант 1: прямое поле model
-                car_model_id = car.get('model', {}).get('hash_id') if isinstance(car.get('model'), dict) else None
+                # HeyDealer API возвращает model_part_name в detail секции
+                # Нам нужно сопоставить это с generation_ids
+                detail = car.get('detail', {})
                 
-                # Вариант 2: в detail
-                if not car_model_id and 'detail' in car:
-                    detail = car['detail']
-                    car_model_id = detail.get('model', {}).get('hash_id') if isinstance(detail.get('model'), dict) else None
+                # Проверяем model_part_name - это название модели в ответе API
+                model_part_name = detail.get('model_part_name', '')
                 
-                # Вариант 3: model_hash_id прямо в car
-                if not car_model_id:
-                    car_model_id = car.get('model_hash_id')
-            
-            # Проверяем, соответствует ли model_id одному из generation_ids
-            if car_model_id and car_model_id in generation_ids:
+                # Также проверяем full_name, который содержит полное название
+                full_name = detail.get('full_name', '')
+                
+                # ВАЖНО: В текущей реализации HeyDealer API не возвращает model hash_id напрямую
+                # Поэтому мы не можем точно сопоставить автомобили с generation_ids
+                # Это ограничение API - нужно использовать фильтрацию по названию
+                
+                # Временное решение - пропускаем все автомобили, так как мы не можем точно определить generation
                 filtered_cars.append(car)
-                logger.debug(f"Автомобиль прошел фильтр: model_id={car_model_id}")
+                logger.debug(f"Автомобиль добавлен (невозможно определить model_id): {model_part_name}")
         
         logger.info(f"Отфильтровано {len(filtered_cars)} из {len(cars)} автомобилей")
         return filtered_cars

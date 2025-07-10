@@ -64,6 +64,16 @@ async def get_brands():
             )
 
         data = response.json()
+        
+        # Debug logging
+        logger.info(f"HeyDealer API response type: {type(data)}")
+        if isinstance(data, dict):
+            logger.info(f"Response keys: {list(data.keys())}")
+        elif isinstance(data, list):
+            logger.info(f"Response is a list with {len(data)} items")
+            if data:
+                logger.info(f"First item keys: {list(data[0].keys()) if isinstance(data[0], dict) else 'Not a dict'}")
+        
         return parser.parse_brands(data)
 
     except requests.RequestException as e:
@@ -448,7 +458,6 @@ async def advanced_search_cars_get(
             "max_mileage": max_mileage,
             "mileage_group": mileage_group,
             "transmission": transmission,
-            "wheel_drive": wheel_drive,
             "car_type": car_type,
             "min_approved_at": min_approved_at,
             "max_approved_at": max_approved_at,
@@ -472,6 +481,7 @@ async def advanced_search_cars_get(
             "location_first_part": location_first_part,
             "payment": payment,
             "accident_group": accident_group,
+            "wheel_drive": wheel_drive,
         }
 
         for key, value in list_params.items():

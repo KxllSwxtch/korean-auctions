@@ -874,20 +874,45 @@ class HeyDealerParser:
         from app.models.heydealer import HeyDealerBrandsResponse, HeyDealerBrand
 
         try:
+            # Debug logging
+            logger.info(f"parse_brands called with data type: {type(brands_data)}")
+            if brands_data is None:
+                logger.warning("brands_data is None")
+                return HeyDealerBrandsResponse(
+                    success=False, data=[], message="No data provided"
+                )
+            
+            if not isinstance(brands_data, list):
+                logger.error(f"brands_data is not a list, it's: {type(brands_data)}")
+                logger.error(f"brands_data content: {brands_data}")
+                return HeyDealerBrandsResponse(
+                    success=False, data=[], message=f"Expected list, got {type(brands_data)}"
+                )
+            
+            logger.info(f"Parsing {len(brands_data)} brands")
+            
             parsed_brands = []
 
-            for brand in brands_data:
-                parsed_brand = HeyDealerBrand(
-                    hash_id=brand.get("hash_id", ""),
-                    name=brand.get("name", ""),
-                    is_domestic=brand.get("is_domestic", False),
-                    image_url=brand.get("image_url", ""),
-                    count=brand.get("count", 0),
-                    is_subscribed=brand.get("is_subscribed"),
-                    has_subscription=brand.get("has_subscription"),
-                    can_subscribe=brand.get("can_subscribe"),
-                )
-                parsed_brands.append(parsed_brand)
+            for i, brand in enumerate(brands_data):
+                try:
+                    if not isinstance(brand, dict):
+                        logger.warning(f"Brand {i} is not a dict: {type(brand)}")
+                        continue
+                    
+                    parsed_brand = HeyDealerBrand(
+                        hash_id=brand.get("hash_id", ""),
+                        name=brand.get("name", ""),
+                        is_domestic=brand.get("is_domestic", False),
+                        image_url=brand.get("image_url", ""),
+                        count=brand.get("count", 0),
+                        is_subscribed=brand.get("is_subscribed"),
+                        has_subscription=brand.get("has_subscription"),
+                        can_subscribe=brand.get("can_subscribe"),
+                    )
+                    parsed_brands.append(parsed_brand)
+                except Exception as e:
+                    logger.error(f"Error parsing brand {i}: {e}")
+                    logger.error(f"Brand data: {brand}")
 
             logger.info(f"Парсинг марок завершен: {len(parsed_brands)} элементов")
             return HeyDealerBrandsResponse(
@@ -896,6 +921,8 @@ class HeyDealerParser:
 
         except Exception as e:
             logger.error(f"Ошибка при парсинге марок: {str(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return HeyDealerBrandsResponse(success=False, data=[], message=str(e))
 
     def parse_brand_detail(
