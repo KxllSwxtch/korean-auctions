@@ -172,8 +172,10 @@ async def get_heydealer_cars(
             for gen_id in generation_ids:
                 gen_params = params.copy()
                 gen_params["model"] = gen_id
+                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
+                gen_params.pop("brand", None)
                 
-                logger.info(f"Запрос для generation {gen_id}")
+                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
                 gen_response = requests.get(
                     "https://api.heydealer.com/v2/dealers/web/cars/",
                     params=gen_params,
@@ -620,8 +622,10 @@ async def get_filtered_cars(
             for gen_id in generation_ids:
                 gen_params = params.copy()
                 gen_params["model"] = gen_id
+                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
+                gen_params.pop("brand", None)
                 
-                logger.info(f"Запрос для generation {gen_id}")
+                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
                 gen_response = requests.get(
                     "https://api.heydealer.com/v2/dealers/web/cars/",
                     params=gen_params,
@@ -636,7 +640,7 @@ async def get_filtered_cars(
                     logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
             
             cars_data = all_cars
-            logger.info(f"Всего получено {len(cars_data)} автомобилей для model_group {model_group}")
+            logger.info(f"Model group expansion для {model_group}: получено {len(cars_data)} автомобилей из {len(generation_ids)} поколений")
         else:
             # Обычный запрос
             response = requests.get(

@@ -50,16 +50,21 @@ class HeyDealerModelMapper:
             )
             
             if response.status_code != 200:
-                logger.error(f"Failed to fetch model group details: {response.status_code}")
+                logger.error(f"Failed to fetch model group details: {response.status_code}, response: {response.text}")
                 return []
             
             data = response.json()
             models = data.get("models", [])
             
+            if not models:
+                logger.warning(f"No models found in model group {model_group_hash_id}")
+                return []
+            
             # Extract generation IDs
             generation_ids = [model.get("hash_id") for model in models if model.get("hash_id")]
             
-            logger.info(f"Found {len(generation_ids)} generations for model_group {model_group_hash_id}: {generation_ids}")
+            logger.info(f"Model group {model_group_hash_id} расширен в {len(generation_ids)} поколений: {generation_ids}")
+            logger.debug(f"Model group details: {data}")
             return generation_ids
             
         except Exception as e:
