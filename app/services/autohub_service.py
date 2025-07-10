@@ -337,26 +337,28 @@ class AutohubService:
             str: HTML контент или None в случае ошибки
         """
         try:
-            # Формируем параметры для пагинации Autohub
-            pagination_data = {}
+            # Определяем, это полные параметры поиска или только пагинация
+            if params and "i_iNowPageNo" in params:
+                # Это уже преобразованные параметры от search_cars
+                request_data = params
+                logger.info(f"Используем полные параметры поиска: {len(request_data)} параметров")
+            else:
+                # Это обычный запрос с пагинацией
+                request_data = {}
+                
+                if params:
+                    # Преобразуем наш параметр page в параметр Autohub i_iNowPageNo
+                    if "page" in params:
+                        request_data["i_iNowPageNo"] = params["page"]
+                        logger.info(
+                            f"Запрос страницы {params['page']} (i_iNowPageNo={params['page']})"
+                        )
+                
+                # Если не указана страница, по умолчанию первая
+                if "i_iNowPageNo" not in request_data:
+                    request_data["i_iNowPageNo"] = 1
 
-            if params:
-                # Преобразуем наш параметр page в параметр Autohub i_iNowPageNo
-                if "page" in params:
-                    pagination_data["i_iNowPageNo"] = params["page"]
-                    logger.info(
-                        f"Запрос страницы {params['page']} (i_iNowPageNo={params['page']})"
-                    )
-
-                # Можно добавить другие параметры фильтрации для Autohub
-                # if 'limit' in params:
-                #     pagination_data['i_iPageSize'] = params['limit']  # если поддерживается
-
-            # Если не указана страница, по умолчанию первая
-            if "i_iNowPageNo" not in pagination_data:
-                pagination_data["i_iNowPageNo"] = 1
-
-            logger.info(f"Выполняем запрос к {url} с параметрами: {pagination_data}")
+            logger.info(f"Выполняем запрос к {url} с {len(request_data)} параметрами")
 
             # Добавляем случайную задержку для имитации человеческого поведения
             await asyncio.sleep(0.5)
@@ -366,11 +368,12 @@ class AutohubService:
 
             # Для пагинации Autohub может требоваться POST запрос
             # Проверим, нужно ли использовать POST или GET
-            if pagination_data.get("i_iNowPageNo", 1) > 1:
-                # Для страниц больше 1 используем POST с данными пагинации
+            # Если есть много параметров (фильтры), всегда используем POST
+            if len(request_data) > 2 or request_data.get("i_iNowPageNo", 1) > 1:
+                # Для страниц больше 1 или с фильтрами используем POST
                 response = self.session.post(
                     url,
-                    data=pagination_data,
+                    data=request_data,
                     timeout=self.settings.request_timeout,
                     allow_redirects=True,
                     headers={
@@ -382,7 +385,7 @@ class AutohubService:
                 # Для первой страницы используем GET
                 response = self.session.get(
                     url,
-                    params=pagination_data,
+                    params=request_data,
                     timeout=self.settings.request_timeout,
                     allow_redirects=True,
                 )
@@ -743,12 +746,7 @@ class AutohubService:
         try:
             logger.info("Начинаем расширенный поиск автомобилей с фильтрами")
             
-            # Преобразуем параметры в формат AutoHub
-            autohub_params = search_params.to_autohub_params()
-            
-            logger.info(f"Параметры поиска: {autohub_params}")
-            
-            # Инициализируем сессию
+            # Инициализируем сессию (ВАЖНО: делаем это перед любыми запросами)
             session_initialized = await self._initialize_session()
             if not session_initialized:
                 return AutohubResponse(
@@ -757,40 +755,56 @@ class AutohubService:
                     data=[],
                 )
             
-            # Выполняем POST запрос с фильтрами
-            url = self.settings.autohub_list_url
+            # Если нет auction_code, получаем текущую активную сессию
+            if not search_params.auction_code:
+                logger.info("Auction code не указан, получаем активную сессию")
+                sessions_response = await self.get_auction_sessions()
+                if sessions_response.success and sessions_response.current_session:
+                    search_params.auction_code = sessions_response.current_session.auction_code
+                    logger.info(f"Используем активную сессию: {search_params.auction_code}")
             
-            # Добавляем headers для POST запроса
-            headers = {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Referer": self.settings.autohub_base_url,
-            }
+            # Преобразуем параметры в формат AutoHub
+            autohub_params = search_params.to_autohub_params()
             
-            response = self.session.post(
-                url,
-                data=autohub_params,
-                headers=headers,
-                timeout=self.settings.request_timeout,
-                allow_redirects=True,
+            logger.info(f"Параметры поиска: {autohub_params}")
+            
+            # Используем _fetch_html метод который правильно обрабатывает сессию
+            # Передаем параметры как словарь для POST запроса
+            html_content = await self._fetch_html(
+                self.settings.autohub_list_url, 
+                autohub_params
             )
-            response.raise_for_status()
             
-            # Проверяем кодировку
-            if response.encoding is None or response.encoding == "ISO-8859-1":
-                response.encoding = "utf-8"
+            if not html_content:
+                return AutohubResponse(
+                    success=False, 
+                    error="Не удалось получить HTML контент", 
+                    data=[]
+                )
                 
             # Для отладки сохраняем полученный HTML
             with open("debug_search_response.html", "w", encoding="utf-8") as f:
-                f.write(response.text)
+                f.write(html_content)
             logger.info("HTML ответ сохранён в debug_search_response.html для анализа")
             
             # Парсим результаты
-            cars = self.parser.parse_car_list(response.text)
+            cars = self.parser.parse_car_list(html_content)
             
             logger.info(f"Найдено {len(cars)} автомобилей с фильтрами")
             
+            # Если автомобили не найдены, проверяем причину
+            if len(cars) == 0:
+                # Проверяем, требуется ли авторизация
+                if "loginFlag" in html_content and "login.do" in html_content:
+                    return AutohubResponse(
+                        success=False,
+                        error="Для доступа к списку автомобилей требуется авторизация на сайте Autohub",
+                        total_count=0,
+                        data=[],
+                    )
+            
             # Пытаемся извлечь общее количество записей
-            total_count = self._extract_total_count_from_html(response.text)
+            total_count = self._extract_total_count_from_html(html_content)
             
             return AutohubResponse(
                 success=True,

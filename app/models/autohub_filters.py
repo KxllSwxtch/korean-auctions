@@ -164,6 +164,22 @@ class AutohubSearchRequest(BaseModel):
             "listTabActiveIdx": "1",
             "pageFlag": "Y",
             "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
+            # Дополнительные обязательные параметры
+            "i_sReturnParam": "",
+            "i_sActionFlag": "",
+            "i_sReceiveCd": "",
+            "i_sMainModel": "",
+            "i_sMakerCodeD": "",
+            "i_sCarName1CodeD": "",
+            "i_sAucNoTempStr": "",
+            "i_sMakerCodeD1": "",
+            "i_sCarName1CodeD1": "",
+            "i_entryNoYn0": "ALL",
+            "i_parkingNoYn0": "Y",
+            "noSelect": "E",
+            "i_sNo": "",
+            "entrySort": self.sort_order.value if self.sort_order else "entry",
+            "receivecd": "",  # Will be filled if we have it
         }
         
         # Параметры аукциона
@@ -173,6 +189,12 @@ class AutohubSearchRequest(BaseModel):
             params["i_sStartDt"] = self.auction_date
         if self.auction_code:
             params["i_sAucCode"] = self.auction_code
+            
+        # Добавляем специальные параметры если есть информация об аукционе
+        if self.auction_no and self.auction_date and self.auction_code:
+            auction_temp = f"{self.auction_no}@@{self.auction_date}@@{self.auction_code}"
+            params["i_sAucNoTemp1"] = auction_temp
+            params["i_sAucNoTemp2"] = auction_temp
             
         # Параметры автомобиля
         if self.manufacturer_code:
