@@ -574,6 +574,13 @@ async def get_filtered_cars(
             if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
                 params["grade"] = grade
                 logger.info(f"Используем grade hash_id: {grade}")
+                # Если указана конкретная конфигурация (grade), удаляем более широкие фильтры
+                if "brand" in params:
+                    params.pop("brand")
+                    logger.info(f"Удален параметр brand, так как указана конкретная конфигурация {grade}")
+                if "model" in params:
+                    params.pop("model")
+                    logger.info(f"Удален параметр model, так как указана конкретная конфигурация {grade}")
             else:
                 logger.warning(
                     f"Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
