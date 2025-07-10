@@ -15,6 +15,8 @@ from app.models.autohub_filters import (
     AutohubManufacturersResponse,
     AutohubModelsResponse,
     AutohubGenerationsResponse,
+    AutohubConfigurationsResponse,
+    AutohubConfiguration,
     AutohubAuctionSessionsResponse,
     AutohubFilterInfo,
     AUTOHUB_MANUFACTURERS,
@@ -615,6 +617,46 @@ async def get_generations(
         logger.info(f"Получение поколений для модели {model_code}")
         
         response = await service.get_generations(model_code)
+        
+        if not response.success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message,
+            )
+            
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Внутренняя ошибка сервера: {str(e)}",
+        )
+    finally:
+        service.close()
+
+
+@router.get("/configurations/{generation_code}", response_model=AutohubConfigurationsResponse)
+async def get_configurations(
+    generation_code: str,
+    model_code: str = Query(..., description="Код модели (обязательный параметр)"),
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Получает список конфигураций для указанного поколения
+    
+    Args:
+        generation_code: Код поколения (например, '003')
+        model_code: Код модели (например, 'HD03')
+        
+    Returns:
+        Список конфигураций с кодами и названиями
+    """
+    try:
+        logger.info(f"Получение конфигураций для поколения {generation_code} модели {model_code}")
+        
+        response = await service.get_configurations(generation_code, model_code)
         
         if not response.success:
             raise HTTPException(

@@ -75,6 +75,13 @@ class AutohubGeneration(BaseModel):
     name: str = Field(..., description="Название поколения")
 
 
+class AutohubConfiguration(BaseModel):
+    """Конфигурация автомобиля AutoHub"""
+    generation_code: str = Field(..., description="Код поколения")
+    configuration_code: str = Field(..., description="Код конфигурации (например, '001')")
+    name: str = Field(..., description="Название конфигурации (например, 'LPG 2WD')")
+
+
 class AutohubAuctionSession(BaseModel):
     """Сессия аукциона AutoHub"""
     auction_no: str = Field(..., description="Номер аукциона (например, '1332')")
@@ -284,6 +291,16 @@ class AutohubAuctionSessionsResponse(BaseModel):
     message: str = "Список сессий аукциона получен успешно"
     sessions: List[AutohubAuctionSession] = Field(default_factory=list)
     current_session: Optional[AutohubAuctionSession] = None
+    total_count: int = 0
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class AutohubConfigurationsResponse(BaseModel):
+    """Ответ со списком конфигураций"""
+    success: bool = True
+    message: str = "Список конфигураций получен успешно"
+    configurations: List[AutohubConfiguration] = Field(default_factory=list)
+    generation_code: Optional[str] = None
     total_count: int = 0
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 

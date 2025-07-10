@@ -20,10 +20,12 @@ from app.models.autohub_filters import (
     AutohubManufacturer,
     AutohubModel,
     AutohubGeneration,
+    AutohubConfiguration,
     AutohubAuctionSession,
     AutohubManufacturersResponse,
     AutohubModelsResponse,
     AutohubGenerationsResponse,
+    AutohubConfigurationsResponse,
     AutohubAuctionSessionsResponse,
     AUTOHUB_MANUFACTURERS,
 )
@@ -861,22 +863,96 @@ class AutohubService:
         try:
             logger.info(f"Получение моделей для производителя {manufacturer_code}")
             
-            # Здесь должен быть реальный запрос к AutoHub для получения моделей
-            # Пока возвращаем заглушку
-            models = []
+            # Инициализируем сессию если нужно
+            if not self._session:
+                session_initialized = await self._initialize_session()
+                if not session_initialized:
+                    logger.error("Не удалось инициализировать сессию для получения моделей")
+                    return AutohubModelsResponse(
+                        success=False,
+                        message="Ошибка инициализации сессии",
+                        models=[],
+                        manufacturer_code=manufacturer_code,
+                        total_count=0,
+                    )
             
-            # TODO: Реализовать парсинг моделей с сайта AutoHub
-            # URL для AJAX запроса моделей обычно выглядит как:
-            # /newfront/common/selectbox/getCarName1List.do
+            # Получаем текущую сессию аукциона для кода аукциона
+            sessions_response = await self.get_auction_sessions()
+            auction_code = "AC202507090001"  # Значение по умолчанию
+            if sessions_response.success and sessions_response.current_session:
+                auction_code = sessions_response.current_session.auction_code
             
-            return AutohubModelsResponse(
-                success=True,
-                message=f"Список моделей для {manufacturer_code} получен успешно",
-                models=models,
-                manufacturer_code=manufacturer_code,
-                total_count=len(models),
+            # Подготавливаем данные для запроса
+            data = {
+                "i_sType": "mdl",
+                "i_sAucCode": auction_code,
+                "i_sMakerCode": manufacturer_code,
+                "isMultiInit": "false",
+            }
+            
+            # Заголовки для AJAX запроса
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": self.settings.autohub_list_url,
+            }
+            
+            # Выполняем запрос
+            url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
+            logger.info(f"Запрос моделей: {url} с параметрами {data}")
+            
+            response = self.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=self.settings.request_timeout,
             )
+            response.raise_for_status()
             
+            # Парсим JSON ответ
+            response_data = response.json()
+            logger.info(f"Получен ответ с моделями: {response_data.get('status')}")
+            
+            if response_data.get("status") == "succ":
+                # Преобразуем данные в наш формат
+                models = []
+                for item in response_data.get("object", []):
+                    model = AutohubModel(
+                        manufacturer_code=manufacturer_code,
+                        model_code=item.get("carname1code", ""),
+                        name=item.get("carname1name", ""),
+                    )
+                    models.append(model)
+                
+                logger.info(f"Успешно получено {len(models)} моделей для {manufacturer_code}")
+                
+                return AutohubModelsResponse(
+                    success=True,
+                    message=f"Список моделей для {manufacturer_code} получен успешно",
+                    models=models,
+                    manufacturer_code=manufacturer_code,
+                    total_count=len(models),
+                )
+            else:
+                logger.error(f"Ошибка от API: {response_data.get('message')}")
+                return AutohubModelsResponse(
+                    success=False,
+                    message=response_data.get("message", "Неизвестная ошибка"),
+                    models=[],
+                    manufacturer_code=manufacturer_code,
+                    total_count=0,
+                )
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP ошибка при получении моделей: {e}")
+            return AutohubModelsResponse(
+                success=False,
+                message=f"Ошибка соединения: {str(e)}",
+                models=[],
+                manufacturer_code=manufacturer_code,
+                total_count=0,
+            )
         except Exception as e:
             logger.error(f"Ошибка при получении моделей: {e}")
             return AutohubModelsResponse(
@@ -900,22 +976,102 @@ class AutohubService:
         try:
             logger.info(f"Получение поколений для модели {model_code}")
             
-            # Здесь должен быть реальный запрос к AutoHub для получения поколений
-            # Пока возвращаем заглушку
-            generations = []
+            # Инициализируем сессию если нужно
+            if not self._session:
+                session_initialized = await self._initialize_session()
+                if not session_initialized:
+                    logger.error("Не удалось инициализировать сессию для получения поколений")
+                    return AutohubGenerationsResponse(
+                        success=False,
+                        message="Ошибка инициализации сессии",
+                        generations=[],
+                        model_code=model_code,
+                        total_count=0,
+                    )
             
-            # TODO: Реализовать парсинг поколений с сайта AutoHub
-            # URL для AJAX запроса поколений обычно выглядит как:
-            # /newfront/common/selectbox/getCarName2List.do
+            # Получаем текущую сессию аукциона для кода аукциона
+            sessions_response = await self.get_auction_sessions()
+            auction_code = "AC202507090001"  # Значение по умолчанию
+            if sessions_response.success and sessions_response.current_session:
+                auction_code = sessions_response.current_session.auction_code
             
-            return AutohubGenerationsResponse(
-                success=True,
-                message=f"Список поколений для {model_code} получен успешно",
-                generations=generations,
-                model_code=model_code,
-                total_count=len(generations),
+            # Нам нужен код производителя для запроса поколений
+            # Предполагаем, что код модели содержит код производителя (например, HD03 -> HD)
+            manufacturer_code = model_code[:2] if len(model_code) >= 2 else ""
+            
+            # Подготавливаем данные для запроса
+            data = {
+                "i_sType": "dmdl",
+                "i_sAucCode": auction_code,
+                "i_sMakerCode": manufacturer_code,
+                "i_sCarName1Code": model_code,
+                "isMultiInit": "false",
+            }
+            
+            # Заголовки для AJAX запроса
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": self.settings.autohub_list_url,
+            }
+            
+            # Выполняем запрос
+            url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
+            logger.info(f"Запрос поколений: {url} с параметрами {data}")
+            
+            response = self.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=self.settings.request_timeout,
             )
+            response.raise_for_status()
             
+            # Парсим JSON ответ
+            response_data = response.json()
+            logger.info(f"Получен ответ с поколениями: {response_data.get('status')}")
+            
+            if response_data.get("status") == "succ":
+                # Преобразуем данные в наш формат
+                generations = []
+                for item in response_data.get("object", []):
+                    generation = AutohubGeneration(
+                        model_code=model_code,
+                        generation_code=item.get("carname2code", ""),
+                        detail_code="",  # Будет заполнено при выборе конфигурации
+                        name=item.get("carname2name", ""),
+                    )
+                    generations.append(generation)
+                
+                logger.info(f"Успешно получено {len(generations)} поколений для {model_code}")
+                
+                return AutohubGenerationsResponse(
+                    success=True,
+                    message=f"Список поколений для {model_code} получен успешно",
+                    generations=generations,
+                    model_code=model_code,
+                    total_count=len(generations),
+                )
+            else:
+                logger.error(f"Ошибка от API: {response_data.get('message')}")
+                return AutohubGenerationsResponse(
+                    success=False,
+                    message=response_data.get("message", "Неизвестная ошибка"),
+                    generations=[],
+                    model_code=model_code,
+                    total_count=0,
+                )
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP ошибка при получении поколений: {e}")
+            return AutohubGenerationsResponse(
+                success=False,
+                message=f"Ошибка соединения: {str(e)}",
+                generations=[],
+                model_code=model_code,
+                total_count=0,
+            )
         except Exception as e:
             logger.error(f"Ошибка при получении поколений: {e}")
             return AutohubGenerationsResponse(
@@ -923,6 +1079,125 @@ class AutohubService:
                 message=f"Ошибка: {str(e)}",
                 generations=[],
                 model_code=model_code,
+                total_count=0,
+            )
+
+    async def get_configurations(self, generation_code: str, model_code: str) -> AutohubConfigurationsResponse:
+        """
+        Получает список конфигураций для поколения
+        
+        Args:
+            generation_code: Код поколения
+            model_code: Код модели (нужен для правильного запроса)
+            
+        Returns:
+            AutohubConfigurationsResponse: Список конфигураций
+        """
+        try:
+            logger.info(f"Получение конфигураций для поколения {generation_code} модели {model_code}")
+            
+            # Инициализируем сессию если нужно
+            if not self._session:
+                session_initialized = await self._initialize_session()
+                if not session_initialized:
+                    logger.error("Не удалось инициализировать сессию для получения конфигураций")
+                    return AutohubConfigurationsResponse(
+                        success=False,
+                        message="Ошибка инициализации сессии",
+                        configurations=[],
+                        generation_code=generation_code,
+                        total_count=0,
+                    )
+            
+            # Получаем текущую сессию аукциона для кода аукциона
+            sessions_response = await self.get_auction_sessions()
+            auction_code = "AC202507090001"  # Значение по умолчанию
+            if sessions_response.success and sessions_response.current_session:
+                auction_code = sessions_response.current_session.auction_code
+            
+            # Нам нужен код производителя для запроса конфигураций
+            manufacturer_code = model_code[:2] if len(model_code) >= 2 else ""
+            
+            # Подготавливаем данные для запроса
+            data = {
+                "i_sType": "ddmdl",
+                "i_sAucCode": auction_code,
+                "i_sMakerCode": manufacturer_code,
+                "i_sCarName1Code": model_code,
+                "i_sCarName2Code": generation_code,
+                "isMultiInit": "false",
+            }
+            
+            # Заголовки для AJAX запроса
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": self.settings.autohub_list_url,
+            }
+            
+            # Выполняем запрос
+            url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
+            logger.info(f"Запрос конфигураций: {url} с параметрами {data}")
+            
+            response = self.session.post(
+                url,
+                data=data,
+                headers=headers,
+                timeout=self.settings.request_timeout,
+            )
+            response.raise_for_status()
+            
+            # Парсим JSON ответ
+            response_data = response.json()
+            logger.info(f"Получен ответ с конфигурациями: {response_data.get('status')}")
+            
+            if response_data.get("status") == "succ":
+                # Преобразуем данные в наш формат
+                configurations = []
+                for item in response_data.get("object", []):
+                    configuration = AutohubConfiguration(
+                        generation_code=generation_code,
+                        configuration_code=item.get("carname3code", ""),
+                        name=item.get("carname3name", ""),
+                    )
+                    configurations.append(configuration)
+                
+                logger.info(f"Успешно получено {len(configurations)} конфигураций для поколения {generation_code}")
+                
+                return AutohubConfigurationsResponse(
+                    success=True,
+                    message=f"Список конфигураций для поколения {generation_code} получен успешно",
+                    configurations=configurations,
+                    generation_code=generation_code,
+                    total_count=len(configurations),
+                )
+            else:
+                logger.error(f"Ошибка от API: {response_data.get('message')}")
+                return AutohubConfigurationsResponse(
+                    success=False,
+                    message=response_data.get("message", "Неизвестная ошибка"),
+                    configurations=[],
+                    generation_code=generation_code,
+                    total_count=0,
+                )
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP ошибка при получении конфигураций: {e}")
+            return AutohubConfigurationsResponse(
+                success=False,
+                message=f"Ошибка соединения: {str(e)}",
+                configurations=[],
+                generation_code=generation_code,
+                total_count=0,
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при получении конфигураций: {e}")
+            return AutohubConfigurationsResponse(
+                success=False,
+                message=f"Ошибка: {str(e)}",
+                configurations=[],
+                generation_code=generation_code,
                 total_count=0,
             )
 
