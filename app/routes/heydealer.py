@@ -598,7 +598,11 @@ async def get_filtered_cars(
         if max_mileage:
             params["max_mileage"] = max_mileage
         if fuel and fuel.strip():
-            params["fuel"] = fuel
+            # Fuel should be sent as a list to HeyDealer API
+            fuel_values = [v.strip() for v in fuel.split(',') if v.strip()]
+            if fuel_values:
+                params["fuel"] = fuel_values
+                logger.info(f"Используем fuel: {fuel_values}")
         if transmission and transmission.strip():
             params["transmission"] = transmission
         if wheel_drive and wheel_drive.strip():
