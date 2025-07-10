@@ -560,6 +560,10 @@ async def get_filtered_cars(
             if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
                 params["model"] = model
                 logger.info(f"Используем model hash_id: {model}")
+                # Если указана конкретная модель (generation), удаляем brand для точной фильтрации
+                if "brand" in params:
+                    params.pop("brand")
+                    logger.info(f"Удален параметр brand, так как указана конкретная модель {model}")
             else:
                 logger.warning(
                     f"Неверный формат model: {model}. Ожидается hash_id из 6 символов"
