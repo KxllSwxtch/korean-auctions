@@ -983,11 +983,15 @@ class AutohubService:
         """
         Получает список поколений для модели
         
+        Примечание: Большинство моделей в системе Autohub не имеют поколений.
+        Это нормальное поведение, и UI автоматически скрывает выбор поколений
+        когда они недоступны.
+        
         Args:
             model_code: Код модели
             
         Returns:
-            AutohubGenerationsResponse: Список поколений
+            AutohubGenerationsResponse: Список поколений (часто пустой)
         """
         try:
             logger.info(f"Получение поколений для модели {model_code}")
@@ -1052,8 +1056,8 @@ class AutohubService:
             if response_data.get("status") == "succ":
                 # Проверяем наличие поля object
                 if "object" not in response_data:
-                    logger.warning(f"API вернул успех, но без данных поколений для {model_code}")
-                    # Возвращаем пустой успешный ответ - возможно, для этой модели нет поколений
+                    logger.info(f"API вернул успех, но без данных поколений для {model_code} - это ожидаемое поведение для большинства моделей Autohub")
+                    # Возвращаем пустой успешный ответ - для большинства моделей Autohub поколения недоступны
                     return AutohubGenerationsResponse(
                         success=True,
                         message=f"Для модели {model_code} поколения не найдены",
@@ -1073,7 +1077,11 @@ class AutohubService:
                     )
                     generations.append(generation)
                 
-                logger.info(f"Успешно получено {len(generations)} поколений для {model_code}")
+                if len(generations) > 0:
+                    logger.warning(f"ВНИМАНИЕ: Найдено {len(generations)} поколений для модели {model_code} - это редкий случай, требующий внимания!")
+                    logger.info(f"Поколения для {model_code}: {[g.name for g in generations]}")
+                else:
+                    logger.info(f"Получено 0 поколений для {model_code} - ожидаемое поведение")
                 
                 return AutohubGenerationsResponse(
                     success=True,
