@@ -1038,7 +1038,7 @@ class AutohubService:
             
             # Подготавливаем данные для запроса
             data = {
-                "i_sType": "dmdl",
+                "i_sType": "clsHead",
                 "i_sAucCode": auction_code,
                 "i_sMakerCode": manufacturer_code,
                 "i_sCarName1Code": model_code,
@@ -1174,7 +1174,7 @@ class AutohubService:
             
             # Подготавливаем данные для запроса
             data = {
-                "i_sType": "ddmdl",
+                "i_sType": "clsDetail",
                 "i_sAucCode": auction_code,
                 "i_sMakerCode": manufacturer_code,
                 "i_sCarName1Code": model_code,
