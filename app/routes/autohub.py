@@ -510,12 +510,8 @@ async def search_cars(
         
         response = await service.search_cars(search_params)
         
-        if not response.success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=response.error or "Ошибка при поиске автомобилей",
-            )
-            
+        # Always return the response, even if no cars found
+        # Let the frontend handle empty results
         return response
         
     except HTTPException:

@@ -257,16 +257,21 @@ class AutohubService:
 
             logger.info(f"Успешно получено {len(cars)} автомобилей")
 
-            # Если автомобили не найдены, проверяем причину
+            # Если автомобили не найдены, это может быть нормальным результатом
             if len(cars) == 0:
-                # Проверяем, требуется ли авторизация
-                if "loginFlag" in html_content and "login.do" in html_content:
+                # Проверяем, действительно ли это проблема с авторизацией
+                # Более надежная проверка: ищем явные признаки страницы входа
+                if ('location.href="/newfront/user/login/user_login.do"' in html_content or
+                    'alert("로그인이 필요합니다")' in html_content or
+                    '<title>로그인</title>' in html_content):
                     return AutohubResponse(
                         success=False,
                         error="Для доступа к списку автомобилей требуется авторизация на сайте Autohub. Используйте endpoint /cars/test для демонстрации функциональности парсера.",
                         total_count=0,
                         data=[],
                     )
+                # Если это не проблема авторизации, то просто нет результатов
+                logger.info("Список автомобилей пуст, но это не ошибка авторизации")
 
             # Формируем информацию о пагинации
             current_page = params.get("page", 1) if params else 1
@@ -798,16 +803,28 @@ class AutohubService:
             
             logger.info(f"Найдено {len(cars)} автомобилей с фильтрами")
             
-            # Если автомобили не найдены, проверяем причину
+            # Если автомобили не найдены, это может быть нормальным результатом поиска
             if len(cars) == 0:
-                # Проверяем, требуется ли авторизация
-                if "loginFlag" in html_content and "login.do" in html_content:
+                # Проверяем, действительно ли это проблема с авторизацией
+                # Более надежная проверка: ищем явные признаки страницы входа
+                if ('location.href="/newfront/user/login/user_login.do"' in html_content or
+                    'alert("로그인이 필요합니다")' in html_content or
+                    '<title>로그인</title>' in html_content):
                     return AutohubResponse(
                         success=False,
                         error="Для доступа к списку автомобилей требуется авторизация на сайте Autohub",
                         total_count=0,
                         data=[],
                     )
+                # Если это не проблема авторизации, то просто нет результатов
+                logger.info("Поиск не вернул результатов, но это не ошибка авторизации")
+                # Сохраним HTML для отладки
+                try:
+                    with open("debug_empty_search_result.html", "w", encoding="utf-8") as f:
+                        f.write(html_content)
+                    logger.debug("HTML с пустым результатом сохранен в debug_empty_search_result.html")
+                except Exception as e:
+                    logger.warning(f"Не удалось сохранить HTML для отладки: {e}")
             
             # Пытаемся извлечь общее количество записей
             total_count = self._extract_total_count_from_html(html_content)
