@@ -1047,8 +1047,21 @@ class AutohubService:
             # Парсим JSON ответ
             response_data = response.json()
             logger.info(f"Получен ответ с поколениями: {response_data.get('status')}")
+            logger.debug(f"Полный ответ: {response_data}")
             
             if response_data.get("status") == "succ":
+                # Проверяем наличие поля object
+                if "object" not in response_data:
+                    logger.warning(f"API вернул успех, но без данных поколений для {model_code}")
+                    # Возвращаем пустой успешный ответ - возможно, для этой модели нет поколений
+                    return AutohubGenerationsResponse(
+                        success=True,
+                        message=f"Для модели {model_code} поколения не найдены",
+                        generations=[],
+                        model_code=model_code,
+                        total_count=0,
+                    )
+                
                 # Преобразуем данные в наш формат
                 generations = []
                 for item in response_data.get("object", []):
