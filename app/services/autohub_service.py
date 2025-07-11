@@ -1,5 +1,6 @@
 import asyncio
 import time
+import json
 from typing import List, Optional, Dict, Any
 import requests
 from requests.adapters import HTTPAdapter
@@ -864,7 +865,7 @@ class AutohubService:
             logger.info(f"Получение моделей для производителя {manufacturer_code}")
             
             # Инициализируем сессию если нужно
-            if not self._session:
+            if not self.session:
                 session_initialized = await self._initialize_session()
                 if not session_initialized:
                     logger.error("Не удалось инициализировать сессию для получения моделей")
@@ -901,6 +902,8 @@ class AutohubService:
             # Выполняем запрос
             url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
             logger.info(f"Запрос моделей: {url} с параметрами {data}")
+            logger.debug(f"Заголовки запроса: {headers}")
+            logger.debug(f"Cookies сессии: {self.session.cookies.get_dict()}")
             
             response = self.session.post(
                 url,
@@ -908,11 +911,24 @@ class AutohubService:
                 headers=headers,
                 timeout=self.settings.request_timeout,
             )
+            logger.info(f"Статус ответа: {response.status_code}")
             response.raise_for_status()
             
             # Парсим JSON ответ
-            response_data = response.json()
-            logger.info(f"Получен ответ с моделями: {response_data.get('status')}")
+            try:
+                response_data = response.json()
+                logger.info(f"Получен ответ с моделями: {response_data.get('status')}")
+                logger.debug(f"Полный ответ API: {response_data}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Ошибка парсинга JSON ответа: {e}")
+                logger.error(f"Текст ответа: {response.text[:500]}")
+                return AutohubModelsResponse(
+                    success=False,
+                    message="Ошибка парсинга ответа от сервера",
+                    models=[],
+                    manufacturer_code=manufacturer_code,
+                    total_count=0,
+                )
             
             if response_data.get("status") == "succ":
                 # Преобразуем данные в наш формат
@@ -977,7 +993,7 @@ class AutohubService:
             logger.info(f"Получение поколений для модели {model_code}")
             
             # Инициализируем сессию если нужно
-            if not self._session:
+            if not self.session:
                 session_initialized = await self._initialize_session()
                 if not session_initialized:
                     logger.error("Не удалось инициализировать сессию для получения поколений")
@@ -1097,7 +1113,7 @@ class AutohubService:
             logger.info(f"Получение конфигураций для поколения {generation_code} модели {model_code}")
             
             # Инициализируем сессию если нужно
-            if not self._session:
+            if not self.session:
                 session_initialized = await self._initialize_session()
                 if not session_initialized:
                     logger.error("Не удалось инициализировать сессию для получения конфигураций")
