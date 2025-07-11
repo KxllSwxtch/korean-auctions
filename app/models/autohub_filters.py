@@ -167,7 +167,7 @@ class AutohubSearchRequest(BaseModel):
             "i_parkingNoYn": self.parking_no_assigned.value if self.parking_no_assigned else "Y",
             "i_bojeongYn": self.extended_warranty.value if self.extended_warranty else "ALL",
             "i_sohYn": self.soh_diagnosis.value if self.soh_diagnosis else "ALL",
-            "tabActiveIdx": "2",  # Вкладка 상세검색
+            "tabActiveIdx": "1",  # Default to tab 1, will be adjusted based on filters
             "listTabActiveIdx": "1",
             "pageFlag": "Y",
             "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
@@ -176,11 +176,7 @@ class AutohubSearchRequest(BaseModel):
             "i_sActionFlag": "",
             "i_sReceiveCd": "",
             "i_sMainModel": "",
-            "i_sMakerCodeD": "",
-            "i_sCarName1CodeD": "",
             "i_sAucNoTempStr": "",
-            "i_sMakerCodeD1": "",
-            "i_sCarName1CodeD1": "",
             "i_entryNoYn0": "ALL",
             "i_parkingNoYn0": "Y",
             "noSelect": "E",
@@ -203,11 +199,24 @@ class AutohubSearchRequest(BaseModel):
             params["i_sAucNoTemp1"] = auction_temp
             params["i_sAucNoTemp2"] = auction_temp
             
+        # Determine which tab to use based on filters
+        # Tab 1 for brand/model filtering, Tab 2 for configuration filtering
+        if self.manufacturer_code or self.model_code:
+            params["tabActiveIdx"] = "1"
+        elif self.generation_code or self.detail_code:
+            params["tabActiveIdx"] = "2"
+            
         # Параметры автомобиля
         if self.manufacturer_code:
             params["i_sMakerCode"] = self.manufacturer_code
+            # Also set the duplicate fields required by Autohub
+            params["i_sMakerCodeD"] = self.manufacturer_code
+            params["i_sMakerCodeD1"] = self.manufacturer_code
         if self.model_code:
             params["i_sCarName1Code"] = self.model_code
+            # Also set the duplicate fields required by Autohub
+            params["i_sCarName1CodeD"] = self.model_code
+            params["i_sCarName1CodeD1"] = self.model_code
         if self.generation_code:
             params["i_sCarName2Code"] = self.generation_code
         if self.detail_code:
