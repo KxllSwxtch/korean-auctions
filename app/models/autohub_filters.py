@@ -200,11 +200,11 @@ class AutohubSearchRequest(BaseModel):
             params["i_sAucNoTemp2"] = auction_temp
             
         # Determine which tab to use based on filters
-        # Tab 1 for brand/model filtering, Tab 2 for configuration filtering
-        if self.manufacturer_code or self.model_code:
-            params["tabActiveIdx"] = "1"
-        elif self.generation_code or self.detail_code:
+        # Tab 2 takes priority for configuration/generation filtering
+        if self.generation_code or self.detail_code:
             params["tabActiveIdx"] = "2"
+        elif self.manufacturer_code or self.model_code:
+            params["tabActiveIdx"] = "1"
             
         # Параметры автомобиля
         if self.manufacturer_code:

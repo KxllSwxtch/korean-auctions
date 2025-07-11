@@ -1,0 +1,18 @@
+{
+  "current": {
+    "auction_no": "1332",
+    "auction_date": "2025-07-09",
+    "auction_code": "AC202507020001",
+    "auction_title": "안성 2025/07/09 1332회차 경매",
+    "is_active": true
+  },
+  "all_sessions": [
+    {
+      "auction_no": "1332",
+      "auction_date": "2025-07-09",
+      "auction_code": "AC202507020001",
+      "auction_title": "안성 2025/07/09 1332회차 경매",
+      "is_active": true
+    }
+  ]
+}
