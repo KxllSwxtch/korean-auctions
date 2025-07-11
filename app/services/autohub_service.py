@@ -1269,10 +1269,10 @@ class AutohubService:
             # Пока возвращаем примерные данные
             sessions = [
                 AutohubAuctionSession(
-                    auction_no="1332",
-                    auction_date="2025-07-09",
-                    auction_code="AC202507020001",
-                    auction_title="안성 2025/07/09 1332회차 경매",
+                    auction_no="1333",
+                    auction_date="2025-07-16",
+                    auction_code="AC202507090001",
+                    auction_title="안성 2025/07/16 1333회차 경매",
                     is_active=True,
                 )
             ]
