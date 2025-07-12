@@ -991,6 +991,7 @@ async def get_heydealer_car_detail_with_tech_sheet(
             inspector_comment=detail_section.get("inspector_comment"),
             comment=detail_section.get("comment"),
             # История автомобиля
+            carhistory=detail_section.get("carhistory"),
             carhistory_summary=detail_section.get("carhistory_summary"),
             vehicle_information=detail_section.get("vehicle_information"),
             # Информация об аукционе
@@ -1147,6 +1148,7 @@ async def get_heydealer_car_detail_basic(
                     "inspector_comment": detail_section.get("inspector_comment"),
                     "comment": detail_section.get("comment"),
                     # История автомобиля
+                    "carhistory": detail_section.get("carhistory"),
                     "carhistory_summary": detail_section.get("carhistory_summary"),
                     "vehicle_information": detail_section.get("vehicle_information"),
                     # Информация об аукционе
@@ -2575,4 +2577,95 @@ async def get_car_accident_repairs_demo(car_hash_id: str):
         logger.error(
             f"Ошибка создания демонстрационного технического листа для {car_hash_id}: {e}"
         )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/cars/{car_hash_id}/accident-diagram")
+async def get_car_accident_diagram(car_hash_id: str):
+    """
+    Получает диаграмму повреждений автомобиля
+    
+    Args:
+        car_hash_id: Уникальный ID автомобиля
+        
+    Returns:
+        URL изображения диаграммы и данные о повреждениях
+    """
+    try:
+        logger.info(f"Получение диаграммы повреждений для автомобиля {car_hash_id}")
+        
+        # Получаем валидную сессию
+        cookies, headers = heydealer_auth.get_valid_session()
+        
+        if not cookies or not headers:
+            logger.error("Не удалось получить валидную сессию HeyDealer")
+            raise HTTPException(
+                status_code=401, 
+                detail="Ошибка авторизации HeyDealer"
+            )
+        
+        # Формируем URL для получения диаграммы
+        diagram_url = f"https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/"
+        
+        # Параметры запроса
+        params = {
+            "car": car_hash_id
+        }
+        
+        # Выполняем запрос
+        response = requests.get(
+            diagram_url,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"Ошибка получения диаграммы: {response.status_code} - {response.text}")
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Ошибка получения диаграммы повреждений: {response.status_code}"
+            )
+        
+        # Получаем данные
+        diagram_data = response.json()
+        
+        # Извлекаем информацию о диаграмме
+        result = {
+            "success": True,
+            "data": {
+                "type": diagram_data.get("type"),
+                "image_url": diagram_data.get("image_url"),
+                "image_width": diagram_data.get("image_width", 420),
+                "accident_repairs": diagram_data.get("accident_repairs", []),
+                "total_damages": len([
+                    repair for repair in diagram_data.get("accident_repairs", [])
+                    if repair.get("repair") != "none"
+                ]),
+                "damage_summary": {
+                    "exchange": len([
+                        repair for repair in diagram_data.get("accident_repairs", [])
+                        if repair.get("repair") == "exchange"
+                    ]),
+                    "weld": len([
+                        repair for repair in diagram_data.get("accident_repairs", [])
+                        if repair.get("repair") == "weld"
+                    ]),
+                    "none": len([
+                        repair for repair in diagram_data.get("accident_repairs", [])
+                        if repair.get("repair") == "none"
+                    ])
+                }
+            },
+            "message": "Диаграмма повреждений успешно получена",
+            "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+        }
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения диаграммы повреждений для {car_hash_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -876,6 +876,9 @@ class HeyDealerCarWithTechSheet(BaseModel):
     comment: Optional[str] = Field(None, description="Общий комментарий")
 
     # История автомобиля
+    carhistory: Optional[Dict[str, Any]] = Field(
+        None, description="Полная история автомобиля"
+    )
     carhistory_summary: Optional[Dict[str, Any]] = Field(
         None, description="Сводка истории автомобиля"
     )
