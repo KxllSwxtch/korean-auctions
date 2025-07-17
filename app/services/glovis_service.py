@@ -80,24 +80,14 @@ class GlovisService:
 
     def _get_current_week_number(self) -> str:
         """
-        Определяет номер недели аукциона в зависимости от текущего дня недели:
-        - Понедельник (0) и Вторник (1) → weekNo = 1
-        - Четверг (3) и Пятница (4) → weekNo = 2
-        - Остальные дни → weekNo = 1 (по умолчанию)
+        Определяет номер недели аукциона.
+        По умолчанию используется weekNo = 5 для совместимости с текущими данными SSANCAR.
         """
-        now = datetime.now()
-        weekday = now.weekday()  # 0=Понедельник, 1=Вторник, ..., 6=Воскресенье
-
-        if weekday in [0, 1]:  # Понедельник или Вторник
-            week_no = "1"
-        elif weekday in [3, 4]:  # Четверг или Пятница
-            week_no = "2"
-        else:  # Остальные дни (Среда, Суббота, Воскресенье)
-            week_no = "1"  # По умолчанию
-
-        logger.info(
-            f"📅 Текущий день недели: {now.strftime('%A')} ({weekday}), используем weekNo: {week_no}"
-        )
+        # Используем фиксированную неделю 5 по умолчанию
+        # Это соответствует данным из примера cars.html
+        week_no = "5"
+        
+        logger.info(f"📅 Используем weekNo: {week_no} (по умолчанию)")
         return week_no
 
     def _is_session_expired(self) -> bool:

@@ -238,28 +238,22 @@ class GlovisParser:
     def _extract_brand_model(self, car_name: str) -> tuple:
         """Извлекает бренд и модель из названия"""
         try:
-            # В SSANCAR названия имеют формат: "INTERACTIVE K5 (G) 2.0 Signature"
-            # где K5 - это модель KIA
+            # В SSANCAR названия имеют формат: "[BRAND] Model Name"
+            # Например: "[KIA] K5 2.0 CVVL Prestige"
             
-            # Определяем бренд по модели
-            if "K5" in car_name:
-                return "KIA", car_name
-            elif "SONATA" in car_name:
-                return "HYUNDAI", car_name
-            elif "GRANDEUR" in car_name:
-                return "HYUNDAI", car_name
-            elif "AVANTE" in car_name:
-                return "HYUNDAI", car_name
-            elif "PALISADE" in car_name:
-                return "HYUNDAI", car_name
-            elif "SPORTAGE" in car_name:
-                return "KIA", car_name
-            elif "SORENTO" in car_name:
-                return "KIA", car_name
+            import re
+            # Ищем паттерн [BRAND] в начале строки
+            match = re.match(r'\[([^\]]+)\]\s*(.+)', car_name)
             
-            # Если не удалось определить, возвращаем пустой бренд
+            if match:
+                brand = match.group(1).strip().upper()
+                model = match.group(2).strip()
+                return brand, model
+            
+            # Если не удалось найти паттерн [BRAND], возвращаем как есть
             return "", car_name
-        except:
+        except Exception as e:
+            logger.warning(f"Ошибка извлечения бренда/модели из '{car_name}': {e}")
             return "", car_name
 
     def _parse_details_section(self, text_area: Tag) -> tuple:
@@ -281,7 +275,8 @@ class GlovisParser:
                 span.get_text().strip() for span in spans if span.get_text().strip()
             ]
 
-            # Парсим данные по порядку из HTML: год, пробег, КПП, цвет, топливо, оценка
+            # Парсим данные по порядку из HTML: 
+            # Year, Transmission, Fuel Type, (br), Engine Volume, Mileage, Grade
             year = 0
             transmission = ""
             fuel_type = ""
@@ -289,7 +284,15 @@ class GlovisParser:
             mileage = ""
             condition_grade = GlovisCarCondition.A4
 
-            # В SSANCAR порядок: Year, Mileage (Km), Transmission, Color, Fuel Type, Grade
+            # В реальном HTML структура:
+            # <span>2013</span>
+            # <span> A/T</span>
+            # <span>Gasoline</span>
+            # <br />
+            # <span>1,999cc</span>
+            # <span>104,044 Km</span>
+            # <span>A/3</span>
+            
             if len(span_texts) >= 1:
                 try:
                     year = int(span_texts[0])
@@ -297,23 +300,23 @@ class GlovisParser:
                     pass
 
             if len(span_texts) >= 2:
-                # Пробег (например: "67,321 Km")
-                mileage = span_texts[1].strip()
+                # Трансмиссия (A/T, M/T)
+                transmission = span_texts[1].strip()
 
             if len(span_texts) >= 3:
-                # КПП (Automatic, Manual и т.д.)
-                transmission = span_texts[2].strip()
+                # Тип топлива (Gasoline, Diesel и т.д.)
+                fuel_type = span_texts[2].strip()
 
             if len(span_texts) >= 4:
-                # Цвет (пропускаем, так как он не используется в основной модели)
-                pass
+                # Объем двигателя (1,999cc)
+                engine_volume = span_texts[3].strip()
 
             if len(span_texts) >= 5:
-                # Тип топлива (Gasoline, Diesel и т.д.)
-                fuel_type = span_texts[4].strip()
+                # Пробег (104,044 Km)
+                mileage = span_texts[4].strip()
 
             if len(span_texts) >= 6:
-                # Оценка состояния (D/C, A/1 и т.д.)
+                # Оценка состояния (A/3, B/1 и т.д.)
                 grade_text = span_texts[5].strip()
                 # Пытаемся найти соответствующую оценку
                 for grade in GlovisCarCondition:
