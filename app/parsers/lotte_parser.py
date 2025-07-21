@@ -135,15 +135,20 @@ class LotteParser:
                 rows = tbody.find_all("tr")
                 
             self.logger.info(f"Найдено {len(rows)} строк в таблице")
+            
 
+            parsed_count = 0
             for row in rows:
                 try:
                     car_data = self._parse_car_row(row)
                     if car_data:
                         cars.append(car_data)
+                        parsed_count += 1
                 except Exception as e:
                     self.logger.error(f"Ошибка при парсинге строки автомобиля: {e}")
                     continue
+            
+            self.logger.info(f"Успешно распарсено {parsed_count} из {len(rows)} строк")
 
             return cars
 
@@ -256,18 +261,44 @@ class LotteParser:
         """Парсит строку таблицы с информацией об автомобиле"""
         try:
             cells = row.find_all(["td", "th"])
-            if len(cells) < 10:
-                self.logger.debug(f"Пропускаем строку: недостаточно ячеек ({len(cells)} < 10)")
-                return None
+            
+            # Логирование количества ячеек только если их мало
+            if len(cells) > 0 and len(cells) < 8:
+                self.logger.debug(f"Найдено ячеек в строке: {len(cells)}")
+            
+            # Проверяем минимальное количество ячеек - снижаем требование
+            if len(cells) < 8:  # Снижаем с 10 до 8
+                self.logger.debug(f"Пропускаем строку: недостаточно ячеек ({len(cells)} < 8)")
+                # Логируем все ссылки в строке для анализа
+                all_links = row.find_all("a")
+                if all_links:
+                    self.logger.debug(f"Найдено ссылок в строке: {len(all_links)}")
+                    for link in all_links[:2]:  # Первые 2 ссылки
+                        self.logger.debug(f"  Ссылка: class={link.get('class', 'no-class')}, onclick={link.get('onclick', 'no-onclick')[:50]}")
+                # Но если есть ссылка с fnPopupCarView, попробуем распарсить
+                if not any(link.get('onclick', '').find('fnPopupCarView') >= 0 for link in all_links):
+                    return None
 
             # Извлекаем данные из onclick атрибута ссылки
             link = row.find("a", class_="a_list")
             if not link:
                 # Пробуем найти любую ссылку с onclick
                 link = row.find("a", {"onclick": lambda x: x and "fnPopupCarView" in x})
+                if not link:
+                    # Ищем любую ссылку с onclick
+                    all_links = row.find_all("a")
+                    for a in all_links:
+                        if a.get("onclick") and "fnPopupCarView" in str(a.get("onclick")):
+                            link = a
+                            self.logger.debug(f"Найдена альтернативная ссылка: {link.get('onclick', '')[:50]}")
+                            break
                 
             if not link or "onclick" not in link.attrs:
                 self.logger.debug("Не найдена ссылка с onclick в строке")
+                # Логируем все атрибуты первой ссылки для анализа
+                first_link = row.find("a")
+                if first_link:
+                    self.logger.debug(f"Первая ссылка в строке: {dict(first_link.attrs)}")
                 return None
 
             onclick = link["onclick"]
@@ -283,39 +314,64 @@ class LotteParser:
             searchMngNo = match.group(2)
             searchExhiRegiSeq = match.group(3)
 
-            # Извлекаем данные из ячеек
-            auction_number = cells[1].get_text(strip=True)  # Номер на аукционе
-            lane = cells[2].get_text(strip=True)  # Полоса
-            license_plate = cells[3].get_text(strip=True)  # Номер автомобиля
-            name = cells[4].get_text(strip=True)  # Название автомобиля
-            year_text = cells[5].get_text(strip=True)  # Год
-            mileage_text = cells[6].get_text(strip=True)  # Пробег
-            color = cells[7].get_text(strip=True)  # Цвет
-            grade = cells[8].get_text(strip=True)  # Оценка
-            price_text = cells[9].get_text(strip=True)  # Стартовая цена
+            # Извлекаем данные из ячеек с защитой от ошибок
+            try:
+                # Проверяем, в какой ячейке находится ссылка
+                link_cell_index = None
+                for i, cell in enumerate(cells):
+                    if cell.find("a", {"onclick": lambda x: x and "fnPopupCarView" in x}):
+                        link_cell_index = i
+                        break
+                
+                # Если ссылка найдена, используем её текст как название автомобиля
+                if link_cell_index is not None and link_cell_index < len(cells):
+                    name = cells[link_cell_index].get_text(strip=True)
+                else:
+                    name = cells[4].get_text(strip=True) if len(cells) > 4 else ""
+                
+                auction_number = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+                lane = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+                license_plate = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+                year_text = cells[5].get_text(strip=True) if len(cells) > 5 else "2000"
+                mileage_text = cells[6].get_text(strip=True) if len(cells) > 6 else "0"
+                color = cells[7].get_text(strip=True) if len(cells) > 7 else ""
+                grade = cells[8].get_text(strip=True) if len(cells) > 8 else ""
+                price_text = cells[9].get_text(strip=True) if len(cells) > 9 else "0"
+            except Exception as e:
+                self.logger.error(f"Ошибка при извлечении данных из ячеек: {e}")
+                return None
 
             # Парсим год
-            year = int(year_text) if year_text.isdigit() else 2000
+            try:
+                year = int(year_text) if year_text and year_text.isdigit() else 2000
+            except Exception:
+                year = 2000
 
             # Парсим пробег
-            mileage = self._parse_mileage(mileage_text)
+            try:
+                mileage = self._parse_mileage(mileage_text)
+            except Exception:
+                mileage = 0
 
             # Парсим цену
-            starting_price = self._parse_price(price_text)
+            try:
+                starting_price = self._parse_price(price_text)
+            except Exception:
+                starting_price = 0
 
             # Создаем уникальный ID
             car_id = f"{searchMngDivCd}_{searchMngNo}_{searchExhiRegiSeq}"
 
             return {
                 "id": car_id,
-                "auction_number": auction_number,
-                "lane": lane,
-                "license_plate": license_plate,
-                "name": name,
+                "auction_number": auction_number or "",
+                "lane": lane or "",
+                "license_plate": license_plate or "",
+                "name": name or "",
                 "year": year,
                 "mileage": mileage,
-                "color": color,
-                "grade": self._normalize_grade(grade),
+                "color": color or "",
+                "grade": self._normalize_grade(grade) if grade else "",
                 "starting_price": starting_price,
                 "searchMngDivCd": searchMngDivCd,
                 "searchMngNo": searchMngNo,
