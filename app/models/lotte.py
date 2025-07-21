@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from enum import Enum
 from datetime import datetime
@@ -223,6 +223,18 @@ class LotteCarConditionCheck(BaseModel):
 
     status_map_image: Optional[str] = None  # 상태점검표 이미지
     special_notes: Optional[str] = None  # 특이사항
+    
+    # Technical assessment abbreviations and meanings
+    abbreviations: Optional[Dict[str, str]] = None  # 약어 설명 (교환이력, 판금이력 등)
+    part_conditions: Optional[Dict[str, str]] = None  # 개별 부품 상태
+    
+    # Technical history flags
+    has_replacement_history: Optional[bool] = None  # 교환이력 여부
+    has_sheet_metal_history: Optional[bool] = None  # 판금이력 여부
+    needs_sheet_metal_painting: Optional[bool] = None  # 판금도색필요 여부
+    has_detachment_history: Optional[bool] = None  # 탈부착 여부
+    needs_replacement: Optional[bool] = None  # 교환필요 여부
+    has_glass_damage: Optional[bool] = None  # 유리파손 여부
 
 
 class LotteCarLegalStatus(BaseModel):

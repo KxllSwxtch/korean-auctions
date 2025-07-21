@@ -1046,6 +1046,12 @@ class LotteCarDetailParser:
                         td = row.find("td")
                         if th and td and "특이사항" in th.get_text():
                             condition.special_notes = td.get_text(strip=True)
+            
+            # Parse abbreviations (약어) section
+            self._parse_abbreviations(condition)
+            
+            # Parse technical history flags from abbreviations
+            self._parse_technical_history_flags(condition)
 
         except Exception as e:
             logger.error(f"Ошибка парсинга condition_check: {e}")
@@ -1082,6 +1088,56 @@ class LotteCarDetailParser:
             condition.seal_check = value
         elif "주소변경 확인" in header:
             condition.address_change_check = value
+
+    def _parse_abbreviations(self, condition: LotteCarConditionCheck):
+        """Parse abbreviations section from the inspection table"""
+        try:
+            # Find all tables with class tbl-v02
+            tables = self.soup.find_all("table", class_="tbl-v02")
+            for table in tables:
+                rows = table.find_all("tr")
+                for row in rows:
+                    th = row.find("th")
+                    td = row.find("td")
+                    if th and td and "약어" in th.get_text():
+                        # Parse abbreviations from td
+                        abbr_container = td.find("p", class_="abbr")
+                        if abbr_container:
+                            abbreviations = {}
+                            spans = abbr_container.find_all("span")
+                            for span in spans:
+                                # Extract class and text
+                                span_class = span.get("class", [])
+                                text = span.get_text(strip=True)
+                                if span_class and text:
+                                    class_name = span_class[0] if isinstance(span_class, list) else span_class
+                                    abbreviations[class_name] = text
+                            
+                            condition.abbreviations = abbreviations
+                        break
+        except Exception as e:
+            logger.error(f"Error parsing abbreviations: {e}")
+    
+    def _parse_technical_history_flags(self, condition: LotteCarConditionCheck):
+        """Set technical history flags based on abbreviations"""
+        try:
+            if condition.abbreviations:
+                # Map Korean terms to flags
+                for key, value in condition.abbreviations.items():
+                    if "교환이력" in value:
+                        condition.has_replacement_history = True
+                    elif "판금이력" in value:
+                        condition.has_sheet_metal_history = True
+                    elif "판금도색필요" in value:
+                        condition.needs_sheet_metal_painting = True
+                    elif "탈부착" in value:
+                        condition.has_detachment_history = True
+                    elif "교환필요" in value:
+                        condition.needs_replacement = True
+                    elif "유리파손" in value:
+                        condition.has_glass_damage = True
+        except Exception as e:
+            logger.error(f"Error parsing technical history flags: {e}")
 
     def _parse_legal_status(self) -> LotteCarLegalStatus:
         """Парсит правовой статус (арест/залог)"""

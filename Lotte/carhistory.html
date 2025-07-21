@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<!--[if IE 7]><html dir="ltr" lang="ko" class="ie7"><![endif]-->
+<!--[if IE 8]><html dir="ltr" lang="ko" class="ie8"><![endif]-->
+<!--[if IE 9]><html dir="ltr" lang="ko" class="ie9"><![endif]-->
+<html dir="ltr" lang="ko">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+
+    <title>출품리스트 | 경매출품현황 | 롯데오토옥션</title>
+    <meta name="description" content="출품리스트" />
+    <meta
+      name="keywords"
+      content="롯데렌탈, 롯데오토옥션, 중고차사기, 중고차팔기, 중고차경매, 경매대행, 경매출품현황, 출품리스트"
+    />
+
+    <!-- publisher [s]-->
+    <link rel="stylesheet" href="/css/hp/common.css?version=1.1" />
+    <script src="/js/hp/jquery-1.12.4.min.js"></script>
+
+    <link rel="stylesheet" href="/css/hp/ui-member.css?ver=20240227" />
+    <script src="/js/hp/ui-member.js"></script>
+
+    <link rel="stylesheet" href="/css/hp/swiper.min.css" />
+
+    <script src="/js/hp/swiper.min.js"></script>
+    <script src="/js/hp/jquery.bxslider.min.js"></script>
+    <!-- publisher [e]-->
+
+    <script
+      type="text/javascript"
+      src="/js/cm/validengine/jquery.validationEngine-kr.js"
+    ></script>
+    <!-- 유효성검사 -->
+    <script
+      type="text/javascript"
+      src="/js/cm/validengine/jquery.validationEngine.js"
+    ></script>
+    <!-- 유효성검사 -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/validengine/validationEngine.jquery.css"
+    />
+    <!-- 유효성검사 -->
+
+    <script src="/js/cm/jquery.bxslider.js"></script>
+    <!-- 차량이미지슬라이딩 -->
+    <link rel="stylesheet" type="text/css" href="/css/hp/niceDndFile.css" />
+    <!-- 첨부파일 -->
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.niceDndFileUploader-1.1.js"
+    ></script>
+    <!-- 첨부파일 -->
+
+    <!-- plug-in [s]-->
+    <script src="/js/cm/jquery-ui.js"></script>
+    <link rel="stylesheet" href="/css/hp/jquery-ui.css" />
+    <!-- fancyBox[s] & BoxSlide -->
+    <script type="text/javascript" src="/js/cm/jquery.fancybox.js"></script>
+    <script type="text/javascript" src="/js/cm/jquery.bxslider.js"></script>
+    <link rel="stylesheet" type="text/css" href="/css/hp/jquery.fancybox.css" />
+    <link rel="stylesheet" type="text/css" href="/css/hp/jquery.bxslider.css" />
+    <link
+      rel="shortcut icon"
+      type="image/x-icon"
+      href="/img/hp/ico/favicon_lotterentacar.ico"
+    />
+    <link rel="shortcut icon" type="image/png" href="/img/hp/ico/favi.png" />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.mousewheel.pack.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/jquery.fancybox-buttons.css"
+    />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.fancybox-buttons.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/css/hp/jquery.fancybox-thumbs.css"
+    />
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.fancybox-thumbs.js"
+    ></script>
+    <script
+      type="text/javascript"
+      src="/js/cm/jquery.drag-drop.plugin.js"
+    ></script>
+    <!-- fancyBox[e] -->
+    <!-- clipboard[s] -->
+    <script type="text/javascript" src="/js/cm/clipboard.js"></script>
+    <script type="text/javascript" src="/js/cm/clipboard.min.js"></script>
+    <!-- clipboard[e] -->
+    <!-- plug-in [e]-->
+
+    <!-- dev custom[s] -->
+    <script src="/js/hp/dev.js?version=1.1"></script>
+    <link rel="stylesheet" href="/css/hp/dev.css" />
+    <!-- dev custom[e] -->
+
+    <script src="/js/cm/jquery.fileDownload.js"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=UA-118654321-1"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || []
+      function gtag() {
+        dataLayer.push(arguments)
+      }
+      gtag("js", new Date())
+
+      gtag("config", "UA-118654321-1")
+    </script>
+
+    <script type="text/javascript">
+      var commNoticMsgOntimeMsg = ""
+
+      $(window).load(function () {
+        //공통메시지 처리
+        var msg = ""
+        if (commNoticMsgOntimeMsg != null && commNoticMsgOntimeMsg != "") {
+          if ("fail_noAuthority" == commNoticMsgOntimeMsg) {
+            msg = "회원님께서는 해당 메뉴의 접근 권한이 없습니다."
+            alert(msg)
+          }
+        }
+      })
+      if ($.datepicker != null) {
+        $.datepicker.setDefaults({
+          buttonImage: "/img/hp/btn/btn-date.png",
+        })
+      }
+      function actionLogout(ggbn) {
+        if (ggbn == null) ggbn = "pub"
+        document.location.href = "/hp/" + ggbn + "/cmm/actionLogout.do"
+      }
+      //isReturnCurrentPage true:로그인 이후 현재 페이지 유지, false or Null:로그인 이후 메인페이지 이동
+      function actionLogin(isReturnCurrentPage) {
+        var contextDiv = "pub"
+        var currentGetUrl =
+          "%2Fhp%2Fauct%2Fmyp%2Fentry%2FselectMypEntryCarDetPop.do%3FsearchMngDivCd%3DKS%26searchMngNo%3DKS202507090027%26searchExhiRegiSeq%3D1%26"
+        if ("auct" == "auct") contextDiv = "auct"
+
+        if (isReturnCurrentPage != null && isReturnCurrentPage) {
+          if (contextDiv == "pub") {
+            document.location.href =
+              "/hp/" +
+              contextDiv +
+              "/cmm/viewLoginLpointUsr.do?returnUrl=" +
+              currentGetUrl
+          } else {
+            document.location.href =
+              "/hp/" +
+              contextDiv +
+              "/cmm/viewLoginUsr.do?returnUrl=" +
+              currentGetUrl
+          }
+        } else {
+          if (contextDiv == "pub") {
+            document.location.href =
+              "/hp/" + contextDiv + "/cmm/viewLoginLpointUsr.do"
+          } else {
+            document.location.href =
+              "/hp/" + contextDiv + "/cmm/viewLoginUsr.do"
+          }
+        }
+      }
+
+      function fn_MoveLinkPage(menuNo, link) {
+        var selectedBaseMenuNo
+        var selectedSubMenuNo
+        var selectedLink
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var menuNo_ = $(this).val().split("|", -1)[0]
+            var upperMenuId_ = $(this).val().split("|", -1)[1]
+            var menuNm_ = $(this).val().split("|", -1)[2]
+            var chkURL_ = $(this).val().split("|", -1)[5]
+            if (menuNo == menuNo_) {
+              selectedLink = chkURL_
+              if (upperMenuId_ == "0") {
+                $('form[name="menuListForm"]')
+                  .find("input[name=tmp_menuNm]")
+                  .each(function () {
+                    if (menuNo == $(this).val().split("|", -1)[1]) {
+                      selectedBaseMenuNo = menuNo_
+                      selectedSubMenuNo = $(this).val().split("|", -1)[0]
+                      return false
+                    }
+                  })
+              } else {
+                $('form[name="menuListForm"]')
+                  .find("input[name=tmp_menuNm]")
+                  .each(function () {
+                    if (
+                      upperMenuId_ == $(this).val().split("|", -1)[0] &&
+                      $(this).val().split("|", -1)[1] == "0"
+                    ) {
+                      selectedBaseMenuNo = $(this).val().split("|", -1)[0]
+                      selectedSubMenuNo = menuNo_
+                      return false
+                    }
+                  })
+              }
+            }
+          })
+        if (selectedBaseMenuNo == null || selectedLink == null) {
+          alert("메뉴 ID가 존재 하지 않습니다.")
+          return false
+        }
+        document.menuListForm.baseMenuNo.value = selectedBaseMenuNo
+        document.menuListForm.subMenuNo.value = selectedSubMenuNo
+        document.menuListForm.subSubMenuNo.value = null
+        document.menuListForm.link.value = "forward:" + link
+        document.menuListForm.action = "/hp/cmm/actionMenuLinkPage.do"
+        document.menuListForm.submit()
+      }
+
+      //세션 TimeOut이 걸렸는지 확인
+      //true:세션 문제 없음, false:세션 타임 아웃
+      function fnCheckSessionTimeOutConfirm(authUrl) {
+        var isSessionTimeOut = false
+        var reqUrl = "/hp/cmm/checkSessionTimeOutAjax.do"
+        if (authUrl != null) reqUrl += "?authUrl=" + authUrl
+        $.ajax({
+          type: "POST",
+          url: reqUrl,
+          dataType: "json",
+          async: false,
+          success: function (json) {
+            if (json.result == "fail") {
+              if (
+                confirm(
+                  "일정시간 화면 이동이 없어 로그아웃 처리되었습니다.\n로그인 페이지로 이동하시겠습니까?"
+                )
+              ) {
+                actionLogin()
+              }
+              isSessionTimeOut = false
+            } else {
+              isSessionTimeOut = true
+            }
+          },
+          error: function (error) {
+            alert("요청처리를 실패하였습니다.(세션타임아웃 체크 요청 실패)")
+          },
+        })
+        return isSessionTimeOut
+      }
+      //파일 업로드 중인지 여부 확인
+      //true:파일업로드 완료, false:파일업로드 중
+      function fnCheckFileUploadingAlter() {
+        if ($.ndFileUploader.isNdFileUploading())
+          alert("파일 업로드 중입니다. 업로드 완료 후 등록해 주세요.")
+        //isUploading_ 플래그는 niceDndFile.js에 정의 되어있음
+        return !$.ndFileUploader.isNdFileUploading()
+      }
+
+      //selectedLink : 검사 URL
+      function fnCheckAuthUrl(selectedLink) {
+        var msg = ""
+        var result = new Object()
+        result.cd = "success"
+        //권한여부 확인
+        $.ajax({
+          type: "POST",
+          url: "/hp/cmm/checkAuthAjax.do",
+          data: { authUrl: selectedLink },
+          dataType: "json",
+          async: false,
+          success: function (json) {
+            if (json.result == "fail_noAuthority") {
+              result.msg = "회원님께서는 해당 메뉴의 접근 권한이 없습니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notPubUser") {
+              result.msg =
+                "경매회원은 이용할 수 없는 서비스입니다.\nL.POINT 통합회원이나 일반회원으로 로그인 해주세요."
+              result.cd = json.result
+            } else if (json.result == "fail_noAuctUser") {
+              result.msg = "경매회원전용 메뉴입니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notAuctLogin") {
+              result.msg = "경매회원 아이디로 로그인이 후 이용 가능합니다."
+              result.cd = json.result
+            } else if (json.result == "fail_notPubLogin") {
+              result.msg =
+                "L.POINT 통합회원/일반회원 아이디로 로그인 후 이용 가능합니다."
+              result.cd = json.result
+            }
+            return result
+          },
+          error: function (error) {
+            alert("요청처리를 실패하였습니다.(" + error + ")")
+          },
+        })
+
+        return result
+      }
+      function getFirstChildNodeNo(menuNo) {
+        var nodeValues
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var upperMenuNo = $(this).val().split("|", -1)[1]
+            var menuOrder = $(this).val().split("|", -1)[3]
+            if (upperMenuNo == menuNo && menuOrder == "1") {
+              nodeValues = $(this).val().split("|", -1)[0]
+              return nodeValues
+            }
+          })
+
+        if (nodeValues == null) return ""
+
+        return nodeValues
+      }
+      function getParentNodeCnt(baseMenuNo, cnt) {
+        var tNode = new Array()
+        var prentNode
+        var check_cnt = 0
+        for (var i = 0; i < document.menuListForm.tmp_menuNm.length; i++) {
+          tNode[i] = document.menuListForm.tmp_menuNm[i].value
+          var nValue = tNode[i].split("|")
+          if (nValue[0] == baseMenuNo) {
+            check_cnt++
+            prentNode = nValue[1]
+          }
+        }
+        if (check_cnt > 0) {
+          cnt++
+          return getParentNodeCnt(prentNode, cnt)
+        } else {
+          return cnt
+        }
+      }
+      //옵션
+      function fn_MovePage(nodeNum, link, target, prevBack) {
+        // 비밀번호가 숫자일경우 비밀번호 변경하라는 alert 창 by 양재환 2024-10-17
+        var pwd = "for1234@"
+        var regex = /^[0-9]+$/
+
+        // 페이지가 메인인지 비밀번호 변경 페이지 인지 확인 후 조건 추가 해야 할듯
+        if (regex.test(pwd) && prevBack == undefined) {
+          alert("비밀번호를 변경하세요.")
+          return false
+        }
+
+        var nodeValues
+        $('form[name="menuListForm"]')
+          .find("input[name=tmp_menuNm]")
+          .each(function () {
+            var menuNo_ = $(this).val().split("|", -1)[0]
+            if (nodeNum == menuNo_) {
+              nodeValues = $(this).val().split("|")
+            }
+          })
+        //권한 확인
+        console.log(nodeValues)
+        var result = fnCheckAuthUrl(nodeValues[5])
+
+        //회원사가 통합회원 로그인 메뉴를 접근하였을 경우만
+        if (result.cd == "fail_notPubUser" || result.cd == "fail_noAuctUser") {
+          if (!confirm(result.msg + "\n로그인 페이지로 이동하시겠습니까?")) {
+            return
+          }
+        }
+        if (getParentNodeCnt(nodeValues[0], 0) == 2) {
+          document.menuListForm.baseMenuNo.value = nodeValues[1]
+          document.menuListForm.subMenuNo.value = nodeValues[0]
+          document.menuListForm.subSubMenuNo.value = getFirstChildNodeNo(
+            nodeValues[0]
+          )
+        } else if (getParentNodeCnt(nodeValues[0], 0) == 3) {
+          $('form[name="menuListForm"]')
+            .find("input[name=tmp_menuNm]")
+            .each(function () {
+              var menoNo_ = $(this).val().split("|", -1)[0]
+              if (nodeValues[1] == menoNo_) {
+                document.menuListForm.baseMenuNo.value = $(this)
+                  .val()
+                  .split("|")[1]
+              }
+            })
+          document.menuListForm.subMenuNo.value = nodeValues[1]
+          document.menuListForm.subSubMenuNo.value = nodeValues[0]
+        } else {
+          document.menuListForm.baseMenuNo.value = nodeValues[0]
+          document.menuListForm.subMenuNo.value = getFirstChildNodeNo(
+            nodeValues[0]
+          )
+          document.menuListForm.subSubMenuNo.value = getFirstChildNodeNo(
+            getFirstChildNodeNo(nodeValues[0])
+          )
+        }
+
+        var conSymbol = "?"
+        if (link != null && link != "") {
+          if (prevBack) {
+            if (link.indexOf("?") != -1) conSymbol = "&"
+            document.menuListForm.link.value =
+              "forward:" + encodeURIComponent(link + conSymbol + "prevBack=Y")
+          } else {
+            document.menuListForm.link.value =
+              "forward:" + encodeURIComponent(link)
+          }
+        } else {
+          if (prevBack) {
+            if (nodeValues[5].indexOf("?") != -1) conSymbol = "&"
+            document.menuListForm.link.value =
+              "forward:" + nodeValues[5] + conSymbol + "prevBack=Y"
+          } else {
+            document.menuListForm.link.value = "forward:" + nodeValues[5]
+          }
+        }
+
+        if (target != null && target != "") {
+          document.menuListForm.target = target
+        }
+        document.menuListForm.action = "/hp/cmm/actionMenuLinkPage.do"
+        document.menuListForm.submit()
+        if (target != null && target != "") {
+          document.menuListForm.target = "_self"
+        }
+      }
+
+      /* ********************************************************
+       * 바로사기 상품 미리보기
+       ******************************************************** */
+      function fnDircCarPreview(formId, type) {
+        var url = "/hp/cmm/buy/dirc/viewAuctDircPreview.do?viewMode=" + type //?searchMngDivCd="+mngDivCd+"&searchMngNo="+mngNo+"&searchExhiRegiSeq="+ExhiRegiSeq;
+        var w = 1285
+        var h = 800
+        var winWidth = window.screen.width //해상도가로
+        var winHeight = window.screen.height //해상도세로
+        var left, top
+        left = parseInt((winWidth - w) / 2)
+        top = parseInt((winHeight - h) / 2)
+        var auctDircPreviewPop = window.open(
+          "",
+          "auctDircPreviewPop",
+          "width=" +
+            w +
+            ",height=" +
+            h +
+            ",left=" +
+            left +
+            ",top=" +
+            top +
+            " toolbar=0, directories=0, status=0, menubar=0, scrollbars=yes, resizable=0"
+        )
+
+        //Cd가 들어가는 콤보박스, 라디오, 체크박스가 있으면 Nm으로 치환하고 Hidden을 만들어서 Form에 Set함
+
+        $("#" + formId + " input[type=radio]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            if (
+              !$("#" + formId + " input[name=sameConfirmCd]") &&
+              !$("#" + formId + " input[name=assurTypeCd]")
+            ) {
+              $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+              $("#" + formId).append(
+                $(
+                  "<input type='hidden' id='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' name='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' value='" +
+                    $(this).next().text() +
+                    "'/>"
+                )
+              )
+            }
+          }
+        })
+        $("#" + formId + " input[name=sameConfirmCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[name=assurTypeCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[type=cheackBox]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " select").each(function () {
+          if ($(this).attr("name").indexOf("Cd") != -1 && $(this).val() != "") {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).find("option:selected").text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#sigunguNm").remove()
+        if (
+          $("#sido_sigunguCd").val() != "" &&
+          $("#signgu_sigunguCd").val() != ""
+        ) {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='" +
+                $("#sido_sigunguNm").val() +
+                " " +
+                $("#signgu_sigunguNm").val() +
+                "'/>"
+            )
+          )
+        } else if ($("#sido_sigunguCd").val() == "361100") {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='세종'/>"
+            )
+          )
+        }
+        $("#" + formId)
+          .attr("action", url)
+          .attr("method", "POST")
+          .attr("target", "auctDircPreviewPop")
+          .submit()
+        auctDircPreviewPop.focus()
+
+        $("#" + formId).attr("target", "")
+      }
+
+      /* ********************************************************
+       * 바로사기 상품 미리보기(인증중고차, R2B 상품)
+       ******************************************************** */
+      function fnCertCarPreview(formId, type) {
+        var url = "/hp/cmm/buy/cert/viewAuctCertPreview.do?viewMode=" + type //?searchMngDivCd="+mngDivCd+"&searchMngNo="+mngNo+"&searchExhiRegiSeq="+ExhiRegiSeq;
+        var w = 1285
+        var h = 800
+        var winWidth = window.screen.width //해상도가로
+        var winHeight = window.screen.height //해상도세로
+        var left, top
+        left = parseInt((winWidth - w) / 2)
+        top = parseInt((winHeight - h) / 2)
+        var auctCertPreviewPop = window.open(
+          "",
+          "auctCertPreviewPop",
+          "width=" +
+            w +
+            ",height=" +
+            h +
+            ",left=" +
+            left +
+            ",top=" +
+            top +
+            " toolbar=0, directories=0, status=0, menubar=0, scrollbars=yes, resizable=0"
+        )
+
+        //Cd가 들어가는 콤보박스, 라디오, 체크박스가 있으면 Nm으로 치환하고 Hidden을 만들어서 Form에 Set함
+
+        $("#" + formId + " input[type=radio]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            if (
+              !$("#" + formId + " input[name=sameConfirmCd]") &&
+              !$("#" + formId + " input[name=assurTypeCd]")
+            ) {
+              $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+              $("#" + formId).append(
+                $(
+                  "<input type='hidden' id='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' name='" +
+                    $(this).attr("name").replace("Cd", "Nm") +
+                    "' value='" +
+                    $(this).next().text() +
+                    "'/>"
+                )
+              )
+            }
+          }
+        })
+        $("#" + formId + " input[name=sameConfirmCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[name=assurTypeCd]").each(function () {
+          if ($(this).is(":checked")) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " input[type=cheackBox]").each(function () {
+          if (
+            $(this).attr("checked") &&
+            $(this).attr("name").indexOf("Cd") != -1 &&
+            $(this).val() != ""
+          ) {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).next().text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#" + formId + " select").each(function () {
+          if ($(this).attr("name").indexOf("Cd") != -1 && $(this).val() != "") {
+            $("#" + $(this).attr("name").replace("Cd", "Nm")).remove()
+            $("#" + formId).append(
+              $(
+                "<input type='hidden' id='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' name='" +
+                  $(this).attr("name").replace("Cd", "Nm") +
+                  "' value='" +
+                  $(this).find("option:selected").text() +
+                  "'/>"
+              )
+            )
+          }
+        })
+        $("#sigunguNm").remove()
+        if (
+          $("#sido_sigunguCd").val() != "" &&
+          $("#signgu_sigunguCd").val() != ""
+        ) {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='" +
+                $("#sido_sigunguNm").val() +
+                " " +
+                $("#signgu_sigunguNm").val() +
+                "'/>"
+            )
+          )
+        } else if ($("#sido_sigunguCd").val() == "361100") {
+          $("#" + formId).append(
+            $(
+              "<input type='hidden' id='sigunguNm' name='sigunguNm' value='세종'/>"
+            )
+          )
+        }
+        $("#" + formId)
+          .attr("action", url)
+          .attr("method", "POST")
+          .attr("target", "auctCertPreviewPop")
+          .submit()
+        auctCertPreviewPop.focus()
+
+        $("#" + formId).attr("target", "")
+      }
+
+      //파일 다운로드
+      function fn_cmm_FileDownload(ggbn, sgbn, ssgbn, sysFileNm, orgFileNm) {
+        var activeProfile = "pro"
+        $.ajax({
+          type: "POST",
+          url: "/cm/cmm/" + ggbn + "/" + sgbn + "Down.do",
+          data: {
+            ssgbn: ssgbn,
+            sysFileNm: sysFileNm,
+            orgFileNm: orgFileNm,
+            mode: "check",
+          },
+          dataType: "json",
+          success: function (json) {
+            if (json.result == "failed") {
+              alert(json.msg)
+            } else {
+              ajax_download("/cm/cmm/" + ggbn + "/" + sgbn + "Down.do", {
+                ssgbn: ssgbn,
+                sysFileNm: sysFileNm,
+                orgFileNm: orgFileNm,
+                mode: "down",
+              })
+            }
+          },
+          error: function (e) {
+            alert(e.responseText)
+          },
+        })
+      }
+
+      //레이어 팝업 닫기
+      function fnPopClose() {
+        $(".btn-close-layer").trigger("click")
+      }
+
+      /* ********************************************************
+       * L포인트 회원가입
+       ******************************************************** */
+      function fnGoMainRegLpoint() {
+        /*$.ajax({
+			type: "POST",
+			url : "/hp/pub/cmm/selectPubMemLPointGbnUrl.do",
+			data : {"urlGbn": "01"},
+			dataType:"json",
+			success:function(json){
+				$("#menuListForm").attr("action", json.result);
+				$("#menuListForm").attr("method", "post");
+				$("#menuListForm").submit();
+				$("#menuListForm").attr("action", "");
+				$("#menuListForm").attr("method", "get");
+			},
+			error : function(error,exception) {
+				alert("요청처리를 실패하였습니다.("+eval(error.status)+", "+exception+")");
+		    }
+		});*/
+
+        var message = ""
+
+        message =
+          "롯데렌터카 홈페이지에서 회원가입이 가능합니다. 롯데렌터카 홈페이지로 이동하시겠습니까?"
+
+        if (confirm(message)) {
+          var url =
+            "https://www.lotterentacar.net/hp/kor/member/lpoint/join.do" /* 운영 */
+          //var url = "https://t.lotterentacar.net/hp/kor/member/lpoint/join.do"; /* 개발 */
+
+          window.open(url)
+        }
+      }
+    </script>
+    <script type="text/javascript">
+      //레이어 팝업 닫기 버튼
+      function fnPopupClose() {
+        close()
+      }
+    </script>
+  </head>
+  <body>
+    <div class="page-popup car-history-wrap">
+      <h1 class="page-tit">사고이력조회</h1>
+      <dl class="mt10">
+        <dt>
+          ＊이 정보는 단순 <strong class="bold">참고용</strong>이며, 미확정 보험
+          금액은 추후 반영될 수 있습니다.
+        </dt>
+        <dd>
+          <p style="margin-left: 10px">
+            정확한 검증은 카히스토리 개별 조회 또는 경매장으로 문의해 주시기
+            바랍니다.
+          </p>
+        </dd>
+      </dl>
+      <dl class="car-history-tit">
+        <dt>
+          <strong>CarHistory</strong>
+          중고차 사고이력정보 보고서
+        </dt>
+        <dd>
+          중고차 사고이력정보 서비스는 중고차 거래의 활성화와 중고차 매매시장의
+          투명성을 높이기 위하여, 보험개발원에서 보유하고 있는<br />
+          1996년 이후의 자동차 관련 정보를 기초로 제공하는 온라인
+          서비스입니다.<br />
+          본 정보는 중고차 품질 확인을 위한 보조정보로서 자동차와 관련된 모든
+          사고의 발생 여부나 품질확인을 위한 결정적인 판단자료로<br />
+          사용 되어서는 아니 됩니다.<br />
+          따라 본 정보의 확대해석이나 오 남용으로 발생하는 사항에 대해서는
+          보험개발원은 어떠한 책임도 부담하지 아니합니다.
+        </dd>
+      </dl>
+
+      <div class="car-info">
+        <span class="car-num"
+          >차량번호 : <strong class="c-red">176하2567</strong></span
+        >
+        <span class="check-date"
+          >정보조회일자 : <strong>2025년 07월 15일 </strong></span
+        >
+      </div>
+      <div class="mt50">
+        <h2 class="page-subtit">중고차 사고이력 정보 요약</h2>
+        <table class="tbl-v02">
+          <colgroup>
+            <col style="width: 230px" />
+            <col style="width: auto" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>자동차 일반사양</th>
+              <td>
+                현대, 쏘나타 하이브리드 (SONATA HYBRID), 2021년식, 세단 4도어
+              </td>
+            </tr>
+            <tr>
+              <th>자동차 용도변경이력</th>
+              <td>있음</td>
+            </tr>
+            <tr>
+              <th>자동차 번호/ 소유자 변경횟수</th>
+              <td>0회 / 1회</td>
+            </tr>
+            <tr>
+              <th>특수 사고이력(전손, 도난, 침수)</th>
+              <td>전손 : 0, 침수 : 0, 도난 : 0</td>
+            </tr>
+            <tr>
+              <th>보험사고이력 : 내차 피해</th>
+              <td>2회, <strong class="c-red bold">3,869,093</strong>원</td>
+            </tr>
+            <tr>
+              <th>보험사고이력 : 타차 가해</th>
+              <td>1회, <strong class="c-red bold">392,089</strong>원</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="mt50">
+        <h2 class="page-subtit">자동차 일반 사양 정보</h2>
+        <table class="tbl-v02">
+          <colgroup>
+            <col style="width: 230px" />
+            <col style="width: auto" />
+            <col style="width: 230px" />
+            <col style="width: auto" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>제작사</th>
+              <td>현대</td>
+              <th>자동차명</th>
+              <td>쏘나타 하이브리드 (SONATA HYBRID)</td>
+            </tr>
+            <tr>
+              <th>연식</th>
+              <td>2021년</td>
+              <th>사용연료</th>
+              <td>하이브리드</td>
+            </tr>
+            <tr>
+              <th>배기량</th>
+              <td>1999cc</td>
+              <th>차체형상</th>
+              <td>세단 4도어</td>
+            </tr>
+            <tr>
+              <th>용도 및 차종</th>
+              <td>영업용/승용</td>
+              <th>최초 보험 가입일자</th>
+              <td>2020년 09월 16일</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="annotation">
+          <p>
+            * 본 중고차 사고이력정보는 정보조회일자를 기준으로 작성된 것입니다.
+          </p>
+          <p>
+            * 본 정보는 자동차 일반정보로서 176하2567 차량을 확인하기 위하여
+            참고로 제공하는 것이며, 수입차나 특수 차량 등의 경우에는 일부 정보의
+            누락이나 오류가 있을 수 있습니다.
+          </p>
+        </div>
+      </div>
+      <div class="mt50">
+        <h2 class="page-subtit">자동차 용도변경 이력</h2>
+        <table class="tbl-v02">
+          <colgroup>
+            <col style="width: 230px" />
+            <col style="width: auto" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>대여용도 사용이력(렌트카)</th>
+              <td>사용이력 있음</td>
+            </tr>
+            <tr>
+              <th>영업용도 이력</th>
+              <td>사용이력 없음</td>
+            </tr>
+            <tr>
+              <th>관용용도 사용이력</th>
+              <td>사용이력 없음</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="annotation">
+          <p>
+            * 본 정보는 176하2567 차량의 과거 자동차번호 변경기록을 모두
+            검색하여 제공하는 것으로 대여용(렌트카), 영업용(택시 등)으로 사용된
+            적이 있는지 확인할 수 있습니다.
+          </p>
+        </div>
+      </div>
+      <div class="mt50">
+        <h2 class="page-subtit">자동차 번호/소유자 변경이력 정보</h2>
+        <table class="tbl-v02">
+          <colgroup>
+            <col style="width: 230px" />
+            <col style="width: auto" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>2024년 05월 14일</th>
+              <td class="owner-change">
+                <span>소유자변경</span>
+                <span></span>
+                <span>&nbsp;</span>
+              </td>
+            </tr>
+
+            <tr>
+              <th>2020년 09월 16일</th>
+              <td class="owner-change">
+                <span>최초차량번호</span>
+                <span>176하XXXX</span>
+                <span>영업용&nbsp;승용</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="annotation">
+          <p>
+            * 소유자 변경이력은 자료수집 방법상 오류가 발생할 수 있으니,
+            의심되는 사항이 있으시면 전화주시기 바랍니다.<br />
+            또한자동차번호 소유자 변경이력은 보고서 상의 제약에 따라 최근부터
+            5회 까지만 제공되기 때문에, 용약 정보에 횟수와 상이 할 수 있습니다.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt50">
+        <h2 class="page-subtit">자동차 특수 사고이력 정보</h2>
+        <table class="tbl-v02">
+          <colgroup>
+            <col style="width: 230px" />
+            <col style="width: auto" />
+          </colgroup>
+          <tbody>
+            <tr>
+              <th>전손 보험사고</th>
+              <td>전손 보험사고 이력없음</td>
+            </tr>
+            <tr>
+              <th>침수 전손 보험사고</th>
+              <td>침수 보험사고 이력없음</td>
+            </tr>
+            <tr>
+              <th>침수 분손 보험사고</th>
+              <td>침수 보험사고 이력없음</td>
+            </tr>
+            <tr>
+              <th>도난 보험사고</th>
+              <td>도난 보험사고 이력없음</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="annotation">
+          <p>
+            * 자동차보험으로 처리된 사고기록 중에서 전손사고, 도난사고, 침수사고
+            발생여부를 확인할 수 있습니다.
+          </p>
+          <p>
+            * 침수사고에는 경미한 부분침수도 포함되며, 자료의 누락으로 "침수
+            보험사고 이력없음"으로 표시되는 경우가 있습니다.
+          </p>
+        </div>
+        <div class="accident-record mt50">
+          <h2 class="page-subtit">보험사고이력 정보 : 내차 피해</h2>
+          <p>
+            자동차사고로 발생한 176하2567 차량의 손상 수리기록을
+            수리비(보험금)출처에 따라 '①자기 자동차보험에서 지급된 경우'와
+            '②타인의 자동차보험에서 지급된 경우'로 나누어 제공합니다.(대인사고는
+            제외합니다.)
+          </p>
+          <ul>
+            <li>
+              <strong class="case">① 자기 자동차보험에서 지급된 경우</strong>
+              자동차 사고로 176하2567 차량이 입은 손해를 동 차량의 보험으로
+              처리한 내역입니다.
+              <!--  <table class="tbl-v02">
+                            <colgroup>
+                                <col style="width:150px;">
+                                <col style="width:auto;">
+                            </colgroup>
+                            <tbody>
+                            
+                            <tr>
+                                <th>사고내역</th>
+                                <td>없음</td>
+                            </tr>
+                            
+                            </tbody>
+                        </table> -->
+
+              <table class="tbl-v02 mt20">
+                <colgroup>
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                </colgroup>
+                <tbody>
+                  <tr>
+                    <th>사고내역</th>
+                    <td>없음</td>
+                  </tr>
+                </tbody>
+              </table>
+            </li>
+            <li>
+              <strong class="case">② 타차보험에서 처리된 내차 사고</strong>
+              자동차 사고로 176하2567 차량이 입은 손해가 다른 차량의 자동차
+              보험에서 처리된 내역입니다.
+
+              <!-- 보험금 존재할 경우 -->
+              <!-- NSR2025052800013 [AA]롯데오토옥션 홈페이지 보험사고이력 개선 요청 건  KHW 2025-05-29 -->
+
+              <ul class="line">
+                <li>
+                  - 사고일자 : 2023년 09월 06일 / 보험금 :
+                  <span>2,128,260</span>원 발생
+                </li>
+              </ul>
+
+              <!-- 보험금 존재하지 않을 경우 -->
+
+              <table class="tbl-v02">
+                <colgroup>
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                </colgroup>
+                <tbody>
+                  <tr>
+                    <th>부품</th>
+                    <td><strong class="c-red bold">497,300</strong>&nbsp;원</td>
+                    <th>공임</th>
+                    <td><strong class="c-red bold">288,290</strong>&nbsp;원</td>
+                    <th>도장</th>
+                    <td><strong class="c-red bold">928,230</strong>&nbsp;원</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- 보험금 존재할 경우 -->
+              <!-- NSR2025052800013 [AA]롯데오토옥션 홈페이지 보험사고이력 개선 요청 건  KHW 2025-05-29 -->
+
+              <ul class="line">
+                <li>
+                  - 사고일자 : 2021년 05월 13일 / 보험금 :
+                  <span>2,703,890</span>원 발생
+                </li>
+              </ul>
+
+              <!-- 보험금 존재하지 않을 경우 -->
+
+              <table class="tbl-v02">
+                <colgroup>
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                  <col style="width: 150px" />
+                  <col style="width: auto" />
+                </colgroup>
+                <tbody>
+                  <tr>
+                    <th>부품</th>
+                    <td><strong class="c-red bold">876,685</strong>&nbsp;원</td>
+                    <th>공임</th>
+                    <td><strong class="c-red bold">542,090</strong>&nbsp;원</td>
+                    <th>도장</th>
+                    <td><strong class="c-red bold">736,498</strong>&nbsp;원</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="annotation">
+                <p>
+                  * 쌍방과실로 해당 자동차의 손상 수리기록이 동 차량의 자동차
+                  보험과 타 자동차 보험에서 동시에 처리된 경우에는, '① 내차
+                  보험으로 처리한 내차 사고'에만 표시되고 '② 타차보험에서 처리된
+                  내차 사고'에서는 생략됩니다.
+                </p>
+                <p class="c-red">
+                  * 카히스토리 자료수집 방법상 오류가 발생할 수 있으니, 의심되는
+                  사항이 있으시면 전화주시기 바랍니다.
+                </p>
+              </div>
+            </li>
+          </ul>
+          <h2 class="page-subtit mt50">보험사고이력 정보 : 타차 가해</h2>
+          <p>
+            176하2567 차량이 타인의 자동차등의 재물에 피해를 입혀, 그 손해를
+            해당 차량의 자동차 보험으로 처리한 내역입니다.<br />(대인사고는
+            제외합니다.)
+          </p>
+
+          <!--  <table class="tbl-v02 mt20">
+                    <colgroup>
+                        <col style="width:150px;">
+                        <col style="width:auto;">
+                    </colgroup>
+                    <tbody> -->
+          <ul class="line">
+            <!-- 보험금 존재할 경우 -->
+            <!-- NSR2025052800013 [AA]롯데오토옥션 홈페이지 보험사고이력 개선 요청 건  KHW 2025-05-29 -->
+
+            <ul class="line">
+              <li>
+                - 사고일자 : 2023년 05월 30일 / 보험금 : <span>400,000</span>원
+                발생
+              </li>
+            </ul>
+
+            <!-- 보험금 존재하지 않을 경우 -->
+          </ul>
+          <table class="tbl-v02">
+            <colgroup>
+              <col style="width: 150px" />
+              <col style="width: auto" />
+              <col style="width: 150px" />
+              <col style="width: auto" />
+              <col style="width: 150px" />
+              <col style="width: auto" />
+            </colgroup>
+            <tbody>
+              <tr>
+                <th>부품</th>
+                <td><strong class="c-red bold">167,000</strong>&nbsp;원</td>
+                <th>공임</th>
+                <td><strong class="c-red bold">106,030</strong>&nbsp;원</td>
+                <th>도장</th>
+                <td><strong class="c-red bold">119,059</strong>&nbsp;원</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!--정보이용관련 유의사항-->
+        <h2 class="page-subtit mt60">정보이용관련 유의사항</h2>
+        <div class="information-notice">
+          <p class="c-red">
+            자동차보험사고기록이 없었다고 해서 반드시 무사고라고 할 수는
+            없습니다.
+          </p>
+          <p>
+            중고차 사고이력정보 서비스는 자동차 보험을 취급하는 14개
+            손해보험사의 자동차 보험수리 지급기록(1996년 이후)에 근거하여
+            제공하고 있습니다.<br />
+            따라서 다음과 같은 경우에는 중고차 사고 이력정보 서비스를 제공할 수
+            없습니다.
+          </p>
+          <ol>
+            <li>
+              1) 사고가 있었다 하더라도 보험회사에서 사고신고를 하지 않고 자비로
+              처리한 경우, 사고신고를 하였더라도 면책, 취소, 등의 사유로
+              지급되지 않는 경우,<br />
+              사고신고 후 자비로 처리한 경우입니다.
+            </li>
+            <li>
+              2) 사고가 있었다 하더라도 종합정보, 즉 자기차량담보나
+              대물배상담보의 자동차 보험에 가입하지 않아서 자동차 보험으로
+              수리비용을 청구하지 못한 경우<br />
+              (단, 이 경우라도 타인 자동차 보험에서 보상받을 경우에는 사고정보
+              제공 가능)
+            </li>
+            <li>
+              3) 자동차보험이 아닌 운수공제(택시공제, 화물공제, 버스공제 등)에
+              가입되어 운수공제로부터 자동차의 피해에 대한 손해를 보상받은 경우
+              등
+            </li>
+          </ol>
+          <p>
+            본 중고차 사고이력 정보는 중고차 품질확인을 위한 보조정보이며
+            결정적인 판단자료로 사용되어서는 아니 됩니다.<br />
+            따라서 정밀한 중고차 품질확인을 원하시면 차량진단 전문업체의 진단을
+            받아보시기 바랍니다.
+          </p>
+        </div>
+        <p class="annotation">
+          * 보험개발원(<a href="http://www.kidi.or.kr" target="_blank"
+            >www.kidi.or.kr</a
+          >)은 보험업법 제 176조에 의하여 설립된 보험요율산출기관이며,
+          중고차사고이력정보서비스(<a
+            href="http://www.carhistory.or.kr"
+            target="_blank"
+            >www.carhistory.or.kr</a
+          >)는 보험업법시행령 제86조 제 1호에 근거하여 제공합니다.
+        </p>
+        <div>
+          <div class="date">2025년 07월 15일</div>
+          <div class="stamp">
+            <img src="/img/hp/common/stamp-diector.jpg" alt="보험개발원장" />
+          </div>
+        </div>
+      </div>
+      <div class="pop-close">
+        <button onclick="fnPopupClose(); return false;">닫기</button>
+      </div>
+      <button class="btn-top"></button>
+    </div>
+  </body>
+</html>

@@ -1,2 +1,0 @@
-# Requirements for API test suite
-requests>=2.31.0
