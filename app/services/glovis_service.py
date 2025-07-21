@@ -51,11 +51,11 @@ class GlovisService:
         # Загружаем данные carList из SSANCAR
         self._carlist_data = self._load_carlist_data()
 
-        # SSANCAR специфичные cookies и headers (обновлено 2025-07-07)
+        # SSANCAR специфичные cookies и headers (обновлено из curl примера)
         self._default_cookies = {
             "_gcl_au": "1.1.78877594.1751338453",
-            "PHPSESSID": "lqqfmskmrn3m0sgdqjh8vnblbk",
-            "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODA%3D",
+            "PHPSESSID": "flrks3dlf8l70v3hgkdl3rdddr",
+            "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODQ%3D",
             "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
         }
 
@@ -81,11 +81,11 @@ class GlovisService:
     def _get_current_week_number(self) -> str:
         """
         Определяет номер недели аукциона.
-        По умолчанию используется weekNo = 5 для совместимости с текущими данными SSANCAR.
+        По умолчанию используется weekNo = 1 для совместимости с текущими данными SSANCAR.
         """
-        # Используем фиксированную неделю 5 по умолчанию
-        # Это соответствует данным из примера cars.html
-        week_no = "5"
+        # Используем фиксированную неделю 1 по умолчанию
+        # SSANCAR обычно имеет недели 1-4
+        week_no = "1"
         
         logger.info(f"📅 Используем weekNo: {week_no} (по умолчанию)")
         return week_no
@@ -210,7 +210,7 @@ class GlovisService:
                 cars=[],
                 current_page=params.get("page", 0),
                 page_size=15,
-                week_number="2",
+                week_number="1",
                 source="SSANCAR",
             )
 
@@ -232,6 +232,10 @@ class GlovisService:
                 week_no = self._get_current_week_number()
             else:
                 week_no = str(week_no)
+                # Валидация: SSANCAR поддерживает только недели 1-4
+                if week_no not in ["1", "2", "3", "4"]:
+                    logger.warning(f"⚠️ Недопустимый номер недели {week_no}, используем 1")
+                    week_no = "1"
 
             # Конвертируем производителя в корейский
             manufacturer = params.get("car_manufacturer", "")

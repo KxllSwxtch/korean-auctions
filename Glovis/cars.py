@@ -2,8 +2,8 @@ import requests
 
 cookies = {
     "_gcl_au": "1.1.78877594.1751338453",
-    "PHPSESSID": "cp3ijk2iov9t9nch92ntd5ngfj",
-    "2a0d2363701f23f8a75028924a3af643": "MTg1LjU3LjcyLjI4",
+    "PHPSESSID": "flrks3dlf8l70v3hgkdl3rdddr",
+    "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODQ%3D",
     "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
 }
 
@@ -22,11 +22,11 @@ headers = {
     "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"macOS"',
-    # 'Cookie': '_gcl_au=1.1.78877594.1751338453; PHPSESSID=cp3ijk2iov9t9nch92ntd5ngfj; 2a0d2363701f23f8a75028924a3af643=MTg1LjU3LjcyLjI4; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D',
+    # 'Cookie': '_gcl_au=1.1.78877594.1751338453; PHPSESSID=flrks3dlf8l70v3hgkdl3rdddr; 2a0d2363701f23f8a75028924a3af643=Mi4xMzUuNjYuODQ%3D; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D',
 }
 
 data = {
-    "weekNo": "5",
+    "weekNo": "1",
     "maker": "",
     "model": "",
     "fuel": "",
@@ -46,7 +46,3 @@ response = requests.post(
     headers=headers,
     data=data,
 )
-
-print("Status Code:", response.status_code)
-print("Response Text:")
-print(response.text[:2000])  # Print first 2000 characters
