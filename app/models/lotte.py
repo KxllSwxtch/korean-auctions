@@ -299,3 +299,77 @@ class LotteCarResponse(BaseModel):
     message: str
     data: Optional[LotteCarDetail] = None
     error: Optional[str] = None
+
+
+class LotteAccidentRecord(BaseModel):
+    """Запись об отдельном страховом случае"""
+    
+    accident_date: str = Field(..., description="Дата аварии")
+    insurance_amount: str = Field(..., description="Сумма страхового возмещения")
+    parts_cost: Optional[str] = Field(None, description="Стоимость запчастей")
+    labor_cost: Optional[str] = Field(None, description="Стоимость работ")
+    painting_cost: Optional[str] = Field(None, description="Стоимость покраски")
+    accident_type: str = Field(..., description="Тип аварии (my_car/other_car)")
+
+
+class LotteOwnerChange(BaseModel):
+    """Запись об изменении владельца"""
+    
+    change_date: str = Field(..., description="Дата изменения")
+    change_type: str = Field(..., description="Тип изменения")
+    car_number: Optional[str] = Field(None, description="Номерной знак")
+    usage_type: Optional[str] = Field(None, description="Тип использования")
+
+
+class LotteCarHistory(BaseModel):
+    """История автомобиля Lotte"""
+    
+    # Основная информация
+    car_number: str = Field(..., description="Номерной знак")
+    check_date: str = Field(..., description="Дата проверки")
+    
+    # Общая информация об автомобиле
+    manufacturer: str = Field(..., description="Производитель")
+    model_name: str = Field(..., description="Название модели")
+    year: str = Field(..., description="Год выпуска")
+    body_type: str = Field(..., description="Тип кузова")
+    fuel_type: str = Field(..., description="Тип топлива")
+    displacement: str = Field(..., description="Объем двигателя")
+    usage_category: str = Field(..., description="Категория использования")
+    first_insurance_date: str = Field(..., description="Дата первой страховки")
+    
+    # История использования
+    rental_history: bool = Field(..., description="История аренды")
+    commercial_history: bool = Field(..., description="История коммерческого использования")
+    government_history: bool = Field(..., description="История государственного использования")
+    
+    # Статистика изменений
+    number_changes_count: int = Field(..., description="Количество изменений номера")
+    owner_changes_count: int = Field(..., description="Количество смен владельцев")
+    
+    # Особые происшествия
+    total_loss_count: int = Field(..., description="Количество полных потерь")
+    flood_count: int = Field(..., description="Количество затоплений")
+    theft_count: int = Field(..., description="Количество угонов")
+    
+    # Страховые случаи - мой автомобиль
+    my_car_damage_count: int = Field(..., description="Количество повреждений моего авто")
+    my_car_damage_total: str = Field(..., description="Общая сумма ущерба моего авто")
+    
+    # Страховые случаи - другие автомобили
+    other_car_damage_count: int = Field(..., description="Количество повреждений других авто")
+    other_car_damage_total: str = Field(..., description="Общая сумма ущерба других авто")
+    
+    # Детальные записи
+    owner_changes: List[LotteOwnerChange] = Field(default_factory=list, description="История изменений владельцев")
+    my_car_accidents: List[LotteAccidentRecord] = Field(default_factory=list, description="Аварии моего автомобиля")
+    other_car_accidents: List[LotteAccidentRecord] = Field(default_factory=list, description="Аварии с другими автомобилями")
+
+
+class LotteCarHistoryResponse(BaseModel):
+    """Ответ API для истории автомобиля"""
+    
+    success: bool
+    message: str
+    data: Optional[LotteCarHistory] = None
+    error: Optional[str] = None

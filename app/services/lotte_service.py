@@ -19,10 +19,13 @@ from app.models.lotte import (
     LotteError,
     LotteCarResponse,
     LotteCarDetail,
+    LotteCarHistory,
+    LotteCarHistoryResponse,
 )
 from app.parsers.lotte_parser import (
     LotteParser,
     parse_lotte_car_detail,
+    parse_car_history,
 )
 from app.core.session_manager import SessionManager
 
@@ -47,6 +50,7 @@ class LotteService:
             "login_action": "/hp/auct/cmm/actionLogin.do",
             "cars_list": "/hp/auct/myp/entry/selectMypEntryList.do",  # Та же страница со списком авто
             "car_details": "/hp/auct/myp/entry/selectMypEntryCarDetPop.do",
+            "car_history": "/hp/cmm/entry/selectMypEntryAccdHistPop.do",  # История автомобиля
         }
 
         self.user_agents = [
@@ -815,3 +819,148 @@ class LotteService:
                     logger.debug(f"Не удалось проверить JSESSIONID при восстановлении: {e}")
         except Exception as e:
             logger.error(f"Ошибка при восстановлении сессии: {e}")
+    
+    async def get_car_history(self, search_mng_no: str, car_number: str = None) -> LotteCarHistoryResponse:
+        """
+        Получает историю автомобиля из Lotte
+        
+        Args:
+            search_mng_no: Номер управления (например, "KS202507090027")
+            car_number: Номерной знак автомобиля (опционально)
+        
+        Returns:
+            LotteCarHistoryResponse: История автомобиля
+        """
+        try:
+            # Аутентификация если нужно
+            if not self.authenticated:
+                logger.info("Требуется аутентификация для получения истории автомобиля")
+                auth_success = await self._authenticate()
+                if not auth_success:
+                    return LotteCarHistoryResponse(
+                        success=False,
+                        message="Не удалось аутентифицироваться",
+                        error="Authentication failed"
+                    )
+            
+            session = self._init_session()
+            
+            # URL для истории автомобиля
+            history_url = urljoin(self.base_url, self.urls["car_history"])
+            
+            # Подготовка данных для POST запроса
+            # Извлекаем номер автомобиля из search_mng_no если не передан
+            if not car_number:
+                # Сначала нужно получить детали автомобиля чтобы узнать номерной знак
+                logger.warning("Номерной знак не передан, получение истории может не работать")
+                car_number = ""
+            
+            data = {
+                "searchCarNo": car_number,  # Номерной знак
+                "search_oldCarNo": "",  # Старый номерной знак
+                "searchMngNo": search_mng_no,  # Номер управления
+                "searchDocGubun": "",  # Тип документа
+            }
+            
+            # Заголовки для POST запроса
+            headers = {
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Cache-Control": "max-age=0",
+                "Connection": "keep-alive",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": self.base_url,
+                "Referer": f"{self.base_url}/hp/auct/myp/entry/selectMypEntryCarDetPop.do",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
+                "Upgrade-Insecure-Requests": "1",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            }
+            
+            logger.info(f"Запрос истории автомобиля: search_mng_no={search_mng_no}, car_number={car_number}")
+            logger.debug(f"POST данные: {data}")
+            
+            # Выполняем POST запрос
+            response = session.post(
+                history_url,
+                data=data,
+                headers=headers,
+                timeout=30,
+                verify=False
+            )
+            
+            logger.info(f"Статус ответа истории: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"Ошибка получения истории: HTTP {response.status_code}")
+                logger.error(f"Response text: {response.text[:500]}")
+                
+                # Проверяем, не истекла ли сессия
+                if response.status_code == 302 or 'login' in response.text.lower():
+                    logger.warning("Похоже, сессия истекла, пробуем переаутентифицироваться")
+                    self.authenticated = False
+                    auth_success = await self._authenticate()
+                    if auth_success:
+                        # Повторяем запрос
+                        response = session.post(
+                            history_url,
+                            data=data,
+                            headers=headers,
+                            timeout=30,
+                            verify=False
+                        )
+                        if response.status_code != 200:
+                            return LotteCarHistoryResponse(
+                                success=False,
+                                message=f"Ошибка получения истории после переаутентификации: HTTP {response.status_code}",
+                                error=f"HTTP {response.status_code}"
+                            )
+                    else:
+                        return LotteCarHistoryResponse(
+                            success=False,
+                            message="Сессия истекла и не удалось переаутентифицироваться",
+                            error="Session expired"
+                        )
+                else:
+                    return LotteCarHistoryResponse(
+                        success=False,
+                        message=f"Ошибка получения истории: HTTP {response.status_code}",
+                        error=f"HTTP {response.status_code}"
+                    )
+            
+            # Парсим историю
+            car_history = parse_car_history(response.text)
+            
+            if car_history:
+                logger.info(f"✅ История автомобиля успешно получена: {car_history.car_number}")
+                return LotteCarHistoryResponse(
+                    success=True,
+                    message="История автомобиля успешно получена",
+                    data=car_history
+                )
+            else:
+                logger.error("Не удалось распарсить историю автомобиля")
+                # Логируем часть ответа для отладки
+                if len(response.text) < 1000:
+                    logger.debug(f"Полный ответ: {response.text}")
+                else:
+                    logger.debug(f"Начало ответа: {response.text[:1000]}")
+                    
+                return LotteCarHistoryResponse(
+                    success=False,
+                    message="Не удалось распарсить историю автомобиля",
+                    error="Parse error"
+                )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при получении истории автомобиля: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            return LotteCarHistoryResponse(
+                success=False,
+                message=f"Внутренняя ошибка: {str(e)}",
+                error=str(e)
+            )

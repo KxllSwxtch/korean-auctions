@@ -17,6 +17,9 @@ from app.models.lotte import (
     LotteCarLegalStatus,
     LotteCarMedia,
     LotteCarInspectionRecord,
+    LotteCarHistory,
+    LotteAccidentRecord,
+    LotteOwnerChange,
 )
 from app.core.logging import logger
 
@@ -1350,3 +1353,274 @@ def parse_lotte_car_detail(
     """
     parser = LotteCarDetailParser()
     return parser.parse(html_content, source_url)
+
+
+def parse_car_history(html_content: str) -> Optional[LotteCarHistory]:
+    """
+    Парсит страницу истории автомобиля Lotte
+    
+    Args:
+        html_content: HTML контент страницы истории
+        
+    Returns:
+        LotteCarHistory объект с полной историей автомобиля
+    """
+    try:
+        soup = BeautifulSoup(html_content, "html.parser")
+        
+        # Извлекаем основную информацию
+        car_number = ""
+        check_date = ""
+        
+        # Ищем информацию о номере и дате проверки
+        car_info_elem = soup.find("div", class_="car-info")
+        if car_info_elem:
+            car_num_elem = car_info_elem.find("span", class_="car-num")
+            if car_num_elem:
+                strong = car_num_elem.find("strong")
+                if strong:
+                    car_number = strong.get_text(strip=True)
+            
+            check_date_elem = car_info_elem.find("span", class_="check-date")
+            if check_date_elem:
+                strong = check_date_elem.find("strong")
+                if strong:
+                    check_date = strong.get_text(strip=True)
+        
+        # Парсим общую информацию об автомобиле
+        car_specs = {}
+        
+        # Ищем таблицу с общей информацией
+        tables = soup.find_all("table", class_="tbl-v02")
+        for table in tables:
+            # Проверяем, что это таблица с общей информацией
+            th = table.find("th")
+            if th and "자동차 일반사양" in th.get_text():
+                rows = table.find_all("tr")
+                for row in rows:
+                    th = row.find("th")
+                    td = row.find("td")
+                    if th and td:
+                        header = th.get_text(strip=True)
+                        value = td.get_text(strip=True)
+                        
+                        if "자동차 일반사양" in header:
+                            # Парсим информацию об автомобиле
+                            parts = value.split(",")
+                            if len(parts) >= 4:
+                                car_specs["manufacturer"] = parts[0].strip()
+                                car_specs["model_name"] = parts[1].strip()
+                                car_specs["year"] = re.search(r"(\d{4})년식", parts[2]).group(1) if re.search(r"(\d{4})년식", parts[2]) else ""
+                                car_specs["body_type"] = parts[3].strip()
+                        elif "자동차 용도변경이력" in header:
+                            car_specs["usage_history"] = value
+                        elif "자동차 번호/ 소유자 변경횟수" in header:
+                            # Парсим количество изменений
+                            match = re.search(r"(\d+)회\s*/\s*(\d+)회", value)
+                            if match:
+                                car_specs["number_changes"] = int(match.group(1))
+                                car_specs["owner_changes"] = int(match.group(2))
+                        elif "특수 사고이력" in header:
+                            # Парсим особые происшествия
+                            match = re.search(r"전손\s*:\s*(\d+).*침수\s*:\s*(\d+).*도난\s*:\s*(\d+)", value)
+                            if match:
+                                car_specs["total_loss"] = int(match.group(1))
+                                car_specs["flood"] = int(match.group(2))
+                                car_specs["theft"] = int(match.group(3))
+                        elif "보험사고이력 : 내차 피해" in header:
+                            # Парсим информацию о повреждениях своего авто
+                            match = re.search(r"(\d+)회.*?([\d,]+)원", value)
+                            if match:
+                                car_specs["my_car_count"] = int(match.group(1))
+                                car_specs["my_car_total"] = match.group(2)
+                        elif "보험사고이력 : 타차 가해" in header:
+                            # Парсим информацию о повреждениях других авто
+                            match = re.search(r"(\d+)회.*?([\d,]+)원", value)
+                            if match:
+                                car_specs["other_car_count"] = int(match.group(1))
+                                car_specs["other_car_total"] = match.group(2)
+        
+        # Парсим детальную информацию об автомобиле
+        for table in tables:
+            th = table.find("th")
+            if th and "제작사" in th.get_text():
+                rows = table.find_all("tr")
+                for row in rows:
+                    cells = row.find_all(["th", "td"])
+                    # Обрабатываем строки с 4 ячейками (2 пары th-td)
+                    if len(cells) == 4:
+                        for i in range(0, len(cells), 2):
+                            th = cells[i]
+                            td = cells[i + 1]
+                            header = th.get_text(strip=True)
+                            value = td.get_text(strip=True)
+                            
+                            if "사용연료" in header:
+                                car_specs["fuel_type"] = value
+                            elif "배기량" in header:
+                                car_specs["displacement"] = value
+                            elif "용도 및 차종" in header:
+                                car_specs["usage_category"] = value
+                            elif "최초 보험 가입일자" in header:
+                                car_specs["first_insurance_date"] = value
+        
+        # Парсим историю использования
+        rental_history = False
+        commercial_history = False
+        government_history = False
+        
+        for table in tables:
+            th = table.find("th")
+            if th and "대여용도 사용이력" in th.get_text():
+                rows = table.find_all("tr")
+                for row in rows:
+                    th = row.find("th")
+                    td = row.find("td")
+                    if th and td:
+                        header = th.get_text(strip=True)
+                        value = td.get_text(strip=True)
+                        
+                        if "대여용도 사용이력" in header:
+                            rental_history = "사용이력 있음" in value
+                        elif "영업용도 이력" in header:
+                            commercial_history = "사용이력 있음" in value
+                        elif "관용용도 사용이력" in header:
+                            government_history = "사용이력 있음" in value
+        
+        # Парсим историю изменений владельцев
+        owner_changes = []
+        for table in tables:
+            th = table.find("th")
+            if th and re.match(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일", th.get_text().strip()):
+                rows = table.find_all("tr")
+                for row in rows:
+                    th = row.find("th")
+                    td = row.find("td", class_="owner-change")
+                    if th and td:
+                        date = th.get_text(strip=True)
+                        spans = td.find_all("span")
+                        if len(spans) >= 1:
+                            change_type = spans[0].get_text(strip=True)
+                            car_num = spans[1].get_text(strip=True) if len(spans) > 1 else None
+                            usage = spans[2].get_text(strip=True) if len(spans) > 2 else None
+                            
+                            owner_changes.append(LotteOwnerChange(
+                                change_date=date,
+                                change_type=change_type,
+                                car_number=car_num,
+                                usage_type=usage
+                            ))
+        
+        # Парсим детальные записи об авариях
+        my_car_accidents = []
+        other_car_accidents = []
+        
+        # Ищем секцию с авариями
+        accident_sections = soup.find_all("div", class_="accident-record")
+        for section in accident_sections:
+            h2 = section.find("h2")
+            if h2:
+                if "내차 피해" in h2.get_text():
+                    # Парсим аварии моего автомобиля
+                    accident_lines = section.find_all("ul", class_="line")
+                    for ul in accident_lines:
+                        lis = ul.find_all("li")
+                        for li in lis:
+                            text = li.get_text(strip=True)
+                            # Извлекаем дату и сумму
+                            match = re.search(r"사고일자\s*:\s*(\d{4}년\s*\d{1,2}월\s*\d{1,2}일).*?보험금\s*:\s*([\d,]+)원", text)
+                            if match:
+                                accident_date = match.group(1)
+                                amount = match.group(2)
+                                
+                                # Ищем детализацию по частям
+                                parts_cost = None
+                                labor_cost = None
+                                painting_cost = None
+                                
+                                # Ищем таблицу с детализацией после этой записи
+                                next_table = li.find_next_sibling("table") or section.find_next("table", class_="tbl-v02")
+                                if next_table:
+                                    cells = next_table.find_all("td")
+                                    if len(cells) >= 6:
+                                        parts_cost = cells[1].get_text(strip=True).replace("원", "").strip()
+                                        labor_cost = cells[3].get_text(strip=True).replace("원", "").strip()
+                                        painting_cost = cells[5].get_text(strip=True).replace("원", "").strip()
+                                
+                                my_car_accidents.append(LotteAccidentRecord(
+                                    accident_date=accident_date,
+                                    insurance_amount=amount,
+                                    parts_cost=parts_cost,
+                                    labor_cost=labor_cost,
+                                    painting_cost=painting_cost,
+                                    accident_type="my_car"
+                                ))
+                
+                elif "타차 가해" in h2.get_text():
+                    # Парсим аварии с другими автомобилями
+                    accident_lines = section.find_all("ul", class_="line")
+                    for ul in accident_lines:
+                        lis = ul.find_all("li")
+                        for li in lis:
+                            text = li.get_text(strip=True)
+                            match = re.search(r"사고일자\s*:\s*(\d{4}년\s*\d{1,2}월\s*\d{1,2}일).*?보험금\s*:\s*([\d,]+)원", text)
+                            if match:
+                                accident_date = match.group(1)
+                                amount = match.group(2)
+                                
+                                # Ищем детализацию
+                                parts_cost = None
+                                labor_cost = None
+                                painting_cost = None
+                                
+                                next_table = section.find_next("table", class_="tbl-v02")
+                                if next_table:
+                                    cells = next_table.find_all("td")
+                                    if len(cells) >= 6:
+                                        parts_cost = cells[1].get_text(strip=True).replace("원", "").strip()
+                                        labor_cost = cells[3].get_text(strip=True).replace("원", "").strip()
+                                        painting_cost = cells[5].get_text(strip=True).replace("원", "").strip()
+                                
+                                other_car_accidents.append(LotteAccidentRecord(
+                                    accident_date=accident_date,
+                                    insurance_amount=amount,
+                                    parts_cost=parts_cost,
+                                    labor_cost=labor_cost,
+                                    painting_cost=painting_cost,
+                                    accident_type="other_car"
+                                ))
+        
+        # Создаем объект истории
+        car_history = LotteCarHistory(
+            car_number=car_number,
+            check_date=check_date,
+            manufacturer=car_specs.get("manufacturer", ""),
+            model_name=car_specs.get("model_name", ""),
+            year=car_specs.get("year", ""),
+            body_type=car_specs.get("body_type", ""),
+            fuel_type=car_specs.get("fuel_type", ""),
+            displacement=car_specs.get("displacement", ""),
+            usage_category=car_specs.get("usage_category", ""),
+            first_insurance_date=car_specs.get("first_insurance_date", ""),
+            rental_history=rental_history,
+            commercial_history=commercial_history,
+            government_history=government_history,
+            number_changes_count=car_specs.get("number_changes", 0),
+            owner_changes_count=car_specs.get("owner_changes", 0),
+            total_loss_count=car_specs.get("total_loss", 0),
+            flood_count=car_specs.get("flood", 0),
+            theft_count=car_specs.get("theft", 0),
+            my_car_damage_count=car_specs.get("my_car_count", 0),
+            my_car_damage_total=car_specs.get("my_car_total", "0"),
+            other_car_damage_count=car_specs.get("other_car_count", 0),
+            other_car_damage_total=car_specs.get("other_car_total", "0"),
+            owner_changes=owner_changes,
+            my_car_accidents=my_car_accidents,
+            other_car_accidents=other_car_accidents
+        )
+        
+        return car_history
+        
+    except Exception as e:
+        logger.error(f"Ошибка при парсинге истории автомобиля: {e}")
+        return None

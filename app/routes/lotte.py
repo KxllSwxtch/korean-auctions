@@ -10,6 +10,7 @@ from app.models.lotte import (
     LotteError,
     LotteAuctionDate,
     LotteCarResponse,
+    LotteCarHistoryResponse,
 )
 from app.services.lotte_service import LotteService
 from app.core.logging import logger
@@ -924,5 +925,56 @@ async def get_car_detail(
         logger.error(f"Ошибка при получении детальной информации Lotte: {e}")
         error_response = LotteCarResponse(
             success=False, message=f"Внутренняя ошибка сервера: {str(e)}", error=str(e)
+        )
+        return JSONResponse(status_code=500, content=error_response.model_dump())
+
+
+@router.get("/car-history/{search_mng_no}", response_model=LotteCarHistoryResponse)
+async def get_car_history(
+    search_mng_no: str = Path(
+        ..., description="Номер управления автомобиля (например, KS202507090027)"
+    ),
+    car_number: str = Query(
+        None, description="Номерной знак автомобиля (например, 176하2567)"
+    ),
+    service: LotteService = Depends(get_lotte_service),
+):
+    """
+    Получение истории автомобиля из CarHistory
+    
+    Возвращает:
+    - Общую информацию об автомобиле (производитель, модель, год)
+    - Историю использования (аренда, коммерческое использование)
+    - Количество смен владельцев и номерных знаков
+    - Особые происшествия (полная потеря, затопление, угон)
+    - Страховые случаи с детализацией по стоимости
+    - Подробные записи об авариях с датами и суммами ущерба
+    
+    Параметры:
+    - search_mng_no: Номер управления (из детальной информации автомобиля)
+    - car_number: Номерной знак (опционально, но рекомендуется для лучших результатов)
+    """
+    try:
+        logger.info(f"Запрос истории автомобиля: search_mng_no={search_mng_no}, car_number={car_number}")
+        
+        # Получаем историю автомобиля
+        history_response = await service.get_car_history(search_mng_no, car_number)
+        
+        if not history_response.success:
+            logger.warning(f"Не удалось получить историю автомобиля: {history_response.message}")
+            return JSONResponse(
+                status_code=404 if "не найд" in history_response.message.lower() else 500,
+                content=history_response.model_dump()
+            )
+        
+        logger.info(f"Успешно получена история автомобиля: {history_response.data.car_number if history_response.data else 'N/A'}")
+        return history_response
+        
+    except Exception as e:
+        logger.error(f"Ошибка при получении истории автомобиля Lotte: {e}")
+        error_response = LotteCarHistoryResponse(
+            success=False,
+            message=f"Внутренняя ошибка сервера: {str(e)}",
+            error=str(e)
         )
         return JSONResponse(status_code=500, content=error_response.model_dump())
