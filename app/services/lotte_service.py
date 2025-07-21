@@ -199,8 +199,13 @@ class LotteService:
                         logger.debug(f"Cookies после аутентификации: {session.cookies.get_dict()}")
                         
                         # Сохраняем сессию для дальнейшего использования
-                        if "JSESSIONID" in session.cookies:
-                            logger.info(f"JSESSIONID получен: {session.cookies['JSESSIONID'][:20]}...")
+                        try:
+                            if "JSESSIONID" in session.cookies:
+                                jsessionid = session.cookies.get('JSESSIONID')
+                                if jsessionid:
+                                    logger.info(f"JSESSIONID получен: {str(jsessionid)[:20]}...")
+                        except Exception as e:
+                            logger.debug(f"Не удалось получить JSESSIONID: {e}")
                         
                         # Сохраняем cookies в файл
                         self._save_session()
@@ -232,6 +237,9 @@ class LotteService:
             except Exception as json_error:
                 logger.error(f"Ошибка при разборе ответа: {json_error}")
                 logger.error(f"Текст ответа: {check_response.text[:500]}")
+                # Не возвращаем False если аутентификация прошла успешно
+                if self.authenticated:
+                    return True
                 return False
 
         except Exception as e:
@@ -325,8 +333,8 @@ class LotteService:
             # Получаем страницу с автомобилями с пагинацией
             cars_response = await self._fetch_cars_page(limit, offset)
 
-            if not cars_response:
-                logger.warning("Пустой ответ от сервера при запросе автомобилей")
+            if not cars_response or len(cars_response.text) < 1000:
+                logger.warning(f"Некорректный ответ от сервера (размер: {len(cars_response.text) if cars_response else 0} символов)")
                 # Пробуем переаутентифицироваться
                 logger.info("Пробуем переаутентифицироваться...")
                 self.authenticated = False
@@ -334,10 +342,11 @@ class LotteService:
                 if auth_success:
                     logger.info("Переаутентификация успешна, повторяем запрос...")
                     cars_response = await self._fetch_cars_page(limit, offset)
-                    if not cars_response:
-                        logger.error("Все еще пустой ответ после переаутентификации")
+                    if not cars_response or len(cars_response.text) < 1000:
+                        logger.error(f"Все еще некорректный ответ после переаутентификации (размер: {len(cars_response.text) if cars_response else 0})")
                         return []
                 else:
+                    logger.error("Не удалось переаутентифицироваться")
                     return []
 
             # Парсим автомобили (пагинация уже применена на сервере)
@@ -347,8 +356,12 @@ class LotteService:
             )
             
             # Если не нашли автомобили, проверяем, может быть сессия истекла
-            if len(cars) == 0 and 'login' in cars_response.text.lower():
-                logger.warning("Похоже, сессия истекла, пробуем переаутентифицироваться...")
+            # Проверяем: нет машин И (маленький ответ ИЛИ есть признаки логина)
+            if len(cars) == 0 and (len(cars_response.text) < 1000 or 'login' in cars_response.text.lower()):
+                logger.warning(f"Похоже, сессия истекла (размер ответа: {len(cars_response.text)} символов)")
+                if len(cars_response.text) < 100:
+                    logger.debug(f"Содержимое короткого ответа: {cars_response.text}")
+                    
                 self.authenticated = False
                 auth_success = await self._authenticate()
                 if auth_success:
@@ -607,12 +620,20 @@ class LotteService:
             
             if response.status_code == 200:
                 logger.info(f"✅ Получен ответ: {len(response.text)} символов")
+                
+                # Проверяем размер ответа
+                if len(response.text) < 1000:
+                    logger.warning(f"⚠️ Подозрительно маленький ответ: {len(response.text)} символов")
+                    logger.debug(f"Полный ответ: {response.text}")
+                    
                 # Проверяем, содержит ли ответ таблицу с автомобилями
                 if 'tbl-t02' in response.text:
                     logger.info("✅ Найдена таблица с автомобилями")
                 else:
                     logger.warning("⚠️ Таблица с автомобилями не найдена в ответе")
-                    logger.debug(f"Начало ответа: {response.text[:1000]}")
+                    if len(response.text) < 5000:
+                        logger.debug(f"Начало ответа: {response.text[:1000]}")
+                        
                 return response
             else:
                 logger.error(
@@ -785,7 +806,12 @@ class LotteService:
                 logger.info(f"Сессия Lotte восстановлена, authenticated={self.authenticated}")
                 
                 # Проверяем, что сессия все еще валидна
-                if self.authenticated and 'JSESSIONID' in self.session.cookies:
-                    logger.info(f"JSESSIONID восстановлен: {self.session.cookies['JSESSIONID'][:20]}...")
+                try:
+                    if self.authenticated and 'JSESSIONID' in self.session.cookies:
+                        jsessionid = self.session.cookies.get('JSESSIONID')
+                        if jsessionid:
+                            logger.info(f"JSESSIONID восстановлен: {str(jsessionid)[:20]}...")
+                except Exception as e:
+                    logger.debug(f"Не удалось проверить JSESSIONID при восстановлении: {e}")
         except Exception as e:
             logger.error(f"Ошибка при восстановлении сессии: {e}")
