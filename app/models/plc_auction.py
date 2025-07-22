@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -107,3 +107,82 @@ class PLCAuctionModel(BaseModel):
     name: str
     manufacturer_code: str
     count: int = 0
+
+
+class PLCAuctionVehicleSchema(BaseModel):
+    """Schema.org Vehicle structured data from PLC Auction"""
+    type: str = Field(alias="@type", default="Vehicle")
+    id: str = Field(alias="@id")
+    main_entity_of_page: str = Field(alias="mainEntityOfPage")
+    name: str
+    mileage_from_odometer: Optional[MileageInfo] = Field(None, alias="mileageFromOdometer")
+    brand: Optional[Dict[str, str]] = None
+    manufacturer: Optional[str] = None
+    model: Optional[str] = None
+    production_date: Optional[int] = Field(None, alias="productionDate")
+    vehicle_transmission: Optional[str] = Field(None, alias="vehicleTransmission")
+    fuel_type: Optional[str] = Field(None, alias="fuelType")
+    vehicle_engine: Optional[Dict[str, Any]] = Field(None, alias="vehicleEngine")
+    drive_wheel_configuration: Optional[str] = Field(None, alias="driveWheelConfiguration")
+    color: Optional[str] = None
+    vehicle_identification_number: Optional[str] = Field(None, alias="vehicleIdentificationNumber")
+    offers: Optional[Dict[str, Any]] = None
+    image: Optional[List[str]] = None
+    
+    class Config:
+        populate_by_name = True
+
+
+class PLCAuctionCarDetail(BaseModel):
+    """Detailed car information from PLC Auction"""
+    success: bool = True
+    message: str = "Success"
+    # Basic info
+    title: str
+    vin: str
+    year: int
+    manufacturer: str
+    model: str
+    # Specifications
+    engine_volume: Optional[float] = None
+    fuel_type: str
+    transmission: str
+    drive_type: Optional[str] = None
+    color: Optional[str] = None
+    mileage: str
+    mileage_km: Optional[int] = None
+    # Auction info
+    lot_number: Optional[str] = None
+    location: str
+    country: str
+    auction_date: Optional[str] = None
+    # Pricing
+    current_bid: Optional[float] = None
+    buy_now_price: Optional[float] = None
+    currency: str = "USD"
+    # Status
+    in_stock: bool = True
+    is_auction: bool = True
+    can_bid: bool = True
+    can_buy: bool = False
+    # Images
+    main_image: Optional[str] = None
+    images: List[str] = Field(default_factory=list)
+    # Additional info
+    runs_drives: Optional[str] = None
+    body_type: Optional[str] = None
+    damage: Optional[str] = None
+    # URLs
+    detail_url: str
+    similar_url: Optional[str] = None
+    # Metadata
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+    source: str = "plc_auction"
+    
+    
+class PLCAuctionDetailResponse(BaseModel):
+    """Response wrapper for car detail endpoint"""
+    success: bool = True
+    message: str = "Car details retrieved successfully"
+    data: Optional[PLCAuctionCarDetail] = None
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())

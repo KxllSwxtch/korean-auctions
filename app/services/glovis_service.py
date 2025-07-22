@@ -119,6 +119,15 @@ class GlovisService:
         logger.info("🔧 Создание новой сессии для SSANCAR")
 
         session = requests.Session()
+        
+        # Configure proxy if enabled
+        from app.core.proxy_config import get_proxy_config
+        proxy_config = get_proxy_config()
+        if proxy_config:
+            session.proxies.update(proxy_config)
+            logger.info("🌐 Proxy configured for SSANCAR session")
+        else:
+            logger.info("📡 Direct connection (no proxy) for SSANCAR session")
 
         # Настройка retry стратегии
         retry_strategy = Retry(
@@ -372,44 +381,51 @@ class GlovisService:
 
     async def get_car_details(self, car_gn: str) -> Optional[Dict[str, Any]]:
         """
-        Получает детальную информацию об автомобиле (эмуляция для совместимости)
+        Получает детальную информацию об автомобиле
+        Теперь перенаправляет на PLC Auction API
 
         Args:
-            car_gn: Идентификатор автомобиля (в SSANCAR это car_no)
+            car_gn: Идентификатор автомобиля (slug для PLC auction)
 
         Returns:
             Optional[Dict]: Детальная информация или None
         """
         try:
-            logger.info(f"📥 Запрос деталей автомобиля SSANCAR car_no={car_gn}")
+            logger.info(f"📥 Запрос деталей автомобиля через PLC Auction API: {car_gn}")
 
-            # В SSANCAR детальная информация доступна по отдельной странице
-            detail_url = f"{self.base_url}/page/car_view.php?car_no={car_gn}"
-
-            response = self.session.get(detail_url, timeout=30)
-
-            if response.status_code == 200:
-                logger.info(f"✅ Детальная страница получена для автомобиля {car_gn}")
-                # Здесь можно добавить парсинг детальной страницы
+            # Используем PLC Auction service для получения деталей
+            from app.services.plc_auction_service import PLCAuctionService
+            plc_service = PLCAuctionService()
+            
+            car_detail = plc_service.get_car_detail(car_gn)
+            
+            if car_detail:
+                logger.info(f"✅ Детальная информация получена для VIN: {car_detail.vin}")
+                # Преобразуем в формат совместимый с Glovis
                 return {
-                    "car_no": car_gn,
-                    "detail_url": detail_url,
-                    "status": "success",
-                    "message": "Детальная информация доступна по URL",
-                    "raw_html": (
-                        response.text[:1000] + "..."
-                        if len(response.text) > 1000
-                        else response.text
-                    ),
+                    "success": True,
+                    "vin": car_detail.vin,
+                    "title": car_detail.title,
+                    "year": car_detail.year,
+                    "manufacturer": car_detail.manufacturer,
+                    "model": car_detail.model,
+                    "mileage": car_detail.mileage,
+                    "fuel_type": car_detail.fuel_type,
+                    "transmission": car_detail.transmission,
+                    "color": car_detail.color,
+                    "location": car_detail.location,
+                    "price": car_detail.current_bid or car_detail.buy_now_price,
+                    "currency": car_detail.currency,
+                    "images": car_detail.images,
+                    "detail_url": car_detail.detail_url,
+                    "source": "plc_auction"
                 }
             else:
-                logger.warning(
-                    f"⚠️ Детальная страница недоступна для автомобиля {car_gn}"
-                )
+                logger.warning(f"⚠️ Детальная информация недоступна для: {car_gn}")
                 return None
 
         except Exception as e:
-            logger.error(f"❌ Ошибка при получении деталей автомобиля SSANCAR: {e}")
+            logger.error(f"❌ Ошибка при получении деталей автомобиля: {e}")
             return None
 
     def get_test_data(self) -> GlovisResponse:

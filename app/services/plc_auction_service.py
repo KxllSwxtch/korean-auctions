@@ -8,9 +8,10 @@ from urllib3.util.retry import Retry
 
 from app.models.plc_auction import (
     PLCAuctionCar, PLCAuctionResponse, PLCAuctionFilters,
-    PLCAuctionManufacturer, PLCAuctionModel
+    PLCAuctionManufacturer, PLCAuctionModel, PLCAuctionCarDetail
 )
 from app.parsers.plc_auction_parser import PLCAuctionParser
+from app.parsers.plc_auction_detail_parser import PLCAuctionDetailParser
 from app.core.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -20,13 +21,16 @@ class PLCAuctionService:
     BASE_URL = "https://plc.auction"
     AUCTION_URL = f"{BASE_URL}/auction"
     
-    # Default cookies from the example
+    # Default cookies from the example (updated with cf_clearance and session tokens)
     DEFAULT_COOKIES = {
         "intercom-id-m1d5ih1o": "0f9a1bfc-debc-4985-9a2a-39a9de0f2eb6",
         "intercom-device-id-m1d5ih1o": "b6cba56c-2517-48c5-b1c0-93ff5d6a24fa",
         "_plc_ref": "eyJpdiI6Im90VTUyWlVMNFEzUE5pdi9XSlBCMEE9PSIsInZhbHVlIjoiT3pWbXAwemlJZjFJeVIyeC9na0tMWHJwWUlrV0pwQ1BERi9zdW5pbE9FUmVKYW1laDc3T1pOWWdmcEpVVWZJNXN5QUlmR0tzZHBTTDR5K3pXUjJLNlE9PSIsIm1hYyI6Ijk5YzU4M2I0NmNmZmJjNTBmNWYwMjdmNzllMTBkZWRmNzM5M2JhOTI5ZTZkMDBhYzhmY2Y1M2I4ZGIwYTIxYjQiLCJ0YWciOiIifQ%3D%3D",
         "_locale": "ru",
         "intercom-session-m1d5ih1o": "",
+        "cf_clearance": "Ze88aRgkaEQVa4qjDnI8z7Bqteor1p6GxDN4MOG6jMQ-1753154140-1.2.1.1-orqppZYrg0xKbrCB6cwGVIGc2Fe3UOebr1MUbQ6p3htC0h8IlBhtd0TPHjsfoHawulQnK3IXq0hrEMxdfeZ6bcO0lDjOwI3AN9oGAnM1lORm.NM_z00gsqgExT0Hq_9_Fvv.H8vByM27cv7xui8pjT8hCj09OzijAVysgnK5bAtXCXtfreeA47qERB_VT_030HO60mzqK0ArsoIzTK56n7x1MBztnnBAStoUx1HaCII",
+        "XSRF-TOKEN": "eyJpdiI6IlloMVNsY2Vja05hQ2FiT1Q0VFVIOVE9PSIsInZhbHVlIjoiTWs5dHlvN3Vtd3RkODlubmpXbzlYQjI4MCsxTnZobytlYSttS2Q4b1NhUUtXQk0xWWoyc00wUXpsbzJ0NG9aTnRUYVVWQUNiQTFLT3NUQVh5WnZ0ZWFLenRsSHBUYWt1dGcrd0wyeW5pS3dqSHNFS3k5Q3gza1hvZEV2Nlc4YjYiLCJtYWMiOiJmY2JmMTFjOTBiYWUzMDE2YzBiNTgwZjZiMjYzNDc2MzQ2MWM5MjkwYWU2YTUyMWE4ZWU3MWY5NmRkZjkyMGExIiwidGFnIjoiIn0%3D",
+        "__session": "eyJpdiI6IlF0T3huRkh6TTdlUDJrQkRnVlRQdXc9PSIsInZhbHVlIjoiWWdaTDBEVitSOG5SQ0J0ZHUzUWZmR3JlUkFPeUd5WG9kNFJhMlpNRlJsbDk4VnJxSWxFY1k3M3BCcG5Rc1FHQ2QyaEFEbG1KbFQva254bVJLSXZBbk5nbU5sOGFuOVVLdUl3Qmp5ejU0aFFra3dneDBZOUxSMzYrU1FneUF4RDQiLCJtYWMiOiJkNzY0YWI5MWFmMTJiZjEwMzNiNDQ5ZjVmMDE4NzExNzFmNjVlZTQ3ZmYwMDgzMTQzNzcyZWFjNDkzY2Y3MWNlIiwidGFnIjoiIn0%3D",
     }
     
     # Default headers from the example
@@ -50,11 +54,22 @@ class PLCAuctionService:
     def __init__(self):
         self.session_manager = SessionManager()
         self.parser = PLCAuctionParser()
+        self.headers = self.DEFAULT_HEADERS.copy()
+        self.cookies = self.DEFAULT_COOKIES.copy()
         self._setup_session()
     
     def _setup_session(self):
         """Setup requests session with retry strategy"""
         self.session = requests.Session()
+        
+        # Configure proxy if enabled
+        from app.core.proxy_config import get_proxy_config
+        proxy_config = get_proxy_config()
+        if proxy_config:
+            self.session.proxies.update(proxy_config)
+            logger.info("🌐 Proxy configured for PLC Auction session")
+        else:
+            logger.info("📡 Direct connection (no proxy) for PLC Auction session")
         
         # Configure retry strategy
         retry_strategy = Retry(
@@ -75,8 +90,10 @@ class PLCAuctionService:
         saved_cookies = self.session_manager.load_session('plc_auction')
         if saved_cookies:
             self.session.cookies.update(saved_cookies)
+            self.cookies.update(saved_cookies)
         else:
             self.session.cookies.update(self.DEFAULT_COOKIES)
+            self.cookies.update(self.DEFAULT_COOKIES)
     
     def _save_cookies(self):
         """Save current session cookies"""
@@ -215,3 +232,51 @@ class PLCAuctionService:
         # For now, just use the fetch_cars method
         # In production, this might use a different endpoint or add more filters
         return self.fetch_cars(filters)
+    
+    def get_car_detail(self, slug: str) -> Optional[PLCAuctionCarDetail]:
+        """
+        Get detailed information about a specific car
+        
+        Args:
+            slug: The car slug from the URL (e.g., "hyundai-santa-fe-2023-kmhs281lgpu493682-25-7112c3769debd7a350b2a5a26e36d3ff")
+            
+        Returns:
+            PLCAuctionCarDetail or None if not found
+        """
+        try:
+            detail_url = f"{self.BASE_URL}/auction/lot/{slug}"
+            logger.info(f"Fetching car detail from: {detail_url}")
+            
+            # Update headers with referrer
+            headers = self.headers.copy()
+            headers['referer'] = self.AUCTION_URL
+            
+            # Make request
+            response = self.session.get(
+                detail_url,
+                headers=headers,
+                cookies=self.cookies,
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                # Parse the HTML with our detail parser
+                parser = PLCAuctionDetailParser()
+                car_detail = parser.parse_car_detail(response.text, detail_url)
+                
+                if car_detail:
+                    logger.info(f"✅ Successfully fetched detail for VIN: {car_detail.vin}")
+                    return car_detail
+                else:
+                    logger.error("Failed to parse car detail from HTML")
+                    return None
+            else:
+                logger.error(f"Failed to fetch car detail. Status: {response.status_code}")
+                return None
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error fetching car detail: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error fetching car detail: {e}")
+            return None

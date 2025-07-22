@@ -5,7 +5,8 @@ from loguru import logger
 
 from app.models.plc_auction import (
     PLCAuctionResponse, PLCAuctionFilters, 
-    PLCAuctionManufacturer, PLCAuctionModel
+    PLCAuctionManufacturer, PLCAuctionModel,
+    PLCAuctionCarDetail, PLCAuctionDetailResponse
 )
 from app.services.plc_auction_service import PLCAuctionService
 from app.core.logging import get_logger
@@ -225,6 +226,51 @@ async def get_models(manufacturer_code: str) -> Dict[str, Any]:
         )
 
 
+@router.get("/cars/{slug}", response_model=PLCAuctionDetailResponse)
+async def get_car_detail(
+    slug: str,
+    service: PLCAuctionService = Depends(get_plc_auction_service)
+) -> PLCAuctionDetailResponse:
+    """
+    Get detailed information about a specific car
+    
+    **Parameters:**
+    - **slug**: The car slug from the URL
+    
+    **Example usage:**
+    ```
+    GET /api/v1/glovis/cars/hyundai-santa-fe-2023-kmhs281lgpu493682-25-7112c3769debd7a350b2a5a26e36d3ff
+    ```
+    """
+    try:
+        plc_logger.info(f"📥 Request for car detail: {slug}")
+        
+        car_detail = service.get_car_detail(slug)
+        
+        if car_detail:
+            plc_logger.info(f"✅ Successfully retrieved car detail for VIN: {car_detail.vin}")
+            return PLCAuctionDetailResponse(
+                success=True,
+                message="Car details retrieved successfully",
+                data=car_detail
+            )
+        else:
+            plc_logger.error(f"❌ Car not found: {slug}")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Car not found: {slug}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        plc_logger.error(f"❌ Unexpected error getting car detail: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
 @router.get("/health", response_model=Dict[str, Any])
 async def health_check() -> Dict[str, Any]:
     """
@@ -294,3 +340,15 @@ async def search_ssancar_cars(
     )
     
     return await search_glovis_cars(plc_filters)
+
+
+@router.get("/cars/ssancar/{car_no}", response_model=PLCAuctionDetailResponse)
+async def get_ssancar_car_detail(
+    car_no: str,
+    service: PLCAuctionService = Depends(get_plc_auction_service)
+) -> PLCAuctionDetailResponse:
+    """Get car detail in SSANCAR format for compatibility"""
+    # In SSANCAR format, car_no might be used directly as slug
+    # For PLC auction, we need to find or construct the proper slug
+    # For now, we'll use car_no as slug (may need adjustment based on actual mapping)
+    return await get_car_detail(car_no, service)
