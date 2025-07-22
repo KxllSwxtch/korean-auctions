@@ -27,11 +27,16 @@ from app.models.glovis import (
     SSANCARCarDetailResponse,
 )
 from app.parsers.glovis_parser import GlovisParser
-from app.parsers.ssancar_detail_parser import parse_ssancar_car_detail
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger("ssancar_service")
+
+
+def parse_ssancar_car_detail(html: str, car_no: str) -> Optional[SSANCARCarDetail]:
+    """Stub function - SSANCAR parser removed, use PLC Auction instead"""
+    logger.warning(f"SSANCAR detail parser called but not available for car {car_no}")
+    return None
 
 
 class GlovisService:

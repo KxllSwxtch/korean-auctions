@@ -8,13 +8,12 @@ from app.routes import (
     lotte,
     lotte_filters,
     kcar,
-    glovis,
+    plc_auction,
     enhanced_lotte,
     glovis_detail,
     glovis_windows_auth,
     heydealer,
     heydealer_filters,
-    ssancar_detail,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -51,7 +50,7 @@ app.include_router(
 app.include_router(lotte.router, tags=["Lotte Auction"])
 app.include_router(lotte_filters.router, tags=["Lotte Filters"])
 app.include_router(kcar.router, tags=["KCar Auction"])
-app.include_router(glovis.router, tags=["Glovis Auction"])
+app.include_router(plc_auction.router, tags=["Glovis Auction"])
 
 # Новые улучшенные маршруты
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
@@ -67,11 +66,7 @@ app.include_router(
     prefix="/api/v1/heydealer/filters",
     tags=["HeyDealer Filters"],
 )
-app.include_router(
-    ssancar_detail.router,
-    prefix="/api/v1",
-    tags=["SSANCAR Car Details"],
-)
+# SSANCAR routes removed - replaced by PLC Auction
 
 
 @app.get("/")

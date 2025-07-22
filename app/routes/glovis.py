@@ -22,7 +22,10 @@ from app.models.glovis_filters import (
     GlovisDetailModelsResponse,
     GlovisFilteredCarsResponse,
 )
-from app.services.glovis_service import GlovisService
+from app.models.plc_auction import (
+    PLCAuctionResponse, PLCAuctionFilters, PLCAuctionManufacturer, PLCAuctionModel
+)
+from app.services.plc_auction_service import PLCAuctionService
 from app.core.logging import get_logger
 
 # Настраиваем логгер
@@ -31,15 +34,15 @@ glovis_logger = get_logger("glovis_routes")
 router = APIRouter(prefix="/api/v1/glovis", tags=["Glovis"])
 
 # Глобальный экземпляр сервиса
-glovis_service = GlovisService()
+plc_auction_service = PLCAuctionService()
 
 
-def get_glovis_service() -> GlovisService:
-    """Dependency для получения экземпляра GlovisService"""
-    return glovis_service
+def get_plc_auction_service() -> PLCAuctionService:
+    """Dependency для получения экземпляра PLCAuctionService"""
+    return plc_auction_service
 
 
-@router.get("/cars", response_model=GlovisResponse)
+@router.get("/cars", response_model=PLCAuctionResponse)
 async def get_glovis_cars(
     page: int = Query(1, ge=1, description="Номер страницы"),
     search_rc: Optional[str] = Query(
