@@ -25,6 +25,7 @@ python-dotenv==1.1.0
 # Additional required dependencies for auction parsing
 Faker==34.0.0
 cryptography
+cloudscraper==1.2.71
 
 # Dependencies (auto-resolved by pip)
 # Core dependencies will be installed automatically

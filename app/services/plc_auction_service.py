@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import cloudscraper
 
 from app.models.plc_auction import (
     PLCAuctionCar, PLCAuctionResponse, PLCAuctionFilters,
@@ -65,8 +66,16 @@ class PLCAuctionService:
         self._initialize_browser_session()
     
     def _setup_session(self):
-        """Setup requests session with retry strategy"""
-        self.session = requests.Session()
+        """Setup cloudscraper session to handle Cloudflare challenges"""
+        # Create cloudscraper session instead of regular requests session
+        self.session = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'darwin',
+                'desktop': True
+            },
+            delay=1  # Add 1 second delay between requests
+        )
         
         # Configure retry strategy
         retry_strategy = Retry(
@@ -86,15 +95,21 @@ class PLCAuctionService:
         # Load or set cookies
         saved_cookies = self.session_manager.load_session('plc_auction')
         if saved_cookies:
-            self.session.cookies.update(saved_cookies)
+            for name, value in saved_cookies.items():
+                if value:  # Skip empty values
+                    self.session.cookies.set(name, value)
             self.cookies.update(saved_cookies)
         else:
-            self.session.cookies.update(self.DEFAULT_COOKIES)
+            for name, value in self.DEFAULT_COOKIES.items():
+                if value:  # Skip empty values
+                    self.session.cookies.set(name, value)
             self.cookies.update(self.DEFAULT_COOKIES)
             
         # Add Intercom cookies
         intercom_cookies = self.intercom.get_intercom_cookies()
-        self.session.cookies.update(intercom_cookies)
+        for name, value in intercom_cookies.items():
+            if value:  # Skip empty values
+                self.session.cookies.set(name, value)
         self.cookies.update(intercom_cookies)
         
         # Set timeout for all requests
@@ -164,6 +179,9 @@ class PLCAuctionService:
             
             # Build query parameters
             params = self._build_query_params(filters)
+            
+            # Add small delay to avoid rate limiting
+            time.sleep(1)
             
             # Make request
             response = self.session.get(
@@ -335,7 +353,9 @@ class PLCAuctionService:
                                 self.cookies.update(new_cookies)
                                 # Update session cookies with proper domain/path
                                 for name, value in new_cookies.items():
-                                    self.session.cookies.set(name, value, domain=".plc.auction", path="/")
+                                    # Skip empty cookie values to avoid errors
+                                    if value:
+                                        self.session.cookies.set(name, value, domain=".plc.auction", path="/")
                                 self._save_cookies()
                                 
                                 logger.info(f"✅ Successfully updated cookies from {curl_file_path}")
