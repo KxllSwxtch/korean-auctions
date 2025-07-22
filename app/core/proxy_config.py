@@ -25,7 +25,7 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
 
     # Default proxy configuration
     proxy_host = os.getenv("PROXY_HOST", "geo.iproyal.com:12321")
-    proxy_auth = os.getenv("PROXY_AUTH", "oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-kz")
+    proxy_auth = os.getenv("PROXY_AUTH", "oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us")
 
     if proxy_host and proxy_auth:
         proxy_url = f"http://{proxy_auth}@{proxy_host}"

@@ -119,15 +119,6 @@ class GlovisService:
         logger.info("🔧 Создание новой сессии для SSANCAR")
 
         session = requests.Session()
-        
-        # Configure proxy if enabled
-        from app.core.proxy_config import get_proxy_config
-        proxy_config = get_proxy_config()
-        if proxy_config:
-            session.proxies.update(proxy_config)
-            logger.info("🌐 Proxy configured for SSANCAR session")
-        else:
-            logger.info("📡 Direct connection (no proxy) for SSANCAR session")
 
         # Настройка retry стратегии
         retry_strategy = Retry(

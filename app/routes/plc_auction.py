@@ -271,6 +271,51 @@ async def get_car_detail(
         )
 
 
+@router.post("/update-cookies", response_model=Dict[str, Any])
+async def update_cookies(
+    cookies: Dict[str, str] = Body(..., description="Fresh cookies from browser"),
+    service: PLCAuctionService = Depends(get_plc_auction_service)
+) -> Dict[str, Any]:
+    """
+    Update PLC Auction cookies manually
+    
+    **Request body example:**
+    ```json
+    {
+        "cf_clearance": "new_cloudflare_token",
+        "XSRF-TOKEN": "new_xsrf_token",
+        "__session": "new_session_token"
+    }
+    ```
+    """
+    try:
+        plc_logger.info("🍪 Updating PLC Auction cookies")
+        
+        # Update service cookies
+        service.cookies.update(cookies)
+        service.session.cookies.update(cookies)
+        service._save_cookies()
+        
+        # Test if cookies work
+        test_filters = PLCAuctionFilters(page=1, page_size=1)
+        test_result = service.fetch_cars(test_filters)
+        
+        return {
+            "success": True,
+            "message": "Cookies updated successfully",
+            "cookies_count": len(cookies),
+            "test_passed": test_result.success,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        plc_logger.error(f"❌ Error updating cookies: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update cookies: {str(e)}"
+        )
+
+
 @router.get("/health", response_model=Dict[str, Any])
 async def health_check() -> Dict[str, Any]:
     """
