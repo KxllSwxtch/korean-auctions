@@ -377,15 +377,28 @@ class KCarService:
                 "Pragma": "no-cache",
             }
 
-            logger.info(
-                f"📡 Получаю данные из обоих лейнов (A и B) для weekly аукционов"
-            )
+            # Определяем какие лейны нужно обработать
+            requested_lane_type = params.get("lane_type") if params else None
+            lanes_to_process = []
+            
+            if requested_lane_type and requested_lane_type in ["A", "B"]:
+                # Если указан конкретный лейн, обрабатываем только его
+                lanes_to_process = [requested_lane_type]
+                logger.info(
+                    f"📡 Получаю данные только из лейна {requested_lane_type} для weekly аукционов"
+                )
+            else:
+                # Если лейн не указан или указан как "все", обрабатываем оба
+                lanes_to_process = ["A", "B"]
+                logger.info(
+                    f"📡 Получаю данные из обоих лейнов (A и B) для weekly аукционов"
+                )
 
             all_cars = []
             total_count = 0
 
-            # Получаем данные из LANE_TYPE A и B
-            for lane_type in ["A", "B"]:
+            # Получаем данные из выбранных лейнов
+            for lane_type in lanes_to_process:
                 logger.info(f"🛣️ Обрабатываю LANE_TYPE: {lane_type}")
 
                 # Копируем параметры и устанавливаем тип лейна
@@ -769,11 +782,11 @@ class KCarService:
                     has_next_page=has_next_page,
                     has_prev_page=has_prev_page,
                     success=True,
-                    message=f"Успешно получено {total_count} автомобилей из weekly аукционов (LANE A+B)",
+                    message=f"Успешно получено {total_count} автомобилей из weekly аукционов (LANE {'+'.join(lanes_to_process)})",
                 )
 
                 logger.success(
-                    f"✅ Объединено {total_count} автомобилей из обоих лейнов (страница {page_number}/{total_pages})"
+                    f"✅ Объединено {total_count} автомобилей из лейнов {lanes_to_process} (страница {page_number}/{total_pages})"
                 )
                 return result
             else:

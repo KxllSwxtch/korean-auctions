@@ -38,6 +38,7 @@ async def get_kcar_cars(
         "weekly", description="Тип аукциона (weekly только)"
     ),
     location: Optional[str] = Query(None, description="Локация"),
+    lane_type: Optional[str] = Query(None, description="Тип лейна (A, B или пусто для всех)"),
     page_size: int = Query(50, ge=1, le=100, description="Количество результатов"),
     page: int = Query(1, ge=1, description="Номер страницы"),
 ):
@@ -85,6 +86,8 @@ async def get_kcar_cars(
             params["COLOR_CD"] = color
         if location:
             params["AUC_PLC_CD"] = location
+        if lane_type:
+            params["lane_type"] = lane_type
 
         # Получаем данные
         result = kcar_service.get_cars(params)
