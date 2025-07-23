@@ -191,6 +191,73 @@ class KCarStatsResponse(BaseModel):
     success: bool = Field(True, description="Статус ответа")
 
 
+class TechnicalSheetInspection(BaseModel):
+    """Результат инспекции системы автомобиля"""
+    
+    status: Optional[str] = Field(None, description="Статус: 양호(Good)/불량(Poor)/수리(Repair)")
+    status_code: Optional[str] = Field(None, description="Код статуса: V/O/△/X/W/A")
+    
+    class Config:
+        populate_by_name = True
+
+
+class TechnicalSheet(BaseModel):
+    """Технический лист (점검·검사기록부) автомобиля"""
+    
+    # Информация о документе
+    inspection_number: Optional[str] = Field(None, description="Номер инспекции (제 XXXXXXXXX호)")
+    form_number: Optional[str] = Field(None, description="Номер формы (별지 제XX호 서식)")
+    
+    # Информация о владельце
+    owner_info: Optional[Dict[str, str]] = Field(None, description="Информация о владельце")
+    
+    # Проверка идентичности
+    vin_condition: Optional[List[str]] = Field(
+        default_factory=list, 
+        description="Состояние VIN: 양호/상이/부식/훼손/변조/도말"
+    )
+    registration_confirmed: Optional[bool] = Field(None, description="Регистрация подтверждена")
+    
+    # Результаты инспекции систем
+    engine_system: Optional[TechnicalSheetInspection] = Field(
+        None, description="Система двигателя (기관장치)"
+    )
+    power_transmission: Optional[TechnicalSheetInspection] = Field(
+        None, description="Трансмиссия (동력전달장치)"
+    )
+    braking_system: Optional[TechnicalSheetInspection] = Field(
+        None, description="Тормозная система (제동장치)"
+    )
+    steering_system: Optional[TechnicalSheetInspection] = Field(
+        None, description="Рулевое управление (조향장치)"
+    )
+    lighting_system: Optional[TechnicalSheetInspection] = Field(
+        None, description="Осветительные приборы (등화장치)"
+    )
+    running_gear: Optional[TechnicalSheetInspection] = Field(
+        None, description="Ходовая часть (주행장치)"
+    )
+    battery_system: Optional[TechnicalSheetInspection] = Field(
+        None, description="Электрооборудование (축전기계장치)"
+    )
+    
+    # Дополнительные проверки - детальные компоненты
+    detailed_inspections: Optional[Dict[str, Any]] = Field(
+        None, description="Детальные проверки компонентов"
+    )
+    
+    # Состояние кузова (из визуальной схемы)
+    body_parts: Optional[Dict[str, List[str]]] = Field(
+        None, description="Состояние частей кузова: replaced/panel_beaten/corroded/adjusted"
+    )
+    
+    # Дополнительные замечания
+    additional_notes: Optional[str] = Field(None, description="Дополнительные замечания")
+    
+    class Config:
+        populate_by_name = True
+
+
 class KCarDetailedCar(BaseModel):
     """Детальная модель автомобиля KCar с полной информацией"""
 
@@ -268,6 +335,11 @@ class KCarDetailedCar(BaseModel):
     usage_type: Optional[str] = Field(None, description="Тип использования")
     created_at: Optional[str] = Field(None, description="Время создания записи")
     updated_at: Optional[str] = Field(None, description="Время последнего обновления")
+    
+    # Технический лист
+    technical_sheet: Optional[TechnicalSheet] = Field(
+        None, description="Технический лист с результатами инспекции"
+    )
 
     class Config:
         populate_by_name = True

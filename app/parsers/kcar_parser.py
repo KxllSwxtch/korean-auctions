@@ -11,6 +11,8 @@ from app.models.kcar import (
     KCarModelsResponse,
     KCarGenerationsResponse,
     KCarSearchResponse,
+    TechnicalSheet,
+    TechnicalSheetInspection,
 )
 
 
@@ -589,6 +591,15 @@ class KCarParser:
                 logger.debug(
                     f"🔍 Извлеченные данные: название={car.car_name}, номер={car.car_number}, год={car.year}, пробег={car.mileage}"
                 )
+                
+                # 12. Пытаемся извлечь технический лист
+                try:
+                    technical_sheet = self._parse_technical_sheet(soup)
+                    if technical_sheet:
+                        car.technical_sheet = technical_sheet
+                        logger.debug(f"📋 Найден технический лист с инспекциями")
+                except Exception as tech_error:
+                    logger.warning(f"⚠️ Ошибка извлечения технического листа: {tech_error}")
 
             except Exception as parse_error:
                 logger.warning(f"⚠️ Ошибка извлечения данных из HTML: {parse_error}")
@@ -614,6 +625,175 @@ class KCarParser:
                 success=False,
                 message=f"Ошибка парсинга детальной информации: {str(e)}",
             )
+
+    def _parse_technical_sheet(self, soup) -> Optional[TechnicalSheet]:
+        """
+        Извлечение данных технического листа из HTML
+        
+        Args:
+            soup: BeautifulSoup объект страницы
+            
+        Returns:
+            TechnicalSheet объект или None
+        """
+        try:
+            # Ищем секцию с техническим листом
+            tech_sheet_div = soup.find("div", class_="optiontest")
+            if not tech_sheet_div:
+                logger.debug("Секция технического листа не найдена")
+                return None
+                
+            tech_sheet = TechnicalSheet()
+            
+            # 1. Извлекаем номер инспекции
+            inspection_p = tech_sheet_div.find("p", string=lambda x: x and "제" in x and "호" in x)
+            if inspection_p:
+                tech_sheet.inspection_number = inspection_p.get_text(strip=True)
+                
+            # 2. Извлекаем номер формы
+            form_p = tech_sheet_div.find("p", string=lambda x: x and "별지" in x)
+            if form_p:
+                tech_sheet.form_number = form_p.get_text(strip=True)
+                
+            # 3. Извлекаем информацию о владельце
+            owner_info = {}
+            owner_company_cell = soup.find("td", string="상호(명칭)")
+            if owner_company_cell:
+                owner_company_value = owner_company_cell.find_next_sibling("td")
+                if owner_company_value:
+                    owner_info["company"] = owner_company_value.get_text(strip=True)
+                    
+            owner_name_cell = soup.find("td", string="성명(대표자)")
+            if owner_name_cell:
+                owner_name_value = owner_name_cell.find_next_sibling("td")
+                if owner_name_value:
+                    owner_info["name"] = owner_name_value.get_text(strip=True)
+                    
+            owner_id_cell = soup.find("td", string="주민등록번호")
+            if owner_id_cell:
+                owner_id_value = owner_id_cell.find_next_sibling("td")
+                if owner_id_value:
+                    owner_info["id"] = owner_id_value.get_text(strip=True)
+                    
+            if owner_info:
+                tech_sheet.owner_info = owner_info
+                
+            # 4. Извлекаем состояние VIN
+            vin_conditions = []
+            vin_checkboxes = soup.find_all("input", {"id": lambda x: x and x.startswith("SAMENESS_")})
+            for checkbox in vin_checkboxes:
+                if checkbox.get("checked") is not None:
+                    label = checkbox.find_next_sibling("label")
+                    if label:
+                        vin_conditions.append(label.get_text(strip=True))
+            
+            if vin_conditions:
+                tech_sheet.vin_condition = vin_conditions
+                
+            # 5. Проверка регистрации
+            reg_confirmed_cell = soup.find("td", string="등록사항 확인")
+            if reg_confirmed_cell:
+                reg_value_cell = reg_confirmed_cell.find_next_sibling("td")
+                if reg_value_cell:
+                    reg_value = reg_value_cell.get_text(strip=True).upper()
+                    tech_sheet.registration_confirmed = reg_value == "Y"
+                    
+            # 6. Извлекаем результаты инспекций систем
+            inspection_mappings = {
+                "10.기관장치": "engine_system",
+                "11.동력전달장치": "power_transmission", 
+                "12.제동장치": "braking_system",
+                "13.조향장치": "steering_system",
+                "14.등화장치": "lighting_system",
+                "15.주행장치": "running_gear",
+                "17.축전기계장치": "battery_system"
+            }
+            
+            for korean_name, field_name in inspection_mappings.items():
+                inspection_cell = soup.find("td", string=korean_name)
+                if inspection_cell:
+                    result_cell = inspection_cell.find_next_sibling("td")
+                    if result_cell:
+                        status_text = result_cell.get_text(strip=True)
+                        inspection = TechnicalSheetInspection(status=status_text)
+                        
+                        # Определяем код статуса
+                        if status_text == "양호":
+                            inspection.status_code = "V"
+                        elif status_text == "불량":
+                            inspection.status_code = "O"
+                        elif status_text == "수리":
+                            inspection.status_code = "△"
+                            
+                        setattr(tech_sheet, field_name, inspection)
+                        
+            # 7. Извлекаем детальные инспекции компонентов
+            detailed_inspections = {}
+            checkbox_sections = tech_sheet_div.find_all("div", class_="check_rd20w")
+            
+            current_section = None
+            for checkbox_div in checkbox_sections:
+                checkbox = checkbox_div.find("input", type="checkbox")
+                if checkbox:
+                    name = checkbox.get("name", "")
+                    if name and name.startswith("i_arr"):
+                        section_name = name.replace("i_arr", "").lower()
+                        if checkbox.get("checked") is not None:
+                            label = checkbox_div.find("label")
+                            if label:
+                                if section_name not in detailed_inspections:
+                                    detailed_inspections[section_name] = []
+                                detailed_inspections[section_name].append(label.get_text(strip=True))
+                                
+            if detailed_inspections:
+                tech_sheet.detailed_inspections = detailed_inspections
+                
+            # 8. Извлекаем состояние частей кузова
+            body_parts = {
+                "replaced": [],
+                "panel_beaten": [],
+                "corroded": [],
+                "adjusted": []
+            }
+            
+            # Ищем активные элементы на схеме кузова
+            # В HTML активные части отмечены классом "on"
+            active_parts = soup.find_all("li", class_="on")
+            for part in active_parts:
+                part_id = part.get("id", "")
+                if part_id:
+                    # Определяем тип работы по префиксу
+                    if part_id.startswith("aw"):  # 교환 (replacement)
+                        body_parts["replaced"].append(part_id)
+                    elif part_id.startswith("ax"):  # 판금 (panel beating)
+                        body_parts["panel_beaten"].append(part_id)
+                    elif part_id.startswith("ac"):  # 부식 (corrosion)
+                        body_parts["corroded"].append(part_id)
+                    elif part_id.startswith("ag"):  # 조정 (adjustment)
+                        body_parts["adjusted"].append(part_id)
+                        
+            # Также проверяем активные области на карте
+            active_areas = soup.find_all("area", class_="on")
+            for area in active_areas:
+                area_id = area.get("id", "")
+                if area_id:
+                    body_parts["adjusted"].append(area_id)  # По умолчанию для областей
+                    
+            if any(body_parts.values()):
+                tech_sheet.body_parts = body_parts
+                
+            # 9. Извлекаем дополнительные замечания
+            special_notes = soup.find("td", string=lambda x: x and "특이사항" in x if x else False)
+            if special_notes:
+                notes_cell = special_notes.find_next_sibling("td") 
+                if notes_cell:
+                    tech_sheet.additional_notes = notes_cell.get_text(strip=True)
+                    
+            return tech_sheet
+            
+        except Exception as e:
+            logger.error(f"Ошибка парсинга технического листа: {e}")
+            return None
 
     def parse_models_json(self, json_data: Dict[str, Any]) -> KCarModelsResponse:
         """
