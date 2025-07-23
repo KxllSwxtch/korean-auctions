@@ -1,5 +1,6 @@
 import requests
 
+# Last updated: 2025-07-22 (these cookies need to be refreshed when they expire)
 cookies = {
     "intercom-id-m1d5ih1o": "0f9a1bfc-debc-4985-9a2a-39a9de0f2eb6",
     "intercom-device-id-m1d5ih1o": "b6cba56c-2517-48c5-b1c0-93ff5d6a24fa",

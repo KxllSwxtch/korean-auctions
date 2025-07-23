@@ -1,5 +1,6 @@
 import logging
 import time
+import random
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import requests
@@ -30,9 +31,9 @@ class PLCAuctionService:
         "_plc_ref": "eyJpdiI6Im90VTUyWlVMNFEzUE5pdi9XSlBCMEE9PSIsInZhbHVlIjoiT3pWbXAwemlJZjFJeVIyeC9na0tMWHJwWUlrV0pwQ1BERi9zdW5pbE9FUmVKYW1laDc3T1pOWWdmcEpVVWZJNXN5QUlmR0tzZHBTTDR5K3pXUjJLNlE9PSIsIm1hYyI6Ijk5YzU4M2I0NmNmZmJjNTBmNWYwMjdmNzllMTBkZWRmNzM5M2JhOTI5ZTZkMDBhYzhmY2Y1M2I4ZGIwYTIxYjQiLCJ0YWciOiIifQ%3D%3D",
         "_locale": "ru",
         "intercom-session-m1d5ih1o": "",
-        "cf_clearance": "7podzPcziNpmU4.ig9_DCCrPVDukP2QFPzZ.lorCr9A-1753155652-1.2.1.1-i0XtZFYWWReCdw9i1nccqqHhW.3f3zVaXZJhDzDXqbF9hbMyKEZKFZivDlPig8j256JZ46Q_9IGWKAB_HfI6KbPRA0Jjheye_UwXUrUnZ9TwvDtgbXlUVzHsTdSapbrYmYNiq4a8yDwZs8aDyZnQzTb43HH8FTFeQxhqmplSUiBqIpA5NpyNVsR2pjTf5KVfg_cwgWmLoaU.R84fdxwiItIZOGhNRukJo_vYiBOo05I",
-        "XSRF-TOKEN": "eyJpdiI6IjJOaU5rMnI3Zmk1U0w5U0NKR1FqQVE9PSIsInZhbHVlIjoieXVrLzRIUVMwcHdrSHc5d0VHVDI3QStreitUS1hIRWNMMlBhQ1Bab3BWK2VsZUVxSk5oYzRQdXcrbmNGNFhRUlZIak1XQ1pqMjJRajJaRWI2YzZ6N0w3eEJ5RXRJQms5d3JWSkM5T2t1d0VMY2RFckVqSXpuNVplTWdDV1o2N20iLCJtYWMiOiJlOTA0M2NmMmM4NjJjY2I4Mjc4OWE3ZjFiYTJjNzJiYWFjZmFhMGIwYjJjYzkzODQ5Yjg3MGRmOTdlNzI0MWQ0IiwidGFnIjoiIn0%3D",
-        "__session": "eyJpdiI6Ik5iNFhOdlF6Z0hhTGJXR1l3RkxLZHc9PSIsInZhbHVlIjoibzRUWHRsV1EwekpGejlRZGFRYVpBRjkyc0VUdnl1d0xSWllDM3RzMGdxR3RGaGxoa2NFUUwxL1VZWEw0NEFrbHE5RDY2dXh6YkdhV2dVYWpXNFpNWnZNNTg3N1VFNjZuWTAvQkVqeThiK0RGMkJBZFduOWR0czJwNjVVZHl3UE0iLCJtYWMiOiI3NmQ5YTMyN2U4ODFhYmM1ZmU1YTVkYTZiMDFmNmU4OWY3NmEyMWU4NzIyM2E4ZGQ5YjFiMDk4YTAwNTdmY2I2IiwidGFnIjoiIn0%3D",
+        "cf_clearance": "yCccDUMOgIo9TSaLpapmcucHbS6l0QkLdsUmtYp.nj8-1753158358-1.2.1.1-.Q8KBv92WDLVD9ZuLzz88uheUdzUXZzNdVl3RLMjS1ZC_Zpfvt9U9FxPhjFBZ8Eiwqrvx25ylwT_WoqFobFhGobgr.2xp26UWBSi22uavj4cx1Gvz7WvvgF_Icg5avZCHWq3XE4.FKO_0cvS3OFoDigam1GUSSstkPpPeu33YQne3pwaF0203y8oXpNIAHFXbVrX1e65ruwytklRkhiDFQQ2dd8oGqslY64V.21uSSo",
+        "XSRF-TOKEN": "eyJpdiI6IjUwVXpCa2tVbmVHcnErMUcyQzVncnc9PSIsInZhbHVlIjoiU1FESnRSOFJzQjNlMTdhcExFV3BTS1lJVktJUFczenYvUkVGbm1RWXBWOExrdTFoNFJlWjVhRk9zMmVKY2pXUkwvQmtUVzY4TlhwcHlMbzc1MDVaMVl1S3V6TGhFUzloM0dLWHgvZ0JENHd4S3dIVEluN1dJWmF3eHVlLys0SmkiLCJtYWMiOiI5MTJlNWZiNDk2YmE1MmM4NDc2ZGE5ZGNhMmY4YmMzM2MwZDhkYjc1YjI0ZDcyZmY1ZjdkNmIxNjRiOGVjYjE2IiwidGFnIjoiIn0%3D",
+        "__session": "eyJpdiI6IkhBNUl3T3p2OXk0ME16UnhWbmNPQUE9PSIsInZhbHVlIjoiS280VklRUWREYnlwejcwN0hpUWRON2RCRU9PeHhnTzV0WDNQMmhJbGFYUGdBd0IwSlZKeUx4bjdYYjRRRUsxNkFGMWRhVjdtMkVhVW1uUy9jOTVqd3lKMGZXb1VURVhoaG5WLzkrQlNYWndJMitBZStkalY5QUtJVnI5b1gvbngiLCJtYWMiOiJhY2NmMGI0NjQ5OTExZWM0Njk1NDcwZmFhOTAzNGRkYjAxYzlhYTdjZjIxYWJlMDVhYWQzOTM2ZGJlNDc0ZjVmIiwidGFnIjoiIn0%3D",
     }
     
     # Default headers from the working example (cars.py)
@@ -67,14 +68,18 @@ class PLCAuctionService:
     
     def _setup_session(self):
         """Setup cloudscraper session to handle Cloudflare challenges"""
-        # Create cloudscraper session instead of regular requests session
+        # Create cloudscraper session with updated configuration
         self.session = cloudscraper.create_scraper(
             browser={
                 'browser': 'chrome',
                 'platform': 'darwin',
-                'desktop': True
+                'desktop': True,
+                'mobile': False,
+                'custom': f'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(138, 142)}.0.0.0 Safari/537.36'
             },
-            delay=1  # Add 1 second delay between requests
+            delay=3,  # Increased delay to avoid rate limiting
+            debug=False,
+            interpreter='nodejs'  # Use nodejs interpreter for better challenge solving
         )
         
         # Configure retry strategy
@@ -119,6 +124,13 @@ class PLCAuctionService:
         """Save current session cookies"""
         cookies_dict = dict(self.session.cookies)
         self.session_manager.save_session('plc_auction', cookies_dict)
+    
+    def _apply_default_cookies(self):
+        """Apply default cookies to session"""
+        for name, value in self.DEFAULT_COOKIES.items():
+            if value:  # Skip empty values
+                self.session.cookies.set(name, value, domain=".plc.auction", path="/")
+        self.cookies.update(self.DEFAULT_COOKIES)
     
     def _initialize_browser_session(self):
         """Initialize session by visiting homepage like a real browser"""
@@ -174,6 +186,11 @@ class PLCAuctionService:
     def fetch_cars(self, filters: PLCAuctionFilters) -> PLCAuctionResponse:
         """Fetch cars from PLC Auction with filters"""
         try:
+            # Validate cookies before making request
+            if not self._validate_cookies():
+                logger.warning("⚠️ Invalid cookies detected, refreshing session...")
+                self.refresh_session()
+            
             # Send Intercom ping before request
             self._ensure_intercom_session()
             
@@ -190,16 +207,57 @@ class PLCAuctionService:
                 timeout=30
             )
             
-            # Handle 403 errors by refreshing session
+            # Handle 403 errors with improved retry logic
             if response.status_code == 403:
                 logger.warning("⚠️ Got 403 error, attempting to refresh session")
-                self.refresh_session()
-                # Retry request with refreshed session
+                
+                # First attempt: Clear cookies and try with fresh session
+                logger.info("🔄 Attempt 1: Clearing cookies and retrying...")
+                self.session.cookies.clear()
+                self._apply_default_cookies()
+                time.sleep(2)
+                
                 response = self.session.get(
                     self.AUCTION_URL,
                     params=params,
                     timeout=30
                 )
+                
+                # Second attempt: Try to refresh cookies from cars.py
+                if response.status_code == 403:
+                    logger.info("🔄 Attempt 2: Loading fresh cookies from cars.py...")
+                    import os
+                    cars_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Glovis", "cars.py")
+                    if self.update_cookies_from_curl(cars_path):
+                        logger.info("✅ Updated cookies from cars.py, retrying...")
+                        time.sleep(2)
+                        response = self.session.get(
+                            self.AUCTION_URL,
+                            params=params,
+                            timeout=30
+                        )
+                
+                # Third attempt: Full session refresh if still 403
+                if response.status_code == 403:
+                    logger.warning("🔄 Attempt 3: Performing full session refresh...")
+                    self.refresh_session()
+                    # Add extra delay after full refresh
+                    time.sleep(3)
+                    # Final retry with refreshed session
+                    response = self.session.get(
+                        self.AUCTION_URL,
+                        params=params,
+                        timeout=30
+                    )
+                
+                # If still failing, provide more detailed error
+                if response.status_code == 403:
+                    logger.error("❌ All attempts failed. Cloudflare protection may have changed.")
+                    # Log response headers for debugging
+                    logger.debug(f"Response headers: {dict(response.headers)}")
+                    # Check if we got a challenge page
+                    if 'cf-ray' in response.headers:
+                        logger.error("🛡️ Cloudflare challenge detected. Manual cookie update may be required.")
             
             response.raise_for_status()
             
@@ -269,6 +327,45 @@ class PLCAuctionService:
         
         return params
     
+    def _validate_cookies(self) -> bool:
+        """Validate if current cookies are still valid"""
+        essential_cookies = ['cf_clearance', 'XSRF-TOKEN', '__session']
+        
+        for cookie_name in essential_cookies:
+            cookie_value = self.session.cookies.get(cookie_name)
+            if not cookie_value:
+                logger.warning(f"⚠️ Missing essential cookie: {cookie_name}")
+                return False
+        
+        # Check if cf_clearance looks expired (very basic check)
+        cf_clearance = self.session.cookies.get('cf_clearance')
+        if cf_clearance and len(cf_clearance) < 50:
+            logger.warning("⚠️ cf_clearance cookie appears to be invalid")
+            return False
+        
+        # Check if cookies were set recently (within last 24 hours)
+        # This is a heuristic since we can't directly check cookie expiration
+        try:
+            session_file = self.session_manager.session_file
+            if session_file.exists():
+                import json
+                from datetime import datetime, timedelta
+                
+                with open(session_file, 'r') as f:
+                    session_data = json.load(f)
+                
+                # Check if session was updated recently
+                last_updated = session_data.get('last_updated')
+                if last_updated:
+                    last_update_time = datetime.fromisoformat(last_updated)
+                    if datetime.now() - last_update_time > timedelta(hours=24):
+                        logger.warning("⚠️ Cookies are older than 24 hours")
+                        return False
+        except Exception as e:
+            logger.debug(f"Could not check cookie age: {e}")
+            
+        return True
+
     def _ensure_intercom_session(self):
         """Ensure Intercom session is active"""
         # Check if we need to ping (first time or been a while)
@@ -289,22 +386,52 @@ class PLCAuctionService:
         try:
             logger.info("🔄 Refreshing PLC Auction session")
             
-            # Clear existing cookies
+            # Clear existing cookies and recreate session
             self.session.cookies.clear()
             
-            # Re-initialize browser session
-            self._initialize_browser_session()
+            # Stop current Intercom session
+            if hasattr(self, 'intercom'):
+                self.intercom.stop_ping_loop()
             
-            # Try to load fresh cookies from file if available
-            import os
-            cars_path = os.path.join(os.getcwd(), "Glovis", "cars.py")
-            if os.path.exists(cars_path):
-                logger.info("📄 Found cars.py, attempting to extract fresh cookies")
-                self.update_cookies_from_curl(cars_path)
-            else:
-                logger.warning("⚠️ cars.py not found, using default cookies")
-                self.session.cookies.update(self.DEFAULT_COOKIES)
-                self.cookies.update(self.DEFAULT_COOKIES)
+            # Recreate cloudscraper session with fresh configuration
+            self._setup_session()
+            
+            # Try multiple approaches to get fresh cookies
+            cookie_refresh_success = False
+            
+            # Approach 1: Try to solve Cloudflare challenge directly
+            try:
+                logger.info("🔐 Attempting to solve Cloudflare challenge...")
+                test_response = self.session.get(self.BASE_URL, timeout=15)
+                if test_response.status_code == 200:
+                    logger.info("✅ Successfully passed Cloudflare challenge")
+                    cookie_refresh_success = True
+            except Exception as e:
+                logger.warning(f"⚠️ Cloudflare challenge failed: {e}")
+            
+            # Approach 2: Load fresh cookies from file if available
+            if not cookie_refresh_success:
+                import os
+                cars_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Glovis", "cars.py")
+                if os.path.exists(cars_path):
+                    logger.info("📄 Found cars.py, attempting to extract fresh cookies")
+                    if self.update_cookies_from_curl(cars_path):
+                        logger.info("✅ Successfully loaded cookies from cars.py")
+                        cookie_refresh_success = True
+                    else:
+                        logger.warning("⚠️ Failed to extract cookies from cars.py")
+            
+            # Approach 3: Use default cookies as last resort
+            if not cookie_refresh_success:
+                logger.warning("⚠️ Using default cookies as fallback")
+                self._apply_default_cookies()
+            
+            # Restart Intercom session
+            self.intercom = IntercomSession()
+            self.intercom.start_ping_loop()
+            
+            # Re-initialize browser session to establish new connection
+            self._initialize_browser_session()
             
             # Save refreshed cookies
             self._save_cookies()
@@ -312,6 +439,8 @@ class PLCAuctionService:
             
         except Exception as e:
             logger.error(f"❌ Error refreshing session: {e}")
+            # Fallback to default cookies
+            self._apply_default_cookies()
     
     def update_cookies_from_curl(self, curl_file_path: str = "Glovis/cars.py") -> bool:
         """
@@ -351,6 +480,8 @@ class PLCAuctionService:
                                 
                                 # Update cookies
                                 self.cookies.update(new_cookies)
+                                # Clear existing cookies first to avoid duplicates
+                                self.session.cookies.clear()
                                 # Update session cookies with proper domain/path
                                 for name, value in new_cookies.items():
                                     # Skip empty cookie values to avoid errors
