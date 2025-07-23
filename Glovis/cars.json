@@ -1,0 +1,448 @@
+{
+  "lots": [
+    {
+      "url": "https://plc.auction/auction/lot/kia-ray-2019-knacf911bkt213031-25-48cd2c142256d797b028f9368e260127",
+      "title": "KIA Ray",
+      "year": 2019,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kI/",
+      "thumb": "https://img.plc.auction/medium/img5/08/2019/872/5490/19762466bf967715eeba18602eed285d/a398475ed8c3b99cf3626114973e916c.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "120 373 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 3300,
+      "price_buy_html": "",
+      "price_bid_html": "3 300 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2016-kmhff41rbga503597-25-b9c240742c01bb4223e3a8b7468f5bc7",
+      "title": "Hyundai Grandeur",
+      "year": 2016,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kM2",
+      "thumb": "https://img.plc.auction/medium/img5/08/2016/871/6802/773e3d0d6928528f93df835319427301/41079c863c192f76e41af2a9c603605a.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Diesel",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "247 387 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 3600,
+      "price_buy_html": "",
+      "price_bid_html": "3 600 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2011-kmhff41ebba002617-25-9977385869af39226df4e433dc16ab55",
+      "title": "Hyundai Grandeur",
+      "year": 2011,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kM1",
+      "thumb": "https://img.plc.auction/medium/img5/08/2011/871/6802/09147531e9e32abab1ea47b1c139db51/9f1a0847baa2d52326765b0f5a3a7b26.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "88 662 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 2500,
+      "price_buy_html": "",
+      "price_bid_html": "2 500 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2012-kmhff41cbca092867-25-e5913d2a232f8fc042986ad8a5c3522a",
+      "title": "Hyundai Grandeur",
+      "year": 2012,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kMz",
+      "thumb": "https://img.plc.auction/medium/img5/08/2012/871/6802/4c3d37c265ce3926838651db2cbc8c29/4a531a968f6a9631974fd2260370947b.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "187 603 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 2500,
+      "price_buy_html": "",
+      "price_bid_html": "2 500 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2022-kmhf141gbna485001-25-1ddb76c5ab44ee7c74419df4d49aa4d5",
+      "title": "Hyundai Grandeur",
+      "year": 2022,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kMw",
+      "thumb": "https://img.plc.auction/medium/img5/08/2022/871/6802/7e49c4a7c55e01cb0c56d33e3d13864f/6adac6815a8c1ac02bc37988df773619.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "91 529 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 13100,
+      "price_buy_html": "",
+      "price_bid_html": "13 100 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2019-kmhf341nbka188274-25-22e9db49a544971471590b9468db815c",
+      "title": "Hyundai Grandeur",
+      "year": 2019,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kMx",
+      "thumb": "https://img.plc.auction/medium/img5/08/2019/871/6802/d8b44f7d15fc0e56fb83754af3acbd39/3c11661062f77515811452fa146d5279.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "LPG",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "410 116 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 3600,
+      "price_buy_html": "",
+      "price_bid_html": "3 600 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2012-kmhff41ebca106493-25-0914de21b930f3ce50260803e3c75ab6",
+      "title": "Hyundai Grandeur",
+      "year": 2012,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx2kM+",
+      "thumb": "https://img.plc.auction/medium/img5/08/2012/871/6802/6c6f25f72abe7002ee4b59c635a6befe/dafb34a7f8bb67df8ee49866f815155e.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "194 470 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 2700,
+      "price_buy_html": "",
+      "price_bid_html": "2 700 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2023-kmhn341fbpa057479-25-7559bdaa01d1fd0ee8c7cc938a0d5fef",
+      "title": "Hyundai Grandeur",
+      "year": 2023,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx3Uo2",
+      "thumb": "https://img.plc.auction/medium/img5/08/2023/871/6802/c9e8a3b0ab3a57d6d07dd904c8e955e7/0d253386bf68aa1716cc8eb1da49f760.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "LPG",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "92 534 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 14200,
+      "price_buy_html": "",
+      "price_bid_html": "14 200 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2009-kmhfa41ap9a385243-25-ab6561ad0e9806934aa5fb1bea4b0fac",
+      "title": "Hyundai Grandeur",
+      "year": 2009,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx3Uo1",
+      "thumb": "https://img.plc.auction/medium/img5/08/2009/871/6802/4d76b38060cf627f020f25702fff081c/f9d367f37b0644f53a8e2fddcb2c34d6.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "82 794 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 700,
+      "price_buy_html": "",
+      "price_bid_html": "700 USD",
+      "vehicle_discount": null
+    },
+    {
+      "url": "https://plc.auction/auction/lot/hyundai-grandeur-2011-kmhff41cbba042604-25-8e0e0e0311b9b4eeb1e57c8f87744ca6",
+      "title": "Hyundai Grandeur",
+      "year": 2011,
+      "runs_drive": "Run & Drive",
+      "runs_drive_html": "Run & Drive",
+      "hash": "N1jAehEZQu6hleylSn5nN8AHu4xPvvPe9+fBaZnsK1CuVBJx3Uoy",
+      "thumb": "https://img.plc.auction/medium/img5/08/2011/871/6802/a386158650993cd1734bfe747c7d97d3/d12b044b01b0fd55d7a81aaa633c722a.jpg",
+      "country": "KR",
+      "country_name": "South Korea",
+      "damaged": false,
+      "damage": null,
+      "attributes": {
+        "fuel": {
+          "icon": "fuel",
+          "value": "Gasoline",
+          "caption": "Fuel type",
+          "title": "Type of fuel"
+        },
+        "transmission": {
+          "icon": "transmission",
+          "value": "Automatic",
+          "caption": "Transmission",
+          "title": "Type of transmission"
+        },
+        "odometer": {
+          "icon": "speedometer",
+          "value": "158 284 km",
+          "caption": "Mileage",
+          "title": "Odometer reading"
+        }
+      },
+      "in_stock": true,
+      "is_auction": true,
+      "do_action": true,
+      "timestamp": 1753329600000,
+      "can_book": false,
+      "can_check": false,
+      "price_buy": false,
+      "price_bid": 2500,
+      "price_buy_html": "",
+      "price_bid_html": "2 500 USD",
+      "vehicle_discount": null
+    }
+  ],
+  "page": 1,
+  "pages": 83,
+  "visible": 821,
+  "count": 821
+}

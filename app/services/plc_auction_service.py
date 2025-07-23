@@ -24,34 +24,34 @@ class PLCAuctionService:
     BASE_URL = "https://plc.auction"
     AUCTION_URL = f"{BASE_URL}/auction"
     
-    # Default cookies from the example (updated from working cars.py)
+    # Default cookies from the working cars.py example
     DEFAULT_COOKIES = {
         "intercom-id-m1d5ih1o": "0f9a1bfc-debc-4985-9a2a-39a9de0f2eb6",
         "intercom-device-id-m1d5ih1o": "b6cba56c-2517-48c5-b1c0-93ff5d6a24fa",
         "_plc_ref": "eyJpdiI6Im90VTUyWlVMNFEzUE5pdi9XSlBCMEE9PSIsInZhbHVlIjoiT3pWbXAwemlJZjFJeVIyeC9na0tMWHJwWUlrV0pwQ1BERi9zdW5pbE9FUmVKYW1laDc3T1pOWWdmcEpVVWZJNXN5QUlmR0tzZHBTTDR5K3pXUjJLNlE9PSIsIm1hYyI6Ijk5YzU4M2I0NmNmZmJjNTBmNWYwMjdmNzllMTBkZWRmNzM5M2JhOTI5ZTZkMDBhYzhmY2Y1M2I4ZGIwYTIxYjQiLCJ0YWciOiIifQ%3D%3D",
         "_locale": "ru",
         "intercom-session-m1d5ih1o": "",
-        "cf_clearance": "yCccDUMOgIo9TSaLpapmcucHbS6l0QkLdsUmtYp.nj8-1753158358-1.2.1.1-.Q8KBv92WDLVD9ZuLzz88uheUdzUXZzNdVl3RLMjS1ZC_Zpfvt9U9FxPhjFBZ8Eiwqrvx25ylwT_WoqFobFhGobgr.2xp26UWBSi22uavj4cx1Gvz7WvvgF_Icg5avZCHWq3XE4.FKO_0cvS3OFoDigam1GUSSstkPpPeu33YQne3pwaF0203y8oXpNIAHFXbVrX1e65ruwytklRkhiDFQQ2dd8oGqslY64V.21uSSo",
-        "XSRF-TOKEN": "eyJpdiI6IjUwVXpCa2tVbmVHcnErMUcyQzVncnc9PSIsInZhbHVlIjoiU1FESnRSOFJzQjNlMTdhcExFV3BTS1lJVktJUFczenYvUkVGbm1RWXBWOExrdTFoNFJlWjVhRk9zMmVKY2pXUkwvQmtUVzY4TlhwcHlMbzc1MDVaMVl1S3V6TGhFUzloM0dLWHgvZ0JENHd4S3dIVEluN1dJWmF3eHVlLys0SmkiLCJtYWMiOiI5MTJlNWZiNDk2YmE1MmM4NDc2ZGE5ZGNhMmY4YmMzM2MwZDhkYjc1YjI0ZDcyZmY1ZjdkNmIxNjRiOGVjYjE2IiwidGFnIjoiIn0%3D",
-        "__session": "eyJpdiI6IkhBNUl3T3p2OXk0ME16UnhWbmNPQUE9PSIsInZhbHVlIjoiS280VklRUWREYnlwejcwN0hpUWRON2RCRU9PeHhnTzV0WDNQMmhJbGFYUGdBd0IwSlZKeUx4bjdYYjRRRUsxNkFGMWRhVjdtMkVhVW1uUy9jOTVqd3lKMGZXb1VURVhoaG5WLzkrQlNYWndJMitBZStkalY5QUtJVnI5b1gvbngiLCJtYWMiOiJhY2NmMGI0NjQ5OTExZWM0Njk1NDcwZmFhOTAzNGRkYjAxYzlhYTdjZjIxYWJlMDVhYWQzOTM2ZGJlNDc0ZjVmIiwidGFnIjoiIn0%3D",
+        "cf_clearance": "4eiWor1neELyote2XWvOrh0PpfULqeuVjtfzzsrC_Qs-1753259372-1.2.1.1-4HmD7L3Db_8cGxL0PbIhA36DK5XnestDU9GqoMfoktged1BQou.4AiMZb66SvS3nxdmYwaIotcgXCCafYDvC4C5cN_8xDT0l0CjPg6DfzBti_QgT58SUyf02in37WCrTzZWvTPc2PSdHYu6t05q4AZalU65K5.BDZ.G1R_Ep2gLkuvRFqzqkWp7g3GAQeQskEuz3Iq2TrEXfyqkoSj1RcnYBAxcl0PAJYFbJToWn3Hs",
+        "XSRF-TOKEN": "eyJpdiI6IkxsMEJMZFVWNWlRSnZmcmJhRmVKdHc9PSIsInZhbHVlIjoiSWRhM1RFKzMrcUF6bzdJbEZ4SkZETmZEUXp3THRvbGZFWXFnVGJZcUZ3YWFsck1CRDBMUkFNTzVjQ1lTaEplOWYxa3M0WmJQVEl1ZzF1OXp6aW9sZ2VJQU53TCtDaEFrTjF5N3JnaUF5OVpqZDFxU25wMHlxRTJKemxqdjVkVUUiLCJtYWMiOiIxNmU4ZDI4YzFiODM4M2MyNTEyMmRhMDhlYjVmZjJhZjgxMjg5ZWEzMTYzMzhlNGEzMjI5OTkzY2Q1NzFlNDgwIiwidGFnIjoiIn0%3D",
+        "__session": "eyJpdiI6IjZ6SFl3YVBVWGJCVXVJRXREeEFSRGc9PSIsInZhbHVlIjoiOVFiaHdia2U2azhIUnk5N3V6ZVVhOWUvaUZlZUxDSFVBYmVvVUl2SFdOWFg5SlRQVldRbWdEZ1VIaDBFWXhLUzcxVHFxaS8veVVBYmM2Y0VlZ1JsamhidEFtclBuQjJIcUxNbjhCY1dabGd0MStIT3hjWWpub3NNbkE0L2ovYTEiLCJtYWMiOiJiOTI4NzhmYTMwNzUxYzEzY2M2YjExMjUxNTM1MGYwZDM4NWM3ODJmNDNlZWFjNDQ5ZjAzOTUzMjdiZjIzNzJlIiwidGFnIjoiIn0%3D",
     }
     
-    # Default headers from the working example (cars.py)
+    # Default headers from the working cars.py example  
     DEFAULT_HEADERS = {
-        "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "accept": "application/json, text/plain, */*",
         "accept-language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
-        "cache-control": "max-age=0",
-        "priority": "u=0, i",
-        "referer": "https://plc.auction/",
+        "content-type": "application/json",
+        "origin": "https://plc.auction",
+        "priority": "u=1, i",
+        "referer": "https://plc.auction/auction?country=kr&date=1753304400&price_type=auction",
         "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
         "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+        "x-requested-with": "XMLHttpRequest",
     }
     
     def __init__(self):
@@ -184,7 +184,7 @@ class PLCAuctionService:
             logger.error(f"❌ Error initializing browser session: {e}")
     
     def fetch_cars(self, filters: PLCAuctionFilters) -> PLCAuctionResponse:
-        """Fetch cars from PLC Auction with filters"""
+        """Fetch cars from PLC Auction with filters using POST request"""
         try:
             # Validate cookies before making request
             if not self._validate_cookies():
@@ -194,16 +194,22 @@ class PLCAuctionService:
             # Send Intercom ping before request
             self._ensure_intercom_session()
             
-            # Build query parameters
-            params = self._build_query_params(filters)
+            # Build JSON data for POST request
+            json_data = self._build_json_data(filters)
+            
+            # Update headers for POST request
+            headers = self.DEFAULT_HEADERS.copy()
+            headers["x-xsrf-token"] = self.cookies.get("XSRF-TOKEN", "")
             
             # Add small delay to avoid rate limiting
             time.sleep(1)
             
-            # Make request
-            response = self.session.get(
-                self.AUCTION_URL,
-                params=params,
+            # Make POST request to the API endpoint
+            response = self.session.post(
+                f"{self.BASE_URL}/auction/request",
+                json=json_data,
+                headers=headers,
+                cookies=self.cookies,
                 timeout=30
             )
             
@@ -217,9 +223,11 @@ class PLCAuctionService:
                 self._apply_default_cookies()
                 time.sleep(2)
                 
-                response = self.session.get(
-                    self.AUCTION_URL,
-                    params=params,
+                response = self.session.post(
+                    f"{self.BASE_URL}/auction/request",
+                    json=json_data,
+                    headers=headers,
+                    cookies=self.cookies,
                     timeout=30
                 )
                 
@@ -230,10 +238,14 @@ class PLCAuctionService:
                     cars_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "Glovis", "cars.py")
                     if self.update_cookies_from_curl(cars_path):
                         logger.info("✅ Updated cookies from cars.py, retrying...")
+                        # Update headers with new XSRF token
+                        headers["x-xsrf-token"] = self.cookies.get("XSRF-TOKEN", "")
                         time.sleep(2)
-                        response = self.session.get(
-                            self.AUCTION_URL,
-                            params=params,
+                        response = self.session.post(
+                            f"{self.BASE_URL}/auction/request",
+                            json=json_data,
+                            headers=headers,
+                            cookies=self.cookies,
                             timeout=30
                         )
                 
@@ -244,9 +256,11 @@ class PLCAuctionService:
                     # Add extra delay after full refresh
                     time.sleep(3)
                     # Final retry with refreshed session
-                    response = self.session.get(
-                        self.AUCTION_URL,
-                        params=params,
+                    response = self.session.post(
+                        f"{self.BASE_URL}/auction/request",
+                        json=json_data,
+                        headers=headers,
+                        cookies=self.cookies,
                         timeout=30
                     )
                 
@@ -264,24 +278,31 @@ class PLCAuctionService:
             # Save cookies after successful request
             self._save_cookies()
             
-            # Parse HTML response
-            cars, total_count = self.parser.parse_cars_from_html(response.text)
+            # Parse JSON response
+            data = response.json()
+            
+            # Extract cars from JSON
+            cars = []
+            for lot in data.get('lots', []):
+                car = self._parse_car_from_json(lot)
+                if car:
+                    cars.append(car)
             
             # Get pagination info
-            pagination = self.parser.extract_pagination_info(
-                response.text, filters.page, filters.page_size
-            )
+            total_count = data.get('count', len(cars))
+            current_page = data.get('page', filters.page)
+            total_pages = data.get('pages', 1)
             
             # Build response
             return PLCAuctionResponse(
                 success=True,
                 message="Cars fetched successfully",
-                total_count=pagination.get('total_count', total_count),
+                total_count=total_count,
                 cars=cars,
-                current_page=filters.page,
+                current_page=current_page,
                 page_size=filters.page_size,
-                has_next_page=pagination.get('has_next_page', False),
-                has_prev_page=pagination.get('has_prev_page', False)
+                has_next_page=current_page < total_pages,
+                has_prev_page=current_page > 1
             )
             
         except requests.RequestException as e:
@@ -309,23 +330,89 @@ class PLCAuctionService:
                 has_prev_page=False
             )
     
-    def _build_query_params(self, filters: PLCAuctionFilters) -> Dict[str, Any]:
-        """Build query parameters from filters"""
+    def _build_json_data(self, filters: PLCAuctionFilters) -> Dict[str, Any]:
+        """Build JSON data for POST request from filters"""
         # Get current timestamp for date parameter
         import time
         current_timestamp = int(time.time())
         
-        params = {
-            "page": str(filters.page),  # Always include page as string
+        # Base JSON data structure from cars.py
+        json_data = {
             "country": filters.country,
-            "date": filters.date or str(current_timestamp),  # Use provided date or current timestamp
+            "damage": "none",  # Default to none, can be extended later
+            "date": filters.date or str(current_timestamp),
             "price_type": filters.price_type
         }
         
-        # Add other filters if implemented
-        # This would need to be extended based on how PLC Auction handles filters
+        # Add pagination if not first page
+        if filters.page > 1:
+            json_data["page"] = filters.page
         
-        return params
+        # Add other filters if provided
+        # This can be extended based on API capabilities
+        
+        return json_data
+    
+    def _parse_car_from_json(self, lot: Dict[str, Any]) -> Optional[PLCAuctionCar]:
+        """Parse car data from JSON response"""
+        try:
+            # Extract attributes
+            attributes = lot.get('attributes', {})
+            
+            # Extract fuel, transmission, and mileage
+            fuel = attributes.get('fuel', {}).get('value', '')
+            transmission = attributes.get('transmission', {}).get('value', '')
+            odometer = attributes.get('odometer', {}).get('value', '')
+            
+            # Parse mileage (remove 'km' and spaces)
+            mileage = None
+            if odometer:
+                mileage_str = odometer.replace('km', '').replace(' ', '').strip()
+                try:
+                    mileage = int(mileage_str)
+                except:
+                    pass
+            
+            # Extract car details from title and URL
+            title = lot.get('title', '')
+            url = lot.get('url', '')
+            
+            # Extract manufacturer and model from title
+            title_parts = title.split()
+            manufacturer = title_parts[0] if title_parts else ''
+            model = ' '.join(title_parts[1:]) if len(title_parts) > 1 else ''
+            
+            # Extract slug from URL
+            slug = url.split('/')[-1] if url else ''
+            
+            # Create PLCAuctionCar object
+            return PLCAuctionCar(
+                id=lot.get('hash', ''),
+                slug=slug,
+                url=url,
+                title=title,
+                manufacturer=manufacturer,
+                model=model,
+                year=lot.get('year', 0),
+                price=lot.get('price_bid', 0),
+                price_formatted=lot.get('price_bid_html', ''),
+                fuel=fuel,
+                transmission=transmission,
+                mileage=mileage,
+                mileage_formatted=odometer,
+                condition=lot.get('runs_drive', 'Unknown'),
+                thumbnail=lot.get('thumb', ''),
+                country=lot.get('country', ''),
+                country_name=lot.get('country_name', ''),
+                auction_date=datetime.fromtimestamp(lot.get('timestamp', 0) / 1000) if lot.get('timestamp') else None,
+                is_auction=lot.get('is_auction', True),
+                in_stock=lot.get('in_stock', True),
+                can_book=lot.get('can_book', False),
+                can_check=lot.get('can_check', False)
+            )
+        except Exception as e:
+            logger.error(f"Error parsing car from JSON: {e}")
+            return None
     
     def _validate_cookies(self) -> bool:
         """Validate if current cookies are still valid"""

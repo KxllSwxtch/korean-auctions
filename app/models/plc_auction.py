@@ -9,24 +9,60 @@ class MileageInfo(BaseModel):
 
 
 class PLCAuctionCar(BaseModel):
-    entry_number: Optional[str] = Field(None, description="Auction lot number")
-    car_name: str = Field(..., description="Full car name (brand + model)")
-    brand: str = Field(..., description="Car manufacturer")
+    """Car data from PLC Auction API response"""
+    id: str = Field(..., description="Car hash ID")
+    slug: str = Field(..., description="URL slug for car detail")
+    url: str = Field(..., description="Full URL to car detail page")
+    title: str = Field(..., description="Car title (brand + model)")
+    manufacturer: str = Field(..., description="Car manufacturer")
     model: str = Field(..., description="Car model")
-    year: int = Field(..., alias="productionDate", description="Manufacturing year")
-    transmission: str = Field(default="Automatic", alias="vehicleTransmission", description="Transmission type")
-    fuel_type: str = Field(..., alias="fuelType", description="Fuel type")
-    engine_volume: Optional[str] = Field(None, description="Engine volume")
-    mileage: str = Field(..., description="Mileage with unit (e.g. '10,091 Km')")
-    mileage_info: Optional[MileageInfo] = Field(None, alias="mileageFromOdometer")
-    condition_grade: Optional[str] = Field(None, description="Car condition grade")
-    starting_price: float = Field(..., alias="price", description="Starting price")
-    currency: str = Field(default="USD", alias="priceCurrency", description="Price currency")
-    main_image_url: str = Field(..., alias="image", description="Main image URL")
+    year: int = Field(..., description="Manufacturing year")
+    price: float = Field(..., description="Current bid price")
+    price_formatted: str = Field(..., description="Formatted price with currency")
+    fuel: str = Field(default="", description="Fuel type")
+    transmission: str = Field(default="", description="Transmission type")
+    mileage: Optional[int] = Field(None, description="Mileage in km")
+    mileage_formatted: str = Field(default="", description="Formatted mileage with unit")
+    condition: str = Field(default="Unknown", description="Car condition")
+    thumbnail: str = Field(..., description="Thumbnail image URL")
+    country: str = Field(..., description="Country code")
+    country_name: str = Field(..., description="Country name")
+    auction_date: Optional[datetime] = Field(None, description="Auction date and time")
+    is_auction: bool = Field(default=True, description="Is this an auction")
+    in_stock: bool = Field(default=True, description="Is car in stock")
+    can_book: bool = Field(default=False, description="Can book this car")
+    can_check: bool = Field(default=False, description="Can check this car")
+    
+    # Legacy fields for compatibility
+    entry_number: Optional[str] = Field(None, description="Auction lot number")
+    car_name: Optional[str] = Field(None, description="Full car name (brand + model)")
+    brand: Optional[str] = Field(None, description="Car manufacturer")
+    fuel_type: Optional[str] = Field(None, description="Fuel type")
+    starting_price: Optional[float] = Field(None, description="Starting price")
+    currency: str = Field(default="USD", description="Price currency")
+    main_image_url: Optional[str] = Field(None, description="Main image URL")
     detail_url: Optional[str] = Field(None, description="Link to detail page")
     car_no: Optional[str] = Field(None, description="Car number for detail lookup")
     location: Optional[str] = Field(None, description="Auction location")
     color: Optional[str] = Field(None, description="Car color")
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Set legacy fields for compatibility
+        if not self.car_name:
+            self.car_name = self.title
+        if not self.brand:
+            self.brand = self.manufacturer
+        if not self.fuel_type:
+            self.fuel_type = self.fuel
+        if not self.starting_price:
+            self.starting_price = self.price
+        if not self.main_image_url:
+            self.main_image_url = self.thumbnail
+        if not self.detail_url:
+            self.detail_url = self.url
+        if not self.car_no:
+            self.car_no = self.id
     
     class Config:
         populate_by_name = True
