@@ -518,12 +518,24 @@ class KCarSearchResponse(BaseModel):
     current_page: int = Field(1, description="Текущая страница")
     page_size: int = Field(18, description="Размер страницы")
     total_pages: Optional[int] = Field(None, description="Общее количество страниц")
+    has_next_page: bool = Field(False, description="Есть ли следующая страница")
+    has_prev_page: bool = Field(False, description="Есть ли предыдущая страница")
     success: bool = Field(True, description="Статус успешности")
     message: Optional[str] = Field(None, description="Сообщение")
 
     class Config:
         populate_by_name = True
         allow_population_by_field_name = True
+    
+    def model_dump(self, **kwargs):
+        """Override model_dump to ensure aliases are used"""
+        kwargs["by_alias"] = True
+        return super().model_dump(**kwargs)
+    
+    def dict(self, **kwargs):
+        """Override dict for backward compatibility"""
+        kwargs["by_alias"] = True
+        return super().dict(**kwargs)
 
 
 # Полный список производителей KCar для отображения в UI (новые коды из интерфейса)
