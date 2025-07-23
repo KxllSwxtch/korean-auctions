@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to help capture fresh cookies from PLC Auction website.
-
-This script provides instructions and tools for updating cookies
-when they expire and cause 403 errors.
+Process a fresh cURL request and update PLC Auction cookies
 """
 
 import re
@@ -14,13 +11,8 @@ from datetime import datetime
 def extract_cookies_from_curl(curl_command):
     """Extract cookies from a cURL command"""
     # Find all cookie headers
-    cookie_pattern = r"-H 'cookie: ([^']+)'"
+    cookie_pattern = r"-H ['\"]cookie: ([^'\"]+)['\"]"
     cookie_match = re.search(cookie_pattern, curl_command, re.IGNORECASE)
-    
-    if not cookie_match:
-        # Try double quotes
-        cookie_pattern = r'-H "cookie: ([^"]+)"'
-        cookie_match = re.search(cookie_pattern, curl_command, re.IGNORECASE)
     
     if not cookie_match:
         print("No cookies found in cURL command")
@@ -44,9 +36,9 @@ def extract_cookies_from_curl(curl_command):
     
     return cookies
 
-def save_cookies_to_files(cookies):
-    """Save cookies to all necessary files"""
-    # Save to cars.py
+def update_all_files(cookies):
+    """Update all necessary files with fresh cookies"""
+    # Update cars.py
     code_lines = ['import requests\n\n', 'cookies = {\n']
     
     for key, value in cookies.items():
@@ -54,7 +46,7 @@ def save_cookies_to_files(cookies):
     
     code_lines.append('}\n\n')
     
-    # Add the headers section
+    # Add headers
     code_lines.extend([
         'headers = {\n',
         '    "accept": "application/json, text/plain, */*",\n',
@@ -73,7 +65,6 @@ def save_cookies_to_files(cookies):
         '    "x-requested-with": "XMLHttpRequest",\n'
     ])
     
-    # Add x-xsrf-token if XSRF-TOKEN exists
     if "XSRF-TOKEN" in cookies:
         code_lines.append(f'    "x-xsrf-token": "{cookies["XSRF-TOKEN"]}",\n')
     
@@ -97,7 +88,7 @@ def save_cookies_to_files(cookies):
     
     print("✅ Updated Glovis/cars.py")
     
-    # Update the session cache
+    # Update session cache
     cache_dir = "cache/sessions"
     os.makedirs(cache_dir, exist_ok=True)
     
@@ -111,26 +102,13 @@ def save_cookies_to_files(cookies):
         json.dump(session_data, f, indent=2)
     
     print(f"✅ Updated {cache_dir}/plc_auction_session.json")
-    
-    # Print code for manual update if needed
-    print("\n# To manually update PLCAuctionService DEFAULT_COOKIES:")
-    print("DEFAULT_COOKIES = {")
-    for key, value in cookies.items():
-        print(f'    "{key}": "{value}",')
-    print("}")
 
 def main():
-    print("=== PLC Auction Cookie Capture Tool ===")
-    print("\nThe PLC Auction API is returning 403 errors due to expired cookies.")
-    print("You need to capture fresh cookies from your browser.\n")
-    print("Instructions:")
-    print("1. Open Chrome/Edge DevTools (F12)")
-    print("2. Go to https://plc.auction/ru/auction")
-    print("3. Wait for the page to load completely")
-    print("4. Open Network tab and clear it (Ctrl+E)")
-    print("5. Look for any API request to /auction/request or /ru/auction/request")
-    print("6. Right click on it -> Copy -> Copy as cURL")
-    print("7. Paste the cURL command below (press Enter twice when done):\n")
+    print("🍪 PLC Auction Cookie Processor")
+    print("================================\n")
+    
+    print("Please paste your fresh cURL request below.")
+    print("(Press Enter twice when done)\n")
     
     # Read multi-line input
     lines = []
@@ -145,27 +123,22 @@ def main():
     if curl_command:
         cookies = extract_cookies_from_curl(curl_command)
         if cookies:
-            print(f"\n✅ Found {len(cookies)} cookies")
+            print(f"\n✅ Found {len(cookies)} cookies:")
+            for key in cookies:
+                print(f"   - {key}")
             
-            # Save to JSON backup
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"plc_cookies_{timestamp}.json"
-            with open(filename, 'w') as f:
-                json.dump(cookies, f, indent=2)
-            print(f"✅ Saved backup to {filename}")
+            # Update all files
+            update_all_files(cookies)
             
-            # Update all necessary files
-            save_cookies_to_files(cookies)
-            
-            print("\n🎉 Cookie update complete! You can now test the API:")
-            print("python test_plc_rum.py")
+            print("\n🎉 All files updated successfully!")
+            print("\n📋 Next steps:")
+            print("1. Run: source venv/bin/activate")
+            print("2. Run: python test_plc_rum.py")
+            print("\nThe API should now work with the fresh cookies!")
         else:
-            print("❌ Failed to extract cookies from cURL command")
-            print("\nAlternative method:")
-            print("1. In browser console, run: JSON.stringify(Object.fromEntries(document.cookie.split('; ').map(c => c.split('='))))")
-            print("2. Copy the output and manually update the cookies in Glovis/cars.py")
+            print("\n❌ Failed to extract cookies from the cURL command")
     else:
-        print("❌ No cURL command provided")
+        print("\n❌ No cURL command provided")
 
 if __name__ == "__main__":
     main()

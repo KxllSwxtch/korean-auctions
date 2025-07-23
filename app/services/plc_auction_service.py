@@ -1,6 +1,7 @@
 import logging
 import time
 import random
+import uuid
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 import requests
@@ -24,16 +25,16 @@ class PLCAuctionService:
     BASE_URL = "https://plc.auction"
     AUCTION_URL = f"{BASE_URL}/auction"
     
-    # Default cookies from the working cars.py example
+    # Default cookies from rum.py
     DEFAULT_COOKIES = {
         "intercom-id-m1d5ih1o": "0f9a1bfc-debc-4985-9a2a-39a9de0f2eb6",
         "intercom-device-id-m1d5ih1o": "b6cba56c-2517-48c5-b1c0-93ff5d6a24fa",
         "_plc_ref": "eyJpdiI6Im90VTUyWlVMNFEzUE5pdi9XSlBCMEE9PSIsInZhbHVlIjoiT3pWbXAwemlJZjFJeVIyeC9na0tMWHJwWUlrV0pwQ1BERi9zdW5pbE9FUmVKYW1laDc3T1pOWWdmcEpVVWZJNXN5QUlmR0tzZHBTTDR5K3pXUjJLNlE9PSIsIm1hYyI6Ijk5YzU4M2I0NmNmZmJjNTBmNWYwMjdmNzllMTBkZWRmNzM5M2JhOTI5ZTZkMDBhYzhmY2Y1M2I4ZGIwYTIxYjQiLCJ0YWciOiIifQ%3D%3D",
         "_locale": "ru",
         "intercom-session-m1d5ih1o": "",
-        "cf_clearance": "4eiWor1neELyote2XWvOrh0PpfULqeuVjtfzzsrC_Qs-1753259372-1.2.1.1-4HmD7L3Db_8cGxL0PbIhA36DK5XnestDU9GqoMfoktged1BQou.4AiMZb66SvS3nxdmYwaIotcgXCCafYDvC4C5cN_8xDT0l0CjPg6DfzBti_QgT58SUyf02in37WCrTzZWvTPc2PSdHYu6t05q4AZalU65K5.BDZ.G1R_Ep2gLkuvRFqzqkWp7g3GAQeQskEuz3Iq2TrEXfyqkoSj1RcnYBAxcl0PAJYFbJToWn3Hs",
-        "XSRF-TOKEN": "eyJpdiI6IkxsMEJMZFVWNWlRSnZmcmJhRmVKdHc9PSIsInZhbHVlIjoiSWRhM1RFKzMrcUF6bzdJbEZ4SkZETmZEUXp3THRvbGZFWXFnVGJZcUZ3YWFsck1CRDBMUkFNTzVjQ1lTaEplOWYxa3M0WmJQVEl1ZzF1OXp6aW9sZ2VJQU53TCtDaEFrTjF5N3JnaUF5OVpqZDFxU25wMHlxRTJKemxqdjVkVUUiLCJtYWMiOiIxNmU4ZDI4YzFiODM4M2MyNTEyMmRhMDhlYjVmZjJhZjgxMjg5ZWEzMTYzMzhlNGEzMjI5OTkzY2Q1NzFlNDgwIiwidGFnIjoiIn0%3D",
-        "__session": "eyJpdiI6IjZ6SFl3YVBVWGJCVXVJRXREeEFSRGc9PSIsInZhbHVlIjoiOVFiaHdia2U2azhIUnk5N3V6ZVVhOWUvaUZlZUxDSFVBYmVvVUl2SFdOWFg5SlRQVldRbWdEZ1VIaDBFWXhLUzcxVHFxaS8veVVBYmM2Y0VlZ1JsamhidEFtclBuQjJIcUxNbjhCY1dabGd0MStIT3hjWWpub3NNbkE0L2ovYTEiLCJtYWMiOiJiOTI4NzhmYTMwNzUxYzEzY2M2YjExMjUxNTM1MGYwZDM4NWM3ODJmNDNlZWFjNDQ5ZjAzOTUzMjdiZjIzNzJlIiwidGFnIjoiIn0%3D",
+        "cf_clearance": "1jNZQy.QPBkBDBOqhAiENqNmcEM7niVJgA.kIpimGP0-1753261678-1.2.1.1-drzVjrLLb0Q.tzZGMjeOt228ArlwCJNj.MeSjP6xz.F4Q0TzpSHZr5yMYZ5I3rSVUu5Z._IaVFMuVSpe3jgeHK_hJTtjQWYRO6dEtN6iROxCT3f1o8L_59u8FwZuUQSk.fJZy7_u0vUSE1MSJz6qugyEqwUA2TUJ4B_vmvIKcdu9gorfJuUesw38npOeNhHzkDIlAMfowBKnqYXqj2cxs9wyV6KdHYDS77Qb4EVaRu8",
+        "XSRF-TOKEN": "eyJpdiI6Ik5sbFhidHRwZXdIb0lOQ3hNZ0RKMEE9PSIsInZhbHVlIjoiY2FVNGQwQlkrRXVRSzBSWE5uOTZQR3lNYXBXaStwQ2N6a2FMNjc3YmhUaE9sWFA4VzZYbjdYaDZibWdUQTNEbzBTTFA2RUI0NUY3RkNKaVJhQ21VY29CZXRQUG9WTS9TQ3V2b2FIdFp1bTMxR09iRDB3dXNsL2hrckZvakIyK2kiLCJtYWMiOiIzYTAwZmU3NDE0NmQ3Y2UyM2RkMzQzZjk3NDk0MWY1YjU4ZmU3MDUwNDc2ODFlZTRmYTRkMjNhYWQ1MmJjY2RlIiwidGFnIjoiIn0%3D",
+        "__session": "eyJpdiI6Ikk2a2UvcE9WY2FoQlQyQ3YyakxQc3c9PSIsInZhbHVlIjoiOTA1TTdSZjNmOHhyVHArYkhORGd5ejZLcDMvUCszdDhpZ29LT0gvUmk3N1lMY09ud2ViN25kazBsL1JUNXZHSnFFNWs2eWo5TFdGQlAzMmg5WVpZM3lTV0JYL1BVWmZIOC9DZ3JyUm8zSW1OMmh2alROTFRxdFlhbFRjVUJSSHciLCJtYWMiOiJmMDljNWQxZDM0MzUwY2M5MDI5NTZmOTNmNTIxMzg5NWFmZmUzZmRhMDUwNWI3MDAxZWFkZWVkYzBiOWJjZjk0IiwidGFnIjoiIn0%3D",
     }
     
     # Default headers from the working cars.py example  
@@ -60,6 +61,9 @@ class PLCAuctionService:
         self.headers = self.DEFAULT_HEADERS.copy()
         self.cookies = self.DEFAULT_COOKIES.copy()
         self.intercom = IntercomSession()
+        self.pageload_id = str(uuid.uuid4())  # Generate unique pageload ID for RUM
+        self.start_time = time.time() * 1000  # Start time in milliseconds
+        
         self._setup_session()
         # Start Intercom ping loop
         self.intercom.start_ping_loop()
@@ -125,12 +129,169 @@ class PLCAuctionService:
         cookies_dict = dict(self.session.cookies)
         self.session_manager.save_session('plc_auction', cookies_dict)
     
+    def _update_cookies_from_response(self, response):
+        """Update cookies from response headers including Set-Cookie headers"""
+        try:
+            # Update cookies from response.cookies (handled by requests)
+            if hasattr(response, 'cookies') and response.cookies:
+                for cookie in response.cookies:
+                    self.session.cookies.set(cookie.name, cookie.value, 
+                                           domain=cookie.domain or ".plc.auction", 
+                                           path=cookie.path or "/")
+                    self.cookies[cookie.name] = cookie.value
+                    logger.debug(f"🍪 Updated cookie from response: {cookie.name}")
+            
+            # Also check for Set-Cookie headers directly
+            if 'set-cookie' in response.headers:
+                logger.info("🍪 Found Set-Cookie headers in response")
+                # The cookies should already be handled by requests library
+                # but we'll ensure our local cookie dict is updated
+                for key in ['XSRF-TOKEN', '__session', '_locale']:
+                    if key in response.cookies:
+                        self.cookies[key] = response.cookies[key]
+                        logger.info(f"✅ Updated {key} from response")
+            
+            # Save updated cookies
+            self._save_cookies()
+            logger.info("💾 Saved updated cookies to session")
+            
+        except Exception as e:
+            logger.error(f"❌ Error updating cookies from response: {e}")
+    
     def _apply_default_cookies(self):
         """Apply default cookies to session"""
         for name, value in self.DEFAULT_COOKIES.items():
             if value:  # Skip empty values
                 self.session.cookies.set(name, value, domain=".plc.auction", path="/")
         self.cookies.update(self.DEFAULT_COOKIES)
+    
+    def _send_rum_metrics(self, location: str = "https://plc.auction/ru", load_time: float = None):
+        """Send Cloudflare RUM (Real User Monitoring) metrics to establish browser session"""
+        try:
+            logger.info("📊 Sending RUM metrics to Cloudflare")
+            
+            # Calculate realistic timing values
+            current_time = time.time() * 1000
+            elapsed = current_time - self.start_time if load_time is None else load_time
+            
+            # Build RUM payload based on rum.py
+            rum_data = {
+                "memory": {
+                    "totalJSHeapSize": random.randint(150000000, 160000000),
+                    "usedJSHeapSize": random.randint(50000000, 60000000),
+                    "jsHeapSizeLimit": 4294705152,
+                },
+                "resources": [],
+                "referrer": "",
+                "eventType": 1,
+                "firstPaint": int(elapsed * 0.6),  # ~60% of load time
+                "firstContentfulPaint": int(elapsed * 0.6),
+                "startTime": self.start_time,
+                "versions": {
+                    "fl": "2025.7.0",
+                    "js": "2024.6.1",
+                    "timings": 2,
+                },
+                "pageloadId": self.pageload_id,
+                "location": location,
+                "nt": "reload",
+                "serverTimings": [
+                    {
+                        "name": "cfCacheStatus",
+                        "dur": 0,
+                        "desc": "DYNAMIC",
+                    },
+                    {
+                        "name": "cfOrigin",
+                        "dur": random.randint(300, 500),
+                        "desc": "",
+                    },
+                    {
+                        "name": "cfEdge",
+                        "dur": random.randint(15, 30),
+                        "desc": "",
+                    },
+                ],
+                "timingsV2": {
+                    "unloadEventStart": int(elapsed * 0.4),
+                    "unloadEventEnd": int(elapsed * 0.4),
+                    "domInteractive": int(elapsed * 0.8),
+                    "domContentLoadedEventStart": int(elapsed * 0.82),
+                    "domContentLoadedEventEnd": int(elapsed * 0.83),
+                    "domComplete": int(elapsed * 0.95),
+                    "loadEventStart": int(elapsed * 0.96),
+                    "loadEventEnd": int(elapsed),
+                    "type": "reload",
+                    "redirectCount": 0,
+                    "criticalCHRestart": 0,
+                    "activationStart": 0,
+                    "initiatorType": "navigation",
+                    "nextHopProtocol": "h2",
+                    "deliveryType": "",
+                    "workerStart": 0,
+                    "redirectStart": 0,
+                    "redirectEnd": 0,
+                    "fetchStart": 1.1,
+                    "domainLookupStart": 1.1,
+                    "domainLookupEnd": 1.1,
+                    "connectStart": 1.1,
+                    "connectEnd": 1.1,
+                    "secureConnectionStart": 1.1,
+                    "requestStart": 3.3,
+                    "responseStart": int(elapsed * 0.4),
+                    "responseEnd": int(elapsed * 0.5),
+                    "transferSize": random.randint(55000, 65000),
+                    "encodedBodySize": random.randint(55000, 60000),
+                    "decodedBodySize": random.randint(440000, 450000),
+                    "responseStatus": 200,
+                    "firstInterimResponseStart": 0,
+                    "renderBlockingStatus": "non-blocking",
+                    "finalResponseHeadersStart": int(elapsed * 0.4),
+                    "name": location,
+                    "entryType": "navigation",
+                    "startTime": 0,
+                    "duration": elapsed,
+                },
+                "dt": "",
+                "siteToken": "22c2765b5fe045249938154baa6cba24",
+                "st": 2,
+            }
+            
+            # RUM headers are different from regular API headers
+            rum_headers = {
+                "accept": "*/*",
+                "accept-language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "content-type": "application/json",
+                "origin": "https://plc.auction",
+                "priority": "u=1, i",
+                "referer": location,
+                "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
+                "sec-fetch-dest": "empty",
+                "sec-fetch-mode": "cors",
+                "sec-fetch-site": "same-origin",
+                "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            }
+            
+            # Send RUM metrics
+            response = self.session.post(
+                f"{self.BASE_URL}/cdn-cgi/rum",
+                json=rum_data,
+                headers=rum_headers,
+                timeout=10
+            )
+            
+            if response.status_code == 204:  # RUM endpoint usually returns 204 No Content
+                logger.info("✅ RUM metrics sent successfully")
+                return True
+            else:
+                logger.warning(f"⚠️ RUM metrics returned status {response.status_code}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error sending RUM metrics: {e}")
+            return False
     
     def _initialize_browser_session(self):
         """Initialize session by visiting homepage like a real browser"""
@@ -165,6 +326,13 @@ class PLCAuctionService:
                 # Update cookies from response
                 self._save_cookies()
                 
+                # Send RUM metrics to establish browser session
+                load_time = (time.time() * 1000) - self.start_time
+                rum_success = self._send_rum_metrics("https://plc.auction/ru", load_time)
+                
+                if rum_success:
+                    logger.info("✅ Browser session established with RUM metrics")
+                
                 # Send initial Intercom ping
                 logger.info("🏓 Sending initial Intercom ping")
                 ping_result = self.intercom.ping(referer=self.BASE_URL)
@@ -179,6 +347,8 @@ class PLCAuctionService:
                             self._save_cookies()
             else:
                 logger.warning(f"⚠️ Homepage returned status {response.status_code}")
+                # Try sending RUM metrics anyway
+                self._send_rum_metrics("https://plc.auction/ru")
                 
         except Exception as e:
             logger.error(f"❌ Error initializing browser session: {e}")
@@ -194,6 +364,10 @@ class PLCAuctionService:
             # Send Intercom ping before request
             self._ensure_intercom_session()
             
+            # Send RUM metrics for the auction page before making API request
+            auction_url = f"{self.AUCTION_URL}?country={filters.country}&date={filters.date or int(time.time())}&price_type={filters.price_type}"
+            self._send_rum_metrics(auction_url)
+            
             # Build JSON data for POST request
             json_data = self._build_json_data(filters)
             
@@ -204,9 +378,9 @@ class PLCAuctionService:
             # Add small delay to avoid rate limiting
             time.sleep(1)
             
-            # Make POST request to the API endpoint
+            # Make POST request to the API endpoint (with /ru/ path)
             response = self.session.post(
-                f"{self.BASE_URL}/auction/request",
+                f"{self.BASE_URL}/ru/auction/request",
                 json=json_data,
                 headers=headers,
                 cookies=self.cookies,
@@ -224,7 +398,7 @@ class PLCAuctionService:
                 time.sleep(2)
                 
                 response = self.session.post(
-                    f"{self.BASE_URL}/auction/request",
+                    f"{self.BASE_URL}/ru/auction/request",
                     json=json_data,
                     headers=headers,
                     cookies=self.cookies,
@@ -242,7 +416,7 @@ class PLCAuctionService:
                         headers["x-xsrf-token"] = self.cookies.get("XSRF-TOKEN", "")
                         time.sleep(2)
                         response = self.session.post(
-                            f"{self.BASE_URL}/auction/request",
+                            f"{self.BASE_URL}/ru/auction/request",
                             json=json_data,
                             headers=headers,
                             cookies=self.cookies,
@@ -257,7 +431,7 @@ class PLCAuctionService:
                     time.sleep(3)
                     # Final retry with refreshed session
                     response = self.session.post(
-                        f"{self.BASE_URL}/auction/request",
+                        f"{self.BASE_URL}/ru/auction/request",
                         json=json_data,
                         headers=headers,
                         cookies=self.cookies,
@@ -274,6 +448,9 @@ class PLCAuctionService:
                         logger.error("🛡️ Cloudflare challenge detected. Manual cookie update may be required.")
             
             response.raise_for_status()
+            
+            # Update cookies from response headers (including XSRF-TOKEN and __session)
+            self._update_cookies_from_response(response)
             
             # Save cookies after successful request
             self._save_cookies()
