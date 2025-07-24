@@ -150,23 +150,50 @@ class SSANCARService:
         logger.info("💾 Saved SSANCAR cookies")
     
     def _get_week_number(self) -> str:
-        """Get the appropriate week number based on current day"""
-        # Get current day of week (0 = Monday, 6 = Sunday)
-        today = datetime.now().weekday()
+        """Get the appropriate week number based on Seoul time
         
-        # Tuesday = 1, Friday = 4
-        if today == 1:  # Tuesday
+        Auction schedule:
+        - Tuesday auction (weekNo=2): Switches at 6PM Monday Seoul time
+        - Friday auction (weekNo=5): Switches at 6PM Thursday Seoul time
+        """
+        import pytz
+        
+        # Get current time in Seoul timezone (KST = UTC+9)
+        seoul_tz = pytz.timezone('Asia/Seoul')
+        seoul_time = datetime.now(seoul_tz)
+        
+        weekday = seoul_time.weekday()  # 0=Monday, 6=Sunday
+        hour = seoul_time.hour
+        
+        logger.info(f"📅 Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S %Z')}, weekday: {weekday}, hour: {hour}")
+        
+        # Monday: switch at 6PM
+        if weekday == 0:  # Monday
+            if hour < 18:
+                logger.info("🎯 Monday before 6PM Seoul → Friday auction (weekNo=5)")
+                return "5"  # Still showing previous Friday auction
+            else:
+                logger.info("🎯 Monday after 6PM Seoul → Tuesday auction (weekNo=2)")
+                return "2"  # Switch to Tuesday auction
+        
+        # Tuesday to Wednesday: Tuesday auction
+        elif weekday in [1, 2]:  # Tuesday, Wednesday
+            logger.info("🎯 Tuesday/Wednesday → Tuesday auction (weekNo=2)")
             return "2"
-        elif today == 4:  # Friday
+        
+        # Thursday: switch at 6PM
+        elif weekday == 3:  # Thursday
+            if hour < 18:
+                logger.info("🎯 Thursday before 6PM Seoul → Tuesday auction (weekNo=2)")
+                return "2"  # Still showing Tuesday auction
+            else:
+                logger.info("🎯 Thursday after 6PM Seoul → Friday auction (weekNo=5)")
+                return "5"  # Switch to Friday auction
+        
+        # Friday to Sunday: Friday auction
+        else:  # Friday, Saturday, Sunday
+            logger.info("🎯 Friday/Weekend → Friday auction (weekNo=5)")
             return "5"
-        else:
-            # For other days, check which auction is closer
-            # If it's Mon, Wed, Thu -> show Tuesday auction
-            # If it's Sat, Sun -> show Friday auction
-            if today in [0, 2, 3]:  # Mon, Wed, Thu
-                return "2"  # Tuesday auction
-            else:  # Sat, Sun
-                return "5"  # Friday auction
     
     def fetch_cars(self, filters: SSANCARFilters) -> SSANCARResponse:
         """Fetch cars from SSANCAR with filters"""

@@ -2,9 +2,9 @@ import requests
 
 cookies = {
     "_gcl_au": "1.1.78877594.1751338453",
-    "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
     "PHPSESSID": "3tkj2orbe4h537fjor8b3623cb",
     "2a0d2363701f23f8a75028924a3af643": "MTc2LjY0LjIzLjg%3D",
+    "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
 }
 
 headers = {
@@ -22,11 +22,11 @@ headers = {
     "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"macOS"',
-    # 'Cookie': '_gcl_au=1.1.78877594.1751338453; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D; PHPSESSID=3tkj2orbe4h537fjor8b3623cb; 2a0d2363701f23f8a75028924a3af643=MTc2LjY0LjIzLjg%3D',
+    # 'Cookie': '_gcl_au=1.1.78877594.1751338453; PHPSESSID=3tkj2orbe4h537fjor8b3623cb; 2a0d2363701f23f8a75028924a3af643=MTc2LjY0LjIzLjg%3D; e1192aefb64683cc97abb83c71057733=bGlzdA%3D%3D',
 }
 
 data = {
-    "weekNo": "4",
+    "weekNo": "5",
     "maker": "",
     "model": "",
     "fuel": "",

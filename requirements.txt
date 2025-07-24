@@ -21,6 +21,7 @@ fake-useragent==2.2.0
 loguru==0.7.3
 tenacity==9.1.2
 python-dotenv==1.1.0
+pytz==2024.2
 
 # Additional required dependencies for auction parsing
 Faker==34.0.0
