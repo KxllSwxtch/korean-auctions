@@ -14,6 +14,7 @@ from app.routes import (
     glovis_windows_auth,
     heydealer,
     heydealer_filters,
+    ssancar,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -66,7 +67,8 @@ app.include_router(
     prefix="/api/v1/heydealer/filters",
     tags=["HeyDealer Filters"],
 )
-# SSANCAR routes removed - replaced by PLC Auction
+# SSANCAR routes - Direct SSANCAR API without PLC wrapper
+app.include_router(ssancar.router, tags=["SSANCAR Auction"])
 
 
 @app.get("/")
