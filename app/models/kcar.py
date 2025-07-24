@@ -488,7 +488,7 @@ class KCarSearchFilters(BaseModel):
 
     # Аукцион
     auction_type: str = Field("weekly", description="Тип аукциона")
-    lane_type: str = Field("A", description="Тип лейна (A или B)")
+    lane_type: Optional[str] = Field(None, description="Тип лейна (A, B или пусто для всех)")
     auction_location: Optional[str] = Field(None, description="Код места аукциона")
 
     # Пагинация
