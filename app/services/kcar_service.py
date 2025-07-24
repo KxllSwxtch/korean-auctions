@@ -1608,6 +1608,8 @@ class KCarService:
 
             all_cars = []
             total_count = 0
+            successful_lanes = []
+            failed_lanes = []
             
             # Обрабатываем каждый лейн отдельно
             for lane_type in lanes_to_process:
@@ -1620,48 +1622,68 @@ class KCarService:
                 logger.info(f"  - MODEL_CD: {lane_data.get('MODEL_CD', '')}")
                 logger.info(f"  - AUC_TYPE: {lane_data.get('AUC_TYPE', '')}")
                 logger.info(f"  - LANE_TYPE: {lane_data.get('LANE_TYPE', '')}")
+                logger.info(f"  - CNO (car number): {lane_data.get('CNO', '')}")
                 logger.debug(f"🔍 Все параметры поиска для лейна {lane_type}: {lane_data}")
                 
-                response = self.session.post(url, data=lane_data, headers=headers)
-                
-                if response.status_code == 200:
-                    try:
-                        json_data = response.json()
-                        logger.debug(f"📥 Получен JSON ответ поиска для лейна {lane_type}")
-                        
-                        # Проверяем что вернул API
-                        if "CAR_LIST" in json_data:
-                            car_count = len(json_data["CAR_LIST"])
-                            logger.info(f"📥 API вернул {car_count} автомобилей из лейна {lane_type}")
-                            
-                            # Парсим ответ
-                            result = self.parser.parse_search_json(json_data)
-                            
-                            if result.success and result.cars:
-                                # Добавляем lane_type к каждому автомобилю
-                                for car in result.cars:
-                                    car_dict = car.dict()
-                                    car_dict['lane_type'] = lane_type
-                                    car_with_lane = KCarCar(**car_dict)
-                                    all_cars.append(car_with_lane)
-                                
-                                lane_count = len(result.cars)
-                                total_count += lane_count
-                                logger.success(f"✅ Получено {lane_count} автомобилей из лейна {lane_type}")
-                            else:
-                                logger.warning(f"⚠️ Пустой результат для лейна {lane_type}")
-                        else:
-                            logger.warning(f"⚠️ CAR_LIST не найден в ответе API для лейна {lane_type}")
+                try:
+                    response = self.session.post(url, data=lane_data, headers=headers)
                     
-                    except json.JSONDecodeError as e:
-                        logger.error(f"❌ Ошибка парсинга JSON ответа поиска для лейна {lane_type}: {e}")
-                else:
-                    logger.error(f"❌ HTTP ошибка {response.status_code} для лейна {lane_type}")
+                    if response.status_code == 200:
+                        try:
+                            json_data = response.json()
+                            logger.debug(f"📥 Получен JSON ответ поиска для лейна {lane_type}")
+                            
+                            # Проверяем что вернул API
+                            if "CAR_LIST" in json_data:
+                                car_count = len(json_data["CAR_LIST"])
+                                logger.info(f"📥 API вернул {car_count} автомобилей из лейна {lane_type}")
+                                
+                                # Парсим ответ
+                                result = self.parser.parse_search_json(json_data)
+                                
+                                if result.success:
+                                    successful_lanes.append(lane_type)
+                                    
+                                    if result.cars:
+                                        # Добавляем lane_type к каждому автомобилю
+                                        for car in result.cars:
+                                            car_dict = car.dict()
+                                            car_dict['lane_type'] = lane_type
+                                            car_with_lane = KCarCar(**car_dict)
+                                            all_cars.append(car_with_lane)
+                                        
+                                        lane_count = len(result.cars)
+                                        total_count += lane_count
+                                        logger.success(f"✅ Получено {lane_count} автомобилей из лейна {lane_type}")
+                                    else:
+                                        logger.info(f"ℹ️ Лейн {lane_type} не содержит результатов для данного запроса")
+                                else:
+                                    logger.warning(f"⚠️ Ошибка парсинга для лейна {lane_type}")
+                                    failed_lanes.append(lane_type)
+                            else:
+                                logger.warning(f"⚠️ CAR_LIST не найден в ответе API для лейна {lane_type}")
+                                failed_lanes.append(lane_type)
+                        
+                        except json.JSONDecodeError as e:
+                            logger.error(f"❌ Ошибка парсинга JSON ответа поиска для лейна {lane_type}: {e}")
+                            failed_lanes.append(lane_type)
+                    else:
+                        # HTTP ошибка не критична - возможно, автомобиль просто не найден в этом лейне
+                        logger.warning(f"⚠️ HTTP {response.status_code} для лейна {lane_type} - продолжаем поиск в других лейнах")
+                        failed_lanes.append(lane_type)
+                        
+                except Exception as e:
+                    logger.error(f"❌ Ошибка при запросе к лейну {lane_type}: {e}")
+                    failed_lanes.append(lane_type)
             
-            logger.info(f"📊 Итого получено {total_count} автомобилей из лейнов {lanes_to_process}")
+            logger.info(f"📊 Итого получено {total_count} автомобилей")
+            logger.info(f"✅ Успешно обработаны лейны: {successful_lanes}")
+            if failed_lanes:
+                logger.warning(f"⚠️ Не удалось обработать лейны: {failed_lanes}")
 
             # Создаем общий результат
-            if all_cars or total_count > 0:
+            # Поиск считается успешным, если хотя бы один лейн был обработан успешно
+            if successful_lanes:
                 # Используем значения из фильтров
                 page_number = filters.page
                 page_size = filters.page_size
@@ -1675,6 +1697,15 @@ class KCarService:
                 has_next_page = len(all_cars) >= page_size  # Если получили полную страницу, возможно есть еще
                 has_prev_page = page_number > 1
 
+                # Формируем сообщение о результате
+                if total_count > 0:
+                    message = f"Найдено {total_count} автомобилей в лейнах: {', '.join(successful_lanes)}"
+                else:
+                    message = f"Автомобили не найдены в лейнах: {', '.join(successful_lanes)}"
+                    
+                if failed_lanes:
+                    message += f" (не удалось проверить лейны: {', '.join(failed_lanes)})"
+
                 final_result = KCarSearchResponse(
                     cars=all_cars,
                     total_count=total_count,
@@ -1683,8 +1714,8 @@ class KCarService:
                     total_pages=total_pages,
                     has_next_page=has_next_page,
                     has_prev_page=has_prev_page,
-                    success=True,
-                    message=f"Найдено {total_count} автомобилей",
+                    success=True,  # Успех, даже если результатов 0
+                    message=message,
                 )
 
                 logger.success(
@@ -1692,7 +1723,7 @@ class KCarService:
                 )
                 return final_result
             else:
-                # Ошибка или пустой результат
+                # Все лейны вернули ошибку
                 return KCarSearchResponse(
                     cars=[],
                     total_count=0,
@@ -1702,7 +1733,7 @@ class KCarService:
                     has_next_page=False,
                     has_prev_page=filters.page > 1,
                     success=False,
-                    message="Ошибка получения данных",
+                    message=f"Не удалось выполнить поиск ни в одном из лейнов: {', '.join(failed_lanes)}",
                 )
 
         except Exception as e:
