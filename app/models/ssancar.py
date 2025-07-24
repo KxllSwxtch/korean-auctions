@@ -197,4 +197,26 @@ class SSANCARHealthResponse(BaseModel):
     service: str = "SSANCAR Auction"
     status: str = "active"
     base_url: str = "https://www.ssancar.com"
+
+
+class SSANCARFilterOption(BaseModel):
+    """Single filter option"""
+    value: str
+    label: str
+    count: Optional[int] = None
+
+
+class SSANCARFilterOptionsResponse(BaseModel):
+    """Response for filter options"""
+    success: bool
+    message: str
+    manufacturers: List[SSANCARManufacturer] = Field(default_factory=list)
+    fuel_types: List[SSANCARFilterOption] = Field(default_factory=list)
+    transmissions: List[SSANCARFilterOption] = Field(default_factory=list)
+    grades: List[SSANCARFilterOption] = Field(default_factory=list)
+    colors: List[SSANCARFilterOption] = Field(default_factory=list)
+    weeks: List[Dict[str, Any]] = Field(default_factory=list)
+    year_range: Dict[str, int] = Field(default={"min": 2000, "max": 2025})
+    price_range: Dict[str, int] = Field(default={"min": 0, "max": 200000})
+    mileage_range: Dict[str, int] = Field(default={"min": 0, "max": 500000})
     timestamp: datetime = Field(default_factory=datetime.now)

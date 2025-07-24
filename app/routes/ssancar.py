@@ -6,7 +6,7 @@ from loguru import logger
 from app.models.ssancar import (
     SSANCARResponse, SSANCARDetailResponse, SSANCARFilters,
     SSANCARManufacturersResponse, SSANCARModelsResponse,
-    SSANCARHealthResponse
+    SSANCARHealthResponse, SSANCARFilterOptionsResponse
 )
 from app.services.ssancar_service import SSANCARService
 from app.core.logging import get_logger
@@ -359,6 +359,49 @@ async def health_check() -> SSANCARHealthResponse:
             status="error",
             base_url=ssancar_service.BASE_URL,
             timestamp=datetime.now()
+        )
+
+
+@router.get("/filters/options", response_model=SSANCARFilterOptionsResponse)
+async def get_filter_options(
+    service: SSANCARService = Depends(get_ssancar_service)
+) -> SSANCARFilterOptionsResponse:
+    """
+    Get all available filter options for SSANCAR
+    
+    Returns complete set of available filters for car search.
+    
+    **Example usage:**
+    ```
+    GET /api/v1/ssancar/filters/options
+    ```
+    
+    **Response includes:**
+    - List of manufacturers
+    - Fuel types
+    - Transmissions
+    - Grades
+    - Colors
+    - Auction weeks
+    - Year, price, and mileage ranges
+    """
+    try:
+        ssancar_logger.info("🔧 Request for filter options")
+        
+        filter_options = service.get_filter_options()
+        
+        if filter_options.get("success"):
+            ssancar_logger.info("✅ Filter options retrieved successfully")
+            return SSANCARFilterOptionsResponse(**filter_options)
+        else:
+            ssancar_logger.error(f"❌ Failed to get filter options: {filter_options.get('message')}")
+            return SSANCARFilterOptionsResponse(**filter_options)
+            
+    except Exception as e:
+        ssancar_logger.error(f"❌ Unexpected error getting filter options: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(e)}"
         )
 
 

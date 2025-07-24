@@ -399,3 +399,109 @@ class SSANCARService:
         self.session.cookies.update(new_cookies)
         self._save_cookies()
         logger.info("✅ Updated SSANCAR cookies")
+    
+    def get_filter_options(self) -> Dict[str, Any]:
+        """Get all available filter options for SSANCAR"""
+        try:
+            from app.models.ssancar import SSANCARFilterOption, SSANCARFilterOptionsResponse
+            
+            logger.info("🔧 Getting SSANCAR filter options")
+            
+            # Get manufacturers (already implemented)
+            manufacturers, _ = self.get_manufacturers()
+            
+            # Define static filter options based on SSANCAR's actual filters
+            fuel_types = [
+                SSANCARFilterOption(value="Gasoline", label="Gasoline", count=None),
+                SSANCARFilterOption(value="Diesel", label="Diesel", count=None),
+                SSANCARFilterOption(value="LPG", label="LPG", count=None),
+                SSANCARFilterOption(value="Hybrid", label="Hybrid", count=None),
+                SSANCARFilterOption(value="Electric", label="Electric", count=None),
+                SSANCARFilterOption(value="Hydrogen", label="Hydrogen", count=None),
+            ]
+            
+            transmissions = [
+                SSANCARFilterOption(value="Automatic", label="Automatic", count=None),
+                SSANCARFilterOption(value="Manual", label="Manual", count=None),
+                SSANCARFilterOption(value="CVT", label="CVT", count=None),
+                SSANCARFilterOption(value="DCT", label="DCT", count=None),
+            ]
+            
+            grades = [
+                SSANCARFilterOption(value="A1", label="A1", count=None),
+                SSANCARFilterOption(value="A2", label="A2", count=None),
+                SSANCARFilterOption(value="A3", label="A3", count=None),
+                SSANCARFilterOption(value="A4", label="A4", count=None),
+                SSANCARFilterOption(value="B1", label="B1", count=None),
+                SSANCARFilterOption(value="B2", label="B2", count=None),
+                SSANCARFilterOption(value="B3", label="B3", count=None),
+                SSANCARFilterOption(value="B4", label="B4", count=None),
+                SSANCARFilterOption(value="C1", label="C1", count=None),
+                SSANCARFilterOption(value="C2", label="C2", count=None),
+                SSANCARFilterOption(value="C3", label="C3", count=None),
+                SSANCARFilterOption(value="C4", label="C4", count=None),
+                SSANCARFilterOption(value="D1", label="D1", count=None),
+                SSANCARFilterOption(value="D2", label="D2", count=None),
+            ]
+            
+            colors = [
+                SSANCARFilterOption(value="Black", label="Black", count=None),
+                SSANCARFilterOption(value="White", label="White", count=None),
+                SSANCARFilterOption(value="Silver", label="Silver", count=None),
+                SSANCARFilterOption(value="Gray", label="Gray", count=None),
+                SSANCARFilterOption(value="Red", label="Red", count=None),
+                SSANCARFilterOption(value="Blue", label="Blue", count=None),
+                SSANCARFilterOption(value="Green", label="Green", count=None),
+                SSANCARFilterOption(value="Brown", label="Brown", count=None),
+                SSANCARFilterOption(value="Beige", label="Beige", count=None),
+                SSANCARFilterOption(value="Orange", label="Orange", count=None),
+                SSANCARFilterOption(value="Yellow", label="Yellow", count=None),
+                SSANCARFilterOption(value="Other", label="Other", count=None),
+            ]
+            
+            # Auction weeks
+            weeks = [
+                {"value": "2", "label": "Tuesday Auction", "day": "Tuesday"},
+                {"value": "5", "label": "Friday Auction", "day": "Friday"},
+            ]
+            
+            # Dynamic ranges - these could be updated based on actual data
+            year_range = {"min": 2000, "max": 2025}
+            price_range = {"min": 0, "max": 200000}
+            mileage_range = {"min": 0, "max": 500000}
+            
+            response = SSANCARFilterOptionsResponse(
+                success=True,
+                message="Filter options retrieved successfully",
+                manufacturers=manufacturers,
+                fuel_types=fuel_types,
+                transmissions=transmissions,
+                grades=grades,
+                colors=colors,
+                weeks=weeks,
+                year_range=year_range,
+                price_range=price_range,
+                mileage_range=mileage_range
+            )
+            
+            logger.info("✅ SSANCAR filter options retrieved")
+            return response.model_dump()
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting filter options: {e}")
+            from app.models.ssancar import SSANCARFilterOptionsResponse
+            
+            error_response = SSANCARFilterOptionsResponse(
+                success=False,
+                message=f"Failed to get filter options: {str(e)}",
+                manufacturers=[],
+                fuel_types=[],
+                transmissions=[],
+                grades=[],
+                colors=[],
+                weeks=[],
+                year_range={"min": 2000, "max": 2025},
+                price_range={"min": 0, "max": 200000},
+                mileage_range={"min": 0, "max": 500000}
+            )
+            return error_response.model_dump()
