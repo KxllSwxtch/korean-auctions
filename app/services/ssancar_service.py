@@ -1,4 +1,5 @@
 import json
+import re
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any, Tuple
@@ -381,37 +382,36 @@ class SSANCARService:
             car_detail = self.parser.parse_car_detail(response.text)
             
             if not car_detail:
-                # For now, return a mock response
-                # In production, this would parse the actual HTML
-                logger.warning("⚠️ Using mock car detail data")
-                car_detail = SSANCARCarDetail(
-                    car_no=car_no,
-                    stock_no="1001(A)",
-                    manufacturer="HYUNDAI",
-                    model="SANTA FE",
-                    full_name="HYUNDAI SANTA FE 2.0 Diesel AWD Premium",
-                    year=2021,
-                    mileage=45000,
-                    mileage_formatted="45,000km",
-                    fuel="Diesel",
-                    transmission="Automatic",
-                    grade="A3",
-                    color="Black",
-                    engine_size="2.0L",
-                    vin="KMHS281LGMU123456",
-                    bid_price=15000,
-                    buy_now_price=18000,
-                    auction_date=datetime.now() + timedelta(days=2),
-                    auction_status="upcoming",
-                    images=[
-                        f"https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/sample_{i}.JPG"
-                        for i in range(1, 6)
-                    ],
-                    inspection_sheet_url=f"https://www.ssancar.com/inspection/{car_no}.pdf",
-                    features=["Sunroof", "Leather seats", "Navigation", "360 camera"],
-                    condition_notes="Minor scratches on rear bumper"
-                )
+                logger.error(f"❌ Failed to parse car detail for car_no: {car_no}")
+                return None
             
+            # Additional processing for SSANCAR specific fields
+            # Ensure we have all required fields for the frontend
+            if not car_detail.full_name and car_detail.manufacturer and car_detail.model:
+                car_detail.full_name = f"[{car_detail.manufacturer}] {car_detail.model}"
+            
+            # Parse bid price from starting_price if needed
+            if car_detail.starting_price and not car_detail.bid_price:
+                price_match = re.search(r'(\d+(?:,\d+)*)', car_detail.starting_price)
+                if price_match:
+                    try:
+                        car_detail.bid_price = int(price_match.group(1).replace(',', ''))
+                    except ValueError:
+                        car_detail.bid_price = 0
+            
+            # Ensure we have the main_image set
+            if not car_detail.main_image and car_detail.images:
+                car_detail.main_image = car_detail.images[0]
+            
+            # Set engine_volume if we have engine_size
+            if not hasattr(car_detail, 'engine_volume') and car_detail.engine_size:
+                car_detail.engine_volume = car_detail.engine_size
+            
+            # Set fuel_type if we have fuel
+            if not hasattr(car_detail, 'fuel_type') and car_detail.fuel:
+                car_detail.fuel_type = car_detail.fuel
+            
+            logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
             return car_detail
             
         except requests.RequestException as e:
@@ -419,6 +419,8 @@ class SSANCARService:
             return None
         except Exception as e:
             logger.error(f"❌ Unexpected error fetching car detail: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def update_cookies(self, new_cookies: Dict[str, str]):

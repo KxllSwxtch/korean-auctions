@@ -52,10 +52,12 @@ class SSANCARCarDetail(BaseModel):
     mileage: Optional[int]
     mileage_formatted: str
     fuel: str
+    fuel_type: Optional[str]  # Alias for fuel
     transmission: str
     grade: str
     color: Optional[str]
     engine_size: Optional[str]
+    engine_volume: Optional[str]  # Alias for engine_size
     vin: Optional[str]
     bid_price: int
     buy_now_price: Optional[int]
@@ -65,6 +67,17 @@ class SSANCARCarDetail(BaseModel):
     inspection_sheet_url: Optional[str]
     features: List[str] = Field(default_factory=list)
     condition_notes: Optional[str]
+    
+    # SSANCAR specific fields
+    starting_price: str = Field(..., description="Starting price with currency symbol")
+    currency: str = Field(default="USD", description="Currency code (USD/KRW)")
+    main_image: str = Field(default="", description="Primary car image URL")
+    auction_start_date: Optional[str] = Field(None, description="Auction start date/time")
+    auction_end_date: Optional[str] = Field(None, description="Auction end date/time")
+    auction_time_remaining: str = Field(default="", description="Time remaining for auction")
+    upload_date: str = Field(default="", description="Date when car was uploaded")
+    parsed_at: Optional[str] = Field(None, description="When data was parsed")
+    condition_grade: Optional[str] = Field(None, description="Alias for grade")
     
     class Config:
         json_schema_extra = {
@@ -78,22 +91,33 @@ class SSANCARCarDetail(BaseModel):
                 "mileage": 114774,
                 "mileage_formatted": "114,774km",
                 "fuel": "Gasoline",
-                "transmission": "Automatic",
-                "grade": "A2",
+                "fuel_type": "Gasoline",
+                "transmission": "A/T",
+                "grade": "A/2",
+                "condition_grade": "A/2",
                 "color": "Black",
-                "engine_size": "4.4L",
+                "engine_size": "4,395cc",
+                "engine_volume": "4,395cc",
                 "vin": "WBAYH8C57BG123456",
                 "bid_price": 8002,
                 "buy_now_price": 12000,
+                "starting_price": "8,002$~",
+                "currency": "USD",
                 "auction_date": "2025-01-28T13:00:00",
                 "auction_status": "upcoming",
+                "auction_start_date": "2025-01-28 1:00PM",
+                "auction_end_date": "2025-01-28 6:00PM",
+                "auction_time_remaining": "Time: 2D 15H 30m 45s",
+                "upload_date": "2025-01-26 7:00PM",
                 "images": [
                     "https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/2032/CA20325265/CA2032526519f23838_1.JPG",
                     "https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/2032/CA20325265/CA2032526519f23838_2.JPG"
                 ],
+                "main_image": "https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/2032/CA20325265/CA2032526519f23838_1.JPG",
                 "inspection_sheet_url": "https://www.ssancar.com/inspection/1536311.pdf",
                 "features": ["Sunroof", "Leather seats", "Navigation"],
-                "condition_notes": "Minor scratches on front bumper"
+                "condition_notes": "Minor scratches on front bumper",
+                "parsed_at": "2025-01-27T10:30:45"
             }
         }
 

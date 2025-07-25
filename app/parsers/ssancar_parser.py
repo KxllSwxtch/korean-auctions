@@ -195,14 +195,170 @@ class SSANCARParser:
         try:
             soup = BeautifulSoup(html, 'html.parser')
             
-            # Extract basic info from the page
-            # This would need to be implemented based on actual HTML structure
-            # For now, returning None as placeholder
-            logger.warning("Car detail parsing not yet implemented")
-            return None
+            # Extract car_no from URL parameter in the HTML
+            car_no_match = re.search(r'car_no=(\d+)', html)
+            car_no = car_no_match.group(1) if car_no_match else ""
+            
+            # Extract stock number
+            stock_elem = soup.find('p', class_='num')
+            stock_no = ""
+            if stock_elem:
+                stock_span = stock_elem.find('span')
+                if stock_span:
+                    stock_no = stock_span.text.strip()
+            
+            # Extract car name and parse manufacturer/model
+            name_elem = soup.find('p', class_='name')
+            full_name = ""
+            manufacturer = ""
+            model = ""
+            if name_elem:
+                name_span = name_elem.find('span')
+                if name_span:
+                    full_name = name_span.text.strip()
+                    manufacturer, model = self._parse_manufacturer_model(full_name)
+            
+            # Extract details (year, transmission, fuel, etc.)
+            year = 0
+            transmission = ""
+            fuel_type = ""
+            engine_volume = ""
+            mileage = ""
+            condition_grade = ""
+            
+            detail_elem = soup.find('ul', class_='detail')
+            if detail_elem:
+                li_elem = detail_elem.find('li')
+                if li_elem:
+                    spans = li_elem.find_all('span')
+                    for span in spans:
+                        text = span.text.strip()
+                        
+                        # Year (4 digits)
+                        if re.match(r'^\d{4}$', text):
+                            year = int(text)
+                        # Transmission
+                        elif text.upper() in ['A/T', 'M/T', 'CVT', 'DCT']:
+                            transmission = text
+                        # Fuel type
+                        elif text.lower() in ['gasoline', 'diesel', 'lpg', 'hybrid', 'electric', 'hydrogen']:
+                            fuel_type = text
+                        # Engine volume (contains 'cc')
+                        elif 'cc' in text.lower():
+                            engine_volume = text
+                        # Mileage (contains 'km')
+                        elif 'km' in text.lower():
+                            mileage = text
+                        # Grade (A/1-D/2 pattern)
+                        elif re.match(r'^[A-D][/]?\d$', text):
+                            condition_grade = text
+            
+            # Extract starting price
+            starting_price = ""
+            currency = "USD"
+            money_elem = soup.find('p', class_='money')
+            if money_elem:
+                money_span = money_elem.find('span')
+                if money_span:
+                    price_text = money_span.text.strip()
+                    starting_price = price_text
+                    # Determine currency from price format
+                    if '$' in price_text:
+                        currency = "USD"
+                    elif '₩' in price_text or 'won' in price_text.lower():
+                        currency = "KRW"
+            
+            # Extract images from swiper slides
+            images = []
+            swiper_slides = soup.find_all('div', class_='swiper-slide')
+            for slide in swiper_slides:
+                img = slide.find('img')
+                if img and 'src' in img.attrs:
+                    img_url = img['src']
+                    # Skip placeholder images
+                    if 'no_image' not in img_url:
+                        images.append(img_url)
+            
+            # Main image is the first image
+            main_image = images[0] if images else ""
+            
+            # Extract auction dates and timing
+            auction_start_date = None
+            auction_end_date = None
+            upload_date = ""
+            auction_time_remaining = ""
+            
+            # Look for date information in the day_list section
+            day_list = soup.find('ul', class_='day_list')
+            if day_list:
+                detail_elem = day_list.find('p', class_='detail')
+                if detail_elem:
+                    detail_text = detail_elem.get_text(separator=' ')
+                    
+                    # Extract upload date
+                    upload_match = re.search(r'Upload\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d+:\d+(?:AM|PM)?)', detail_text)
+                    if upload_match:
+                        upload_date = upload_match.group(1)
+                    
+                    # Extract start date
+                    start_match = re.search(r'Start\s*:\s*(\d{4}-\d{2}-\d{2}\s+\d+:\d+(?:AM|PM)?)', detail_text)
+                    if start_match:
+                        auction_start_date = start_match.group(1)
+                        auction_end_date = auction_start_date  # SSANCAR typically has same day auctions
+            
+            # Extract remaining time
+            timer_elem = soup.find('strong', id='timer')
+            if timer_elem:
+                # Get the formatted time string
+                time_text = timer_elem.get_text(strip=True)
+                auction_time_remaining = time_text if time_text else "Time :DHms"
+            
+            # Build the SSANCARCarDetail object
+            from datetime import datetime
+            car_detail = SSANCARCarDetail(
+                car_no=car_no,
+                stock_no=stock_no,
+                manufacturer=manufacturer,
+                model=model,
+                full_name=full_name,
+                year=year,
+                mileage=mileage if mileage else None,
+                mileage_formatted=mileage,
+                fuel=fuel_type,
+                fuel_type=fuel_type,  # Set both fuel and fuel_type
+                transmission=transmission,
+                grade=condition_grade,
+                condition_grade=condition_grade,  # Set both grade and condition_grade
+                color="",  # Color not shown in detail page
+                engine_size=engine_volume,
+                engine_volume=engine_volume,  # Set both engine_size and engine_volume
+                vin="",  # VIN not shown in public view
+                bid_price=0,  # Will be parsed from starting_price
+                buy_now_price=0,  # Not available in SSANCAR
+                auction_date=datetime.now() if auction_start_date else None,
+                auction_status="active" if auction_time_remaining and "D" in auction_time_remaining else "ended",
+                images=images,
+                inspection_sheet_url="",  # Not provided in the HTML
+                features=[],  # Features not listed in detail page
+                condition_notes="",  # Notes not shown in public view
+                # Additional SSANCAR specific fields
+                starting_price=starting_price,
+                currency=currency,
+                main_image=main_image,
+                auction_start_date=auction_start_date,
+                auction_end_date=auction_end_date,
+                auction_time_remaining=auction_time_remaining,
+                upload_date=upload_date,
+                parsed_at=datetime.now().isoformat()
+            )
+            
+            logger.info(f"✅ Successfully parsed car detail for {car_no}")
+            return car_detail
             
         except Exception as e:
             logger.error(f"Error parsing car detail: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
     
     def parse_manufacturers(self, html: str) -> List[SSANCARManufacturer]:
