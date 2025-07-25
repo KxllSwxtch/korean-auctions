@@ -385,6 +385,10 @@ class SSANCARService:
                 logger.error(f"❌ Failed to parse car detail for car_no: {car_no}")
                 return None
             
+            # Ensure car_no is set
+            if not car_detail.car_no:
+                car_detail.car_no = car_no
+            
             # Additional processing for SSANCAR specific fields
             # Ensure we have all required fields for the frontend
             if not car_detail.full_name and car_detail.manufacturer and car_detail.model:

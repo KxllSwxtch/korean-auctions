@@ -195,9 +195,17 @@ class SSANCARParser:
         try:
             soup = BeautifulSoup(html, 'html.parser')
             
-            # Extract car_no from URL parameter in the HTML
+            # Extract car_no from URL parameter in the HTML or from script tags
+            car_no = ""
+            # Try to find in URL parameters first
             car_no_match = re.search(r'car_no=(\d+)', html)
-            car_no = car_no_match.group(1) if car_no_match else ""
+            if car_no_match:
+                car_no = car_no_match.group(1)
+            else:
+                # Try to find in JavaScript or other places
+                car_no_script_match = re.search(r"['\"]car_no['\"]:\s*['\"](\d+)['\"]", html)
+                if car_no_script_match:
+                    car_no = car_no_script_match.group(1)
             
             # Extract stock number
             stock_elem = soup.find('p', class_='num')
@@ -223,7 +231,8 @@ class SSANCARParser:
             transmission = ""
             fuel_type = ""
             engine_volume = ""
-            mileage = ""
+            mileage = None  # Initialize as None (optional int)
+            mileage_formatted = ""
             condition_grade = ""
             
             detail_elem = soup.find('ul', class_='detail')
@@ -248,7 +257,11 @@ class SSANCARParser:
                             engine_volume = text
                         # Mileage (contains 'km')
                         elif 'km' in text.lower():
-                            mileage = text
+                            mileage_formatted = text
+                            # Extract numeric value for mileage
+                            mileage_num = re.sub(r'[^\d]', '', text)
+                            if mileage_num:
+                                mileage = int(mileage_num)
                         # Grade (A/1-D/2 pattern)
                         elif re.match(r'^[A-D][/]?\d$', text):
                             condition_grade = text
@@ -322,8 +335,8 @@ class SSANCARParser:
                 model=model,
                 full_name=full_name,
                 year=year,
-                mileage=mileage if mileage else None,
-                mileage_formatted=mileage,
+                mileage=mileage,  # Already None if not found
+                mileage_formatted=mileage_formatted,
                 fuel=fuel_type,
                 fuel_type=fuel_type,  # Set both fuel and fuel_type
                 transmission=transmission,
