@@ -3,8 +3,7 @@ import logging
 import asyncio
 from datetime import datetime
 
-from app.core.base_service import BaseService
-from app.core.http_client import AsyncHTTPClient
+from app.core.http_client import AsyncHttpClient
 from app.models.bikemart import (
     BikemartResponse,
     BikemartBrandsResponse,
@@ -19,15 +18,14 @@ from app.parsers.bikemart_parser import BikemartParser
 logger = logging.getLogger(__name__)
 
 
-class BikemartService(BaseService):
+class BikemartService:
     """Service for interacting with Bikemart API"""
     
     BASE_URL = "https://shop.bikemart.co.kr/api/index.php"
     
     def __init__(self):
-        super().__init__()
         self.parser = BikemartParser()
-        self.http_client = AsyncHTTPClient(timeout=30)
+        self.http_client = AsyncHttpClient(timeout=30)
         
         # Default headers from the example
         self.headers = {
