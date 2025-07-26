@@ -13,7 +13,9 @@ from app.models.bikemart import (
     BikemartPaginationInfo,
     BikemartFilter,
     BikemartBikeDetailResponse,
-    BikemartBikeDetail
+    BikemartBikeDetail,
+    BikemartModelsResponse,
+    BikemartModel
 )
 from app.parsers.bikemart_parser import BikemartParser
 
@@ -343,6 +345,60 @@ class BikemartService:
                 success=False,
                 data=None,
                 message=f"Error fetching bike detail: {str(e)}"
+            )
+    
+    async def get_models_by_brand(self, brand_seq: str) -> BikemartModelsResponse:
+        """
+        Get bike models for a specific brand
+        
+        Args:
+            brand_seq: Brand sequence ID
+            
+        Returns:
+            BikemartModelsResponse with models data
+        """
+        try:
+            # Build query parameters for getting models
+            params = {
+                "brand": brand_seq,
+                "program": "bike",
+                "service": "sell",
+                "version": "1.0",
+                "action": "getBikeModel",
+                "token": "",
+            }
+            
+            # Make API request
+            response = await self.http_client.get(
+                self.BASE_URL,
+                params=params,
+                headers=self.headers
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"API returned status code: {response.status_code}")
+                return BikemartModelsResponse(
+                    success=False,
+                    data=[],
+                    message=f"API error: {response.status_code}"
+                )
+            
+            # Parse response
+            response_data = response.json()
+            models = self.parser.parse_models_response(response_data)
+            
+            return BikemartModelsResponse(
+                success=True,
+                data=models,
+                message=response_data.get("ResultMessage", "")
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching models: {e}")
+            return BikemartModelsResponse(
+                success=False,
+                data=[],
+                message=f"Error fetching models: {str(e)}"
             )
 
 

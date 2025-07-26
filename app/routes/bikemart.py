@@ -7,7 +7,8 @@ from app.models.bikemart import (
     BikemartBrandsResponse,
     BikemartFiltersResponse,
     BikemartError,
-    BikemartBikeDetailResponse
+    BikemartBikeDetailResponse,
+    BikemartModelsResponse
 )
 from app.services.bikemart_service import bikemart_service, BikemartService
 from app.core.logging import get_logger
@@ -226,6 +227,60 @@ async def get_filters(
         raise
     except Exception as e:
         logger.error(f"Unexpected error fetching filters: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get(
+    "/brands/{brand_seq}/models",
+    response_model=BikemartModelsResponse,
+    summary="Get bike models by brand",
+    description="Get list of available bike models for a specific brand",
+    responses={
+        200: {
+            "description": "Successful response with models data",
+            "model": BikemartModelsResponse
+        },
+        500: {
+            "description": "Internal server error",
+            "model": BikemartError
+        }
+    }
+)
+async def get_models_by_brand(
+    brand_seq: str,
+    service: BikemartService = Depends(get_bikemart_service)
+) -> BikemartModelsResponse:
+    """
+    Get list of models for a specific brand
+    
+    Args:
+        brand_seq: Brand sequence ID
+        
+    Returns:
+        BikemartModelsResponse with models data
+    """
+    try:
+        logger.info(f"Fetching models for brand: {brand_seq}")
+        
+        response = await service.get_models_by_brand(brand_seq)
+        
+        if not response.success:
+            logger.error(f"Failed to fetch models: {response.message}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message or "Failed to fetch models"
+            )
+        
+        logger.info(f"Successfully fetched {len(response.data)} models for brand: {brand_seq}")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error fetching models: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"

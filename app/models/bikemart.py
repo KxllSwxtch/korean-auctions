@@ -159,3 +159,29 @@ class BikemartBikeDetailResponse(BaseModel):
     success: bool = Field(..., description="Request success status")
     data: Optional[BikemartBikeDetail] = Field(None, description="Bike detail data")
     message: Optional[str] = Field(None, description="Response message")
+
+
+class BikemartModel(BaseModel):
+    """Model for bike model"""
+    
+    seq: str = Field(..., description="Model sequence ID")
+    bike_style: Optional[str] = Field(None, description="Bike style")
+    brand_seq: str = Field(..., description="Brand sequence ID")
+    model: str = Field(..., description="Model name")
+    p_code: Optional[str] = Field(None, description="Product code")
+    piston: str = Field("", description="Engine displacement")
+    engine: str = Field("", description="Engine type")
+    color: Optional[str] = Field(None, description="Available colors")
+    del_yn: Optional[str] = Field(None, description="Deleted flag")
+    writer: str = Field(..., description="Writer ID")
+    write_date: str = Field(..., description="Write date")
+    changer: str = Field(..., description="Changer ID")
+    change_date: str = Field(..., description="Change date")
+
+
+class BikemartModelsResponse(BaseModel):
+    """Response model for models listing"""
+    
+    success: bool = Field(..., description="Request success status")
+    data: List[BikemartModel] = Field(..., description="List of models")
+    message: Optional[str] = Field(None, description="Response message")

@@ -8,7 +8,8 @@ from app.models.bikemart import (
     BikemartBrand,
     BikemartPaginationInfo,
     BikemartBikeDetail,
-    BikemartImageUpload
+    BikemartImageUpload,
+    BikemartModel
 )
 
 logger = logging.getLogger(__name__)
@@ -251,3 +252,38 @@ class BikemartParser:
         except Exception as e:
             logger.error(f"Error parsing bike detail response: {e}")
             return None
+    
+    @staticmethod
+    def parse_models_response(response_data: Dict[str, Any]) -> List[BikemartModel]:
+        """
+        Parse models response from Bikemart API
+        
+        Args:
+            response_data: Raw JSON response from API
+            
+        Returns:
+            List of models
+        """
+        try:
+            models = []
+            
+            # Check if response is successful
+            if not response_data.get("ResultCode"):
+                logger.error("Invalid response: ResultCode is False")
+                return []
+            
+            # Extract models data
+            models_data = response_data.get("data", [])
+            for model_data in models_data:
+                try:
+                    model = BikemartModel(**model_data)
+                    models.append(model)
+                except Exception as e:
+                    logger.error(f"Error parsing model data: {e}")
+                    continue
+            
+            return models
+            
+        except Exception as e:
+            logger.error(f"Error parsing models response: {e}")
+            return []
