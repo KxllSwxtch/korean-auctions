@@ -61,7 +61,7 @@ class BikemartBike(BaseModel):
     changer: str = Field(..., description="Changer ID")
     change_date: str = Field(..., description="Change date")
     product_gbn: str = Field(..., description="Product type")
-    thumbnail_url: str = Field(..., description="Thumbnail image URL")
+    thumbnail_url: Optional[str] = Field(None, description="Thumbnail image URL")
     favorite: str = Field(..., description="Favorite count")
 
 
