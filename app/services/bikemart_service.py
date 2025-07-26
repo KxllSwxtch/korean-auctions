@@ -166,7 +166,7 @@ class BikemartService:
                 "program": "bike",
                 "service": "sell",
                 "version": "1.0",
-                "action": "getBrandList",
+                "action": "getBikeBrandList",
                 "token": "",
             }
             

@@ -86,9 +86,9 @@ class BikemartParser:
                 try:
                     # Transform the data to match our model
                     brand = BikemartBrand(
-                        brand_seq=brand_data.get("Value", ""),
-                        brand_name=brand_data.get("Name", ""),
-                        count=brand_data.get("Count", 0)
+                        brand_seq=brand_data.get("seq", ""),
+                        brand_name=brand_data.get("brand_name", ""),
+                        count=None  # Count is not provided in the API response
                     )
                     brands.append(brand)
                 except Exception as e:
