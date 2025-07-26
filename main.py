@@ -15,6 +15,7 @@ from app.routes import (
     heydealer,
     heydealer_filters,
     ssancar,
+    bikemart,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -69,6 +70,9 @@ app.include_router(
 )
 # SSANCAR routes - Direct SSANCAR API without PLC wrapper
 app.include_router(ssancar.router, tags=["SSANCAR Auction"])
+
+# Bikemart routes - Motorcycle marketplace
+app.include_router(bikemart.router, prefix="/api/v1/bikemart", tags=["Bikemart"])
 
 
 @app.get("/")
