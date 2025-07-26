@@ -11,7 +11,9 @@ from app.models.bikemart import (
     BikemartError,
     BikemartBike,
     BikemartPaginationInfo,
-    BikemartFilter
+    BikemartFilter,
+    BikemartBikeDetailResponse,
+    BikemartBikeDetail
 )
 from app.parsers.bikemart_parser import BikemartParser
 
@@ -280,6 +282,67 @@ class BikemartService:
                 price_ranges=[],
                 regions=[],
                 message=f"Error fetching filters: {str(e)}"
+            )
+    
+    async def get_bike_detail(self, seq: str) -> BikemartBikeDetailResponse:
+        """
+        Get detailed bike information by sequence ID
+        
+        Args:
+            seq: Bike sequence ID
+            
+        Returns:
+            BikemartBikeDetailResponse with bike detail data
+        """
+        try:
+            # Build query parameters for getting bike detail
+            params = {
+                "seq": seq,
+                "program": "bike",
+                "service": "sell",
+                "version": "1.0",
+                "action": "getBikeSellDetail",
+                "token": "",
+            }
+            
+            # Make API request
+            response = await self.http_client.get(
+                self.BASE_URL,
+                params=params,
+                headers=self.headers
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"API returned status code: {response.status_code}")
+                return BikemartBikeDetailResponse(
+                    success=False,
+                    data=None,
+                    message=f"API error: {response.status_code}"
+                )
+            
+            # Parse response
+            response_data = response.json()
+            bike_detail = self.parser.parse_bike_detail_response(response_data)
+            
+            if not bike_detail:
+                return BikemartBikeDetailResponse(
+                    success=False,
+                    data=None,
+                    message="Failed to parse bike detail"
+                )
+            
+            return BikemartBikeDetailResponse(
+                success=True,
+                data=bike_detail,
+                message=response_data.get("ResultMessage", "")
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching bike detail: {e}")
+            return BikemartBikeDetailResponse(
+                success=False,
+                data=None,
+                message=f"Error fetching bike detail: {str(e)}"
             )
 
 

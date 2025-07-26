@@ -125,3 +125,37 @@ class BikemartError(BaseModel):
     success: bool = False
     error: str = Field(..., description="Error message")
     detail: Optional[str] = Field(None, description="Detailed error information")
+
+
+class BikemartImageUpload(BaseModel):
+    """Model for bike image upload data"""
+    
+    seq: str = Field(..., description="Image sequence ID")
+    sell_seq: str = Field(..., description="Bike sell sequence ID")
+    url: str = Field(..., description="Full image URL")
+    thumbnail_url: str = Field(..., description="Thumbnail image URL")
+    filepath: str = Field(..., description="File path on server")
+    filename: str = Field(..., description="File name")
+    origin_filename: str = Field(..., description="Original file name")
+    filesize: str = Field(..., description="File size in bytes")
+    width: Optional[str] = Field(None, description="Image width")
+    height: Optional[str] = Field(None, description="Image height")
+    is_default: str = Field(..., description="Is default image flag")
+
+
+class BikemartBikeDetail(BikemartBike):
+    """Model for detailed bike information including images"""
+    
+    name: Optional[str] = Field(None, description="Seller name")
+    nickname: Optional[str] = Field(None, description="Seller nickname")
+    tel: Optional[str] = Field(None, description="Telephone number")
+    youtube: Optional[str] = Field(None, description="YouTube link")
+    upload: List[BikemartImageUpload] = Field(default_factory=list, description="List of bike images")
+
+
+class BikemartBikeDetailResponse(BaseModel):
+    """Response model for bike detail"""
+    
+    success: bool = Field(..., description="Request success status")
+    data: Optional[BikemartBikeDetail] = Field(None, description="Bike detail data")
+    message: Optional[str] = Field(None, description="Response message")

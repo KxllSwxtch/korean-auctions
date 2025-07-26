@@ -6,7 +6,9 @@ from app.models.bikemart import (
     BikemartBike, 
     BikemartFilter, 
     BikemartBrand,
-    BikemartPaginationInfo
+    BikemartPaginationInfo,
+    BikemartBikeDetail,
+    BikemartImageUpload
 )
 
 logger = logging.getLogger(__name__)
@@ -203,3 +205,49 @@ class BikemartParser:
         except Exception as e:
             logger.error(f"Error parsing total count: {e}")
             return 0
+    
+    @staticmethod
+    def parse_bike_detail_response(response_data: Dict[str, Any]) -> Optional[BikemartBikeDetail]:
+        """
+        Parse bike detail response from Bikemart API
+        
+        Args:
+            response_data: Raw JSON response from API
+            
+        Returns:
+            BikemartBikeDetail object or None if parsing fails
+        """
+        try:
+            # Check if response is successful
+            if not response_data.get("ResultCode"):
+                logger.error("Invalid response: ResultCode is False")
+                return None
+            
+            # Extract bike data
+            bike_data = response_data.get("data")
+            if not bike_data:
+                logger.error("No bike data in response")
+                return None
+            
+            # Parse image uploads
+            upload_images = []
+            if "upload" in bike_data and isinstance(bike_data["upload"], list):
+                for img_data in bike_data["upload"]:
+                    try:
+                        image = BikemartImageUpload(**img_data)
+                        upload_images.append(image)
+                    except Exception as e:
+                        logger.error(f"Error parsing image data: {e}")
+                        continue
+            
+            # Add upload images to bike data
+            bike_data["upload"] = upload_images
+            
+            # Create BikemartBikeDetail object
+            bike_detail = BikemartBikeDetail(**bike_data)
+            
+            return bike_detail
+            
+        except Exception as e:
+            logger.error(f"Error parsing bike detail response: {e}")
+            return None

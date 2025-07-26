@@ -6,7 +6,8 @@ from app.models.bikemart import (
     BikemartResponse,
     BikemartBrandsResponse,
     BikemartFiltersResponse,
-    BikemartError
+    BikemartError,
+    BikemartBikeDetailResponse
 )
 from app.services.bikemart_service import bikemart_service, BikemartService
 from app.core.logging import get_logger
@@ -225,6 +226,69 @@ async def get_filters(
         raise
     except Exception as e:
         logger.error(f"Unexpected error fetching filters: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get(
+    "/bikes/{seq}",
+    response_model=BikemartBikeDetailResponse,
+    summary="Get bike detail",
+    description="Get detailed information about a specific bike",
+    responses={
+        200: {
+            "description": "Successful response with bike detail data",
+            "model": BikemartBikeDetailResponse
+        },
+        404: {
+            "description": "Bike not found",
+            "model": BikemartError
+        },
+        500: {
+            "description": "Internal server error",
+            "model": BikemartError
+        }
+    }
+)
+async def get_bike_detail(
+    seq: str,
+    service: BikemartService = Depends(get_bikemart_service)
+) -> BikemartBikeDetailResponse:
+    """
+    Get detailed information about a specific bike
+    
+    Args:
+        seq: Bike sequence ID
+        
+    Returns:
+        BikemartBikeDetailResponse with bike detail data including images
+    """
+    try:
+        logger.info(f"Fetching bike detail for seq: {seq}")
+        
+        response = await service.get_bike_detail(seq)
+        
+        if not response.success:
+            logger.error(f"Failed to fetch bike detail: {response.message}")
+            if "not found" in (response.message or "").lower():
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Bike not found"
+                )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=response.message or "Failed to fetch bike detail"
+            )
+        
+        logger.info(f"Successfully fetched bike detail for seq: {seq}")
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error fetching bike detail: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Internal server error: {str(e)}"
