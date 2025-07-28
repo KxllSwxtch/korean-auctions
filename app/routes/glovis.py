@@ -23,7 +23,10 @@ from app.models.glovis_filters import (
     GlovisFilteredCarsResponse,
 )
 from app.models.plc_auction import (
-    PLCAuctionResponse, PLCAuctionFilters, PLCAuctionManufacturer, PLCAuctionModel
+    PLCAuctionResponse,
+    PLCAuctionFilters,
+    PLCAuctionManufacturer,
+    PLCAuctionModel,
 )
 from app.services.plc_auction_service import PLCAuctionService
 from app.core.logging import get_logger
@@ -997,7 +1000,7 @@ async def paste_curl_command(
 
         # Создаем конвертер и обрабатываем команду
         converter = GlovisCurlConverter()
-        converter.api_url = "http://localhost:8000"  # Внутренний URL
+        converter.api_url = "https://korean-auctions.onrender.com"  # Внутренний URL
 
         # Парсим cookies из cURL команды
         cookies = converter.parse_curl_command(curl_command)
