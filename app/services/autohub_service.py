@@ -884,6 +884,9 @@ class AutohubService:
                     logger.info(f"📍 Используем сессию аукциона: код={current_session.auction_code}, номер={current_session.auction_no}, дата={current_session.auction_date}")
                 else:
                     logger.warning("⚠️ Не удалось получить информацию о текущей сессии аукциона")
+                    # Use empty auction params if we can't get session info
+                    # This allows search to work without auction-specific filtering
+                    logger.info("📍 Используем поиск без привязки к конкретному аукциону")
             
             if not has_filters and search_params.page == 1:
                 # For initial load without filters, use simple GET request
@@ -903,6 +906,10 @@ class AutohubService:
                 logger.info(f"  - Модель: {autohub_params.get('i_sCarName1Code', 'Все')}")
                 logger.info(f"  - Год: {autohub_params.get('i_sCarYearStr', 'Любой')} - {autohub_params.get('i_sCarYearEnd', 'Любой')}")
                 logger.info(f"  - Цена: {autohub_params.get('i_sPricecStr', 'Любая')} - {autohub_params.get('i_sPricecEnd', 'Любая')}")
+                logger.info(f"  - Аукцион: {autohub_params.get('i_sAucNo', 'Не указан')} / {autohub_params.get('i_sStartDt', 'Не указана')}")
+                
+                # Log all parameters for deeper debugging
+                logger.debug(f"Все параметры поиска: {autohub_params}")
                 
                 # Используем _fetch_html метод который правильно обрабатывает сессию
                 html_content = await self._fetch_html(
@@ -1022,7 +1029,8 @@ class AutohubService:
             logger.info(f"Получение моделей для производителя {manufacturer_code}")
             
             # Инициализируем сессию если нужно
-            if not self.session:
+            if not hasattr(self, '_session') or self._session is None:
+                logger.info("Инициализация сессии для получения моделей")
                 session_initialized = await self._initialize_session()
                 if not session_initialized:
                     logger.error("Не удалось инициализировать сессию для получения моделей")
@@ -1090,7 +1098,14 @@ class AutohubService:
             if response_data.get("status") == "succ":
                 # Преобразуем данные в наш формат
                 models = []
-                for item in response_data.get("object", []):
+                raw_models = response_data.get("object", [])
+                logger.info(f"API вернул {len(raw_models)} моделей для {manufacturer_code}")
+                
+                # Логируем первые несколько моделей для отладки
+                if raw_models:
+                    logger.debug(f"Пример модели: {raw_models[0] if raw_models else 'Нет данных'}")
+                
+                for item in raw_models:
                     model = AutohubModel(
                         manufacturer_code=manufacturer_code,
                         model_code=item.get("carname1code", ""),
@@ -1099,6 +1114,11 @@ class AutohubService:
                     models.append(model)
                 
                 logger.info(f"Успешно получено {len(models)} моделей для {manufacturer_code}")
+                
+                # Дополнительная проверка для пустого ответа
+                if len(models) == 0:
+                    logger.warning(f"API вернул успешный статус, но список моделей пуст для {manufacturer_code}")
+                    logger.debug(f"Полный ответ API для отладки: {response_data}")
                 
                 return AutohubModelsResponse(
                     success=True,
