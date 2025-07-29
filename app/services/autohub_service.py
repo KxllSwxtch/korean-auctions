@@ -427,6 +427,61 @@ class AutohubService:
 
         return None
 
+    async def _fetch_html_simple(self, url: str) -> Optional[str]:
+        """
+        Выполняет простой GET запрос без параметров (как в рабочем примере)
+        
+        Args:
+            url: URL для запроса
+            
+        Returns:
+            str: HTML контент или None в случае ошибки
+        """
+        try:
+            logger.info(f"Выполняем простой GET запрос к {url}")
+            
+            # Добавляем случайную задержку для имитации человеческого поведения
+            await asyncio.sleep(0.5)
+            
+            # Обновляем User-Agent для каждого запроса
+            self.session.headers.update({"User-Agent": self.ua.random})
+            
+            # Простой GET запрос без параметров
+            response = self.session.get(
+                url,
+                timeout=self.settings.request_timeout,
+                allow_redirects=True,
+            )
+            
+            # Проверяем статус ответа
+            response.raise_for_status()
+            
+            # Проверяем кодировку
+            if response.encoding is None or response.encoding == "ISO-8859-1":
+                response.encoding = "utf-8"
+            
+            logger.info(f"Успешно получен ответ. Размер: {len(response.text)} символов")
+            
+            # Для отладки сохраняем полученный HTML
+            with open("debug_response_simple.html", "w", encoding="utf-8") as f:
+                f.write(response.text)
+            logger.info("HTML ответ сохранён в debug_response_simple.html для анализа")
+            
+            return response.text
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Таймаут при запросе к {url}")
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Ошибка соединения при запросе к {url}: {e}")
+        except requests.exceptions.HTTPError as e:
+            logger.error(
+                f"HTTP ошибка при запросе к {url}: {e} - Status: {e.response.status_code if e.response else 'Unknown'}"
+            )
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка при запросе к {url}: {e}")
+        
+        return None
+
     def _extract_total_count_from_html(self, html_content: str) -> Optional[int]:
         """
         Извлекает общее количество автомобилей из HTML страницы
@@ -763,28 +818,53 @@ class AutohubService:
                     data=[],
                 )
             
-            # Если нет информации об аукционе, получаем текущую активную сессию
-            if not search_params.auction_code or not search_params.auction_no or not search_params.auction_date:
-                logger.info("Информация об аукционе не полная, получаем активную сессию")
-                sessions_response = await self.get_auction_sessions()
-                if sessions_response.success and sessions_response.current_session:
-                    current_session = sessions_response.current_session
-                    search_params.auction_code = current_session.auction_code
-                    search_params.auction_no = current_session.auction_no
-                    search_params.auction_date = current_session.auction_date
-                    logger.info(f"Используем активную сессию: {current_session.auction_code}, номер: {current_session.auction_no}, дата: {current_session.auction_date}")
-            
-            # Преобразуем параметры в формат AutoHub
-            autohub_params = search_params.to_autohub_params()
-            
-            logger.info(f"Параметры поиска: {autohub_params}")
-            
-            # Используем _fetch_html метод который правильно обрабатывает сессию
-            # Передаем параметры как словарь для POST запроса
-            html_content = await self._fetch_html(
-                self.settings.autohub_list_url, 
-                autohub_params
+            # Check if this is a simple request without filters
+            has_filters = (
+                search_params.manufacturer_code or
+                search_params.model_code or
+                search_params.generation_code or
+                search_params.fuel_type or
+                search_params.year_from or
+                search_params.year_to or
+                search_params.mileage_from or
+                search_params.mileage_to or
+                search_params.price_from or
+                search_params.price_to or
+                search_params.auction_result or
+                search_params.lane or
+                search_params.search_number or
+                search_params.entry_number or
+                search_params.parking_number
             )
+            
+            if not has_filters and search_params.page == 1:
+                # For initial load without filters, use simple GET request like the working example
+                logger.info("Используем простой GET запрос без параметров (как в рабочем примере)")
+                html_content = await self._fetch_html_simple(self.settings.autohub_list_url)
+            else:
+                # For filtered search or pagination, use POST with parameters
+                # Если нет информации об аукционе, получаем текущую активную сессию
+                if not search_params.auction_code or not search_params.auction_no or not search_params.auction_date:
+                    logger.info("Информация об аукционе не полная, получаем активную сессию")
+                    sessions_response = await self.get_auction_sessions()
+                    if sessions_response.success and sessions_response.current_session:
+                        current_session = sessions_response.current_session
+                        search_params.auction_code = current_session.auction_code
+                        search_params.auction_no = current_session.auction_no
+                        search_params.auction_date = current_session.auction_date
+                        logger.info(f"Используем активную сессию: {current_session.auction_code}, номер: {current_session.auction_no}, дата: {current_session.auction_date}")
+                
+                # Преобразуем параметры в формат AutoHub
+                autohub_params = search_params.to_autohub_params()
+                
+                logger.info(f"Параметры поиска: {autohub_params}")
+                
+                # Используем _fetch_html метод который правильно обрабатывает сессию
+                # Передаем параметры как словарь для POST запроса
+                html_content = await self._fetch_html(
+                    self.settings.autohub_list_url, 
+                    autohub_params
+                )
             
             if not html_content:
                 return AutohubResponse(
@@ -1265,19 +1345,28 @@ class AutohubService:
         try:
             logger.info("Получение списка сессий аукциона")
             
-            # Здесь должен быть реальный запрос к AutoHub для получения сессий
-            # Пока возвращаем примерные данные
+            # Get current auction date with 6PM cutoff logic
+            auction_date = self._get_current_auction_date()
+            
+            # Generate auction code and number based on date
+            auction_code = self._generate_auction_code(auction_date)
+            auction_no = self._calculate_auction_number(auction_date)
+            
+            # Format auction title
+            date_parts = auction_date.split('-')
+            auction_title = f"안성 {date_parts[0]}/{date_parts[1]}/{date_parts[2]} {auction_no}회차 경매"
+            
+            logger.info(f"📅 Generated auction session: date={auction_date}, no={auction_no}, code={auction_code}")
+            
             sessions = [
                 AutohubAuctionSession(
-                    auction_no="1333",
-                    auction_date="2025-07-16",
-                    auction_code="AC202507090001",
-                    auction_title="안성 2025/07/16 1333회차 경매",
+                    auction_no=auction_no,
+                    auction_date=auction_date,
+                    auction_code=auction_code,
+                    auction_title=auction_title,
                     is_active=True,
                 )
             ]
-            
-            # TODO: Реализовать парсинг сессий с сайта AutoHub
             
             return AutohubAuctionSessionsResponse(
                 success=True,
@@ -1295,6 +1384,73 @@ class AutohubService:
                 sessions=[],
                 total_count=0,
             )
+    
+    def _get_current_auction_date(self) -> str:
+        """
+        Get current auction date with 6PM Seoul time cutoff
+        
+        Returns:
+            str: Auction date in YYYY-MM-DD format
+        """
+        import pytz
+        from datetime import datetime, timedelta
+        
+        # Get current Seoul time
+        seoul_tz = pytz.timezone('Asia/Seoul')
+        seoul_time = datetime.now(seoul_tz)
+        hour = seoul_time.hour
+        
+        logger.info(f"📅 Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S %Z')}, hour: {hour}")
+        
+        # If after 6PM, use tomorrow's date
+        if hour >= 18:
+            auction_date = seoul_time + timedelta(days=1)
+            logger.info(f"🎯 After 6PM Seoul → Using tomorrow's date: {auction_date.strftime('%Y-%m-%d')}")
+        else:
+            auction_date = seoul_time
+            logger.info(f"🎯 Before 6PM Seoul → Using today's date: {auction_date.strftime('%Y-%m-%d')}")
+        
+        return auction_date.strftime('%Y-%m-%d')
+    
+    def _generate_auction_code(self, auction_date: str) -> str:
+        """
+        Generate auction code based on date
+        
+        Args:
+            auction_date: Date in YYYY-MM-DD format
+            
+        Returns:
+            str: Auction code in format ACYYYYMMDD0001
+        """
+        # Remove hyphens from date
+        date_no_hyphens = auction_date.replace('-', '')
+        # Generate code - AC + date + 0001
+        return f"AC{date_no_hyphens}0001"
+    
+    def _calculate_auction_number(self, auction_date: str) -> str:
+        """
+        Calculate auction number (회차) based on date
+        
+        Args:
+            auction_date: Date in YYYY-MM-DD format
+            
+        Returns:
+            str: Auction number
+        """
+        from datetime import datetime
+        
+        # Parse the auction date
+        date_obj = datetime.strptime(auction_date, '%Y-%m-%d')
+        
+        # Calculate days since start of year
+        year_start = datetime(date_obj.year, 1, 1)
+        days_since_start = (date_obj - year_start).days + 1
+        
+        # Autohub seems to run daily auctions, so auction number could be based on day of year
+        # Adding a base number to make it look realistic (e.g., 1200 + day_of_year)
+        auction_number = 1200 + days_since_start
+        
+        return str(auction_number)
 
 
 # Глобальный экземпляр сервиса

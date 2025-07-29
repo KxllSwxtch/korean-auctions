@@ -834,12 +834,11 @@ function frontModalProgress() {
     <textarea name="noSelect" style="display:none;">E</textarea>
     <textarea name="i_sActionFlag" style="display:none;"></textarea>
     <textarea name="i_sohYn" style="display:none;">ALL</textarea>
-    <textarea name="i_sFueltypecode" style="display:none;">04</textarea>
     <textarea name="i_bojeongYn" style="display:none;">ALL</textarea>
     <textarea name="i_entryNoYn" style="display:none;">ALL</textarea>
     <textarea name="receivecd" style="display:none;"></textarea>
     <textarea name="i_sAucNoTemp1" style="display:none;">1333@@2025-07-16@@AC202507090001</textarea>
-    <textarea name="i_iPageSize" style="display:none;">5</textarea>
+    <textarea name="i_iPageSize" style="display:none;">20</textarea>
     <textarea name="i_sAucNoTemp2" style="display:none;">1333@@2025-07-16@@AC202507090001</textarea>
     <textarea name="pageFlag" style="display:none;">Y</textarea>
     <textarea name="listTabActiveIdx" style="display:none;">1</textarea>
@@ -883,8 +882,8 @@ function frontModalProgress() {
 <input type="hidden" id="pageFlag"		    name="pageFlag"	        value="Y" />
 <input type="hidden" id="i_sAucNo"		    name="i_sAucNo"		    value="1333" />
 <input type="hidden" id="i_sStartDt"		name="i_sStartDt"	    value="2025-07-16" />
-<input type="hidden" id="i_sAucTitle"		name="i_sAucTitle"	    value="안성 2025/07/16 1333회차 경매" />
-<input type="hidden" id="i_sAucCode"		name="i_sAucCode"	    value="AC202507090001" />
+<input type="hidden" id="i_sAucTitle"		name="i_sAucTitle"	    value="" />
+<input type="hidden" id="i_sAucCode"		name="i_sAucCode"	    value="" />
 <input type="hidden" id="i_sSortFlag"		name="i_sSortFlag"	    value="entry" />
 <input type="hidden" id="i_sMainModel"		name="i_sMainModel"	    value="" />
 <input type="hidden" id="i_sMakerCodeD"     name="i_sMakerCodeD"    value="" />
@@ -909,62 +908,6 @@ function frontModalProgress() {
                                 <select name="i_sMakerCodeD1" id="i_sMakerCodeD1" >
 									<option value="">제조사</option>
 				                      
-				                  	     <option value="HD" >현대</option>
-				                      
-				                  	     <option value="KA" >기아</option>
-				                      
-				                  	     <option value="GN" >제네시스</option>
-				                      
-				                  	     <option value="BZ" >벤츠</option>
-				                      
-				                  	     <option value="SY" >쌍용</option>
-				                      
-				                  	     <option value="RS" >르노삼성</option>
-				                      
-				                  	     <option value="KG" >쉐보레(한국GM)</option>
-				                      
-				                  	     <option value="BM" >BMW</option>
-				                      
-				                  	     <option value="AU" >아우디</option>
-				                      
-				                  	     <option value="TY" >도요타</option>
-				                      
-				                  	     <option value="VO" >폭스바겐</option>
-				                      
-				                  	     <option value="MN" >미니</option>
-				                      
-				                  	     <option value="LX" >렉서스</option>
-				                      
-				                  	     <option value="JE" >지프</option>
-				                      
-				                  	     <option value="RR" >랜드로버</option>
-				                      
-				                  	     <option value="FO" >포드</option>
-				                      
-				                  	     <option value="HO" >혼다</option>
-				                      
-				                  	     <option value="AJ" >닛산</option>
-				                      
-				                  	     <option value="MI" >마세라티</option>
-				                      
-				                  	     <option value="LC" >링컨</option>
-				                      
-				                  	     <option value="CA" >캐딜락</option>
-				                      
-				                  	     <option value="IN" >인피니티</option>
-				                      
-				                  	     <option value="PO" >포르쉐</option>
-				                      
-				                  	     <option value="TE" >테슬라</option>
-				                      
-				                  	     <option value="JA" >재규어</option>
-				                      
-				                  	     <option value="PG" >푸조</option>
-				                      
-				                  	     <option value="AM" >애스턴마틴</option>
-				                      
-				                  	     <option value="VV" >볼보</option>
-				                      
                                 </select>
                             </div>
                             <div class="col-md-3">
@@ -976,8 +919,6 @@ function frontModalProgress() {
                             <div class="col-md-4" id="aucNoSelectbox">
                                 <label class="labe_item" for="i_sAucNoTemp1">회차</label>
                                 <select name="i_sAucNoTemp1" id="i_sAucNoTemp1">
-                                	
-                                    	<option value="1333@@2025-07-16@@AC202507090001" selected="selected">안성 2025/07/16 1333회차 경매</option>
                                 	
                                 </select>
                             </div>
@@ -1081,62 +1022,6 @@ function frontModalProgress() {
 				              	 <select name=i_sMakerCode id="i_sMakerCode" style="width:160px">
 				                    <option value="">제조사</option>
 				                      
-				                  	     <option value="HD" >현대</option>
-				                      
-				                  	     <option value="KA" >기아</option>
-				                      
-				                  	     <option value="GN" >제네시스</option>
-				                      
-				                  	     <option value="BZ" >벤츠</option>
-				                      
-				                  	     <option value="SY" >쌍용</option>
-				                      
-				                  	     <option value="RS" >르노삼성</option>
-				                      
-				                  	     <option value="KG" >쉐보레(한국GM)</option>
-				                      
-				                  	     <option value="BM" >BMW</option>
-				                      
-				                  	     <option value="AU" >아우디</option>
-				                      
-				                  	     <option value="TY" >도요타</option>
-				                      
-				                  	     <option value="VO" >폭스바겐</option>
-				                      
-				                  	     <option value="MN" >미니</option>
-				                      
-				                  	     <option value="LX" >렉서스</option>
-				                      
-				                  	     <option value="JE" >지프</option>
-				                      
-				                  	     <option value="RR" >랜드로버</option>
-				                      
-				                  	     <option value="FO" >포드</option>
-				                      
-				                  	     <option value="HO" >혼다</option>
-				                      
-				                  	     <option value="AJ" >닛산</option>
-				                      
-				                  	     <option value="MI" >마세라티</option>
-				                      
-				                  	     <option value="LC" >링컨</option>
-				                      
-				                  	     <option value="CA" >캐딜락</option>
-				                      
-				                  	     <option value="IN" >인피니티</option>
-				                      
-				                  	     <option value="PO" >포르쉐</option>
-				                      
-				                  	     <option value="TE" >테슬라</option>
-				                      
-				                  	     <option value="JA" >재규어</option>
-				                      
-				                  	     <option value="PG" >푸조</option>
-				                      
-				                  	     <option value="AM" >애스턴마틴</option>
-				                      
-				                  	     <option value="VV" >볼보</option>
-				                      
 				                 </select>
                             </div>
                             <div class="col-md-3 col-sm-6">
@@ -1171,7 +1056,7 @@ function frontModalProgress() {
 				                	
 				                    <option value="03"  >LPG</option>
 				                	
-				                    <option value="04" selected="selected" >겸용</option>
+				                    <option value="04"  >겸용</option>
 				                	
 				                    <option value="05"  >하이브리드</option>
 				                	
@@ -1450,8 +1335,6 @@ function frontModalProgress() {
 								<label class="labe_item" for="i_sAucNoTemp2">회차</label>
 								<select name="i_sAucNoTemp2" id="i_sAucNoTemp2">
 									
-										<option value="1333@@2025-07-16@@AC202507090001" selected="selected">안성 2025/07/16 1333회차 경매</option>
-									
 								</select>
 							</div>
 							<div class="col-md-3 col-sm-6">
@@ -1476,7 +1359,7 @@ function frontModalProgress() {
         </div>
         <hr class="hr_Styl2">
         <div class="timeline-heading">
-            <h2><span class="i_comm_main_txt">안성 2025/07/16 1333회차 경매</span> 출품리스트</h2>
+            <h2><span class="i_comm_main_txt"></span> 출품리스트</h2>
         </div>
         <div class="row">
             <div class="col-lg-2 col-md-2 col-sm-2 mobile_bottom_space sort_btn"> <!-- 181020 텍스트형 리스트 수정 -->
@@ -1503,7 +1386,7 @@ function frontModalProgress() {
                 <a class="button btn_no_padd2" id="excBtn" href="javascript:void(0);"><i class="fa fa-download"></i> Excel</a> 
             </div>
             <div class="col-lg-3 col-md-12 col-sm-6 right_align"> <!-- 181020 텍스트형 리스트 수정 --><!-- 181116 리스트 현행화 -->
-                <strong>검색결과: 총 <span class="text_style7 i_comm_main_txt">0</span>건</strong> / <span>단위(만원)</span> <!-- 181020 텍스트형 리스트 수정 -->
+                <strong>검색결과: 총 <span class="text_style7 i_comm_main_txt"></span>건</strong> / <span>단위(만원)</span> <!-- 181020 텍스트형 리스트 수정 -->
             </div>
         </div>
         
@@ -1605,7 +1488,7 @@ function addBtnEvent() {
 		if('' == ''){
 			alert('대상 목록이 존재하지 않습니다.');
 		}else{
-			var flag ='Y';	
+			var flag ='';	
 			
 			if ( flag == 'N' ){
 				alert('지난경매회차는 Excel다운로드를 할 수 없습니다. 경매회차를 확인 하여 주시기 바랍니다.');

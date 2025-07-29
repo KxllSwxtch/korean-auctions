@@ -1,8 +1,0 @@
-{
-  "status": "succ",
-  "message": "success",
-  "object": [
-    { "carname3code": "001", "carname3name": "LPG 2WD" },
-    { "carname3code": "002", "carname3name": "가솔린 2WD" }
-  ]
-}
