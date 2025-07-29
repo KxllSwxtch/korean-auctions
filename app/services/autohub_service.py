@@ -943,9 +943,7 @@ class AutohubService:
                 logger.info(
                     f"  - Производитель: {search_params.manufacturer_code or 'Все'}"
                 )
-                logger.info(
-                    f"  - Модель: {search_params.model_code or 'Все'}"
-                )
+                logger.info(f"  - Модель: {search_params.model_code or 'Все'}")
                 logger.info(
                     f"  - Год: {search_params.year_from or 'Любой'} - {search_params.year_to or 'Любой'}"
                 )
@@ -970,12 +968,12 @@ class AutohubService:
             cars = self.parser.parse_car_list(html_content)
 
             logger.info(f"🚗 Найдено {len(cars)} автомобилей до фильтрации")
-            
+
             # Применяем фильтры если они есть
             if has_filters:
                 logger.info("🔍 Применяем фильтры к результатам")
                 filtered_cars = []
-                
+
                 for car in cars:
                     # Фильтр по производителю
                     if search_params.manufacturer_code:
@@ -983,63 +981,105 @@ class AutohubService:
                         # Обычно название начинается с бренда
                         car_brand = car.title.split()[0] if car.title else ""
                         manufacturer_match = False
-                        
+
                         # Проверяем соответствие производителя
-                        if search_params.manufacturer_code == "KA" and "기아" in car_brand:
+                        if (
+                            search_params.manufacturer_code == "KA"
+                            and "기아" in car_brand
+                        ):
                             manufacturer_match = True
-                        elif search_params.manufacturer_code == "HD" and "현대" in car_brand:
+                        elif (
+                            search_params.manufacturer_code == "HD"
+                            and "현대" in car_brand
+                        ):
                             manufacturer_match = True
-                        elif search_params.manufacturer_code == "GN" and "제네시스" in car_brand:
+                        elif (
+                            search_params.manufacturer_code == "GN"
+                            and "제네시스" in car_brand
+                        ):
                             manufacturer_match = True
-                        elif search_params.manufacturer_code == "CV" and ("쉐보레" in car_brand or "Chevrolet" in car_brand):
+                        elif search_params.manufacturer_code == "CV" and (
+                            "쉐보레" in car_brand or "Chevrolet" in car_brand
+                        ):
                             manufacturer_match = True
-                        elif search_params.manufacturer_code == "RN" and "르노" in car_brand:
+                        elif (
+                            search_params.manufacturer_code == "RN"
+                            and "르노" in car_brand
+                        ):
                             manufacturer_match = True
-                        elif search_params.manufacturer_code == "SY" and "쌍용" in car_brand:
+                        elif (
+                            search_params.manufacturer_code == "SY"
+                            and "쌍용" in car_brand
+                        ):
                             manufacturer_match = True
                         # Добавить другие производители по мере необходимости
-                        
+
                         if not manufacturer_match:
                             continue
-                    
+
                     # Фильтр по модели
                     if search_params.model_code:
-                        # Простая проверка - модель должна быть в названии
-                        # Это временное решение, пока не будет точного соответствия
                         model_found = False
                         car_title_lower = car.title.lower() if car.title else ""
-                        
-                        # Mapping кодов моделей к названиям (примеры для Kia и Hyundai)
+
+                        # Улучшенный mapping кодов моделей к названиям
+                        # Включаем различные варианты написания для лучшего совпадения
                         model_mappings = {
                             # Kia models
-                            "KA01": ["k3", "케이쓰리"],
-                            "KA02": ["k5", "케이파이브"],
-                            "KA03": ["k7", "케이세븐"],
-                            "KA04": ["k8", "케이에잇"],
-                            "KA05": ["k9", "케이나인"],
+                            "KA01": ["k3", "케이쓰리", "k 3"],
+                            "KA02": ["k5", "케이파이브", "k 5"],
+                            "KA03": ["k7", "케이세븐", "k 7"],
+                            "KA04": ["k8", "케이에잇", "k 8"],
+                            "KA05": ["k9", "케이나인", "k 9"],
                             "KA06": ["sportage", "스포티지"],
-                            "KA07": ["sorento", "쏘렌토"],
+                            "KA07": ["sorento", "쏘렌토", "소렌토"],
                             "KA08": ["carnival", "카니발"],
                             "KA09": ["seltos", "셀토스"],
                             "KA10": ["mohave", "모하비"],
                             # Hyundai models
-                            "HD01": ["avante", "아반떼", "elantra"],
-                            "HD02": ["sonata", "쏘나타"],
-                            "HD03": ["grandeur", "그랜저"],
-                            "HD04": ["tucson", "투싼"],
-                            "HD05": ["santafe", "싼타페"],
+                            "HD01": ["avante", "아반떼", "elantra", "아반테"],
+                            "HD02": ["sonata", "쏘나타", "소나타"],
+                            "HD03": ["grandeur", "그랜저", "그랜져"],
+                            "HD04": ["tucson", "투싼", "툭산"],
+                            "HD05": ["santafe", "싼타페", "산타페", "santa fe"],
                             "HD06": ["palisade", "팰리세이드"],
+                            "HD07": ["맥스크루즈", "maxcruz"],
+                            # Genesis models
+                            "GN01": ["g70", "g 70"],
+                            "GN02": ["g80", "g 80"],
+                            "GN03": ["g90", "g 90"],
+                            "GN04": ["gv70", "gv 70"],
+                            "GN05": ["gv80", "gv 80"],
+                            "GN06": ["gv90", "gv 90"],
                         }
-                        
+
                         if search_params.model_code in model_mappings:
                             for model_name in model_mappings[search_params.model_code]:
+                                # Проверяем с учетом пробелов и специальных символов
+                                # Например, "쏘렌토 4세대" должно совпадать с "쏘렌토"
                                 if model_name in car_title_lower:
                                     model_found = True
+                                    logger.debug(
+                                        f"✅ Модель найдена: '{model_name}' в '{car.title}'"
+                                    )
                                     break
-                        
+                                # Также проверяем с границами слов для английских названий
+                                elif (
+                                    model_name.replace(" ", "").isalpha()
+                                    and f" {model_name} " in f" {car_title_lower} "
+                                ):
+                                    model_found = True
+                                    logger.debug(
+                                        f"✅ Модель найдена (с границами): '{model_name}' в '{car.title}'"
+                                    )
+                                    break
+
                         if not model_found:
+                            logger.debug(
+                                f"❌ Модель {search_params.model_code} не найдена в '{car.title}'"
+                            )
                             continue
-                    
+
                     # Фильтр по году
                     if search_params.year_from and car.year:
                         try:
@@ -1048,7 +1088,7 @@ class AutohubService:
                                 continue
                         except:
                             pass
-                            
+
                     if search_params.year_to and car.year:
                         try:
                             car_year = int(car.year)
@@ -1056,54 +1096,64 @@ class AutohubService:
                                 continue
                         except:
                             pass
-                    
+
                     # Фильтр по цене
                     if search_params.price_from and car.starting_price:
                         if car.starting_price < search_params.price_from:
                             continue
-                            
+
                     if search_params.price_to and car.starting_price:
                         if car.starting_price > search_params.price_to:
                             continue
-                    
+
                     # Фильтр по пробегу
                     if search_params.mileage_from and car.mileage:
                         try:
-                            car_mileage = int(car.mileage.replace(",", "").replace("km", ""))
+                            car_mileage = int(
+                                car.mileage.replace(",", "").replace("km", "")
+                            )
                             if car_mileage < search_params.mileage_from:
                                 continue
                         except:
                             pass
-                            
+
                     if search_params.mileage_to and car.mileage:
                         try:
-                            car_mileage = int(car.mileage.replace(",", "").replace("km", ""))
+                            car_mileage = int(
+                                car.mileage.replace(",", "").replace("km", "")
+                            )
                             if car_mileage > search_params.mileage_to:
                                 continue
                         except:
                             pass
-                    
+
                     # Если автомобиль прошел все фильтры, добавляем его
                     filtered_cars.append(car)
-                
-                logger.info(f"✅ После фильтрации осталось {len(filtered_cars)} автомобилей")
+
+                logger.info(
+                    f"✅ После фильтрации осталось {len(filtered_cars)} автомобилей"
+                )
                 cars = filtered_cars
-            
+
             # Сохраняем общее количество до пагинации
             total_filtered_count = len(cars)
-            
+
             # Применяем пагинацию к отфильтрованным результатам
             page = search_params.page
             page_size = search_params.page_size
             start_idx = (page - 1) * page_size
             end_idx = start_idx + page_size
-            
+
             logger.info(f"📄 Применяем пагинацию: страница {page}, размер {page_size}")
-            logger.info(f"📄 Индексы: {start_idx} - {end_idx} из {total_filtered_count}")
-            
+            logger.info(
+                f"📄 Индексы: {start_idx} - {end_idx} из {total_filtered_count}"
+            )
+
             cars = cars[start_idx:end_idx]
-            
-            logger.info(f"🚗 Итого возвращаем {len(cars)} автомобилей на странице {page}")
+
+            logger.info(
+                f"🚗 Итого возвращаем {len(cars)} автомобилей на странице {page}"
+            )
 
             # Если автомобили не найдены, это может быть нормальным результатом поиска
             if len(cars) == 0:
@@ -1157,8 +1207,10 @@ class AutohubService:
                 logger.info("📊 Не удалось определить общее количество автомобилей")
 
             # Если применялись фильтры, используем количество отфильтрованных автомобилей
-            final_total_count = total_filtered_count if has_filters else (total_count or len(cars))
-            
+            final_total_count = (
+                total_filtered_count if has_filters else (total_count or len(cars))
+            )
+
             return AutohubResponse(
                 success=True,
                 data=cars,
@@ -1241,13 +1293,13 @@ class AutohubService:
                 "i_sMakerCode": manufacturer_code,
                 "isMultiInit": "false",
             }
-            
+
             # Альтернативный набор параметров (как в старой версии)
             alt_data = {
                 "i_sMakerCode": manufacturer_code,
                 "mode": "maker",
             }
-            
+
             # Логируем оба варианта
             logger.info(f"Основные параметры запроса: {data}")
             logger.info(f"Альтернативные параметры: {alt_data}")
@@ -1265,13 +1317,15 @@ class AutohubService:
             logger.info(f"Запрос моделей: {url} с параметрами {data}")
             logger.debug(f"Заголовки запроса: {headers}")
             logger.debug(f"Cookies сессии: {self.session.cookies.get_dict()}")
-            
+
             # Дополнительное логирование для отладки
             logger.info(f"=== Отладка запроса моделей для {manufacturer_code} ===")
             logger.info(f"URL: {url}")
             logger.info(f"Метод: POST")
             logger.info(f"Данные: {data}")
-            logger.info(f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}")
+            logger.info(
+                f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}"
+            )
             logger.info(f"User-Agent: {headers.get('User-Agent', 'НЕТ')}")
             logger.info(f"Referer: {headers.get('Referer', 'НЕТ')}")
 
@@ -1289,39 +1343,48 @@ class AutohubService:
                 response_data = response.json()
                 logger.info(f"Получен ответ с моделями: {response_data.get('status')}")
                 logger.debug(f"Полный ответ API: {response_data}")
-                
+
                 # Сохраняем сырой ответ в файл для отладки
                 import os
                 from datetime import datetime
-                
+
                 debug_dir = "logs/autohub_debug"
                 os.makedirs(debug_dir, exist_ok=True)
-                
+
                 debug_filename = f"{debug_dir}/models_response_{manufacturer_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                
+
                 try:
-                    with open(debug_filename, 'w', encoding='utf-8') as f:
-                        json.dump({
-                            "request_info": {
-                                "manufacturer_code": manufacturer_code,
-                                "url": url,
-                                "method": "POST",
-                                "headers": dict(response.request.headers),
-                                "data": data,
-                                "cookies": self.session.cookies.get_dict(),
-                                "timestamp": datetime.now().isoformat()
+                    with open(debug_filename, "w", encoding="utf-8") as f:
+                        json.dump(
+                            {
+                                "request_info": {
+                                    "manufacturer_code": manufacturer_code,
+                                    "url": url,
+                                    "method": "POST",
+                                    "headers": dict(response.request.headers),
+                                    "data": data,
+                                    "cookies": self.session.cookies.get_dict(),
+                                    "timestamp": datetime.now().isoformat(),
+                                },
+                                "response_info": {
+                                    "status_code": response.status_code,
+                                    "headers": dict(response.headers),
+                                    "raw_data": response_data,
+                                    "raw_text": (
+                                        response.text
+                                        if len(response.text) < 10000
+                                        else response.text[:10000] + "... (truncated)"
+                                    ),
+                                },
                             },
-                            "response_info": {
-                                "status_code": response.status_code,
-                                "headers": dict(response.headers),
-                                "raw_data": response_data,
-                                "raw_text": response.text if len(response.text) < 10000 else response.text[:10000] + "... (truncated)"
-                            }
-                        }, f, ensure_ascii=False, indent=2)
+                            f,
+                            ensure_ascii=False,
+                            indent=2,
+                        )
                     logger.info(f"Сохранен отладочный файл: {debug_filename}")
                 except Exception as e:
                     logger.error(f"Не удалось сохранить отладочный файл: {e}")
-                    
+
             except json.JSONDecodeError as e:
                 logger.error(f"Ошибка парсинга JSON ответа: {e}")
                 logger.error(f"Текст ответа: {response.text[:500]}")
@@ -1365,10 +1428,12 @@ class AutohubService:
                         f"API вернул успешный статус, но список моделей пуст для {manufacturer_code}"
                     )
                     logger.debug(f"Полный ответ API для отладки: {response_data}")
-                    
+
                     # Пробуем альтернативный подход с другими параметрами
-                    logger.info("Пробуем альтернативный запрос с параметрами mode=maker")
-                    
+                    logger.info(
+                        "Пробуем альтернативный запрос с параметрами mode=maker"
+                    )
+
                     try:
                         alt_response = self.session.post(
                             url,
@@ -1377,12 +1442,14 @@ class AutohubService:
                             timeout=self.settings.request_timeout,
                         )
                         alt_response.raise_for_status()
-                        
+
                         alt_response_data = alt_response.json()
                         if alt_response_data.get("status") == "succ":
                             alt_raw_models = alt_response_data.get("object", [])
-                            logger.info(f"Альтернативный запрос вернул {len(alt_raw_models)} моделей")
-                            
+                            logger.info(
+                                f"Альтернативный запрос вернул {len(alt_raw_models)} моделей"
+                            )
+
                             if alt_raw_models:
                                 models = []
                                 for item in alt_raw_models:
@@ -1392,16 +1459,22 @@ class AutohubService:
                                         name=item.get("carname1name", ""),
                                     )
                                     models.append(model)
-                                logger.info(f"Успешно получено {len(models)} моделей через альтернативный метод")
+                                logger.info(
+                                    f"Успешно получено {len(models)} моделей через альтернативный метод"
+                                )
                     except Exception as e:
                         logger.error(f"Ошибка при альтернативном запросе: {e}")
-                        
+
                     # Если все способы не сработали, используем резервные данные
                     if len(models) == 0:
-                        logger.warning("Используем резервные статические данные для моделей")
+                        logger.warning(
+                            "Используем резервные статические данные для моделей"
+                        )
                         models = self._get_fallback_models(manufacturer_code)
                         if models:
-                            logger.info(f"Загружено {len(models)} моделей из резервных данных")
+                            logger.info(
+                                f"Загружено {len(models)} моделей из резервных данных"
+                            )
 
                 return AutohubModelsResponse(
                     success=True,
@@ -1425,7 +1498,9 @@ class AutohubService:
             # Пытаемся использовать резервные данные
             fallback_models = self._get_fallback_models(manufacturer_code)
             if fallback_models:
-                logger.warning(f"Используем резервные данные из-за ошибки сети: {len(fallback_models)} моделей")
+                logger.warning(
+                    f"Используем резервные данные из-за ошибки сети: {len(fallback_models)} моделей"
+                )
                 return AutohubModelsResponse(
                     success=True,
                     message=f"Список моделей для {manufacturer_code} получен из резервных данных",
@@ -1445,7 +1520,9 @@ class AutohubService:
             # Пытаемся использовать резервные данные
             fallback_models = self._get_fallback_models(manufacturer_code)
             if fallback_models:
-                logger.warning(f"Используем резервные данные из-за ошибки: {len(fallback_models)} моделей")
+                logger.warning(
+                    f"Используем резервные данные из-за ошибки: {len(fallback_models)} моделей"
+                )
                 return AutohubModelsResponse(
                     success=True,
                     message=f"Список моделей для {manufacturer_code} получен из резервных данных",
@@ -1464,10 +1541,10 @@ class AutohubService:
     def _get_fallback_models(self, manufacturer_code: str) -> List[AutohubModel]:
         """
         Возвращает статический список моделей для производителя в качестве резервного варианта
-        
+
         Args:
             manufacturer_code: Код производителя
-            
+
         Returns:
             List[AutohubModel]: Список моделей
         """
@@ -1479,7 +1556,9 @@ class AutohubService:
                 AutohubModel(manufacturer_code="KA", model_code="KA03", name="K7"),
                 AutohubModel(manufacturer_code="KA", model_code="KA04", name="K8"),
                 AutohubModel(manufacturer_code="KA", model_code="KA05", name="K9"),
-                AutohubModel(manufacturer_code="KA", model_code="KA06", name="스포티지"),
+                AutohubModel(
+                    manufacturer_code="KA", model_code="KA06", name="스포티지"
+                ),
                 AutohubModel(manufacturer_code="KA", model_code="KA07", name="쏘렌토"),
                 AutohubModel(manufacturer_code="KA", model_code="KA08", name="카니발"),
                 AutohubModel(manufacturer_code="KA", model_code="KA09", name="셀토스"),
@@ -1494,11 +1573,17 @@ class AutohubService:
                 AutohubModel(manufacturer_code="HD", model_code="HD03", name="그랜저"),
                 AutohubModel(manufacturer_code="HD", model_code="HD04", name="투싼"),
                 AutohubModel(manufacturer_code="HD", model_code="HD05", name="싼타페"),
-                AutohubModel(manufacturer_code="HD", model_code="HD06", name="팰리세이드"),
+                AutohubModel(
+                    manufacturer_code="HD", model_code="HD06", name="팰리세이드"
+                ),
                 AutohubModel(manufacturer_code="HD", model_code="HD07", name="코나"),
                 AutohubModel(manufacturer_code="HD", model_code="HD08", name="베뉴"),
-                AutohubModel(manufacturer_code="HD", model_code="HD09", name="아이오닉5"),
-                AutohubModel(manufacturer_code="HD", model_code="HD10", name="아이오닉6"),
+                AutohubModel(
+                    manufacturer_code="HD", model_code="HD09", name="아이오닉5"
+                ),
+                AutohubModel(
+                    manufacturer_code="HD", model_code="HD10", name="아이오닉6"
+                ),
             ],
             "GN": [  # Genesis
                 AutohubModel(manufacturer_code="GN", model_code="GN01", name="G70"),
@@ -1510,7 +1595,7 @@ class AutohubService:
                 AutohubModel(manufacturer_code="GN", model_code="GN07", name="GV90"),
             ],
         }
-        
+
         return fallback_models.get(manufacturer_code, [])
 
     async def get_generations(self, model_code: str) -> AutohubGenerationsResponse:
@@ -1575,13 +1660,15 @@ class AutohubService:
             # Выполняем запрос
             url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
             logger.info(f"Запрос поколений: {url} с параметрами {data}")
-            
+
             # Дополнительное логирование для отладки
             logger.info(f"=== Отладка запроса поколений для {model_code} ===")
             logger.info(f"URL: {url}")
             logger.info(f"Метод: POST")
             logger.info(f"Данные: {data}")
-            logger.info(f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}")
+            logger.info(
+                f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}"
+            )
 
             response = self.session.post(
                 url,
@@ -1595,42 +1682,53 @@ class AutohubService:
             # Парсим JSON ответ
             try:
                 response_data = response.json()
-                logger.info(f"Получен ответ с поколениями: {response_data.get('status')}")
+                logger.info(
+                    f"Получен ответ с поколениями: {response_data.get('status')}"
+                )
                 logger.debug(f"Полный ответ: {response_data}")
-                
+
                 # Сохраняем сырой ответ в файл для отладки
                 import os
                 from datetime import datetime
-                
+
                 debug_dir = "logs/autohub_debug"
                 os.makedirs(debug_dir, exist_ok=True)
-                
+
                 debug_filename = f"{debug_dir}/generations_response_{model_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                
+
                 try:
-                    with open(debug_filename, 'w', encoding='utf-8') as f:
-                        json.dump({
-                            "request_info": {
-                                "model_code": model_code,
-                                "manufacturer_code": manufacturer_code,
-                                "url": url,
-                                "method": "POST",
-                                "headers": dict(response.request.headers),
-                                "data": data,
-                                "cookies": self.session.cookies.get_dict(),
-                                "timestamp": datetime.now().isoformat()
+                    with open(debug_filename, "w", encoding="utf-8") as f:
+                        json.dump(
+                            {
+                                "request_info": {
+                                    "model_code": model_code,
+                                    "manufacturer_code": manufacturer_code,
+                                    "url": url,
+                                    "method": "POST",
+                                    "headers": dict(response.request.headers),
+                                    "data": data,
+                                    "cookies": self.session.cookies.get_dict(),
+                                    "timestamp": datetime.now().isoformat(),
+                                },
+                                "response_info": {
+                                    "status_code": response.status_code,
+                                    "headers": dict(response.headers),
+                                    "raw_data": response_data,
+                                    "raw_text": (
+                                        response.text
+                                        if len(response.text) < 10000
+                                        else response.text[:10000] + "... (truncated)"
+                                    ),
+                                },
                             },
-                            "response_info": {
-                                "status_code": response.status_code,
-                                "headers": dict(response.headers),
-                                "raw_data": response_data,
-                                "raw_text": response.text if len(response.text) < 10000 else response.text[:10000] + "... (truncated)"
-                            }
-                        }, f, ensure_ascii=False, indent=2)
+                            f,
+                            ensure_ascii=False,
+                            indent=2,
+                        )
                     logger.info(f"Сохранен отладочный файл: {debug_filename}")
                 except Exception as e:
                     logger.error(f"Не удалось сохранить отладочный файл: {e}")
-                    
+
             except json.JSONDecodeError as e:
                 logger.error(f"Ошибка парсинга JSON ответа: {e}")
                 logger.error(f"Текст ответа: {response.text[:500]}")
@@ -1779,13 +1877,17 @@ class AutohubService:
             # Выполняем запрос
             url = urljoin(self.base_url, "/comm/comm_Ajcarmodel_ajax.do")
             logger.info(f"Запрос конфигураций: {url} с параметрами {data}")
-            
+
             # Дополнительное логирование для отладки
-            logger.info(f"=== Отладка запроса конфигураций для поколения {generation_code} модели {model_code} ===")
+            logger.info(
+                f"=== Отладка запроса конфигураций для поколения {generation_code} модели {model_code} ==="
+            )
             logger.info(f"URL: {url}")
             logger.info(f"Метод: POST")
             logger.info(f"Данные: {data}")
-            logger.info(f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}")
+            logger.info(
+                f"Cookies: JSESSIONID={self.session.cookies.get('JSESSIONID', 'НЕТ')}, WMONID={self.session.cookies.get('WMONID', 'НЕТ')}"
+            )
 
             response = self.session.post(
                 url,
@@ -1803,41 +1905,50 @@ class AutohubService:
                     f"Получен ответ с конфигурациями: {response_data.get('status')}"
                 )
                 logger.debug(f"Полный ответ: {response_data}")
-                
+
                 # Сохраняем сырой ответ в файл для отладки
                 import os
                 from datetime import datetime
-                
+
                 debug_dir = "logs/autohub_debug"
                 os.makedirs(debug_dir, exist_ok=True)
-                
+
                 debug_filename = f"{debug_dir}/configurations_response_{model_code}_{generation_code}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                
+
                 try:
-                    with open(debug_filename, 'w', encoding='utf-8') as f:
-                        json.dump({
-                            "request_info": {
-                                "generation_code": generation_code,
-                                "model_code": model_code,
-                                "manufacturer_code": manufacturer_code,
-                                "url": url,
-                                "method": "POST",
-                                "headers": dict(response.request.headers),
-                                "data": data,
-                                "cookies": self.session.cookies.get_dict(),
-                                "timestamp": datetime.now().isoformat()
+                    with open(debug_filename, "w", encoding="utf-8") as f:
+                        json.dump(
+                            {
+                                "request_info": {
+                                    "generation_code": generation_code,
+                                    "model_code": model_code,
+                                    "manufacturer_code": manufacturer_code,
+                                    "url": url,
+                                    "method": "POST",
+                                    "headers": dict(response.request.headers),
+                                    "data": data,
+                                    "cookies": self.session.cookies.get_dict(),
+                                    "timestamp": datetime.now().isoformat(),
+                                },
+                                "response_info": {
+                                    "status_code": response.status_code,
+                                    "headers": dict(response.headers),
+                                    "raw_data": response_data,
+                                    "raw_text": (
+                                        response.text
+                                        if len(response.text) < 10000
+                                        else response.text[:10000] + "... (truncated)"
+                                    ),
+                                },
                             },
-                            "response_info": {
-                                "status_code": response.status_code,
-                                "headers": dict(response.headers),
-                                "raw_data": response_data,
-                                "raw_text": response.text if len(response.text) < 10000 else response.text[:10000] + "... (truncated)"
-                            }
-                        }, f, ensure_ascii=False, indent=2)
+                            f,
+                            ensure_ascii=False,
+                            indent=2,
+                        )
                     logger.info(f"Сохранен отладочный файл: {debug_filename}")
                 except Exception as e:
                     logger.error(f"Не удалось сохранить отладочный файл: {e}")
-                    
+
             except json.JSONDecodeError as e:
                 logger.error(f"Ошибка парсинга JSON ответа: {e}")
                 logger.error(f"Текст ответа: {response.text[:500]}")
