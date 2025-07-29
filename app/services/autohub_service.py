@@ -1004,14 +1004,32 @@ class AutohubService:
                 )
 
             # Для отладки сохраняем полученный HTML
-            with open("debug_search_response.html", "w", encoding="utf-8") as f:
+            debug_filename = "debug_search_response.html"
+            if has_filters:
+                debug_filename = "debug_search_response_filtered.html"
+            with open(debug_filename, "w", encoding="utf-8") as f:
                 f.write(html_content)
-            logger.info("HTML ответ сохранён в debug_search_response.html для анализа")
+            logger.info(f"HTML ответ сохранён в {debug_filename} для анализа")
+            
+            # Проверяем размер HTML для отладки
+            html_size = len(html_content)
+            logger.info(f"📏 Размер HTML ответа: {html_size} символов")
+            
+            # Проверяем наличие маркеров контента
+            has_tbody = "tbody" in html_content
+            has_car_info = "carInfo" in html_content
+            has_no_results = "검색결과가 없습니다" in html_content or "조회된 데이터가 없습니다" in html_content
+            
+            logger.info(f"🔍 Маркеры контента: tbody={has_tbody}, carInfo={has_car_info}, no_results={has_no_results}")
 
             # Парсим результаты
             cars = self.parser.parse_car_list(html_content)
 
             logger.info(f"🚗 Найдено {len(cars)} автомобилей")
+            
+            # Если автомобили не найдены, но есть маркеры контента, логируем предупреждение
+            if len(cars) == 0 and has_tbody and has_car_info and not has_no_results:
+                logger.warning("⚠️ Парсер не смог извлечь автомобили, хотя HTML содержит данные")
 
             # Поскольку мы теперь отправляем фильтры напрямую в Autohub,
             # клиентская фильтрация больше не нужна

@@ -46,8 +46,9 @@ app.add_middleware(
 
 # Подключение маршрутов
 app.include_router(autohub.router, prefix="/api/v1/autohub", tags=["Autohub"])
+# Demo routes should be under a different path to avoid conflicts
 app.include_router(
-    autohub_demo.router, prefix="/api/v1/autohub/cars", tags=["Autohub Demo"]
+    autohub_demo.router, prefix="/api/v1/autohub-demo", tags=["Autohub Demo"]
 )
 app.include_router(lotte.router, tags=["Lotte Auction"])
 app.include_router(lotte_filters.router, tags=["Lotte Filters"])

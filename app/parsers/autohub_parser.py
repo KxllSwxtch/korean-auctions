@@ -65,8 +65,10 @@ class AutohubParser:
             if tbody:
                 # Если нашли tbody, ищем все строки в нем
                 car_blocks = tbody.find_all("tr")
+                logger.info(f"Найден tbody с классом 'text-center text_vert_midd', содержит {len(car_blocks)} строк")
             else:
                 # Если не нашли tbody с классом, ищем все таблицы и берем первую подходящую
+                logger.warning("Не найден tbody с классом 'text-center text_vert_midd', ищем альтернативные способы")
                 tables = soup.find_all("table", class_=lambda x: x and "table" in x)
                 car_blocks = []
                 for table in tables:
@@ -75,6 +77,7 @@ class AutohubParser:
                         rows = tbody.find_all("tr")
                         if rows:
                             car_blocks.extend(rows)
+                            logger.info(f"Найдена таблица с {len(rows)} строками")
                             break
 
             logger.info(f"Найдено {len(car_blocks)} строк с автомобилями")
@@ -526,30 +529,40 @@ class AutohubParser:
         try:
             cells = car_block.find_all("td")
             
-            # Цена обычно в 4-5 ячейке
-            if len(cells) > 4:
-                price_cell = cells[4]
-                price_text = price_cell.get_text(strip=True)
-                
-                # Убираем все нецифровые символы кроме запятых
-                price_clean = re.sub(r"[^\d,]", "", price_text)
-                # Убираем запятые и конвертируем в число
-                price_clean = price_clean.replace(",", "")
-                
-                if price_clean.isdigit():
-                    financial["starting_price"] = int(price_clean)
-                    logger.debug(f"Найдена цена: {price_clean}")
+            # Цена обычно в 3-й ячейке (после названия и оценки)
+            if len(cells) > 2:
+                # Ищем ячейку с ценой по классу
+                for idx, cell in enumerate(cells):
+                    cell_text = cell.get_text(strip=True)
+                    
+                    # Проверяем содержит ли текст признаки цены
+                    if "만원" in cell_text or re.search(r"\d{3,}", cell_text.replace(",", "")):
+                        # Парсим цену
+                        price_match = re.search(r"([\d,]+)\s*만원", cell_text)
+                        if price_match:
+                            price_str = price_match.group(1).replace(",", "")
+                            financial["starting_price"] = int(price_str)
+                            logger.debug(f"Найдена стартовая цена: {financial['starting_price']} 만원")
+                        else:
+                            # Пробуем найти просто числа
+                            numbers = re.findall(r"\d{3,}", cell_text.replace(",", ""))
+                            if numbers:
+                                financial["starting_price"] = int(numbers[0])
+                                logger.debug(f"Найдена цена (альтернативный): {financial['starting_price']}")
+                        break
             
-            # Альтернативный поиск в strong тегах
-            strong_tags = car_block.find_all("strong")
-            for strong in strong_tags:
-                text = strong.get_text(strip=True)
-                # Ищем числа с запятыми (форматированные цены)
-                if re.match(r"^[\d,]+$", text):
-                    price_clean = text.replace(",", "")
-                    if price_clean.isdigit() and "starting_price" not in financial:
-                        financial["starting_price"] = int(price_clean)
-                        logger.debug(f"Найдена цена (альтернативный): {price_clean}")
+            # Дополнительный поиск в strong тегах
+            if "starting_price" not in financial:
+                strong_tags = car_block.find_all("strong")
+                for strong in strong_tags:
+                    text = strong.get_text(strip=True)
+                    # Ищем числа с запятыми (форматированные цены)
+                    if re.match(r"^[\d,]+$", text):
+                        price_clean = text.replace(",", "")
+                        if price_clean.isdigit() and len(price_clean) >= 3:
+                            financial["starting_price"] = int(price_clean)
+                            logger.debug(f"Найдена цена в strong теге: {price_clean}")
+                            break
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении financial_info: {e}")
@@ -563,37 +576,32 @@ class AutohubParser:
         try:
             cells = car_block.find_all("td")
             
-            # Статус обычно в последней ячейке
-            if len(cells) > 5:
-                status_cell = cells[5]
-                status_text = status_cell.get_text(strip=True)
-                
-                if status_text:
-                    status_info["status"] = self._parse_status(status_text)
-                    
-                    # Если есть результат аукциона, он тоже здесь
-                    if "낙찰" in status_text or "유찰" in status_text:
-                        status_info["auction_result"] = status_text
-            
-            # Альтернативный поиск статуса в тексте
-            all_text = car_block.get_text()
-            
-            # Статус
-            status_match = re.search(r"진행상태\s*:\s*([^\s]+)", all_text)
-            if status_match and "status" not in status_info:
-                status_text = status_match.group(1)
-                status_info["status"] = self._parse_status(status_text)
-            
-            # Результат аукциона
-            result_match = re.search(r"경매결과\s*:\s*([^\s]+)", all_text)
-            if result_match and "auction_result" not in status_info:
-                result_text = result_match.group(1)
-                if result_text != "-":
-                    status_info["auction_result"] = result_text
+            # Статус обычно в предпоследней или последней ячейке
+            if len(cells) >= 5:
+                # Проверяем последние две ячейки
+                for cell_idx in [-2, -1]:
+                    if len(cells) > abs(cell_idx):
+                        status_cell = cells[cell_idx]
+                        status_text = status_cell.get_text(strip=True)
+                        
+                        # Проверяем на статусы
+                        if any(status in status_text for status in ["출품등록", "진행중", "완료", "대기", "낙찰", "유찰"]):
+                            if "출품등록" in status_text:
+                                status_info["status"] = CarStatus.REGISTERED
+                            else:
+                                status_info["status"] = self._parse_status(status_text)
+                            
+                            # Если есть результат аукциона
+                            if "낙찰" in status_text or "유찰" in status_text:
+                                status_info["auction_result"] = status_text
+                            
+                            logger.debug(f"Найден статус: {status_text} -> {status_info['status']}")
+                            break
             
             # По умолчанию статус REGISTERED
             if "status" not in status_info:
                 status_info["status"] = CarStatus.REGISTERED
+                logger.debug("Используется статус по умолчанию: REGISTERED")
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении status_info: {e}")
@@ -603,21 +611,21 @@ class AutohubParser:
     def _extract_main_image(self, car_block: Tag) -> Optional[str]:
         """Извлекает URL основного изображения"""
         try:
-            # В таблице изображения обычно находятся в первой ячейке
-            cells = car_block.find_all("td")
+            # Для новой структуры HTML ищем изображение во вложенных div-ах
+            # Ищем div с классом car_img_area или car-image
+            img_divs = car_block.find_all("div", class_=lambda x: x and ("car_img" in x or "car-image" in x))
             
-            if cells:
-                # Ищем изображение в первых ячейках
-                for cell in cells[:2]:  # Проверяем первые 2 ячейки
-                    img = cell.find("img")
-                    if img and img.get("src"):
-                        src = img["src"]
-                        # Если URL относительный, делаем его абсолютным
-                        if src.startswith("/"):
-                            return f"{self.base_url}{src}"
-                        elif not src.startswith("http"):
-                            return f"{self.base_url}/{src}"
-                        return src
+            for div in img_divs:
+                img = div.find("img")
+                if img and img.get("src"):
+                    src = img["src"]
+                    # Если URL относительный, делаем его абсолютным
+                    if src.startswith("/"):
+                        return f"{self.base_url}{src}"
+                    elif not src.startswith("http"):
+                        return f"{self.base_url}/{src}"
+                    logger.debug(f"Найдено изображение: {src}")
+                    return src
             
             # Альтернативный поиск - любое изображение в строке
             img_element = car_block.find("img")
@@ -627,6 +635,7 @@ class AutohubParser:
                     return f"{self.base_url}{src}"
                 elif not src.startswith("http"):
                     return f"{self.base_url}/{src}"
+                logger.debug(f"Найдено изображение (альтернативный): {src}")
                 return src
                 
         except Exception as e:
