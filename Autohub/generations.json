@@ -1,0 +1,29 @@
+{
+  "status": "succ",
+  "message": "success",
+  "object": [
+    { "carname2name": "NF 쏘나타 트랜스폼 (07년~12년)", "carname2code": "004" },
+    { "carname2name": "YF 쏘나타 (09년~12년)", "carname2code": "005" },
+    {
+      "carname2name": "쏘나타 더 브릴리언트 (12년~16년)",
+      "carname2code": "007"
+    },
+    { "carname2name": "쏘나타 하이브리드 (11년~14년)", "carname2code": "008" },
+    { "carname2name": "LF 쏘나타 (14년~현재)", "carname2code": "011" },
+    {
+      "carname2name": "LF 쏘나타 하이브리드 (14년~현재)",
+      "carname2code": "013"
+    },
+    {
+      "carname2name": "쏘나타 뉴 라이즈 하이브리드 (17년~현재)",
+      "carname2code": "015"
+    },
+    { "carname2name": "쏘나타(DN8) (19년~현재)", "carname2code": "017" },
+    {
+      "carname2name": "쏘나타 하이브리드 (DN8)(19년~현재)",
+      "carname2code": "018"
+    },
+    { "carname2name": "쏘나타 디 엣지(DN8)(23년~현재)", "carname2code": "019" },
+    { "carname2name": "쏘나타 뉴 라이즈 (17년~현재)", "carname2code": "14" }
+  ]
+}

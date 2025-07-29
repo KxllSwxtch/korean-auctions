@@ -824,3 +824,72 @@ async def test_models_loading(
         )
     finally:
         service.close()
+
+
+@router.get("/test/generations/{model_code}")
+async def test_generations_loading(
+    model_code: str,
+    auction_code: Optional[str] = Query(None, description="Код аукциона для тестирования"),
+    use_fallback: bool = Query(False, description="Использовать fallback данные"),
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Тестовый эндпоинт для отладки загрузки поколений
+    
+    Позволяет протестировать загрузку поколений с разными параметрами
+    
+    Args:
+        model_code: Код модели (например, HD20)
+        auction_code: Опциональный код аукциона для тестирования
+        use_fallback: Принудительно использовать fallback данные
+    """
+    try:
+        logger.info(f"Тестирование загрузки поколений для {model_code}")
+        
+        # Получаем поколения
+        response = await service.get_generations(model_code)
+        
+        # Проверяем наличие лог файлов
+        import os
+        from datetime import datetime
+        
+        debug_dir = "logs/autohub_debug"
+        log_files = []
+        if os.path.exists(debug_dir):
+            for file in os.listdir(debug_dir):
+                if file.startswith(f"generations_response_{model_code}"):
+                    log_files.append(file)
+        
+        # Добавляем дополнительную информацию для отладки
+        debug_info = {
+            "model_code": model_code,
+            "test_auction_code": auction_code,
+            "use_fallback": use_fallback,
+            "generations_count": len(response.generations) if response.success else 0,
+            "has_fallback": model_code == "HD20",
+            "session_info": {
+                "has_session": hasattr(service, "_session") and service._session is not None,
+                "cookies": service.session.cookies.get_dict() if service.session else {},
+            },
+            "debug_logs": log_files[-5:] if log_files else [],  # Последние 5 логов
+            "response": response.dict(),
+        }
+        
+        # Если запрошен тест с fallback и это HD20
+        if use_fallback and model_code == "HD20":
+            fallback_generations = service._get_fallback_generations(model_code)
+            debug_info["fallback_data"] = {
+                "count": len(fallback_generations),
+                "generations": [{"code": g.generation_code, "name": g.name} for g in fallback_generations]
+            }
+        
+        return debug_info
+        
+    except Exception as e:
+        logger.error(f"Ошибка при тестировании загрузки поколений: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка тестирования: {str(e)}",
+        )
+    finally:
+        service.close()
