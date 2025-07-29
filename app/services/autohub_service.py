@@ -947,22 +947,22 @@ class AutohubService:
                 "i_sCarName1Code": search_params.model_code or "",
                 "i_sCarName2Code": search_params.generation_code or "",
                 "i_sCarName3Code": search_params.detail_code or "",
-                "i_sFueltypecode": search_params.fuel_type or "",
-                "i_bojeongYn": "Y" if search_params.extended_warranty else "ALL",
+                "i_sFueltypecode": search_params.fuel_type.value if search_params.fuel_type else "",
+                "i_bojeongYn": search_params.extended_warranty.value if search_params.extended_warranty else "ALL",
                 "i_sCarYearStr": str(search_params.year_from) if search_params.year_from else "",
                 "i_sCarYearEnd": str(search_params.year_to) if search_params.year_to else "",
                 "i_sDriveKmShortDescStr": str(search_params.mileage_from) if search_params.mileage_from else "",
                 "i_sDriveKmShortDescEnd": str(search_params.mileage_to) if search_params.mileage_to else "",
                 "i_sPricecStr": str(search_params.price_from) if search_params.price_from else "",
                 "i_sPricecEnd": str(search_params.price_to) if search_params.price_to else "",
-                "i_sAucResult": search_params.auction_result or "",
-                "i_sAucLane": search_params.lane or "",
+                "i_sAucResult": search_params.auction_result.value if search_params.auction_result else "",
+                "i_sAucLane": search_params.lane.value if search_params.lane else "",
                 "i_sEntryNo": search_params.entry_number or "",
                 "i_sParkingNo": search_params.parking_number or "",
                 "i_entryNoYn0": "Y" if search_params.entry_number else "ALL",
                 "i_parkingNoYn0": "Y" if search_params.parking_number else "Y",
                 "i_sAucNoTemp2": "",
-                "i_sohYn": "Y" if search_params.soh_diagnosis else "ALL",
+                "i_sohYn": search_params.soh_diagnosis.value if search_params.soh_diagnosis else "ALL",
                 "entrySort": "entry",
                 "i_iPageSize": str(search_params.page_size),
             }
@@ -974,12 +974,26 @@ class AutohubService:
             logger.info(f"  - Модель: {search_params.model_code or 'Все'}")
             logger.info(f"  - Поколение: {search_params.generation_code or 'Все'}")
             
-            # Выполняем POST запрос с параметрами
-            logger.info("🔍 Выполняем POST запрос к Autohub с фильтрами")
-            html_content = await self._fetch_html(
-                self.settings.autohub_list_url,
-                params=post_data
-            )
+            # Для первой страницы без фильтров используем простой GET
+            if search_params.page == 1 and not has_filters:
+                logger.info("🔍 Выполняем простой GET запрос к Autohub (первая страница без фильтров)")
+                html_content = await self._fetch_html_simple(
+                    self.settings.autohub_list_url
+                )
+            else:
+                # Выполняем POST запрос с параметрами
+                logger.info("🔍 Выполняем POST запрос к Autohub с фильтрами")
+                
+                # Логируем важные параметры для отладки
+                logger.debug(f"POST параметры:")
+                for key, value in post_data.items():
+                    if value:  # Только непустые значения
+                        logger.debug(f"  {key}: {value}")
+                
+                html_content = await self._fetch_html(
+                    self.settings.autohub_list_url,
+                    params=post_data
+                )
 
             if not html_content:
                 logger.error("❌ Не удалось получить HTML контент от Autohub")
@@ -1487,13 +1501,17 @@ class AutohubService:
 
             # Получаем текущую сессию аукциона для кода аукциона
             sessions_response = await self.get_auction_sessions()
-            auction_code = "AC202507230001"  # Обновленное значение по умолчанию из рабочего примера
+            
+            # Генерируем код аукциона на основе текущей даты
+            from datetime import datetime
+            current_date = datetime.now().strftime("%Y%m%d")
+            auction_code = f"AC{current_date}0001"  # Формат: ACYYYYMMDDnnnn
             
             if sessions_response.success and sessions_response.current_session:
                 auction_code = sessions_response.current_session.auction_code
                 logger.info(f"Используется код аукциона из текущей сессии: {auction_code}")
             else:
-                logger.warning(f"Не удалось получить текущую сессию аукциона, используется значение по умолчанию: {auction_code}")
+                logger.warning(f"Не удалось получить текущую сессию аукциона, используется сгенерированный код: {auction_code}")
 
             # Нам нужен код производителя для запроса поколений
             # Предполагаем, что код модели содержит код производителя (например, HD03 -> HD)
