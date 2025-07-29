@@ -98,6 +98,7 @@ class AutohubSearchRequest(BaseModel):
     auction_no: Optional[str] = Field(None, description="Номер аукциона")
     auction_date: Optional[str] = Field(None, description="Дата аукциона (YYYY-MM-DD)")
     auction_code: Optional[str] = Field(None, description="Код аукциона")
+    auction_title: Optional[str] = Field(None, description="Название аукциона")
     
     # Фильтры по автомобилю
     manufacturer_code: Optional[str] = Field(None, description="Код производителя")
