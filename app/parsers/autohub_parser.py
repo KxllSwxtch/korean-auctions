@@ -63,13 +63,22 @@ class AutohubParser:
 
             logger.info(f"Найдено {len(car_blocks)} блоков автомобилей")
 
-            for block in car_blocks:
+            for idx, block in enumerate(car_blocks):
                 try:
                     car_data = self._parse_single_car(block, auction_info)
                     if car_data:
                         cars.append(car_data)
+                        logger.debug(f"Успешно спарсен автомобиль {idx + 1}: {car_data.title}")
+                    else:
+                        logger.warning(f"Не удалось извлечь данные из блока {idx + 1}")
                 except Exception as e:
-                    logger.error(f"Ошибка при парсинге автомобиля: {e}")
+                    logger.error(f"Ошибка при парсинге автомобиля {idx + 1}: {e}")
+                    # Log the HTML content of failed block for debugging
+                    try:
+                        block_html = str(block)[:500]  # First 500 chars
+                        logger.debug(f"HTML блока {idx + 1} (первые 500 символов): {block_html}")
+                    except:
+                        pass
                     continue
 
             logger.info(f"Успешно спарсено {len(cars)} автомобилей")

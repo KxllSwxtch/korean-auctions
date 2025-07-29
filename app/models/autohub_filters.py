@@ -185,19 +185,27 @@ class AutohubSearchRequest(BaseModel):
             "receivecd": "",  # Will be filled if we have it
         }
         
-        # Параметры аукциона
-        if self.auction_no:
-            params["i_sAucNo"] = self.auction_no
-        if self.auction_date:
-            params["i_sStartDt"] = self.auction_date
-        if self.auction_code:
-            params["i_sAucCode"] = self.auction_code
-            
-        # Добавляем специальные параметры если есть информация об аукционе
-        if self.auction_no and self.auction_date and self.auction_code:
-            auction_temp = f"{self.auction_no}@@{self.auction_date}@@{self.auction_code}"
-            params["i_sAucNoTemp1"] = auction_temp
-            params["i_sAucNoTemp2"] = auction_temp
+        # Параметры аукциона - только если нет других фильтров
+        # Если есть фильтры по автомобилям, не добавляем параметры аукциона
+        has_car_filters = (
+            self.manufacturer_code or self.model_code or self.generation_code or
+            self.detail_code or self.fuel_type or self.year_from or self.year_to or
+            self.mileage_from or self.mileage_to or self.price_from or self.price_to
+        )
+        
+        if not has_car_filters:
+            if self.auction_no:
+                params["i_sAucNo"] = self.auction_no
+            if self.auction_date:
+                params["i_sStartDt"] = self.auction_date
+            if self.auction_code:
+                params["i_sAucCode"] = self.auction_code
+                
+            # Добавляем специальные параметры если есть информация об аукционе
+            if self.auction_no and self.auction_date and self.auction_code:
+                auction_temp = f"{self.auction_no}@@{self.auction_date}@@{self.auction_code}"
+                params["i_sAucNoTemp1"] = auction_temp
+                params["i_sAucNoTemp2"] = auction_temp
             
         # Determine which tab to use based on filters
         # Tab 2 takes priority for configuration/generation filtering

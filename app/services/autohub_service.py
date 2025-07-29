@@ -146,77 +146,105 @@ class AutohubService:
 
     async def _authenticate(self) -> bool:
         """
-        Выполняет авторизацию на сайте Autohub
+        Выполняет авторизацию на сайте Autohub с повторными попытками
 
         Returns:
             bool: True если авторизация прошла успешно
         """
-        try:
-            logger.info("Выполняем авторизацию на Autohub")
+        max_retries = 3
+        retry_delay = 2.0
+        
+        for attempt in range(max_retries):
+            try:
+                logger.info(f"🔐 Попытка авторизации на Autohub ({attempt + 1}/{max_retries})")
 
-            # Данные для авторизации
-            login_data = {
-                "i_sUserId": self.settings.autohub_username,
-                "i_sPswd": self.settings.autohub_password,
-                "i_sLoginGubun": "001",  # Тип пользователя: 001 = участник аукциона
-            }
+                # Данные для авторизации
+                login_data = {
+                    "i_sUserId": self.settings.autohub_username,
+                    "i_sPswd": self.settings.autohub_password,
+                    "i_sLoginGubun": "001",  # Тип пользователя: 001 = участник аукциона
+                }
+                
+                logger.debug(f"Используем логин: {self.settings.autohub_username}")
 
-            # Обновляем headers для AJAX запроса
-            auth_headers = {
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-                "Referer": self.settings.autohub_base_url,
-            }
+                # Обновляем headers для AJAX запроса
+                auth_headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "Referer": self.settings.autohub_base_url,
+                }
 
-            # Добавляем задержку перед авторизацией
-            await asyncio.sleep(1.0)
+                # Добавляем задержку перед авторизацией
+                await asyncio.sleep(1.0)
 
-            # Выполняем POST запрос для авторизации
-            response = self.session.post(
-                self.settings.autohub_login_url,
-                data=login_data,
-                headers=auth_headers,
-                timeout=self.settings.request_timeout,
-                allow_redirects=False,
-            )
-
-            logger.info(f"Ответ авторизации: статус {response.status_code}")
-
-            # Проверяем ответ
-            if response.status_code == 200:
-                try:
-                    auth_response = response.json()
-                    logger.info(f"Ответ авторизации: {auth_response}")
-
-                    if auth_response.get("status") == "succ":
-                        logger.info("✅ Авторизация успешна!")
-
-                        # Обновляем cookies после авторизации
-                        logger.info(
-                            f"Cookies после авторизации: {len(self.session.cookies)} штук"
-                        )
-
-                        return True
-                    else:
-                        logger.error(
-                            f"❌ Авторизация не удалась: {auth_response.get('message', 'Неизвестная ошибка')}"
-                        )
-                        return False
-
-                except Exception as json_error:
-                    logger.error(f"Ошибка при парсинге JSON ответа: {json_error}")
-                    logger.info(f"Текст ответа: {response.text[:500]}...")
-                    return False
-            else:
-                logger.error(
-                    f"❌ Неожиданный статус авторизации: {response.status_code}"
+                # Выполняем POST запрос для авторизации
+                response = self.session.post(
+                    self.settings.autohub_login_url,
+                    data=login_data,
+                    headers=auth_headers,
+                    timeout=self.settings.request_timeout,
+                    allow_redirects=False,
                 )
-                return False
 
-        except Exception as e:
-            logger.error(f"❌ Ошибка при авторизации: {e}")
-            return False
+                logger.info(f"📡 Ответ авторизации: статус {response.status_code}")
+
+                # Проверяем ответ
+                if response.status_code == 200:
+                    try:
+                        auth_response = response.json()
+                        logger.debug(f"JSON ответ: {auth_response}")
+
+                        if auth_response.get("status") == "succ":
+                            logger.info("✅ Авторизация успешна!")
+
+                            # Обновляем cookies после авторизации
+                            logger.info(
+                                f"🍪 Cookies после авторизации: {len(self.session.cookies)} штук"
+                            )
+                            
+                            # Логируем важные cookies для отладки
+                            important_cookies = ['JSESSIONID', 'WMONID', 'userid']
+                            for cookie_name in important_cookies:
+                                if cookie_name in self.session.cookies:
+                                    logger.debug(f"  - {cookie_name}: установлен")
+
+                            return True
+                        else:
+                            error_msg = auth_response.get('message', 'Неизвестная ошибка')
+                            logger.error(f"❌ Авторизация не удалась: {error_msg}")
+                            
+                            # Если это ошибка с паролем/логином, не повторяем
+                            if 'password' in error_msg.lower() or 'userid' in error_msg.lower():
+                                logger.error("🚫 Неверный логин или пароль - прекращаем попытки")
+                                return False
+
+                    except Exception as json_error:
+                        logger.error(f"Ошибка при парсинге JSON ответа: {json_error}")
+                        logger.debug(f"Текст ответа: {response.text[:500]}...")
+                else:
+                    logger.error(f"❌ Неожиданный статус авторизации: {response.status_code}")
+                    
+                    if response.status_code >= 500:
+                        logger.warning("🔄 Ошибка сервера, повторим попытку")
+                    else:
+                        logger.debug(f"Заголовки ответа: {dict(response.headers)}")
+
+            except requests.exceptions.Timeout:
+                logger.error(f"⏱️ Таймаут при авторизации (попытка {attempt + 1})")
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"🔌 Ошибка соединения при авторизации: {e}")
+            except Exception as e:
+                logger.error(f"❌ Неожиданная ошибка при авторизации: {e}")
+            
+            # Если не последняя попытка, ждем перед повтором
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Ожидание {retry_delay} сек перед повторной попыткой...")
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 1.5  # Увеличиваем задержку с каждой попыткой
+        
+        logger.error(f"❌ Не удалось авторизоваться после {max_retries} попыток")
+        return False
 
     async def get_car_list(
         self, params: Optional[Dict[str, Any]] = None
@@ -812,11 +840,14 @@ class AutohubService:
             # Инициализируем сессию (ВАЖНО: делаем это перед любыми запросами)
             session_initialized = await self._initialize_session()
             if not session_initialized:
+                logger.error("❌ Ошибка инициализации сессии Autohub")
                 return AutohubResponse(
                     success=False,
-                    error="Не удалось инициализировать сессию с Autohub",
+                    error="Не удалось инициализировать сессию с Autohub. Проверьте настройки авторизации.",
                     data=[],
                 )
+            
+            logger.info("✅ Сессия успешно инициализирована")
             
             # Check if this is a simple request without filters
             has_filters = (
@@ -837,39 +868,53 @@ class AutohubService:
                 search_params.parking_number
             )
             
+            # Get current auction session info only if not already provided
+            if not search_params.auction_code or not search_params.auction_no or not search_params.auction_date:
+                logger.info("📋 Получаем информацию о текущей сессии аукциона")
+                sessions_response = await self.get_auction_sessions()
+                if sessions_response.success and sessions_response.current_session:
+                    current_session = sessions_response.current_session
+                    # Only set auction info if not already set
+                    if not search_params.auction_code:
+                        search_params.auction_code = current_session.auction_code
+                    if not search_params.auction_no:
+                        search_params.auction_no = current_session.auction_no
+                    if not search_params.auction_date:
+                        search_params.auction_date = current_session.auction_date
+                    logger.info(f"📍 Используем сессию аукциона: код={current_session.auction_code}, номер={current_session.auction_no}, дата={current_session.auction_date}")
+                else:
+                    logger.warning("⚠️ Не удалось получить информацию о текущей сессии аукциона")
+            
             if not has_filters and search_params.page == 1:
-                # For initial load without filters, use simple GET request like the working example
-                logger.info("Используем простой GET запрос без параметров (как в рабочем примере)")
+                # For initial load without filters, use simple GET request
+                logger.info("🔍 Выполняем простой поиск без фильтров (страница 1)")
                 html_content = await self._fetch_html_simple(self.settings.autohub_list_url)
             else:
                 # For filtered search or pagination, use POST with parameters
-                # Если нет информации об аукционе, получаем текущую активную сессию
-                if not search_params.auction_code or not search_params.auction_no or not search_params.auction_date:
-                    logger.info("Информация об аукционе не полная, получаем активную сессию")
-                    sessions_response = await self.get_auction_sessions()
-                    if sessions_response.success and sessions_response.current_session:
-                        current_session = sessions_response.current_session
-                        search_params.auction_code = current_session.auction_code
-                        search_params.auction_no = current_session.auction_no
-                        search_params.auction_date = current_session.auction_date
-                        logger.info(f"Используем активную сессию: {current_session.auction_code}, номер: {current_session.auction_no}, дата: {current_session.auction_date}")
+                logger.info(f"🔍 Выполняем поиск с фильтрами или пагинацией (страница {search_params.page})")
                 
                 # Преобразуем параметры в формат AutoHub
                 autohub_params = search_params.to_autohub_params()
                 
-                logger.info(f"Параметры поиска: {autohub_params}")
+                # Log key parameters for debugging
+                logger.info(f"📊 Ключевые параметры поиска:")
+                logger.info(f"  - Страница: {autohub_params.get('i_iNowPageNo', 1)}")
+                logger.info(f"  - Производитель: {autohub_params.get('i_sMakerCode', 'Все')}")
+                logger.info(f"  - Модель: {autohub_params.get('i_sCarName1Code', 'Все')}")
+                logger.info(f"  - Год: {autohub_params.get('i_sCarYearStr', 'Любой')} - {autohub_params.get('i_sCarYearEnd', 'Любой')}")
+                logger.info(f"  - Цена: {autohub_params.get('i_sPricecStr', 'Любая')} - {autohub_params.get('i_sPricecEnd', 'Любая')}")
                 
                 # Используем _fetch_html метод который правильно обрабатывает сессию
-                # Передаем параметры как словарь для POST запроса
                 html_content = await self._fetch_html(
                     self.settings.autohub_list_url, 
                     autohub_params
                 )
             
             if not html_content:
+                logger.error("❌ Не удалось получить HTML контент от Autohub")
                 return AutohubResponse(
                     success=False, 
-                    error="Не удалось получить HTML контент", 
+                    error="Не удалось получить данные от Autohub. Сервер не отвечает.", 
                     data=[]
                 )
                 
@@ -881,7 +926,7 @@ class AutohubService:
             # Парсим результаты
             cars = self.parser.parse_car_list(html_content)
             
-            logger.info(f"Найдено {len(cars)} автомобилей с фильтрами")
+            logger.info(f"🚗 Найдено {len(cars)} автомобилей")
             
             # Если автомобили не найдены, это может быть нормальным результатом поиска
             if len(cars) == 0:
@@ -890,24 +935,39 @@ class AutohubService:
                 if ('location.href="/newfront/user/login/user_login.do"' in html_content or
                     'alert("로그인이 필요합니다")' in html_content or
                     '<title>로그인</title>' in html_content):
+                    logger.error("❌ Обнаружена страница входа - требуется авторизация")
                     return AutohubResponse(
                         success=False,
-                        error="Для доступа к списку автомобилей требуется авторизация на сайте Autohub",
+                        error="Требуется авторизация на сайте Autohub. Проверьте логин и пароль.",
                         total_count=0,
                         data=[],
                     )
-                # Если это не проблема авторизации, то просто нет результатов
-                logger.info("Поиск не вернул результатов, но это не ошибка авторизации")
+                
+                # Проверяем наличие сообщения "нет результатов"
+                if ('검색결과가 없습니다' in html_content or 
+                    '조회된 데이터가 없습니다' in html_content or
+                    'no results' in html_content.lower()):
+                    logger.info("ℹ️ Поиск не вернул результатов (сообщение от Autohub)")
+                else:
+                    logger.warning("⚠️ Пустой результат без явного сообщения")
+                
                 # Сохраним HTML для отладки
                 try:
                     with open("debug_empty_search_result.html", "w", encoding="utf-8") as f:
                         f.write(html_content)
-                    logger.debug("HTML с пустым результатом сохранен в debug_empty_search_result.html")
+                    logger.debug("📄 HTML с пустым результатом сохранен в debug_empty_search_result.html")
+                    
+                    # Логируем первые 500 символов HTML для быстрой диагностики
+                    logger.debug(f"📋 Начало HTML ответа: {html_content[:500]}...")
                 except Exception as e:
-                    logger.warning(f"Не удалось сохранить HTML для отладки: {e}")
+                    logger.warning(f"⚠️ Не удалось сохранить HTML для отладки: {e}")
             
             # Пытаемся извлечь общее количество записей
             total_count = self._extract_total_count_from_html(html_content)
+            if total_count:
+                logger.info(f"📊 Общее количество автомобилей в результатах: {total_count}")
+            else:
+                logger.info("📊 Не удалось определить общее количество автомобилей")
             
             return AutohubResponse(
                 success=True,
@@ -1387,30 +1447,27 @@ class AutohubService:
     
     def _get_current_auction_date(self) -> str:
         """
-        Get current auction date with 6PM Seoul time cutoff
+        Get current auction date
+        
+        Returns the current date for auction queries.
+        Autohub runs auctions daily, so we use the current date.
         
         Returns:
             str: Auction date in YYYY-MM-DD format
         """
+        from datetime import datetime
         import pytz
-        from datetime import datetime, timedelta
         
         # Get current Seoul time
         seoul_tz = pytz.timezone('Asia/Seoul')
         seoul_time = datetime.now(seoul_tz)
-        hour = seoul_time.hour
         
-        logger.info(f"📅 Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S %Z')}, hour: {hour}")
+        # Use current date (not tomorrow)
+        auction_date = seoul_time.strftime('%Y-%m-%d')
         
-        # If after 6PM, use tomorrow's date
-        if hour >= 18:
-            auction_date = seoul_time + timedelta(days=1)
-            logger.info(f"🎯 After 6PM Seoul → Using tomorrow's date: {auction_date.strftime('%Y-%m-%d')}")
-        else:
-            auction_date = seoul_time
-            logger.info(f"🎯 Before 6PM Seoul → Using today's date: {auction_date.strftime('%Y-%m-%d')}")
+        logger.info(f"📅 Using current auction date: {auction_date} (Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S')})")
         
-        return auction_date.strftime('%Y-%m-%d')
+        return auction_date
     
     def _generate_auction_code(self, auction_date: str) -> str:
         """
@@ -1442,13 +1499,21 @@ class AutohubService:
         # Parse the auction date
         date_obj = datetime.strptime(auction_date, '%Y-%m-%d')
         
-        # Calculate days since start of year
-        year_start = datetime(date_obj.year, 1, 1)
-        days_since_start = (date_obj - year_start).days + 1
+        # Autohub auction numbers appear to be sequential
+        # Based on the test report showing auction #1332 for 2025-07-09
+        # We'll calculate relative to that known reference point
+        reference_date = datetime(2025, 7, 9)
+        reference_number = 1332
         
-        # Autohub seems to run daily auctions, so auction number could be based on day of year
-        # Adding a base number to make it look realistic (e.g., 1200 + day_of_year)
-        auction_number = 1200 + days_since_start
+        # Calculate days difference from reference
+        days_diff = (date_obj - reference_date).days
+        auction_number = reference_number + days_diff
+        
+        # Ensure positive number
+        if auction_number < 1:
+            auction_number = 1
+        
+        logger.info(f"📊 Calculated auction number: {auction_number} for date {auction_date}")
         
         return str(auction_number)
 
