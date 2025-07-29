@@ -58,27 +58,34 @@ class AutohubParser:
             auction_info = self._extract_auction_info(soup)
             logger.info(f"Извлечена информация об аукционе: {auction_info}")
 
-            # Ищем таблицу с автомобилями
-            # Сначала пробуем найти tbody с классом
-            tbody = soup.find("tbody", class_="text-center text_vert_midd")
+            # Сначала пробуем найти grid layout (новый формат)
+            car_grids = soup.find_all("div", class_="car-grid")
+            car_blocks = []
             
-            if tbody:
-                # Если нашли tbody, ищем все строки в нем
-                car_blocks = tbody.find_all("tr")
-                logger.info(f"Найден tbody с классом 'text-center text_vert_midd', содержит {len(car_blocks)} строк")
+            if car_grids:
+                # Новый формат: div-based grid layout
+                logger.info(f"Найден grid layout с {len(car_grids)} блоками автомобилей")
+                car_blocks = car_grids
             else:
-                # Если не нашли tbody с классом, ищем все таблицы и берем первую подходящую
-                logger.warning("Не найден tbody с классом 'text-center text_vert_midd', ищем альтернативные способы")
-                tables = soup.find_all("table", class_=lambda x: x and "table" in x)
-                car_blocks = []
-                for table in tables:
-                    tbody = table.find("tbody")
-                    if tbody:
-                        rows = tbody.find_all("tr")
-                        if rows:
-                            car_blocks.extend(rows)
-                            logger.info(f"Найдена таблица с {len(rows)} строками")
-                            break
+                # Старый формат: table-based layout
+                tbody = soup.find("tbody", class_="text-center text_vert_midd")
+                
+                if tbody:
+                    # Если нашли tbody, ищем все строки в нем
+                    car_blocks = tbody.find_all("tr")
+                    logger.info(f"Найден tbody с классом 'text-center text_vert_midd', содержит {len(car_blocks)} строк")
+                else:
+                    # Если не нашли tbody с классом, ищем все таблицы и берем первую подходящую
+                    logger.warning("Не найден ни grid layout, ни tbody с классом, ищем альтернативные способы")
+                    tables = soup.find_all("table", class_=lambda x: x and "table" in x)
+                    for table in tables:
+                        tbody = table.find("tbody")
+                        if tbody:
+                            rows = tbody.find_all("tr")
+                            if rows:
+                                car_blocks.extend(rows)
+                                logger.info(f"Найдена таблица с {len(rows)} строками")
+                                break
 
             logger.info(f"Найдено {len(car_blocks)} строк с автомобилями")
 
@@ -223,6 +230,14 @@ class AutohubParser:
             AutohubCar: Данные об автомобиле
         """
         try:
+            # Определяем формат блока (grid или table)
+            is_grid_format = car_block.name == "div" and "car-grid" in car_block.get("class", [])
+            
+            if is_grid_format:
+                logger.debug("Обрабатываем блок в формате grid")
+            else:
+                logger.debug("Обрабатываем блок в формате table")
+
             # Извлекаем car_id из onclick атрибута
             car_id = self._extract_car_id(car_block)
             if not car_id:
@@ -322,8 +337,17 @@ class AutohubParser:
     def _extract_title(self, car_block: Tag) -> Optional[str]:
         """Извлекает название автомобиля"""
         try:
-            # В таблице название находится в ссылке внутри ячейки
-            # Ищем strong тег внутри ссылки или просто текст ссылки
+            # Сначала пробуем найти в div с классом car-title (grid format)
+            car_title_div = car_block.find("div", class_="car-title")
+            if car_title_div:
+                title_link = car_title_div.find("a")
+                if title_link:
+                    text = title_link.get_text(strip=True)
+                    if text:
+                        logger.debug(f"Найдено название в car-title div: {text}")
+                        return text
+            
+            # Если не нашли, ищем по старому способу (table format)
             links = car_block.find_all("a")
             for link in links:
                 # Проверяем, есть ли onclick с carInfo
@@ -359,7 +383,46 @@ class AutohubParser:
         info = {}
 
         try:
-            # В таблице информация разбита по ячейкам <td>
+            # Сначала пробуем grid format
+            car_list_div = car_block.find("div", class_="car-list")
+            if car_list_div:
+                # Grid format - ищем ul с информацией
+                info_list = car_list_div.find("ul", class_="list-inline")
+                if info_list:
+                    list_items = info_list.find_all("li")
+                    logger.debug(f"Найден список с {len(list_items)} элементами")
+                    
+                    for item in list_items:
+                        text = item.get_text(strip=True)
+                        
+                        # Год (4 цифры)
+                        if re.match(r"^\d{4}$", text):
+                            info["year"] = int(text)
+                            logger.debug(f"Найден год: {info['year']}")
+                        
+                        # Пробег (содержит km)
+                        elif "km" in text.lower():
+                            info["mileage"] = text
+                            logger.debug(f"Найден пробег: {info['mileage']}")
+                        
+                        # Трансмиссия
+                        elif text in ["오토", "수동", "자동", "CVT", "DCT", "Auto", "Manual"]:
+                            info["transmission"] = self._parse_transmission(text)
+                            logger.debug(f"Найдена трансмиссия: {text} -> {info['transmission']}")
+                        
+                        # Тип топлива
+                        elif text in ["휘발유", "경유", "전기", "하이브리드", "LPG", "디젤", "가솔린", "CNG", "수소"]:
+                            info["fuel_type"] = self._parse_fuel_type(text)
+                            logger.debug(f"Найден тип топлива: {text} -> {info['fuel_type']}")
+                        
+                        # Цвет
+                        elif text in ["흰색", "검정색", "회색", "파란색", "빨간색", "은색", "기타"]:
+                            info["color"] = text
+                            logger.debug(f"Найден цвет: {info['color']}")
+                    
+                    return info
+            
+            # Table format - старый способ
             cells = car_block.find_all("td")
             
             if len(cells) >= 5:  # Ожидаем минимум 5 ячеек
@@ -471,6 +534,21 @@ class AutohubParser:
         identifiers = {}
 
         try:
+            # Сначала пробуем grid format
+            # В grid format номер аукциона часто в кнопках
+            buttons = car_block.find_all("button")
+            for button in buttons:
+                onclick = button.get("onclick", "")
+                # Ищем кнопки с onclick функциями
+                if "regInterest" in onclick:
+                    # regInterest('1001','N','RC202507230743')
+                    match = re.search(r"regInterest\(['\"]([^'\"]+)['\"].*\)", onclick)
+                    if match:
+                        identifiers["auction_number"] = match.group(1)
+                        logger.debug(f"Найден номер аукциона в onclick: {identifiers['auction_number']}")
+                        break
+            
+            # Table format
             cells = car_block.find_all("td")
             
             # Обычно номера находятся в 3-4 ячейке
@@ -527,6 +605,21 @@ class AutohubParser:
         financial = {}
 
         try:
+            # Grid format - ищем в кнопках или тексте
+            buttons = car_block.find_all("button")
+            for button in buttons:
+                onclick = button.get("onclick", "")
+                # receive_rc_autoTender_pop('RC202507230743','N','3710','1001')
+                if "receive_rc_autoTender_pop" in onclick:
+                    match = re.search(r"receive_rc_autoTender_pop\([^,]+,[^,]+,['\"]([^'\"]+)['\"].*\)", onclick)
+                    if match:
+                        price_str = match.group(1)
+                        if price_str.isdigit():
+                            financial["starting_price"] = int(price_str)
+                            logger.debug(f"Найдена цена в onclick: {financial['starting_price']} 만원")
+                            break
+            
+            # Table format
             cells = car_block.find_all("td")
             
             # Цена обычно в 3-й ячейке (после названия и оценки)

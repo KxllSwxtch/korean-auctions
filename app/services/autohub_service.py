@@ -74,20 +74,24 @@ class AutohubService:
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
-        # Настройка headers
+        # Настройка headers (соответствуют cURL примеру)
         session.headers.update(
             {
-                "User-Agent": self.ua.random,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
                 "Accept-Encoding": "gzip, deflate, br",
                 "DNT": "1",
                 "Connection": "keep-alive",
                 "Upgrade-Insecure-Requests": "1",
                 "Sec-Fetch-Dest": "document",
                 "Sec-Fetch-Mode": "navigate",
-                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-Site": "same-origin",
+                "Sec-Fetch-User": "?1",
                 "Cache-Control": "max-age=0",
+                "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+                "sec-ch-ua-mobile": "?0",
+                "sec-ch-ua-platform": '"macOS"',
             }
         )
 
@@ -124,7 +128,7 @@ class AutohubService:
             # Добавляем дополнительные headers для выглядеть как браузер
             self.session.headers.update(
                 {
-                    "Referer": self.settings.autohub_base_url,
+                    "Referer": "https://www.autohubauction.co.kr/newfront/index.do",
                     "Sec-Fetch-Site": "same-origin",
                     "Sec-Fetch-Mode": "navigate",
                     "Sec-Fetch-User": "?1",
@@ -205,11 +209,15 @@ class AutohubService:
                                 f"🍪 Cookies после авторизации: {len(self.session.cookies)} штук"
                             )
 
+                            # Добавляем дополнительные cookies как в cURL примере
+                            self.session.cookies.set("gubun", "on")
+                            self.session.cookies.set("userid", self.settings.autohub_username)
+
                             # Логируем важные cookies для отладки
-                            important_cookies = ["JSESSIONID", "WMONID", "userid"]
+                            important_cookies = ["JSESSIONID", "WMONID", "userid", "gubun"]
                             for cookie_name in important_cookies:
                                 if cookie_name in self.session.cookies:
-                                    logger.debug(f"  - {cookie_name}: установлен")
+                                    logger.debug(f"  - {cookie_name}: {self.session.cookies.get(cookie_name)}")
 
                             return True
                         else:
