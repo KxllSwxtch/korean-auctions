@@ -774,3 +774,53 @@ async def get_filters_info():
 async def health_check():
     """Проверка здоровья сервиса Autohub"""
     return {"status": "healthy", "service": "autohub", "version": "1.0.0"}
+
+
+@router.get("/test/models/{manufacturer_code}")
+async def test_models_loading(
+    manufacturer_code: str,
+    auction_code: Optional[str] = Query(None, description="Код аукциона для тестирования"),
+    service: AutohubService = Depends(get_autohub_service),
+):
+    """
+    Тестовый эндпоинт для отладки загрузки моделей
+    
+    Позволяет протестировать загрузку моделей с разными параметрами
+    """
+    try:
+        logger.info(f"Тестирование загрузки моделей для {manufacturer_code}")
+        
+        # Если передан код аукциона, временно устанавливаем его
+        original_code = None
+        if auction_code:
+            logger.info(f"Использование тестового кода аукциона: {auction_code}")
+            # Сохраняем оригинальный код для восстановления
+            sessions_response = await service.get_auction_sessions()
+            if sessions_response.success and sessions_response.current_session:
+                original_code = sessions_response.current_session.auction_code
+        
+        # Получаем модели
+        response = await service.get_models(manufacturer_code)
+        
+        # Добавляем дополнительную информацию для отладки
+        debug_info = {
+            "manufacturer_code": manufacturer_code,
+            "test_auction_code": auction_code,
+            "models_count": len(response.models) if response.success else 0,
+            "session_info": {
+                "has_session": hasattr(service, "_session") and service._session is not None,
+                "cookies": service.session.cookies.get_dict() if service.session else {},
+            },
+            "response": response.dict(),
+        }
+        
+        return debug_info
+        
+    except Exception as e:
+        logger.error(f"Ошибка при тестировании загрузки моделей: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Ошибка тестирования: {str(e)}",
+        )
+    finally:
+        service.close()
