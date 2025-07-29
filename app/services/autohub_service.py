@@ -915,41 +915,71 @@ class AutohubService:
                         "📍 Используем поиск без привязки к конкретному аукциону"
                     )
 
-            # ВРЕМЕННОЕ РЕШЕНИЕ: Всегда используем простой GET для получения всех автомобилей
-            # затем фильтруем их на стороне Python
-            # Это обходит проблему с POST запросами, которые возвращают 0 результатов
-            if not has_filters and search_params.page == 1:
-                # For initial load without filters, use simple GET request
-                logger.info("🔍 Выполняем простой поиск без фильтров (страница 1)")
-                html_content = await self._fetch_html_simple(
-                    self.settings.autohub_list_url
-                )
-            else:
-                # ОБХОДНОЕ РЕШЕНИЕ: Используем GET и фильтруем результаты вручную
-                logger.warning(
-                    f"⚠️ Используем обходное решение: GET запрос с последующей фильтрацией на Python"
-                )
-                logger.info(
-                    f"🔍 Выполняем GET запрос для получения всех автомобилей (фильтры будут применены после)"
-                )
-                # Всегда используем простой GET без параметров для получения всех автомобилей
-                html_content = await self._fetch_html_simple(
-                    self.settings.autohub_list_url
-                )
-
-                # Log key parameters for debugging
-                logger.info(f"📊 Ключевые параметры фильтрации:")
-                logger.info(f"  - Страница: {search_params.page}")
-                logger.info(
-                    f"  - Производитель: {search_params.manufacturer_code or 'Все'}"
-                )
-                logger.info(f"  - Модель: {search_params.model_code or 'Все'}")
-                logger.info(
-                    f"  - Год: {search_params.year_from or 'Любой'} - {search_params.year_to or 'Любой'}"
-                )
-                logger.info(
-                    f"  - Цена: {search_params.price_from or 'Любая'} - {search_params.price_to or 'Любая'}"
-                )
+            # Подготавливаем параметры для POST запроса к Autohub
+            post_data = {
+                "i_iNowPageNo": str(search_params.page),
+                "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
+                "i_sReturnParam": "",
+                "i_sActionFlag": "",
+                "i_sReceiveCd": "",
+                "pageFlag": "Y",
+                "i_sAucNo": search_params.auction_no or "",
+                "i_sStartDt": search_params.auction_date or "",
+                "i_sAucTitle": search_params.auction_title or "",
+                "i_sAucCode": search_params.auction_code or "",
+                "i_sSortFlag": "entry",
+                "i_sMainModel": "",
+                "i_sMakerCodeD": "",
+                "i_sCarName1CodeD": "",
+                "tabActiveIdx": "",
+                "listTabActiveIdx": "",
+                "receivecd": "",
+                "i_sAucNoTempStr": "",
+                "i_sMakerCodeD1": "",
+                "i_sCarName1CodeD1": "",
+                "i_sAucNoTemp1": "",
+                "i_entryNoYn": "ALL",
+                "i_parkingNoYn": "Y",
+                "noSelect": "E",
+                "i_sNo": "",
+                # Важно: добавляем фильтры производителя и модели
+                "i_sMakerCode": search_params.manufacturer_code or "",
+                "i_sCarName1Code": search_params.model_code or "",
+                "i_sCarName2Code": search_params.generation_code or "",
+                "i_sCarName3Code": search_params.detail_code or "",
+                "i_sFueltypecode": search_params.fuel_type or "",
+                "i_bojeongYn": "Y" if search_params.extended_warranty else "ALL",
+                "i_sCarYearStr": str(search_params.year_from) if search_params.year_from else "",
+                "i_sCarYearEnd": str(search_params.year_to) if search_params.year_to else "",
+                "i_sDriveKmShortDescStr": str(search_params.mileage_from) if search_params.mileage_from else "",
+                "i_sDriveKmShortDescEnd": str(search_params.mileage_to) if search_params.mileage_to else "",
+                "i_sPricecStr": str(search_params.price_from) if search_params.price_from else "",
+                "i_sPricecEnd": str(search_params.price_to) if search_params.price_to else "",
+                "i_sAucResult": search_params.auction_result or "",
+                "i_sAucLane": search_params.lane or "",
+                "i_sEntryNo": search_params.entry_number or "",
+                "i_sParkingNo": search_params.parking_number or "",
+                "i_entryNoYn0": "Y" if search_params.entry_number else "ALL",
+                "i_parkingNoYn0": "Y" if search_params.parking_number else "Y",
+                "i_sAucNoTemp2": "",
+                "i_sohYn": "Y" if search_params.soh_diagnosis else "ALL",
+                "entrySort": "entry",
+                "i_iPageSize": str(search_params.page_size),
+            }
+            
+            # Логируем ключевые параметры
+            logger.info(f"📊 Параметры поиска Autohub:")
+            logger.info(f"  - Страница: {search_params.page}")
+            logger.info(f"  - Производитель: {search_params.manufacturer_code or 'Все'}")
+            logger.info(f"  - Модель: {search_params.model_code or 'Все'}")
+            logger.info(f"  - Поколение: {search_params.generation_code or 'Все'}")
+            
+            # Выполняем POST запрос с параметрами
+            logger.info("🔍 Выполняем POST запрос к Autohub с фильтрами")
+            html_content = await self._fetch_html(
+                self.settings.autohub_list_url,
+                params=post_data
+            )
 
             if not html_content:
                 logger.error("❌ Не удалось получить HTML контент от Autohub")
@@ -967,192 +997,19 @@ class AutohubService:
             # Парсим результаты
             cars = self.parser.parse_car_list(html_content)
 
-            logger.info(f"🚗 Найдено {len(cars)} автомобилей до фильтрации")
+            logger.info(f"🚗 Найдено {len(cars)} автомобилей")
 
-            # Применяем фильтры если они есть
-            if has_filters:
-                logger.info("🔍 Применяем фильтры к результатам")
-                filtered_cars = []
-
-                for car in cars:
-                    # Фильтр по производителю
-                    if search_params.manufacturer_code:
-                        # Извлекаем код производителя из названия или других полей
-                        # Обычно название начинается с бренда
-                        car_brand = car.title.split()[0] if car.title else ""
-                        manufacturer_match = False
-
-                        # Проверяем соответствие производителя
-                        if (
-                            search_params.manufacturer_code == "KA"
-                            and "기아" in car_brand
-                        ):
-                            manufacturer_match = True
-                        elif (
-                            search_params.manufacturer_code == "HD"
-                            and "현대" in car_brand
-                        ):
-                            manufacturer_match = True
-                        elif (
-                            search_params.manufacturer_code == "GN"
-                            and "제네시스" in car_brand
-                        ):
-                            manufacturer_match = True
-                        elif search_params.manufacturer_code == "CV" and (
-                            "쉐보레" in car_brand or "Chevrolet" in car_brand
-                        ):
-                            manufacturer_match = True
-                        elif (
-                            search_params.manufacturer_code == "RN"
-                            and "르노" in car_brand
-                        ):
-                            manufacturer_match = True
-                        elif (
-                            search_params.manufacturer_code == "SY"
-                            and "쌍용" in car_brand
-                        ):
-                            manufacturer_match = True
-                        # Добавить другие производители по мере необходимости
-
-                        if not manufacturer_match:
-                            continue
-
-                    # Фильтр по модели
-                    if search_params.model_code:
-                        model_found = False
-                        car_title_lower = car.title.lower() if car.title else ""
-
-                        # Улучшенный mapping кодов моделей к названиям
-                        # Включаем различные варианты написания для лучшего совпадения
-                        model_mappings = {
-                            # Kia models
-                            "KA01": ["k3", "케이쓰리", "k 3"],
-                            "KA02": ["k5", "케이파이브", "k 5"],
-                            "KA03": ["k7", "케이세븐", "k 7"],
-                            "KA04": ["k8", "케이에잇", "k 8"],
-                            "KA05": ["k9", "케이나인", "k 9"],
-                            "KA06": ["sportage", "스포티지"],
-                            "KA07": ["sorento", "쏘렌토", "소렌토"],
-                            "KA08": ["carnival", "카니발"],
-                            "KA09": ["seltos", "셀토스"],
-                            "KA10": ["mohave", "모하비"],
-                            # Hyundai models
-                            "HD01": ["avante", "아반떼", "elantra", "아반테"],
-                            "HD02": ["sonata", "쏘나타", "소나타"],
-                            "HD03": ["grandeur", "그랜저", "그랜져"],
-                            "HD04": ["tucson", "투싼", "툭산"],
-                            "HD05": ["santafe", "싼타페", "산타페", "santa fe"],
-                            "HD06": ["palisade", "팰리세이드"],
-                            "HD07": ["맥스크루즈", "maxcruz"],
-                            # Genesis models
-                            "GN01": ["g70", "g 70"],
-                            "GN02": ["g80", "g 80"],
-                            "GN03": ["g90", "g 90"],
-                            "GN04": ["gv70", "gv 70"],
-                            "GN05": ["gv80", "gv 80"],
-                            "GN06": ["gv90", "gv 90"],
-                        }
-
-                        if search_params.model_code in model_mappings:
-                            for model_name in model_mappings[search_params.model_code]:
-                                # Проверяем с учетом пробелов и специальных символов
-                                # Например, "쏘렌토 4세대" должно совпадать с "쏘렌토"
-                                if model_name in car_title_lower:
-                                    model_found = True
-                                    logger.debug(
-                                        f"✅ Модель найдена: '{model_name}' в '{car.title}'"
-                                    )
-                                    break
-                                # Также проверяем с границами слов для английских названий
-                                elif (
-                                    model_name.replace(" ", "").isalpha()
-                                    and f" {model_name} " in f" {car_title_lower} "
-                                ):
-                                    model_found = True
-                                    logger.debug(
-                                        f"✅ Модель найдена (с границами): '{model_name}' в '{car.title}'"
-                                    )
-                                    break
-
-                        if not model_found:
-                            logger.debug(
-                                f"❌ Модель {search_params.model_code} не найдена в '{car.title}'"
-                            )
-                            continue
-
-                    # Фильтр по году
-                    if search_params.year_from and car.year:
-                        try:
-                            car_year = int(car.year)
-                            if car_year < search_params.year_from:
-                                continue
-                        except:
-                            pass
-
-                    if search_params.year_to and car.year:
-                        try:
-                            car_year = int(car.year)
-                            if car_year > search_params.year_to:
-                                continue
-                        except:
-                            pass
-
-                    # Фильтр по цене
-                    if search_params.price_from and car.starting_price:
-                        if car.starting_price < search_params.price_from:
-                            continue
-
-                    if search_params.price_to and car.starting_price:
-                        if car.starting_price > search_params.price_to:
-                            continue
-
-                    # Фильтр по пробегу
-                    if search_params.mileage_from and car.mileage:
-                        try:
-                            car_mileage = int(
-                                car.mileage.replace(",", "").replace("km", "")
-                            )
-                            if car_mileage < search_params.mileage_from:
-                                continue
-                        except:
-                            pass
-
-                    if search_params.mileage_to and car.mileage:
-                        try:
-                            car_mileage = int(
-                                car.mileage.replace(",", "").replace("km", "")
-                            )
-                            if car_mileage > search_params.mileage_to:
-                                continue
-                        except:
-                            pass
-
-                    # Если автомобиль прошел все фильтры, добавляем его
-                    filtered_cars.append(car)
-
-                logger.info(
-                    f"✅ После фильтрации осталось {len(filtered_cars)} автомобилей"
-                )
-                cars = filtered_cars
-
-            # Сохраняем общее количество до пагинации
+            # Поскольку мы теперь отправляем фильтры напрямую в Autohub,
+            # клиентская фильтрация больше не нужна
+            # Autohub уже вернул отфильтрованные результаты
+            
+            # Сохраняем общее количество
             total_filtered_count = len(cars)
 
-            # Применяем пагинацию к отфильтрованным результатам
-            page = search_params.page
-            page_size = search_params.page_size
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-
-            logger.info(f"📄 Применяем пагинацию: страница {page}, размер {page_size}")
+            # Пагинация уже применена на стороне Autohub
+            # Мы отправили номер страницы и размер в POST запросе
             logger.info(
-                f"📄 Индексы: {start_idx} - {end_idx} из {total_filtered_count}"
-            )
-
-            cars = cars[start_idx:end_idx]
-
-            logger.info(
-                f"🚗 Итого возвращаем {len(cars)} автомобилей на странице {page}"
+                f"🚗 Получено {len(cars)} автомобилей на странице {search_params.page}"
             )
 
             # Если автомобили не найдены, это может быть нормальным результатом поиска
@@ -1206,10 +1063,8 @@ class AutohubService:
             else:
                 logger.info("📊 Не удалось определить общее количество автомобилей")
 
-            # Если применялись фильтры, используем количество отфильтрованных автомобилей
-            final_total_count = (
-                total_filtered_count if has_filters else (total_count or len(cars))
-            )
+            # Используем общее количество из HTML или количество найденных автомобилей
+            final_total_count = total_count or total_filtered_count
 
             return AutohubResponse(
                 success=True,
@@ -1800,7 +1655,7 @@ class AutohubService:
                     )
                     
                     # Fallback для известных моделей с поколениями
-                    if model_code == "HD20":  # Hyundai Sonata
+                    if model_code in ["HD02", "HD20"]:  # Hyundai Sonata (HD02 in models list, HD20 in working example)
                         logger.info(f"Применяем fallback для {model_code}")
                         generations = self._get_fallback_generations(model_code)
 
@@ -1851,7 +1706,75 @@ class AutohubService:
             Список поколений из рабочего примера
         """
         fallback_generations = {
-            "HD20": [  # Hyundai Sonata
+            "HD02": [  # Hyundai Sonata (model code in our system)
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="004",
+                    name="NF 쏘나타 트랜스폼 (07년~12년)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="005",
+                    name="YF 쏘나타 (09년~12년)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="007",
+                    name="쏘나타 더 브릴리언트 (12년~16년)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="008",
+                    name="쏘나타 하이브리드 (11년~14년)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="011",
+                    name="LF 쏘나타 (14년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="013",
+                    name="LF 쏘나타 하이브리드 (14년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="015",
+                    name="쏘나타 뉴 라이즈 하이브리드 (17년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="017",
+                    name="쏘나타(DN8) (19년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="018",
+                    name="쏘나타 하이브리드 (DN8)(19년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="019",
+                    name="쏘나타 디 엣지(DN8)(23년~현재)",
+                    detail_code=""
+                ),
+                AutohubGeneration(
+                    model_code="HD02",
+                    generation_code="14",
+                    name="쏘나타 뉴 라이즈 (17년~현재)",
+                    detail_code=""
+                ),
+            ],
+            "HD20": [  # Hyundai Sonata (model code from working example)
                 AutohubGeneration(
                     model_code="HD20",
                     generation_code="004",
