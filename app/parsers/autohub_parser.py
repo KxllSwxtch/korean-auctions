@@ -58,10 +58,26 @@ class AutohubParser:
             auction_info = self._extract_auction_info(soup)
             logger.info(f"Извлечена информация об аукционе: {auction_info}")
 
-            # Ищем все блоки с автомобилями
-            car_blocks = soup.find_all("div", class_="car_one")
+            # Ищем таблицу с автомобилями
+            # Сначала пробуем найти tbody с классом
+            tbody = soup.find("tbody", class_="text-center text_vert_midd")
+            
+            if tbody:
+                # Если нашли tbody, ищем все строки в нем
+                car_blocks = tbody.find_all("tr")
+            else:
+                # Если не нашли tbody с классом, ищем все таблицы и берем первую подходящую
+                tables = soup.find_all("table", class_=lambda x: x and "table" in x)
+                car_blocks = []
+                for table in tables:
+                    tbody = table.find("tbody")
+                    if tbody:
+                        rows = tbody.find_all("tr")
+                        if rows:
+                            car_blocks.extend(rows)
+                            break
 
-            logger.info(f"Найдено {len(car_blocks)} блоков автомобилей")
+            logger.info(f"Найдено {len(car_blocks)} строк с автомобилями")
 
             for idx, block in enumerate(car_blocks):
                 try:
@@ -69,6 +85,8 @@ class AutohubParser:
                     if car_data:
                         cars.append(car_data)
                         logger.debug(f"Успешно спарсен автомобиль {idx + 1}: {car_data.title}")
+                        if idx < 3:  # Логируем первые 3 автомобиля для отладки
+                            logger.info(f"Автомобиль {idx + 1}: {car_data.title}, год: {car_data.year}, пробег: {car_data.mileage}, топливо: {car_data.fuel_type}")
                     else:
                         logger.warning(f"Не удалось извлечь данные из блока {idx + 1}")
                 except Exception as e:
@@ -272,12 +290,28 @@ class AutohubParser:
     def _extract_car_id(self, car_block: Tag) -> Optional[str]:
         """Извлекает car_id из onclick атрибута"""
         try:
-            # Ищем ссылку с onclick
-            link = car_block.find("a", onclick=re.compile(r"carInfo\('([^']+)'\)"))
-            if link and link.get("onclick"):
-                match = re.search(r"carInfo\('([^']+)'\)", link["onclick"])
+            # В таблице Autohub ссылка с onclick находится в ячейке
+            links = car_block.find_all("a", onclick=True)
+            for link in links:
+                onclick = link.get("onclick", "")
+                # Ищем паттерн carInfo('RC202507230743')
+                match = re.search(r"carInfo\(['\"]([^'\"]+)['\"]\)", onclick)
                 if match:
-                    return match.group(1)
+                    car_id = match.group(1)
+                    logger.debug(f"Найден car_id: {car_id}")
+                    return car_id
+            
+            # Дополнительный поиск в JavaScript функциях
+            onclick_elements = car_block.find_all(attrs={"onclick": True})
+            for elem in onclick_elements:
+                onclick = elem.get("onclick", "")
+                match = re.search(r"carInfo\(['\"]([^'\"]+)['\"]\)", onclick)
+                if match:
+                    car_id = match.group(1)
+                    logger.debug(f"Найден car_id (альтернативный метод): {car_id}")
+                    return car_id
+                    
+            logger.warning("car_id не найден в строке таблицы")
         except Exception as e:
             logger.error(f"Ошибка при извлечении car_id: {e}")
         return None
@@ -285,97 +319,144 @@ class AutohubParser:
     def _extract_title(self, car_block: Tag) -> Optional[str]:
         """Извлекает название автомобиля"""
         try:
-            title_element = car_block.find("div", class_="car-title")
-            if title_element:
-                link = title_element.find("a")
-                if link:
-                    return link.get_text(strip=True)
+            # В таблице название находится в ссылке внутри ячейки
+            # Ищем strong тег внутри ссылки или просто текст ссылки
+            links = car_block.find_all("a")
+            for link in links:
+                # Проверяем, есть ли onclick с carInfo
+                onclick = link.get("onclick", "")
+                if "carInfo" in onclick:
+                    # Ищем strong внутри ссылки
+                    strong = link.find("strong")
+                    if strong:
+                        title = strong.get_text(strip=True)
+                        if title:
+                            logger.debug(f"Найдено название в strong: {title}")
+                            return title
+                    # Если нет strong, берем текст ссылки
+                    title = link.get_text(strip=True)
+                    if title:
+                        logger.debug(f"Найдено название в ссылке: {title}")
+                        return title
+            
+            # Альтернативный поиск - первый strong тег в строке
+            strong_tags = car_block.find_all("strong")
+            for strong in strong_tags:
+                text = strong.get_text(strip=True)
+                if text and len(text) > 5:  # Минимальная длина для названия
+                    logger.debug(f"Найдено название в strong (альтернативный): {text}")
+                    return text
+                    
         except Exception as e:
             logger.error(f"Ошибка при извлечении title: {e}")
         return None
 
     def _extract_car_info(self, car_block: Tag) -> Dict[str, Any]:
-        """Извлекает основную информацию об автомобиле"""
+        """Извлекает основную информацию об автомобиле из ячеек таблицы"""
         info = {}
 
         try:
-            # Ищем список с основной информацией
-            car_list = car_block.find("ul", class_="list-inline")
-            if car_list:
-                items = car_list.find_all("li")
-                if len(items) >= 4:
-                    # Год - проверяем на формат с датой регистрации
-                    year_text = items[0].get_text(strip=True)
-                    year_match = re.search(r"(\d{4})", year_text)
-                    if year_match:
-                        info["year"] = int(year_match.group(1))
-
-                        # Проверяем, есть ли дата регистрации в том же элементе
-                        reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", year_text)
+            # В таблице информация разбита по ячейкам <td>
+            cells = car_block.find_all("td")
+            
+            if len(cells) >= 5:  # Ожидаем минимум 5 ячеек
+                # Обычная структура:
+                # 0 - чекбокс
+                # 1 - название и основная инфо
+                # 2 - год/пробег/трансмиссия/топливо
+                # 3 - номера (аукцион/парковка)
+                # 4 - цена
+                # 5 - статус (если есть)
+                
+                # Извлекаем из второй ячейки (основная информация)
+                if len(cells) > 2:
+                    info_cell = cells[2]
+                    info_text = info_cell.get_text(" ", strip=True)  # Используем пробел как разделитель
+                    logger.debug(f"Извлечен текст из info_cell: {info_text}")
+                    
+                    # Парсим год, пробег, трансмиссию и топливо
+                    # Формат: "2020 33,076km 오토 경유"
+                    parts = info_text.split()
+                    
+                    if len(parts) >= 1:
+                        # Год
+                        for part in parts:
+                            year_match = re.search(r"^(\d{4})$", part)
+                            if year_match:
+                                info["year"] = int(year_match.group(1))
+                                logger.debug(f"Найден год: {info['year']}")
+                                break
+                        
+                        # Пробег
+                        for part in parts:
+                            if "km" in part.lower():
+                                info["mileage"] = part
+                                logger.debug(f"Найден пробег: {info['mileage']}")
+                                break
+                        
+                        # Трансмиссия
+                        for part in parts:
+                            if part in ["오토", "수동", "자동", "CVT", "DCT"]:
+                                info["transmission"] = self._parse_transmission(part)
+                                logger.debug(f"Найдена трансмиссия: {part} -> {info['transmission']}")
+                                break
+                        
+                        # Тип топлива
+                        for part in parts:
+                            if part in ["휘발유", "경유", "전기", "하이브리드", "LPG", "디젤", "가솔린"]:
+                                info["fuel_type"] = self._parse_fuel_type(part)
+                                logger.debug(f"Найден тип топлива: {part} -> {info['fuel_type']}")
+                                break
+                    
+                    # Проверяем на дату регистрации в тексте
+                    reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", info_text)
+                    if reg_match:
+                        raw_date = reg_match.group(1)
+                        formatted_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                        info["first_registration_date"] = formatted_date
+                        logger.debug(f"📅 Найдена дата регистрации: {raw_date} -> {formatted_date}")
+                
+                # Альтернативный поиск в br разделенном тексте
+                br_texts = []
+                for cell in cells:
+                    # Извлекаем текст между br тегами
+                    for br in cell.find_all("br"):
+                        if br.previous_sibling:
+                            text = str(br.previous_sibling).strip()
+                            if text:
+                                br_texts.append(text)
+                        if br.next_sibling:
+                            text = str(br.next_sibling).strip()
+                            if text:
+                                br_texts.append(text)
+                
+                # Парсим дополнительную информацию из br текстов
+                for text in br_texts:
+                    # Год с датой регистрации
+                    year_reg_match = re.search(r"(\d{4})\s*\(최초등록일\s*:\s*(\d{8})\)", text)
+                    if year_reg_match:
+                        info["year"] = int(year_reg_match.group(1))
+                        raw_date = year_reg_match.group(2)
+                        info["first_registration_date"] = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                    
+                    # Отдельная дата регистрации
+                    elif "최초등록일" in text:
+                        reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", text)
                         if reg_match:
                             raw_date = reg_match.group(1)
-                            formatted_date = (
-                                f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
-                            )
-                            info["first_registration_date"] = formatted_date
-                            logger.debug(
-                                f"📅 Найдена дата регистрации в элементе года: {raw_date} -> {formatted_date}"
-                            )
-                    elif year_text.isdigit():
-                        info["year"] = int(year_text)
-
-                    # Пробег
-                    info["mileage"] = items[1].get_text(strip=True)
-
-                    # Трансмиссия
-                    transmission_text = items[2].get_text(strip=True)
-                    info["transmission"] = self._parse_transmission(transmission_text)
-
-                    # Тип топлива
-                    fuel_text = items[3].get_text(strip=True)
-                    info["fuel_type"] = self._parse_fuel_type(fuel_text)
-
-            # Дополнительная информация из других элементов
-            # Дата регистрации - поиск в разных местах (если не найдена выше)
-            first_registration_date = info.get("first_registration_date")
-
-            # Способ 1: Поиск в прямом тексте с меткой "최초등록일 : " (если не найдена выше)
-            if not first_registration_date:
-                reg_date_element = car_block.find("strong", string="최초등록일 : ")
-                if reg_date_element and reg_date_element.next_sibling:
-                    first_registration_date = reg_date_element.next_sibling.strip()
-
-            # Способ 2: Поиск в тексте с годом в формате "YYYY (최초등록일 : YYYYMMDD)" (если не найдена выше)
-            if not first_registration_date:
-                # Ищем в любом тексте формат с годом и датой регистрации
-                text_elements = car_block.find_all(
-                    text=re.compile(r"\d{4}\s*\(최초등록일\s*:\s*\d{8}\)")
-                )
-                for text_elem in text_elements:
-                    reg_match = re.search(r"최초등록일\s*:\s*(\d{8})", text_elem)
-                    if reg_match:
-                        # Форматируем дату из YYYYMMDD в YYYY-MM-DD
-                        raw_date = reg_match.group(1)
-                        first_registration_date = (
-                            f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
-                        )
-                        logger.debug(
-                            f"📅 Найдена дата регистрации в дополнительном тексте: {raw_date} -> {first_registration_date}"
-                        )
-                        break
-
-            if first_registration_date:
-                info["first_registration_date"] = first_registration_date
-
-            # Оценка состояния
-            grade_element = car_block.find("strong", string="평가점 : ")
-            if grade_element and grade_element.next_sibling:
-                info["condition_grade"] = grade_element.next_sibling.strip()
-
-            # История использования
-            history_element = car_block.find("strong", string="경력 : ")
-            if history_element and history_element.next_sibling:
-                info["history"] = history_element.next_sibling.strip()
+                            info["first_registration_date"] = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+                    
+                    # Оценка состояния
+                    elif "평가점" in text:
+                        grade_match = re.search(r"평가점\s*:\s*([^\s]+)", text)
+                        if grade_match:
+                            info["condition_grade"] = grade_match.group(1)
+                    
+                    # История
+                    elif "경력" in text:
+                        history_match = re.search(r"경력\s*:\s*(.+)", text)
+                        if history_match:
+                            info["history"] = history_match.group(1).strip()
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении car_info: {e}")
@@ -383,43 +464,55 @@ class AutohubParser:
         return info
 
     def _extract_identifiers(self, car_block: Tag) -> Dict[str, str]:
-        """Извлекает идентификаторы автомобиля"""
+        """Извлекает идентификаторы автомобиля из ячеек таблицы"""
         identifiers = {}
 
         try:
-            # Номер лота
-            auction_num_element = car_block.find("strong", string="출품번호 : ")
-            if auction_num_element:
-                next_strong = auction_num_element.find_next("strong")
-                if next_strong:
-                    font_element = next_strong.find("font")
-                    if font_element:
-                        identifiers["auction_number"] = font_element.get_text(
-                            strip=True
-                        )
-
-            # Номер автомобиля
-            car_num_element = car_block.find("strong", string="차량번호 : ")
-            if car_num_element and car_num_element.next_sibling:
-                identifiers["car_number"] = car_num_element.next_sibling.strip()
-
-            # Номер парковки
-            parking_element = car_block.find("strong", string="주차번호 : ")
-            if parking_element:
-                next_strong = parking_element.find_next("strong")
-                if next_strong:
-                    font_element = next_strong.find("font")
-                    if font_element:
-                        identifiers["parking_number"] = font_element.get_text(
-                            strip=True
-                        )
-
-            # Полоса
-            lane_element = car_block.find("strong", string="레인 : ")
-            if lane_element and lane_element.next_sibling:
-                lane_text = lane_element.next_sibling.strip()
-                if lane_text:
-                    identifiers["lane"] = lane_text
+            cells = car_block.find_all("td")
+            
+            # Обычно номера находятся в 3-4 ячейке
+            if len(cells) > 3:
+                numbers_cell = cells[3]
+                numbers_text = numbers_cell.get_text(strip=True)
+                
+                # Парсим номера из текста вида "0289 / D-1342"
+                if "/" in numbers_text:
+                    parts = numbers_text.split("/")
+                    if len(parts) >= 2:
+                        identifiers["auction_number"] = parts[0].strip()
+                        identifiers["parking_number"] = parts[1].strip()
+                        
+                        # Извлекаем полосу из парковочного номера (например, "D" из "D-1342")
+                        parking = parts[1].strip()
+                        if "-" in parking:
+                            lane = parking.split("-")[0]
+                            identifiers["lane"] = lane
+            
+            # Альтернативный поиск в font тегах с цветом
+            font_tags = car_block.find_all("font")
+            for font in font_tags:
+                color = font.get("color", "")
+                text = font.get_text(strip=True)
+                
+                # Красный цвет часто используется для номера аукциона
+                if color.lower() in ["red", "#ff0000", "#f00"] and text.isdigit():
+                    if "auction_number" not in identifiers:
+                        identifiers["auction_number"] = text
+                
+                # Синий цвет часто для парковочного номера
+                elif color.lower() in ["blue", "#0000ff", "#00f"] and "-" in text:
+                    if "parking_number" not in identifiers:
+                        identifiers["parking_number"] = text
+                        # Извлекаем полосу
+                        if "-" in text:
+                            lane = text.split("-")[0]
+                            identifiers["lane"] = lane
+            
+            # Поиск номера автомобиля в тексте
+            all_text = car_block.get_text()
+            car_num_match = re.search(r"차량번호\s*:\s*([^\s]+)", all_text)
+            if car_num_match:
+                identifiers["car_number"] = car_num_match.group(1)
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении identifiers: {e}")
@@ -427,18 +520,36 @@ class AutohubParser:
         return identifiers
 
     def _extract_financial_info(self, car_block: Tag) -> Dict[str, Optional[int]]:
-        """Извлекает финансовую информацию"""
+        """Извлекает финансовую информацию из ячеек таблицы"""
         financial = {}
 
         try:
-            # Стартовая цена
-            price_element = car_block.find("strong", string="시작가 : ")
-            if price_element:
-                next_strong = price_element.find_next("strong")
-                if next_strong:
-                    price_text = next_strong.get_text(strip=True).replace(",", "")
-                    if price_text.isdigit():
-                        financial["starting_price"] = int(price_text)
+            cells = car_block.find_all("td")
+            
+            # Цена обычно в 4-5 ячейке
+            if len(cells) > 4:
+                price_cell = cells[4]
+                price_text = price_cell.get_text(strip=True)
+                
+                # Убираем все нецифровые символы кроме запятых
+                price_clean = re.sub(r"[^\d,]", "", price_text)
+                # Убираем запятые и конвертируем в число
+                price_clean = price_clean.replace(",", "")
+                
+                if price_clean.isdigit():
+                    financial["starting_price"] = int(price_clean)
+                    logger.debug(f"Найдена цена: {price_clean}")
+            
+            # Альтернативный поиск в strong тегах
+            strong_tags = car_block.find_all("strong")
+            for strong in strong_tags:
+                text = strong.get_text(strip=True)
+                # Ищем числа с запятыми (форматированные цены)
+                if re.match(r"^[\d,]+$", text):
+                    price_clean = text.replace(",", "")
+                    if price_clean.isdigit() and "starting_price" not in financial:
+                        financial["starting_price"] = int(price_clean)
+                        logger.debug(f"Найдена цена (альтернативный): {price_clean}")
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении financial_info: {e}")
@@ -446,22 +557,43 @@ class AutohubParser:
         return financial
 
     def _extract_status_info(self, car_block: Tag) -> Dict[str, Any]:
-        """Извлекает информацию о статусе"""
+        """Извлекает информацию о статусе из ячеек таблицы"""
         status_info = {}
 
         try:
+            cells = car_block.find_all("td")
+            
+            # Статус обычно в последней ячейке
+            if len(cells) > 5:
+                status_cell = cells[5]
+                status_text = status_cell.get_text(strip=True)
+                
+                if status_text:
+                    status_info["status"] = self._parse_status(status_text)
+                    
+                    # Если есть результат аукциона, он тоже здесь
+                    if "낙찰" in status_text or "유찰" in status_text:
+                        status_info["auction_result"] = status_text
+            
+            # Альтернативный поиск статуса в тексте
+            all_text = car_block.get_text()
+            
             # Статус
-            status_element = car_block.find("strong", string="진행상태 : ")
-            if status_element and status_element.next_sibling:
-                status_text = status_element.next_sibling.strip()
+            status_match = re.search(r"진행상태\s*:\s*([^\s]+)", all_text)
+            if status_match and "status" not in status_info:
+                status_text = status_match.group(1)
                 status_info["status"] = self._parse_status(status_text)
-
+            
             # Результат аукциона
-            result_element = car_block.find("strong", string="경매결과 : ")
-            if result_element and result_element.next_sibling:
-                result_text = result_element.next_sibling.strip()
+            result_match = re.search(r"경매결과\s*:\s*([^\s]+)", all_text)
+            if result_match and "auction_result" not in status_info:
+                result_text = result_match.group(1)
                 if result_text != "-":
                     status_info["auction_result"] = result_text
+            
+            # По умолчанию статус REGISTERED
+            if "status" not in status_info:
+                status_info["status"] = CarStatus.REGISTERED
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении status_info: {e}")
@@ -471,13 +603,32 @@ class AutohubParser:
     def _extract_main_image(self, car_block: Tag) -> Optional[str]:
         """Извлекает URL основного изображения"""
         try:
-            img_element = car_block.find("img", class_="img-fluid")
+            # В таблице изображения обычно находятся в первой ячейке
+            cells = car_block.find_all("td")
+            
+            if cells:
+                # Ищем изображение в первых ячейках
+                for cell in cells[:2]:  # Проверяем первые 2 ячейки
+                    img = cell.find("img")
+                    if img and img.get("src"):
+                        src = img["src"]
+                        # Если URL относительный, делаем его абсолютным
+                        if src.startswith("/"):
+                            return f"{self.base_url}{src}"
+                        elif not src.startswith("http"):
+                            return f"{self.base_url}/{src}"
+                        return src
+            
+            # Альтернативный поиск - любое изображение в строке
+            img_element = car_block.find("img")
             if img_element and img_element.get("src"):
                 src = img_element["src"]
-                # Если URL относительный, делаем его абсолютным
                 if src.startswith("/"):
                     return f"{self.base_url}{src}"
+                elif not src.startswith("http"):
+                    return f"{self.base_url}/{src}"
                 return src
+                
         except Exception as e:
             logger.error(f"Ошибка при извлечении main_image: {e}")
         return None
