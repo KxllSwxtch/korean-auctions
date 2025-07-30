@@ -1422,8 +1422,17 @@ class AutohubService:
         Returns:
             str: Auction code in format ACYYYYMMDD0001
         """
-        # Remove hyphens from date
-        date_no_hyphens = auction_date.replace('-', '')
+        from datetime import datetime, timedelta
+        
+        # Parse the auction date
+        date_obj = datetime.strptime(auction_date, '%Y-%m-%d')
+        
+        # Autohub uses auction code date that is 7 days before the actual auction date
+        code_date = date_obj - timedelta(days=7)
+        
+        # Format as YYYYMMDD
+        date_no_hyphens = code_date.strftime('%Y%m%d')
+        
         # Generate code - AC + date + 0001
         return f"AC{date_no_hyphens}0001"
     
@@ -1442,13 +1451,20 @@ class AutohubService:
         # Parse the auction date
         date_obj = datetime.strptime(auction_date, '%Y-%m-%d')
         
-        # Calculate days since start of year
-        year_start = datetime(date_obj.year, 1, 1)
-        days_since_start = (date_obj - year_start).days + 1
+        # Based on the working example:
+        # 2025-07-30 = auction number 1335
+        # This appears to be a sequential number, not directly based on day of year
         
-        # Autohub seems to run daily auctions, so auction number could be based on day of year
-        # Adding a base number to make it look realistic (e.g., 1200 + day_of_year)
-        auction_number = 1200 + days_since_start
+        # Use a reference point to calculate the auction number
+        # Reference: 2025-07-30 = 1335
+        reference_date = datetime(2025, 7, 30)
+        reference_number = 1335
+        
+        # Calculate the difference in days
+        days_diff = (date_obj - reference_date).days
+        
+        # Autohub runs daily auctions, so increment/decrement by 1 per day
+        auction_number = reference_number + days_diff
         
         return str(auction_number)
 
