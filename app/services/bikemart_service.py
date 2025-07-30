@@ -15,7 +15,7 @@ from app.models.bikemart import (
     BikemartBikeDetailResponse,
     BikemartBikeDetail,
     BikemartModelsResponse,
-    BikemartModel
+    BikemartModel,
 )
 from app.parsers.bikemart_parser import BikemartParser
 
@@ -24,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 class BikemartService:
     """Service for interacting with Bikemart API"""
-    
+
     BASE_URL = "https://shop.bikemart.co.kr/api/index.php"
-    
+
     def __init__(self):
         self.parser = BikemartParser()
         self.http_client = AsyncHttpClient(timeout=30)
-        
+
         # Default headers from the example
         self.headers = {
             "accept": "application/json, text/plain, */*",
@@ -47,7 +47,7 @@ class BikemartService:
             "sec-fetch-site": "same-site",
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
         }
-    
+
     async def get_bikes(
         self,
         page: int = 1,
@@ -60,11 +60,11 @@ class BikemartService:
         min_mileage: Optional[int] = None,
         max_mileage: Optional[int] = None,
         search_text: Optional[str] = None,
-        sort_by: Optional[str] = None
+        sort_by: Optional[str] = None,
     ) -> BikemartResponse:
         """
         Get bikes listing with optional filters
-        
+
         Args:
             page: Page number (default: 1)
             brand_seq: Brand sequence ID
@@ -77,7 +77,7 @@ class BikemartService:
             max_mileage: Maximum mileage
             search_text: Search text
             sort_by: Sort option
-            
+
         Returns:
             BikemartResponse with bikes data
         """
@@ -107,56 +107,52 @@ class BikemartService:
                 "action": "getBikeSellList",
                 "token": "",
             }
-            
+
             # Make API request
             response = await self.http_client.get(
-                self.BASE_URL,
-                params=params,
-                headers=self.headers
+                self.BASE_URL, params=params, headers=self.headers
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"API returned status code: {response.status_code}")
                 return BikemartResponse(
-                    success=False,
-                    data=[],
-                    message=f"API error: {response.status_code}"
+                    success=False, data=[], message=f"API error: {response.status_code}"
                 )
-            
+
             # Parse response
             response_data = response.json()
             bikes, pagination = self.parser.parse_bikes_response(response_data)
-            
+
             # Calculate pagination if not provided
             if not pagination:
                 total_count = self.parser.parse_total_count(response_data)
                 items_per_page = 20  # Default items per page
                 pagination = BikemartPaginationInfo(
                     current_page=page,
-                    total_pages=max(1, (total_count + items_per_page - 1) // items_per_page),
+                    total_pages=max(
+                        1, (total_count + items_per_page - 1) // items_per_page
+                    ),
                     total_count=total_count,
-                    items_per_page=items_per_page
+                    items_per_page=items_per_page,
                 )
-            
+
             return BikemartResponse(
                 success=True,
                 data=bikes,
                 pagination=pagination,
-                message=response_data.get("ResultMessage", "")
+                message=response_data.get("ResultMessage", ""),
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching bikes: {e}")
             return BikemartResponse(
-                success=False,
-                data=[],
-                message=f"Error fetching bikes: {str(e)}"
+                success=False, data=[], message=f"Error fetching bikes: {str(e)}"
             )
-    
+
     async def get_brands(self) -> BikemartBrandsResponse:
         """
         Get available bike brands
-        
+
         Returns:
             BikemartBrandsResponse with brands data
         """
@@ -169,69 +165,60 @@ class BikemartService:
                 "action": "getBikeBrandList",
                 "token": "",
             }
-            
+
             # Make API request
             response = await self.http_client.get(
-                self.BASE_URL,
-                params=params,
-                headers=self.headers
+                self.BASE_URL, params=params, headers=self.headers
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"API returned status code: {response.status_code}")
                 return BikemartBrandsResponse(
-                    success=False,
-                    data=[],
-                    message=f"API error: {response.status_code}"
+                    success=False, data=[], message=f"API error: {response.status_code}"
                 )
-            
+
             # Parse response
             response_data = response.json()
             brands = self.parser.parse_brands_response(response_data)
-            
+
             return BikemartBrandsResponse(
                 success=True,
                 data=brands,
-                message=response_data.get("ResultMessage", "")
+                message=response_data.get("ResultMessage", ""),
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching brands: {e}")
             return BikemartBrandsResponse(
-                success=False,
-                data=[],
-                message=f"Error fetching brands: {str(e)}"
+                success=False, data=[], message=f"Error fetching brands: {str(e)}"
             )
-    
+
     async def get_filters(self) -> BikemartFiltersResponse:
         """
         Get available filter options
-        
+
         Returns:
             BikemartFiltersResponse with filter options
         """
         try:
             # For filters, we'll create static options based on common ranges
             # In a real implementation, you might want to fetch these dynamically
-            
+
             # Year filters
             current_year = datetime.now().year
             years = []
             for year in range(current_year, 1990, -1):
-                years.append(BikemartFilter(
-                    value=str(year),
-                    label=str(year)
-                ))
-            
+                years.append(BikemartFilter(value=str(year), label=str(year)))
+
             # Mileage ranges
             mileage_ranges = [
                 BikemartFilter(value="0-10000", label="0~10,000km"),
                 BikemartFilter(value="10000-30000", label="10,000~30,000km"),
                 BikemartFilter(value="30000-50000", label="30,000~50,000km"),
                 BikemartFilter(value="50000-100000", label="50,000~100,000km"),
-                BikemartFilter(value="100000+", label="100,000km+")
+                BikemartFilter(value="100000+", label="100,000km+"),
             ]
-            
+
             # Price ranges (in 만원)
             price_ranges = [
                 BikemartFilter(value="0-100", label="~100만원"),
@@ -239,20 +226,22 @@ class BikemartService:
                 BikemartFilter(value="200-300", label="200~300만원"),
                 BikemartFilter(value="300-500", label="300~500만원"),
                 BikemartFilter(value="500-1000", label="500~1,000만원"),
-                BikemartFilter(value="1000+", label="1,000만원+")
+                BikemartFilter(value="1000+", label="1,000만원+"),
             ]
-            
+
             # Get brands for brand filter
             brands_response = await self.get_brands()
             brand_filters = []
             if brands_response.success:
                 for brand in brands_response.data:
-                    brand_filters.append(BikemartFilter(
-                        value=brand.brand_seq,
-                        label=brand.brand_name,
-                        count=brand.count
-                    ))
-            
+                    brand_filters.append(
+                        BikemartFilter(
+                            value=brand.brand_seq,
+                            label=brand.brand_name,
+                            count=brand.count,
+                        )
+                    )
+
             # Regions (major cities in Korea)
             regions = [
                 BikemartFilter(value="seoul", label="서울"),
@@ -264,16 +253,16 @@ class BikemartService:
                 BikemartFilter(value="daejeon", label="대전"),
                 BikemartFilter(value="ulsan", label="울산"),
             ]
-            
+
             return BikemartFiltersResponse(
                 success=True,
                 brands=brand_filters,
                 years=years,
                 mileage_ranges=mileage_ranges,
                 price_ranges=price_ranges,
-                regions=regions
+                regions=regions,
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching filters: {e}")
             return BikemartFiltersResponse(
@@ -283,16 +272,16 @@ class BikemartService:
                 mileage_ranges=[],
                 price_ranges=[],
                 regions=[],
-                message=f"Error fetching filters: {str(e)}"
+                message=f"Error fetching filters: {str(e)}",
             )
-    
+
     async def get_bike_detail(self, seq: str) -> BikemartBikeDetailResponse:
         """
         Get detailed bike information by sequence ID
-        
+
         Args:
             seq: Bike sequence ID
-            
+
         Returns:
             BikemartBikeDetailResponse with bike detail data
         """
@@ -306,54 +295,50 @@ class BikemartService:
                 "action": "getBikeSellDetail",
                 "token": "",
             }
-            
+
             # Make API request
             response = await self.http_client.get(
-                self.BASE_URL,
-                params=params,
-                headers=self.headers
+                self.BASE_URL, params=params, headers=self.headers
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"API returned status code: {response.status_code}")
                 return BikemartBikeDetailResponse(
                     success=False,
                     data=None,
-                    message=f"API error: {response.status_code}"
+                    message=f"API error: {response.status_code}",
                 )
-            
+
             # Parse response
             response_data = response.json()
             bike_detail = self.parser.parse_bike_detail_response(response_data)
-            
+
             if not bike_detail:
                 return BikemartBikeDetailResponse(
-                    success=False,
-                    data=None,
-                    message="Failed to parse bike detail"
+                    success=False, data=None, message="Failed to parse bike detail"
                 )
-            
+
             return BikemartBikeDetailResponse(
                 success=True,
                 data=bike_detail,
-                message=response_data.get("ResultMessage", "")
+                message=response_data.get("ResultMessage", ""),
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching bike detail: {e}")
             return BikemartBikeDetailResponse(
                 success=False,
                 data=None,
-                message=f"Error fetching bike detail: {str(e)}"
+                message=f"Error fetching bike detail: {str(e)}",
             )
-    
+
     async def get_models_by_brand(self, brand_seq: str) -> BikemartModelsResponse:
         """
         Get bike models for a specific brand
-        
+
         Args:
             brand_seq: Brand sequence ID
-            
+
         Returns:
             BikemartModelsResponse with models data
         """
@@ -367,38 +352,32 @@ class BikemartService:
                 "action": "getBikeModel",
                 "token": "",
             }
-            
+
             # Make API request
             response = await self.http_client.get(
-                self.BASE_URL,
-                params=params,
-                headers=self.headers
+                self.BASE_URL, params=params, headers=self.headers
             )
-            
+
             if response.status_code != 200:
                 logger.error(f"API returned status code: {response.status_code}")
                 return BikemartModelsResponse(
-                    success=False,
-                    data=[],
-                    message=f"API error: {response.status_code}"
+                    success=False, data=[], message=f"API error: {response.status_code}"
                 )
-            
+
             # Parse response
             response_data = response.json()
             models = self.parser.parse_models_response(response_data)
-            
+
             return BikemartModelsResponse(
                 success=True,
                 data=models,
-                message=response_data.get("ResultMessage", "")
+                message=response_data.get("ResultMessage", ""),
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching models: {e}")
             return BikemartModelsResponse(
-                success=False,
-                data=[],
-                message=f"Error fetching models: {str(e)}"
+                success=False, data=[], message=f"Error fetching models: {str(e)}"
             )
 
 
