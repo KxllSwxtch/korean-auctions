@@ -444,20 +444,21 @@ class SSANCARService:
             manufacturers, _ = self.get_manufacturers()
             
             # Define static filter options based on SSANCAR's actual filters
+            # Updated to use code/name structure for frontend compatibility
             fuel_types = [
-                SSANCARFilterOption(value="Gasoline", label="Gasoline", count=None),
-                SSANCARFilterOption(value="Diesel", label="Diesel", count=None),
-                SSANCARFilterOption(value="LPG", label="LPG", count=None),
-                SSANCARFilterOption(value="Hybrid", label="Hybrid", count=None),
-                SSANCARFilterOption(value="Electric", label="Electric", count=None),
-                SSANCARFilterOption(value="Hydrogen", label="Hydrogen", count=None),
+                {"code": "Gasoline", "name": "Gasoline"},
+                {"code": "Diesel", "name": "Diesel"},
+                {"code": "LPG", "name": "LPG"},
+                {"code": "Hybrid", "name": "Hybrid"},
+                {"code": "Electric", "name": "Electric"},
+                {"code": "Hydrogen", "name": "Hydrogen"},
             ]
             
             transmissions = [
-                SSANCARFilterOption(value="Automatic", label="Automatic", count=None),
-                SSANCARFilterOption(value="Manual", label="Manual", count=None),
-                SSANCARFilterOption(value="CVT", label="CVT", count=None),
-                SSANCARFilterOption(value="DCT", label="DCT", count=None),
+                {"code": "Automatic", "name": "Automatic"},
+                {"code": "Manual", "name": "Manual"},
+                {"code": "CVT", "name": "CVT"},
+                {"code": "DCT", "name": "DCT"},
             ]
             
             grades = [
@@ -478,18 +479,18 @@ class SSANCARService:
             ]
             
             colors = [
-                SSANCARFilterOption(value="Black", label="Black", count=None),
-                SSANCARFilterOption(value="White", label="White", count=None),
-                SSANCARFilterOption(value="Silver", label="Silver", count=None),
-                SSANCARFilterOption(value="Gray", label="Gray", count=None),
-                SSANCARFilterOption(value="Red", label="Red", count=None),
-                SSANCARFilterOption(value="Blue", label="Blue", count=None),
-                SSANCARFilterOption(value="Green", label="Green", count=None),
-                SSANCARFilterOption(value="Brown", label="Brown", count=None),
-                SSANCARFilterOption(value="Beige", label="Beige", count=None),
-                SSANCARFilterOption(value="Orange", label="Orange", count=None),
-                SSANCARFilterOption(value="Yellow", label="Yellow", count=None),
-                SSANCARFilterOption(value="Other", label="Other", count=None),
+                {"code": "Black", "name": "Black"},
+                {"code": "White", "name": "White"},
+                {"code": "Silver", "name": "Silver"},
+                {"code": "Gray", "name": "Gray"},
+                {"code": "Red", "name": "Red"},
+                {"code": "Blue", "name": "Blue"},
+                {"code": "Green", "name": "Green"},
+                {"code": "Brown", "name": "Brown"},
+                {"code": "Beige", "name": "Beige"},
+                {"code": "Orange", "name": "Orange"},
+                {"code": "Yellow", "name": "Yellow"},
+                {"code": "Other", "name": "Other"},
             ]
             
             # Auction weeks
