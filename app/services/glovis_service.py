@@ -626,7 +626,7 @@ class GlovisService:
             korean_manufacturer = self._convert_manufacturer_to_korean(manufacturer)
 
             # Получаем модели из carList
-            carlist = self._carlist_data.get("full_carlist", {})
+            carlist = self._carlist_data.get("models", {})
             models_data = carlist.get(korean_manufacturer, [])
 
             # Формируем ответ в формате API
@@ -660,7 +660,7 @@ class GlovisService:
 
             for korean_name, english_name in korean_to_english.items():
                 # Получаем количество моделей для производителя
-                carlist = self._carlist_data.get("full_carlist", {})
+                carlist = self._carlist_data.get("models", {})
                 model_count = len(carlist.get(korean_name, []))
 
                 manufacturers.append(

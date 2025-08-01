@@ -53,59 +53,51 @@ class SSANCARService:
         "sec-ch-ua-platform": '"macOS"',
     }
     
-    # Car manufacturer and model mapping (from full-page.html)
-    CAR_LIST_MAP = {
-        "현대": [
-            {"no": "472", "name": "아반떼", "e_name": "AVANTE"},
-            {"no": "550", "name": "엑센트", "e_name": "ACCENT"},
-            {"no": "551", "name": "캐스퍼", "e_name": "CASPER"},
-            {"no": "553", "name": "카운티", "e_name": "COUNTY"},
-            {"no": "540", "name": "제네시스", "e_name": "GENESIS"},
-            {"no": "460", "name": "그랜저", "e_name": "GRANDEUR"},
-            {"no": "501", "name": "i30", "e_name": "i30"},
-            {"no": "499", "name": "i40", "e_name": "i40"},
-            {"no": "490", "name": "아이오닉", "e_name": "IONIQ"},
-            {"no": "544", "name": "코나", "e_name": "KONA"},
-            {"no": "549", "name": "맥스크루즈", "e_name": "MAXCRUZ"},
-            {"no": "555", "name": "마이티", "e_name": "MIGHTY"},
-            {"no": "556", "name": "넥쏘", "e_name": "NEXO"},
-            {"no": "545", "name": "팰리세이드", "e_name": "PALISADE"},
-            {"no": "558", "name": "포터", "e_name": "PORTER"},
-            {"no": "541", "name": "싼타페", "e_name": "SANTAFE"},
-            {"no": "557", "name": "쏠라티", "e_name": "SOLATI"},
-            {"no": "559", "name": "쏘나타", "e_name": "SONATA"},
-            {"no": "539", "name": "스타렉스", "e_name": "STAREX"},
-            {"no": "560", "name": "스타리아", "e_name": "STARIA"},
-            {"no": "542", "name": "투싼", "e_name": "TUCSON"},
-            {"no": "546", "name": "벨로스터", "e_name": "VELOSTER"},
-            {"no": "561", "name": "베뉴", "e_name": "VENUE"},
-        ],
-        "기아": [
-            {"no": "587", "name": "봉고", "e_name": "BONGO"},
-            {"no": "565", "name": "카니발", "e_name": "CARNIVAL"},
-            {"no": "588", "name": "EV6", "e_name": "EV6"},
-            {"no": "589", "name": "EV9", "e_name": "EV9"},
-            {"no": "572", "name": "K3", "e_name": "K3"},
-            {"no": "568", "name": "K5", "e_name": "K5"},
-            {"no": "566", "name": "K7", "e_name": "K7"},
-            {"no": "585", "name": "K8", "e_name": "K8"},
-            {"no": "578", "name": "K9", "e_name": "K9"},
-            {"no": "577", "name": "모하비", "e_name": "MOHAVE"},
-            {"no": "567", "name": "모닝", "e_name": "MORNING"},
-            {"no": "575", "name": "니로", "e_name": "NIRO"},
-            {"no": "573", "name": "프라이드", "e_name": "PRIDE"},
-            {"no": "570", "name": "레이", "e_name": "RAY"},
-            {"no": "583", "name": "셀토스", "e_name": "SELTOS"},
-            {"no": "569", "name": "쏘렌토", "e_name": "SORENTO"},
-            {"no": "576", "name": "쏘울", "e_name": "SOUL"},
-            {"no": "571", "name": "스포티지", "e_name": "SPORTAGE"},
-            {"no": "590", "name": "스팅어", "e_name": " STINGER"},
-            {"no": "582", "name": "스토닉", "e_name": "STONIC"},
-        ],
-        # Add more manufacturers as needed...
-    }
+    # Load car manufacturer and model mapping from JSON
+    CAR_LIST_MAP = {}
+    MANUFACTURER_MAPPING = {}
+    
+    @classmethod
+    def _load_carlist_data(cls):
+        """Load car list data from JSON file"""
+        if cls.CAR_LIST_MAP:  # Already loaded
+            return
+            
+        try:
+            import os
+            json_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'ssancar_carlist.json')
+            
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                cls.CAR_LIST_MAP = data.get('models', {})
+                cls.MANUFACTURER_MAPPING = {
+                    'korean_to_english': data.get('korean_to_english_manufacturers', {}),
+                    'english_to_korean': data.get('english_to_korean_manufacturers', {})
+                }
+                logger.info(f"✅ Loaded {len(cls.CAR_LIST_MAP)} manufacturers with models from ssancar_carlist.json")
+        except FileNotFoundError:
+            logger.warning("⚠️ ssancar_carlist.json not found, using default data")
+            # Fallback to minimal data
+            cls.CAR_LIST_MAP = {
+                "현대": [
+                    {"no": "472", "name": "아반떼", "e_name": "AVANTE"},
+                    {"no": "460", "name": "그랜저", "e_name": "GRANDEUR"},
+                    {"no": "559", "name": "쏘나타", "e_name": "SONATA"},
+                ],
+                "기아": [
+                    {"no": "565", "name": "카니발", "e_name": "CARNIVAL"},
+                    {"no": "568", "name": "K5", "e_name": "K5"},
+                    {"no": "571", "name": "스포티지", "e_name": "SPORTAGE"},
+                ],
+            }
+        except Exception as e:
+            logger.error(f"❌ Error loading ssancar_carlist.json: {e}")
+            cls.CAR_LIST_MAP = {}
     
     def __init__(self):
+        # Load car list data first
+        self._load_carlist_data()
+        
         self.session_manager = SessionManager()
         self.parser = SSANCARParser()
         self.session = self._create_session()
@@ -280,64 +272,32 @@ class SSANCARService:
         try:
             manufacturers = []
             
+            # Use manufacturer mapping from loaded JSON
+            korean_to_english = self.MANUFACTURER_MAPPING.get('korean_to_english', {})
+            
             # Convert our CAR_LIST_MAP to manufacturer list
             for korean_name, models in self.CAR_LIST_MAP.items():
-                # Map Korean names to English
-                name_map = {
-                    "현대": "HYUNDAI",
-                    "기아": "KIA",
-                    "한국지엠": "CHEVROLET",
-                    "르노삼성": "RENAULT",
-                    "쌍용": "SSANGYONG",
-                    "제네시스": "GENESIS",
-                }
-                
-                english_name = name_map.get(korean_name, korean_name)
+                # Get English name from mapping
+                english_name = korean_to_english.get(korean_name, korean_name)
                 
                 manufacturer = SSANCARManufacturer(
                     code=korean_name,
                     name=english_name,
                     korean_name=korean_name,
-                    count=len(models)
+                    count=len(models) if isinstance(models, list) else 0
                 )
                 manufacturers.append(manufacturer)
             
-            # Add more manufacturers from extended list
-            additional_manufacturers = [
-                SSANCARManufacturer(code="벤츠", name="BENZ", korean_name="벤츠", count=0),
-                SSANCARManufacturer(code="BMW", name="BMW", korean_name="BMW", count=0),
-                SSANCARManufacturer(code="아우디", name="AUDI", korean_name="아우디", count=0),
-                SSANCARManufacturer(code="폭스바겐", name="VOLKSWAGEN", korean_name="폭스바겐", count=0),
-                SSANCARManufacturer(code="랜드로버", name="LANDROVER", korean_name="랜드로버", count=0),
-                SSANCARManufacturer(code="미니", name="MINI", korean_name="미니", count=0),
-                SSANCARManufacturer(code="포드", name="FORD", korean_name="포드", count=0),
-                SSANCARManufacturer(code="닛산", name="NISSAN", korean_name="닛산", count=0),
-                SSANCARManufacturer(code="토요타", name="TOYOTA", korean_name="토요타", count=0),
-                SSANCARManufacturer(code="렉서스", name="LEXUS", korean_name="렉서스", count=0),
-                SSANCARManufacturer(code="마세라티", name="MASERATI", korean_name="마세라티", count=0),
-                SSANCARManufacturer(code="링컨", name="LINCOLN", korean_name="링컨", count=0),
-                SSANCARManufacturer(code="벤틀리", name="BENTLEY", korean_name="벤틀리", count=0),
-                SSANCARManufacturer(code="볼보", name="VOLVO", korean_name="볼보", count=0),
-                SSANCARManufacturer(code="시트로엥", name="CITROEN", korean_name="시트로엥", count=0),
-                SSANCARManufacturer(code="인피니티", name="INFINITI", korean_name="인피니티", count=0),
-                SSANCARManufacturer(code="재규어", name="JAGUAR", korean_name="재규어", count=0),
-                SSANCARManufacturer(code="지프", name="JEEP", korean_name="지프", count=0),
-                SSANCARManufacturer(code="캐딜락", name="CADILLAC", korean_name="캐딜락", count=0),
-                SSANCARManufacturer(code="크라이슬러", name="CHRYSLER", korean_name="크라이슬러", count=0),
-                SSANCARManufacturer(code="테슬라", name="TESLA", korean_name="테슬라", count=0),
-                SSANCARManufacturer(code="포르쉐", name="PORSCHE", korean_name="포르쉐", count=0),
-                SSANCARManufacturer(code="푸조", name="PEUGEOT", korean_name="푸조", count=0),
-                SSANCARManufacturer(code="피아트", name="FIAT", korean_name="피아트", count=0),
-                SSANCARManufacturer(code="혼다", name="HONDA", korean_name="혼다", count=0),
-            ]
+            # Sort by Korean name for consistency
+            manufacturers.sort(key=lambda x: x.korean_name)
             
-            manufacturers.extend(additional_manufacturers)
-            
-            logger.info(f"✅ Retrieved {len(manufacturers)} manufacturers")
+            logger.info(f"✅ Retrieved {len(manufacturers)} manufacturers with models")
             return manufacturers, True
             
         except Exception as e:
             logger.error(f"❌ Error getting manufacturers: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return [], False
     
     def get_models(self, manufacturer_code: str) -> Tuple[List[SSANCARModel], bool]:
@@ -357,10 +317,11 @@ class SSANCARService:
                 )
                 models.append(model)
             
-            # If no models found in our map, try to fetch from website
-            if not models and manufacturer_code not in self.CAR_LIST_MAP:
-                logger.warning(f"⚠️ No models found for manufacturer: {manufacturer_code}")
-                # Could implement dynamic fetching here
+            # Log info about models found
+            if models:
+                logger.info(f"✅ Found {len(models)} models for {manufacturer_code}")
+            else:
+                logger.info(f"ℹ️ No models configured for {manufacturer_code} yet")
             
             logger.info(f"✅ Retrieved {len(models)} models for {manufacturer_code}")
             return models, True
