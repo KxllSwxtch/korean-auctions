@@ -588,11 +588,35 @@ class KCarParser:
                                 f"🔧 Найден объем двигателя: {car.displacement}"
                             )
 
+                # 12. Извлекаем стартовую цену
+                start_price_elem = soup.find("strong", {"id": "auc_strt_prc"})
+                if start_price_elem:
+                    car.start_price = start_price_elem.get_text(strip=True)
+                    logger.debug(f"💰 Найдена стартовая цена: {car.start_price}만원")
+                
+                # 13. Извлекаем ожидаемую цену (если есть)
+                expected_price_elem = soup.find("strong", {"id": "auc_strt_hope"})
+                if expected_price_elem:
+                    car.expected_price = expected_price_elem.get_text(strip=True)
+                    logger.debug(f"💰 Найдена ожидаемая цена: {car.expected_price}만원")
+                
+                # 14. Извлекаем дату аукциона
+                auction_date_elem = soup.find("strong", {"id": "auc_strt_dt"})
+                if auction_date_elem:
+                    car.auction_date = auction_date_elem.get_text(strip=True)
+                    logger.debug(f"📅 Найдена дата аукциона: {car.auction_date}")
+                
+                # 15. Извлекаем статус аукциона
+                auction_status_elem = soup.find("strong", {"id": "auc_stat"})
+                if auction_status_elem:
+                    car.auction_status = auction_status_elem.get_text(strip=True)
+                    logger.debug(f"📊 Найден статус аукциона: {car.auction_status}")
+
                 logger.debug(
-                    f"🔍 Извлеченные данные: название={car.car_name}, номер={car.car_number}, год={car.year}, пробег={car.mileage}"
+                    f"🔍 Извлеченные данные: название={car.car_name}, номер={car.car_number}, год={car.year}, пробег={car.mileage}, цена={car.start_price}"
                 )
                 
-                # 12. Пытаемся извлечь технический лист
+                # 16. Пытаемся извлечь технический лист
                 try:
                     technical_sheet = self._parse_technical_sheet(soup)
                     if technical_sheet:

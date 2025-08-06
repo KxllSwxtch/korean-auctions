@@ -291,6 +291,8 @@ class KCarDetailedCar(BaseModel):
     auction_date: Optional[str] = Field(None, description="Дата аукциона")
     auction_round: Optional[str] = Field(None, description="Номер аукциона")
     start_price: Optional[str] = Field(None, description="Стартовая цена")
+    expected_price: Optional[str] = Field(None, description="Ожидаемая цена")
+    auction_status: Optional[str] = Field(None, description="Статус аукциона")
     auction_place: Optional[str] = Field(None, description="Место проведения аукциона")
     auction_type: Optional[str] = Field(None, description="Тип аукциона")
 
