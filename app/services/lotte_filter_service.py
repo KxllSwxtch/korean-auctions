@@ -3,6 +3,8 @@ import json
 from typing import List, Optional, Dict, Any
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
+from urllib.parse import urljoin
+import warnings
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -34,29 +36,27 @@ class LotteFilterService:
         self.authenticated = False
         self.cache = {}
         self.cache_ttl = 3600  # 1 час для фильтров
+        
+        # Disable SSL warnings
+        warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
-        # URL для API фильтров
+        # URL для API фильтров и аутентификации
         self.filter_url = "/hp/auct/myp/entry/selectMultiComboVehi.do"
         self.search_url = "/hp/auct/myp/entry/selectMypEntryList.do"
+        
+        # URLs для аутентификации (такие же как в LotteService)
+        self.login_url = "/hp/auct/cmm/viewLoginUsr.do?loginMode=redirect"
+        self.login_check_url = "/hp/auct/cmm/selectAuctMemLoginCheckAjax.do"
+        self.login_action_url = "/hp/auct/cmm/actionLogin.do"
 
-        # Cookies и headers из примеров - обновленные значения
-        self.cookies = {
-            "_xm_webid_1_": "-1226978328",
-            "_gid": "GA1.2.346177550.1751701164",
-            "hpAuctSaveid": "119102",
-            "JSESSIONID": "jUEw5UsaMaAAMInWwGazuTRhV1LNbkgFlA2N1O14zgXGCgnOl2P8w23YFAgqhwpO.UlBBQV9kb21haW4vUlBBQV9IUEdfTjIx",
-            "_gat_gtag_UA_118654321_1": "1",
-            "_ga_BG67GSX5WV": "GS2.1.s1751707181$o12$g1$t1751708033$j59$l0$h0",
-            "_ga": "GA1.1.1122542401.1749522854",
-        }
-
+        # Default headers
         self.headers = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
             "Connection": "keep-alive",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Origin": "https://www.lotteautoauction.net",
-            "Referer": "https://www.lotteautoauction.net/hp/cmm/actionMenuLinkPage.do?baseMenuNo=1010000&link=forward%3A%2Fhp%2Fauct%2Fmyp%2Fentry%2FselectMypEntryList.do&redirectMode=&popHeight=&popWidth=&subMenuNo=1010200&subSubMenuNo=",
+            "Referer": "https://www.lotteautoauction.net/hp/cmm/actionMenuLinkPage.do",
             "Sec-Fetch-Dest": "empty",
             "Sec-Fetch-Mode": "cors",
             "Sec-Fetch-Site": "same-origin",
@@ -82,15 +82,137 @@ class LotteFilterService:
             self.session.mount("http://", adapter)
             self.session.mount("https://", adapter)
 
-            # Устанавливаем cookies и headers
-            self.session.cookies.update(self.cookies)
+            # Устанавливаем default headers
             self.session.headers.update(self.headers)
 
         return self.session
+    
+    def _authenticate(self) -> bool:
+        """Аутентификация в системе Lotte (двухэтапный процесс)"""
+        try:
+            session = self._init_session()
+            
+            # Логин и пароль из конфига
+            login = settings.lotte_username
+            password = settings.lotte_password
+            
+            logger.info(f"Начинаем аутентификацию в Lotte Filter Service для пользователя: {login}")
+            
+            # Шаг 1: Получаем страницу логина для получения cookies и сессии
+            login_page_url = urljoin(self.base_url, self.login_url)
+            response = session.get(login_page_url, timeout=30, verify=False)
+            
+            if response.status_code != 200:
+                logger.error(f"Не удалось получить страницу логина: HTTP {response.status_code}")
+                return False
+            
+            logger.debug(f"Страница логина получена, размер: {len(response.text)} символов")
+            
+            # Шаг 2: Проверяем логин данные через AJAX
+            login_check_url = urljoin(self.base_url, self.login_check_url)
+            
+            # Подготавливаем данные для проверки логина
+            login_check_data = {
+                "userId": login,
+                "userPwd": password,
+                "resultCd": "",
+            }
+            
+            # Обновляем headers для AJAX запроса
+            session.headers.update({
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": login_page_url,
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+            })
+            
+            # Отправляем AJAX запрос для проверки логина
+            check_response = session.post(
+                login_check_url, data=login_check_data, timeout=30, verify=False
+            )
+            
+            logger.debug(f"Проверка логина: HTTP {check_response.status_code}")
+            
+            if check_response.status_code != 200:
+                logger.error(f"Ошибка проверки логина: HTTP {check_response.status_code}")
+                return False
+            
+            # Проверяем результат
+            try:
+                check_result = check_response.json()
+                logger.debug(f"Результат проверки логина: {check_result}")
+                
+                # Lotte возвращает пустой объект или специфичные поля при успехе
+                # Проверяем отсутствие ошибок
+                if check_result.get("resultCd") == "0000" or (
+                    not check_result.get("error") and 
+                    not check_result.get("fail") and
+                    "auPswdUptEndYn" in check_result
+                ):
+                    logger.info("Проверка логина прошла успешно")
+                    
+                    # Шаг 3: Финальный логин
+                    login_action_url = urljoin(self.base_url, self.login_action_url)
+                    
+                    # Данные для финального логина
+                    final_login_data = {
+                        "userId": login,
+                        "userPwd": password,
+                    }
+                    
+                    # Обновляем headers для финального логина
+                    session.headers.update({
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "Referer": login_page_url,
+                    })
+                    # Удаляем AJAX заголовок
+                    if "X-Requested-With" in session.headers:
+                        del session.headers["X-Requested-With"]
+                    
+                    final_response = session.post(
+                        login_action_url,
+                        data=final_login_data,
+                        timeout=30,
+                        verify=False,
+                    )
+                    
+                    logger.debug(f"Финальный логин: HTTP {final_response.status_code}")
+                    
+                    if final_response.status_code in [200, 302, 303]:
+                        self.authenticated = True
+                        logger.info("✅ Аутентификация в Lotte Filter Service успешна!")
+                        logger.debug(f"Cookies после аутентификации: {session.cookies.get_dict()}")
+                        
+                        # Восстанавливаем заголовок для последующих запросов
+                        session.headers["X-Requested-With"] = "XMLHttpRequest"
+                        
+                        return True
+                    else:
+                        logger.error(f"Неожиданный статус финального логина: {final_response.status_code}")
+                        return False
+                else:
+                    logger.error(f"Неверный результат проверки логина: {check_result}")
+                    return False
+                    
+            except json.JSONDecodeError as json_error:
+                logger.error(f"Ошибка при разборе ответа: {json_error}")
+                logger.error(f"Текст ответа: {check_response.text[:500]}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Ошибка аутентификации: {e}")
+            return False
 
     def _make_request(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Выполнение POST запроса к API фильтров"""
+        """Выполнение POST запроса к API фильтров с аутентификацией"""
         try:
+            # Проверяем аутентификацию
+            if not self.authenticated:
+                logger.info("Требуется аутентификация для API фильтров")
+                if not self._authenticate():
+                    logger.error("Не удалось аутентифицироваться для API фильтров")
+                    return None
+            
             session = self._init_session()
             url = self.base_url + self.filter_url
 
@@ -102,6 +224,26 @@ class LotteFilterService:
                 try:
                     json_data = response.json()
                     logger.info(f"Получен ответ от API: {len(str(json_data))} символов")
+                    
+                    # Проверяем, не истекла ли сессия
+                    if isinstance(json_data, dict) and json_data.get("result") == "fail_notAuctLogin":
+                        logger.warning("Сессия истекла, требуется повторная аутентификация")
+                        self.authenticated = False
+                        
+                        # Пробуем аутентифицироваться заново
+                        if self._authenticate():
+                            # Повторяем запрос после успешной аутентификации
+                            response = session.post(url, data=data, timeout=30, verify=False)
+                            if response.status_code == 200:
+                                json_data = response.json()
+                                logger.info(f"Повторный запрос успешен: {len(str(json_data))} символов")
+                            else:
+                                logger.error(f"Повторный запрос неудачен: HTTP {response.status_code}")
+                                return None
+                        else:
+                            logger.error("Не удалось повторно аутентифицироваться")
+                            return None
+                    
                     return json_data
                 except json.JSONDecodeError:
                     logger.error("Ошибка декодирования JSON ответа")
@@ -319,6 +461,12 @@ class LotteFilterService:
         """Очистка кэша"""
         self.cache.clear()
         logger.info("Кэш фильтров очищен")
+    
+    def reset_authentication(self):
+        """Сброс состояния аутентификации"""
+        self.authenticated = False
+        self.session = None
+        logger.info("Аутентификация Lotte Filter Service сброшена")
 
     def search_cars(self, filter_request: LotteFilterRequest) -> Dict[str, Any]:
         """
