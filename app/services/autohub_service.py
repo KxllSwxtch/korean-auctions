@@ -1223,9 +1223,16 @@ class AutohubService:
 
             # Получаем текущую сессию аукциона для кода аукциона
             sessions_response = await self.get_auction_sessions()
-            auction_code = "AC202507090001"  # Значение по умолчанию
+            
+            # Use the generated auction code from the current session
             if sessions_response.success and sessions_response.current_session:
                 auction_code = sessions_response.current_session.auction_code
+                logger.info(f"✅ Using auction code from current session: {auction_code}")
+            else:
+                # Fallback: generate auction code based on current logic
+                auction_date = self._get_current_auction_date()
+                auction_code = self._generate_auction_code(auction_date)
+                logger.warning(f"⚠️ Using generated auction code: {auction_code}")
 
             # Подготавливаем данные для запроса
             # Пробуем разные варианты параметров для отладки
@@ -1575,20 +1582,18 @@ class AutohubService:
             # Получаем текущую сессию аукциона для кода аукциона
             sessions_response = await self.get_auction_sessions()
 
-            # Генерируем код аукциона на основе текущей даты
-            from datetime import datetime
-
-            current_date = datetime.now().strftime("%Y%m%d")
-            auction_code = f"AC{current_date}0001"  # Формат: ACYYYYMMDDnnnn
-
+            # Use the generated auction code from the current session
             if sessions_response.success and sessions_response.current_session:
                 auction_code = sessions_response.current_session.auction_code
                 logger.info(
-                    f"Используется код аукциона из текущей сессии: {auction_code}"
+                    f"✅ Используется код аукциона из текущей сессии: {auction_code}"
                 )
             else:
+                # Fallback: generate auction code based on current logic
+                auction_date = self._get_current_auction_date()
+                auction_code = self._generate_auction_code(auction_date)
                 logger.warning(
-                    f"Не удалось получить текущую сессию аукциона, используется сгенерированный код: {auction_code}"
+                    f"⚠️ Используется сгенерированный код аукциона: {auction_code}"
                 )
 
             # Нам нужен код производителя для запроса поколений
@@ -2196,36 +2201,62 @@ class AutohubService:
 
     def _get_current_auction_date(self) -> str:
         """
-        Get current auction date
-
-        Returns the current date for auction queries.
-        Autohub runs auctions daily, so we use the current date.
+        Get current auction date based on Wednesday auction schedule
+        
+        Autohub auctions are held every Wednesday.
+        Cars are viewable from Tuesday 6PM Seoul time.
 
         Returns:
-            str: Auction date in YYYY-MM-DD format
+            str: Auction date in YYYY-MM-DD format (always a Wednesday)
         """
-        from datetime import datetime
+        from datetime import datetime, timedelta
         import pytz
 
         # Get current Seoul time
         seoul_tz = pytz.timezone("Asia/Seoul")
         seoul_time = datetime.now(seoul_tz)
-
-        # Use current date (not tomorrow)
-        auction_date = seoul_time.strftime("%Y-%m-%d")
-
+        
+        # Get current day of week (0=Monday, 6=Sunday)
+        current_weekday = seoul_time.weekday()
+        current_hour = seoul_time.hour
+        
         logger.info(
-            f"📅 Using current auction date: {auction_date} (Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S')})"
+            f"📅 Current Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S')} (weekday: {current_weekday})"
+        )
+        
+        # Calculate next auction date based on current day and time
+        if current_weekday == 2:  # Wednesday
+            # If it's Wednesday, use today's date
+            auction_date = seoul_time
+        elif current_weekday == 1 and current_hour >= 18:  # Tuesday after 6PM
+            # If it's Tuesday after 6PM, use next day (Wednesday)
+            auction_date = seoul_time + timedelta(days=1)
+        elif current_weekday < 2:  # Monday or Tuesday before 6PM
+            # Find this week's Wednesday
+            days_until_wednesday = 2 - current_weekday
+            auction_date = seoul_time + timedelta(days=days_until_wednesday)
+        else:  # Thursday, Friday, Saturday, Sunday
+            # Find next week's Wednesday
+            days_until_wednesday = (7 - current_weekday) + 2
+            auction_date = seoul_time + timedelta(days=days_until_wednesday)
+        
+        auction_date_str = auction_date.strftime("%Y-%m-%d")
+        
+        logger.info(
+            f"📅 Using auction date: {auction_date_str} (Wednesday) - viewable from Tuesday 6PM"
         )
 
-        return auction_date
+        return auction_date_str
 
     def _generate_auction_code(self, auction_date: str) -> str:
         """
         Generate auction code based on date
+        
+        The auction code uses the date of the previous Wednesday (7 days before).
+        Format: ACYYYYMMDD0001
 
         Args:
-            auction_date: Date in YYYY-MM-DD format
+            auction_date: Date in YYYY-MM-DD format (should be a Wednesday)
 
         Returns:
             str: Auction code in format ACYYYYMMDD0001
@@ -2234,38 +2265,70 @@ class AutohubService:
 
         # Parse the auction date
         date_obj = datetime.strptime(auction_date, "%Y-%m-%d")
+        
+        # Verify it's a Wednesday (weekday = 2)
+        if date_obj.weekday() != 2:
+            logger.warning(
+                f"⚠️ Auction date {auction_date} is not a Wednesday (weekday={date_obj.weekday()})"
+            )
 
-        # Autohub uses auction code date that is 7 days before the actual auction date
+        # The auction code uses the previous Wednesday's date (7 days before)
+        # This is the date when the auction was announced/registered
         code_date = date_obj - timedelta(days=7)
 
         # Format as YYYYMMDD
         date_no_hyphens = code_date.strftime("%Y%m%d")
 
         # Generate code - AC + date + 0001
-        return f"AC{date_no_hyphens}0001"
+        auction_code = f"AC{date_no_hyphens}0001"
+        
+        logger.info(
+            f"📝 Generated auction code: {auction_code} (for auction on {auction_date})"
+        )
+        
+        return auction_code
 
     def _calculate_auction_number(self, auction_date: str) -> str:
         """
         Calculate auction number (회차) based on date
+        
+        Since Autohub runs weekly auctions on Wednesdays, we calculate
+        the auction number based on weeks since the start of the year.
 
         Args:
-            auction_date: Date in YYYY-MM-DD format
+            auction_date: Date in YYYY-MM-DD format (should be a Wednesday)
 
         Returns:
-            str: Auction number
+            str: Auction number (e.g., "1332" for the 32nd auction of the year)
         """
-        from datetime import datetime
+        from datetime import datetime, timedelta
 
         # Parse the auction date
         date_obj = datetime.strptime(auction_date, "%Y-%m-%d")
-
-        # Calculate days since start of year
+        
+        # Find the first Wednesday of the year
         year_start = datetime(date_obj.year, 1, 1)
-        days_since_start = (date_obj - year_start).days + 1
-
-        # Autohub seems to run daily auctions, so auction number could be based on day of year
-        # Adding a base number to make it look realistic (e.g., 1200 + day_of_year)
-        auction_number = 1200 + days_since_start
+        # Find the first Wednesday
+        days_until_first_wednesday = (2 - year_start.weekday()) % 7
+        if days_until_first_wednesday == 0 and year_start.weekday() != 2:
+            days_until_first_wednesday = 7
+        first_wednesday = year_start + timedelta(days=days_until_first_wednesday)
+        
+        # Calculate weeks since first Wednesday
+        if date_obj < first_wednesday:
+            # If auction date is before first Wednesday of the year, it's auction #1
+            weeks_since_start = 0
+        else:
+            days_diff = (date_obj - first_wednesday).days
+            weeks_since_start = days_diff // 7
+        
+        # Autohub uses a base number around 1300+ for auction numbers
+        # Adding week number to base (1300 + week number)
+        auction_number = 1300 + weeks_since_start + 1
+        
+        logger.info(
+            f"📊 Calculated auction number: {auction_number} (week {weeks_since_start + 1} of year {date_obj.year})"
+        )
 
         return str(auction_number)
 
