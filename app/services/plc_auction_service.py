@@ -16,7 +16,6 @@ from app.models.plc_auction import (
 from app.parsers.plc_auction_parser import PLCAuctionParser
 from app.parsers.plc_auction_detail_parser import PLCAuctionDetailParser
 from app.core.session_manager import SessionManager
-from app.services.intercom_session import IntercomSession
 
 logger = logging.getLogger(__name__)
 
@@ -60,13 +59,10 @@ class PLCAuctionService:
         self.parser = PLCAuctionParser()
         self.headers = self.DEFAULT_HEADERS.copy()
         self.cookies = self.DEFAULT_COOKIES.copy()
-        self.intercom = IntercomSession()
         self.pageload_id = str(uuid.uuid4())  # Generate unique pageload ID for RUM
         self.start_time = time.time() * 1000  # Start time in milliseconds
         
         self._setup_session()
-        # Start Intercom ping loop
-        self.intercom.start_ping_loop()
         # Initialize session with homepage visit
         self._initialize_browser_session()
     
@@ -114,12 +110,7 @@ class PLCAuctionService:
                     self.session.cookies.set(name, value)
             self.cookies.update(self.DEFAULT_COOKIES)
             
-        # Add Intercom cookies
-        intercom_cookies = self.intercom.get_intercom_cookies()
-        for name, value in intercom_cookies.items():
-            if value:  # Skip empty values
-                self.session.cookies.set(name, value)
-        self.cookies.update(intercom_cookies)
+        # Intercom cookies are already in DEFAULT_COOKIES if needed
         
         # Set timeout for all requests
         self.session.timeout = 30
@@ -333,18 +324,7 @@ class PLCAuctionService:
                 if rum_success:
                     logger.info("✅ Browser session established with RUM metrics")
                 
-                # Send initial Intercom ping
-                logger.info("🏓 Sending initial Intercom ping")
-                ping_result = self.intercom.ping(referer=self.BASE_URL)
-                if ping_result:
-                    logger.info("✅ Initial Intercom ping successful")
-                    # Update session cookie if returned
-                    if 'anonymous_session' in ping_result:
-                        session_cookie = ping_result.get('anonymous_session')
-                        if session_cookie:
-                            self.session.cookies.set('anonymous_session', session_cookie)
-                            self.cookies['anonymous_session'] = session_cookie
-                            self._save_cookies()
+                # Intercom ping removed - not needed
             else:
                 logger.warning(f"⚠️ Homepage returned status {response.status_code}")
                 # Try sending RUM metrics anyway
@@ -361,8 +341,6 @@ class PLCAuctionService:
                 logger.warning("⚠️ Invalid cookies detected, refreshing session...")
                 self.refresh_session()
             
-            # Send Intercom ping before request
-            self._ensure_intercom_session()
             
             # Send RUM metrics for the auction page before making API request
             auction_url = f"{self.AUCTION_URL}?country={filters.country}&date={filters.date or int(time.time())}&price_type={filters.price_type}"
@@ -630,21 +608,6 @@ class PLCAuctionService:
             
         return True
 
-    def _ensure_intercom_session(self):
-        """Ensure Intercom session is active"""
-        # Check if we need to ping (first time or been a while)
-        if (not self.intercom.last_ping or 
-            (datetime.now() - self.intercom.last_ping).seconds > 25):
-            logger.info("🏓 Sending Intercom ping before request")
-            ping_result = self.intercom.ping(referer=self.AUCTION_URL)
-            if ping_result:
-                # Update cookies with any new values from ping response
-                if 'anonymous_session' in ping_result:
-                    session_cookie = ping_result.get('anonymous_session')
-                    if session_cookie:
-                        self.session.cookies.set('anonymous_session', session_cookie)
-                        self.cookies['anonymous_session'] = session_cookie
-    
     def refresh_session(self):
         """Refresh the entire session when cookies expire"""
         try:
@@ -653,9 +616,6 @@ class PLCAuctionService:
             # Clear existing cookies and recreate session
             self.session.cookies.clear()
             
-            # Stop current Intercom session
-            if hasattr(self, 'intercom'):
-                self.intercom.stop_ping_loop()
             
             # Recreate cloudscraper session with fresh configuration
             self._setup_session()
@@ -690,9 +650,6 @@ class PLCAuctionService:
                 logger.warning("⚠️ Using default cookies as fallback")
                 self._apply_default_cookies()
             
-            # Restart Intercom session
-            self.intercom = IntercomSession()
-            self.intercom.start_ping_loop()
             
             # Re-initialize browser session to establish new connection
             self._initialize_browser_session()
@@ -827,8 +784,6 @@ class PLCAuctionService:
             detail_url = f"{self.BASE_URL}/auction/lot/{slug}"
             logger.info(f"Fetching car detail from: {detail_url}")
             
-            # Send Intercom ping before request
-            self._ensure_intercom_session()
             
             # Update headers with referrer
             headers = self.headers.copy()
