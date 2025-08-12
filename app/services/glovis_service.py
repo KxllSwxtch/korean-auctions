@@ -179,9 +179,17 @@ class GlovisService:
         """
         try:
             logger.info(f"📥 Запрос списка автомобилей SSANCAR с параметрами: {params}")
-
+            
+            # Сохраняем оригинальную модель для последующей фильтрации
+            requested_model = params.get("car_model", "")
+            
             # Конвертируем параметры Glovis в параметры SSANCAR
             ssancar_filters = self._convert_glovis_params_to_ssancar(params)
+            
+            # УМНАЯ СТРАТЕГИЯ: Если указана модель, НЕ отправляем её в API
+            if requested_model and ssancar_filters.model:
+                logger.warning(f"⚠️ Модель '{requested_model}' будет отфильтрована на сервере (API SSANCAR ненадёжен с моделями)")
+                ssancar_filters.model = ""  # Очищаем модель для API запроса
             
             # Логируем преобразованные параметры
             logger.info(f"🔧 Преобразованные параметры SSANCAR: {ssancar_filters.model_dump()}")
@@ -207,6 +215,11 @@ class GlovisService:
                 page=int(ssancar_filters.pages),
                 week_no=ssancar_filters.week_no,
             )
+            
+            # Если была запрошена конкретная модель, фильтруем результаты
+            if requested_model:
+                result = self._filter_cars_by_model(result, requested_model)
+                logger.info(f"🔍 После фильтрации модели '{requested_model}': {len(result.cars)} автомобилей")
 
             logger.info(f"✅ Получено {len(result.cars)} автомобилей от SSANCAR")
             return result
@@ -1036,6 +1049,116 @@ class GlovisService:
     # =============================================================================
     # CARLIST METHODS - Working with real SSANCAR data
     # =============================================================================
+
+    async def _search_all_weeks(self, params: Dict[str, Any]) -> GlovisResponse:
+        """
+        Ищет автомобили по всем неделям (1-4) и объединяет результаты
+        
+        Args:
+            params: Параметры поиска
+            
+        Returns:
+            GlovisResponse с объединёнными результатами
+        """
+        all_cars = []
+        all_weeks_searched = []
+        
+        logger.info("🔄 Поиск по всем неделям для максимального охвата")
+        
+        # Ищем по всем неделям
+        for week in ["1", "2", "3", "4"]:
+            params_with_week = params.copy()
+            params_with_week["auction_number"] = week
+            
+            try:
+                result = await self.get_car_list(params_with_week)
+                if result.success and result.cars:
+                    all_cars.extend(result.cars)
+                    all_weeks_searched.append(week)
+                    logger.info(f"  Неделя {week}: найдено {len(result.cars)} автомобилей")
+            except Exception as e:
+                logger.warning(f"  Неделя {week}: ошибка {e}")
+                
+        # Удаляем дубликаты по car_no
+        unique_cars = {}
+        for car in all_cars:
+            if car.car_no not in unique_cars:
+                unique_cars[car.car_no] = car
+                
+        cars_list = list(unique_cars.values())
+        
+        return GlovisResponse(
+            success=True,
+            message=f"Найдено {len(cars_list)} уникальных автомобилей по неделям: {', '.join(all_weeks_searched)}",
+            total_count=len(cars_list),
+            cars=cars_list,
+            current_page=1,
+            page_size=len(cars_list),
+            total_pages=1,
+            has_next_page=False,
+            has_prev_page=False,
+            week_number=",".join(all_weeks_searched),
+            source="SSANCAR",
+        )
+
+    def _filter_cars_by_model(self, result: GlovisResponse, model_name: str) -> GlovisResponse:
+        """
+        Фильтрует автомобили по модели на стороне сервера
+        
+        Args:
+            result: Результат от API с автомобилями
+            model_name: Название модели для фильтрации (например, "5 Series")
+            
+        Returns:
+            GlovisResponse с отфильтрованными автомобилями
+        """
+        import re
+        
+        # Создаём паттерны для поиска модели
+        # Например, для "5 Series" ищем: 5 Series, 520, 525, 528, 530, 535, 540, 545, 550, M5, 5시리즈
+        model_patterns = []
+        
+        # Базовый паттерн - точное совпадение
+        model_patterns.append(re.escape(model_name))
+        
+        # Специальные паттерны для популярных моделей
+        if "5 Series" in model_name or "5시리즈" in model_name:
+            model_patterns.extend(["5\\s*Series", "520", "525", "528", "530", "535", "540", "545", "550", "M5", "5시리즈"])
+        elif "3 Series" in model_name or "3시리즈" in model_name:
+            model_patterns.extend(["3\\s*Series", "318", "320", "325", "328", "330", "335", "340", "M3", "3시리즈"])
+        elif "7 Series" in model_name or "7시리즈" in model_name:
+            model_patterns.extend(["7\\s*Series", "730", "735", "740", "745", "750", "760", "M7", "7시리즈"])
+        elif "X5" in model_name:
+            model_patterns.extend(["X5", "xDrive"])
+        elif "X3" in model_name:
+            model_patterns.extend(["X3", "xDrive"])
+            
+        # Объединяем паттерны в одно регулярное выражение
+        combined_pattern = "|".join(model_patterns)
+        regex = re.compile(combined_pattern, re.IGNORECASE)
+        
+        # Фильтруем автомобили
+        filtered_cars = []
+        for car in result.cars:
+            if regex.search(car.car_name):
+                filtered_cars.append(car)
+                
+        # Создаём новый результат с отфильтрованными автомобилями
+        filtered_result = GlovisResponse(
+            success=result.success,
+            message=f"Отфильтровано по модели '{model_name}'",
+            total_count=len(filtered_cars),
+            cars=filtered_cars,
+            current_page=result.current_page,
+            page_size=result.page_size,
+            total_pages=1,  # После фильтрации пагинация меняется
+            has_next_page=False,
+            has_prev_page=False,
+            week_number=result.week_number,
+            source=result.source,
+        )
+        
+        return filtered_result
 
     def convert_model_to_code(self, manufacturer: str, model_name: str) -> str:
         """Конвертируем название модели в корейское название для SSANCAR API"""
