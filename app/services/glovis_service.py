@@ -87,13 +87,17 @@ class GlovisService:
     def _get_current_week_number(self) -> str:
         """
         Определяет номер недели аукциона.
-        По умолчанию используется weekNo = 1 для совместимости с текущими данными SSANCAR.
+        По умолчанию используется weekNo = 3, так как эта неделя обычно имеет больше всего автомобилей.
         """
-        # Используем фиксированную неделю 1 по умолчанию
-        # SSANCAR обычно имеет недели 1-4
-        week_no = "1"
+        # Используем неделю 3 по умолчанию - обычно самая большая коллекция автомобилей
+        # SSANCAR имеет недели 1-4, где:
+        # - Week 1: мало BMW, нет 5 Series
+        # - Week 2: средне BMW, есть 5 Series
+        # - Week 3: много BMW, много 5 Series (лучший выбор)
+        # - Week 4: средне BMW, есть 5 Series
+        week_no = "3"
         
-        logger.info(f"📅 Используем weekNo: {week_no} (по умолчанию)")
+        logger.info(f"📅 Используем weekNo: {week_no} (по умолчанию - максимальный инвентарь)")
         return week_no
 
     def _is_session_expired(self) -> bool:
@@ -240,8 +244,8 @@ class GlovisService:
                 week_no = str(week_no)
                 # Валидация: SSANCAR поддерживает только недели 1-4
                 if week_no not in ["1", "2", "3", "4"]:
-                    logger.warning(f"⚠️ Недопустимый номер недели {week_no}, используем 1")
-                    week_no = "1"
+                    logger.warning(f"⚠️ Недопустимый номер недели {week_no}, используем 3")
+                    week_no = "3"  # Используем неделю 3 - максимальный инвентарь
 
             # Конвертируем производителя в корейский
             manufacturer = params.get("car_manufacturer", "")
