@@ -29,6 +29,7 @@ from app.models.plc_auction import (
     PLCAuctionModel,
 )
 from app.services.plc_auction_service import PLCAuctionService
+from app.services.glovis_service import GlovisService
 from app.core.logging import get_logger
 
 # Настраиваем логгер
@@ -38,11 +39,17 @@ router = APIRouter(prefix="/api/v1/glovis", tags=["Glovis"])
 
 # Глобальный экземпляр сервиса
 plc_auction_service = PLCAuctionService()
+glovis_service = GlovisService()
 
 
 def get_plc_auction_service() -> PLCAuctionService:
     """Dependency для получения экземпляра PLCAuctionService"""
     return plc_auction_service
+
+
+def get_glovis_service() -> GlovisService:
+    """Dependency для получения экземпляра GlovisService"""
+    return glovis_service
 
 
 @router.get("/cars", response_model=PLCAuctionResponse)
@@ -786,34 +793,41 @@ async def update_cookies_from_curl(
     try:
         logger.info(f"🔄 Начинаю обновление cookies из файла: {file_path}")
 
-        # Извлекаем данные из curl файла
-        updater = GlovisCookiesUpdater()
-        result = updater.update_cookies_from_curl_file(file_path)
-
-        if not result["success"]:
-            logger.error(f"❌ Ошибка извлечения данных: {result['message']}")
-            return {
-                "success": False,
-                "message": result["message"],
-                "timestamp": datetime.now().isoformat(),
-            }
-
-        # Обновляем cookies в сервисе
-        glovis_service.update_cookies(result["cookies"])
-
-        # Проверяем валидность обновленной сессии
-        session_check = await glovis_service.check_session_validity()
-
-        logger.info(f"✅ Cookies успешно обновлены из {file_path}")
-
+        # GlovisCookiesUpdater не реализован, возвращаем заглушку
         return {
-            "success": True,
-            "message": f"Cookies успешно обновлены из {file_path}",
-            "jsessionid": result["jsessionid"],
-            "session_valid": session_check.get("is_valid", False),
-            "cookies_count": len(result["cookies"]),
+            "success": False,
+            "message": "GlovisCookiesUpdater не реализован. Используйте /paste-curl или /update-cookies напрямую",
             "timestamp": datetime.now().isoformat(),
         }
+        
+        # # Извлекаем данные из curl файла
+        # updater = GlovisCookiesUpdater()
+        # result = updater.update_cookies_from_curl_file(file_path)
+        #
+        # if not result["success"]:
+        #     logger.error(f"❌ Ошибка извлечения данных: {result['message']}")
+        #     return {
+        #         "success": False,
+        #         "message": result["message"],
+        #         "timestamp": datetime.now().isoformat(),
+        #     }
+        #
+        # # Обновляем cookies в сервисе
+        # glovis_service.update_cookies(result["cookies"])
+        #
+        # # Проверяем валидность обновленной сессии
+        # session_check = await glovis_service.check_session_validity()
+        #
+        # logger.info(f"✅ Cookies успешно обновлены из {file_path}")
+        #
+        # return {
+        #     "success": True,
+        #     "message": f"Cookies успешно обновлены из {file_path}",
+        #     "jsessionid": result["jsessionid"],
+        #     "session_valid": session_check.get("is_valid", False),
+        #     "cookies_count": len(result["cookies"]),
+        #     "timestamp": datetime.now().isoformat(),
+        # }
 
     except Exception as e:
         logger.error(f"❌ Ошибка при обновлении cookies: {e}")
@@ -1079,10 +1093,10 @@ async def get_session_info(
         else:
             saved_info = {"exists": False, "age": None, "is_fresh": False}
 
-        # Информация о мониторинге
+        # Информация о мониторинге (временно отключено - glovis_monitor не реализован)
         monitor_info = {
-            "monitoring_active": service.glovis_monitor.monitoring,
-            "check_interval": service.glovis_monitor.check_interval,
+            "monitoring_active": False,
+            "check_interval": 60,
         }
 
         return {

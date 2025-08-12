@@ -57,10 +57,11 @@ class GlovisService:
         self._carlist_data = self._load_carlist_data()
 
         # SSANCAR специфичные cookies и headers (обновлено из curl примера)
+        # ВАЖНО: Используем актуальные cookies из предоставленного curl запроса
         self._default_cookies = {
             "_gcl_au": "1.1.78877594.1751338453",
-            "PHPSESSID": "flrks3dlf8l70v3hgkdl3rdddr",
-            "2a0d2363701f23f8a75028924a3af643": "Mi4xMzUuNjYuODQ%3D",
+            "PHPSESSID": "pvffbj03oiev5egen6vta3a36h",
+            "2a0d2363701f23f8a75028924a3af643": "ODUuMTE3Ljk3LjEwMg%3D%3D",
             "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
         }
 
@@ -610,14 +611,9 @@ class GlovisService:
         return korean_color
 
     def _convert_model_to_code(self, manufacturer: str, model_name: str) -> str:
-        """Конвертируем название модели в код для SSANCAR API"""
-        # Используем данные из carList
-        models_mapping = self._carlist_data.get("english_model_to_code", {}).get(
-            manufacturer, {}
-        )
-        model_code = models_mapping.get(model_name, "")
-        logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {model_code}")
-        return model_code
+        """Конвертируем название модели в корейское название для SSANCAR API"""
+        # Используем общий метод convert_model_to_code
+        return self.convert_model_to_code(manufacturer, model_name)
 
     def get_models_for_manufacturer(self, manufacturer: str) -> List[Dict[str, str]]:
         """Получает список моделей для указанного производителя из carList"""
@@ -1038,13 +1034,24 @@ class GlovisService:
     # =============================================================================
 
     def convert_model_to_code(self, manufacturer: str, model_name: str) -> str:
-        """Конвертируем название модели в код для SSANCAR API"""
-        models_mapping = self._carlist_data.get("english_model_to_code", {}).get(
-            manufacturer, {}
-        )
-        model_code = models_mapping.get(model_name, "")
-        logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {model_code}")
-        return model_code
+        """Конвертируем название модели в корейское название для SSANCAR API"""
+        # Получаем список моделей для производителя
+        models_list = self._carlist_data.get("models", {}).get(manufacturer, [])
+        
+        # Ищем модель по английскому названию
+        for model in models_list:
+            if model.get("e_name", "").lower() == model_name.lower():
+                korean_name = model.get("name", "")
+                logger.debug(f"🔄 Маппинг модели {manufacturer}/{model_name} -> {korean_name}")
+                return korean_name
+            # Также проверяем точное совпадение с корейским названием (для обратной совместимости)
+            elif model.get("name", "") == model_name:
+                logger.debug(f"🔄 Модель уже на корейском: {model_name}")
+                return model_name
+        
+        # Если не нашли, возвращаем исходное название
+        logger.debug(f"⚠️ Не найден маппинг для {manufacturer}/{model_name}, используем как есть")
+        return model_name
 
     # =============================================================================
     # SSANCAR CAR DETAIL METHODS
