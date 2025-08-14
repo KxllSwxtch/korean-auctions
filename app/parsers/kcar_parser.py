@@ -780,28 +780,49 @@ class KCarParser:
                 "adjusted": []
             }
             
+            # Словарь для отслеживания типа повреждения по номеру части
+            damage_type_by_part = {}
+            
             # Ищем активные элементы на схеме кузова
             # В HTML активные части отмечены классом "on"
             active_parts = soup.find_all("li", class_="on")
             for part in active_parts:
                 part_id = part.get("id", "")
-                if part_id:
+                if part_id and len(part_id) >= 6:  # e.g., aw0107
+                    # Извлекаем номер части (последние 4 цифры)
+                    part_number = part_id[-4:]
+                    
                     # Определяем тип работы по префиксу
                     if part_id.startswith("aw"):  # 교환 (replacement)
-                        body_parts["replaced"].append(part_id)
+                        body_parts["replaced"].append(part_number)
+                        damage_type_by_part[part_number] = "replaced"
                     elif part_id.startswith("ax"):  # 판금 (panel beating)
-                        body_parts["panel_beaten"].append(part_id)
+                        body_parts["panel_beaten"].append(part_number)
+                        damage_type_by_part[part_number] = "panel_beaten"
                     elif part_id.startswith("ac"):  # 부식 (corrosion)
-                        body_parts["corroded"].append(part_id)
-                    elif part_id.startswith("ag"):  # 조정 (adjustment)
-                        body_parts["adjusted"].append(part_id)
+                        body_parts["corroded"].append(part_number)
+                        damage_type_by_part[part_number] = "corroded"
+                    elif part_id.startswith("aa"):  # 조정 (adjustment)
+                        body_parts["adjusted"].append(part_number)
+                        damage_type_by_part[part_number] = "adjusted"
+                    elif part_id.startswith("az"):  # 전면유리 (front glass) - treated as replacement
+                        body_parts["replaced"].append(part_number)
+                        damage_type_by_part[part_number] = "replaced"
                         
             # Также проверяем активные области на карте
+            # Area элементы соответствуют тем же частям, что и li элементы
             active_areas = soup.find_all("area", class_="on")
             for area in active_areas:
                 area_id = area.get("id", "")
-                if area_id:
-                    body_parts["adjusted"].append(area_id)  # По умолчанию для областей
+                if area_id and area_id.startswith("p") and len(area_id) == 5:  # e.g., p0107
+                    # Извлекаем номер части
+                    part_number = area_id[1:]  # Remove 'p' prefix
+                    
+                    # Если эта часть уже обработана через li элемент, пропускаем
+                    if part_number not in damage_type_by_part:
+                        # Если нет соответствующего li элемента, добавляем как adjusted по умолчанию
+                        body_parts["adjusted"].append(part_number)
+                        damage_type_by_part[part_number] = "adjusted"
                     
             if any(body_parts.values()):
                 tech_sheet.body_parts = body_parts
