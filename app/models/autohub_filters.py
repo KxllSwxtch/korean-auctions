@@ -350,7 +350,7 @@ AUTOHUB_MANUFACTURERS = [
     AutohubManufacturer(code="SY", name="쌍용", name_en="SsangYong"),
     AutohubManufacturer(code="BZ", name="벤츠", name_en="Mercedes-Benz"),
     AutohubManufacturer(code="BM", name="BMW", name_en="BMW"),
-    AutohubManufacturer(code="AD", name="아우디", name_en="Audi"),
+    AutohubManufacturer(code="AU", name="아우디", name_en="Audi"),
     AutohubManufacturer(code="VW", name="폭스바겐", name_en="Volkswagen"),
     AutohubManufacturer(code="FD", name="포드", name_en="Ford"),
     AutohubManufacturer(code="TY", name="토요타", name_en="Toyota"),

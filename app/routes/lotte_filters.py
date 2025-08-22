@@ -79,7 +79,7 @@ async def get_manufacturers(service: LotteFilterService = Depends(get_filter_ser
 @router.get("/models", response_model=LotteModelsResponse)
 async def get_models(
     manufacturer_code: str = Query(
-        ..., description="Код производителя (например, 'AD' для Audi)"
+        ..., description="Код производителя (например, 'AU' для Audi)"
     ),
     service: LotteFilterService = Depends(get_filter_service),
 ):
@@ -147,7 +147,7 @@ async def get_models(
 @router.get("/car-groups", response_model=LotteCarGroupsResponse)
 async def get_car_groups(
     model_code: str = Query(
-        ..., description="Код модели (например, 'AD004' для Audi A6)"
+        ..., description="Код модели (например, 'AU004' для Audi A6)"
     ),
     service: LotteFilterService = Depends(get_filter_service),
 ):

@@ -795,7 +795,18 @@ class AutohubParser:
         return status_info
 
     def _extract_main_image(self, car_block: Tag) -> Optional[str]:
-        """Извлекает URL основного изображения"""
+        """Извлекает URL основного изображения и удаляет суффикс _M для получения полноразмерного изображения"""
+        
+        def process_image_url(url: str) -> str:
+            """Удаляет суффикс _M из URL изображения для получения полноразмерной версии"""
+            import re
+            # Паттерн для поиска _M перед расширением файла
+            # Например: AT175219858847000_M.jpg -> AT175219858847000.jpg
+            processed_url = re.sub(r'_M(\.\w+)$', r'\1', url)
+            if processed_url != url:
+                logger.debug(f"Удален суффикс _M из URL: {url} -> {processed_url}")
+            return processed_url
+        
         try:
             # Для новой структуры HTML ищем изображение во вложенных div-ах
             # Ищем div с классом car_img_area или car-image
@@ -809,22 +820,32 @@ class AutohubParser:
                     src = img["src"]
                     # Если URL относительный, делаем его абсолютным
                     if src.startswith("/"):
-                        return f"{self.base_url}{src}"
+                        full_url = f"{self.base_url}{src}"
                     elif not src.startswith("http"):
-                        return f"{self.base_url}/{src}"
-                    logger.debug(f"Найдено изображение: {src}")
-                    return src
+                        full_url = f"{self.base_url}/{src}"
+                    else:
+                        full_url = src
+                    
+                    # Удаляем суффикс _M для получения полноразмерного изображения
+                    full_url = process_image_url(full_url)
+                    logger.debug(f"Найдено изображение: {full_url}")
+                    return full_url
 
             # Альтернативный поиск - любое изображение в строке
             img_element = car_block.find("img")
             if img_element and img_element.get("src"):
                 src = img_element["src"]
                 if src.startswith("/"):
-                    return f"{self.base_url}{src}"
+                    full_url = f"{self.base_url}{src}"
                 elif not src.startswith("http"):
-                    return f"{self.base_url}/{src}"
-                logger.debug(f"Найдено изображение (альтернативный): {src}")
-                return src
+                    full_url = f"{self.base_url}/{src}"
+                else:
+                    full_url = src
+                
+                # Удаляем суффикс _M для получения полноразмерного изображения
+                full_url = process_image_url(full_url)
+                logger.debug(f"Найдено изображение (альтернативный): {full_url}")
+                return full_url
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении main_image: {e}")
