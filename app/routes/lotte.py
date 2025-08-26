@@ -200,6 +200,35 @@ async def get_test_cars(service: LotteService = Depends(get_lotte_service)):
         return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
+@router.get("/total-count", response_model=LotteCountResponse)
+async def get_total_count(service: LotteService = Depends(get_lotte_service)):
+    """
+    Get total count of cars available at Lotte auction
+    
+    Returns:
+    - Total number of cars
+    - Success status
+    - Response message with auction date
+    """
+    try:
+        logger.info("Fetching Lotte auction total car count")
+        count_response = await service.fetch_total_count()
+        
+        if not count_response.success:
+            logger.warning(f"Failed to fetch Lotte count: {count_response.message}")
+            
+        return count_response
+        
+    except Exception as e:
+        logger.error(f"Error fetching Lotte total count: {e}")
+        return LotteCountResponse(
+            success=False,
+            total_count=0,
+            message=f"Ошибка при получении количества: {str(e)}",
+            timestamp=datetime.now()
+        )
+
+
 @router.get("/cars/upcoming", response_model=LotteResponse)
 async def get_upcoming_cars(
     limit: int = Query(
