@@ -1,5 +1,6 @@
 from typing import List, Optional, Any, Dict
 from pydantic import BaseModel, Field
+from datetime import datetime
 
 
 class KCarCar(BaseModel):
@@ -726,3 +727,13 @@ KCAR_UI_TO_API_MAPPING = {
     "003_006": "008",  # Camping Car/Trailer -> Others
     "003_999": "008",  # Others -> Others
 }
+
+
+class KCarCountResponse(BaseModel):
+    """Response for KCar total car count"""
+    lane_a_count: int = Field(default=0, description="Number of cars in LANE A")
+    lane_b_count: int = Field(default=0, description="Number of cars in LANE B")
+    total_count: int = Field(default=0, description="Total number of cars (LANE A + LANE B)")
+    success: bool = Field(default=True, description="Whether the request was successful")
+    message: str = Field(default="", description="Response message")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Response timestamp")

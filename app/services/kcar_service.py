@@ -1741,3 +1741,117 @@ class KCarService:
             return KCarSearchResponse(
                 cars=[], success=False, message=f"Ошибка запроса: {str(e)}"
             )
+    
+    def fetch_total_count(self) -> Dict[str, int]:
+        """Fetch total car count for both LANE A and LANE B
+        
+        Returns:
+            Dictionary with lane_a_count, lane_b_count, and total_count
+        """
+        try:
+            # Ensure we're authenticated
+            if not self.authenticated:
+                if not self.authenticate():
+                    logger.error("❌ Failed to authenticate for fetching count")
+                    return {
+                        "lane_a_count": 0,
+                        "lane_b_count": 0,
+                        "total_count": 0
+                    }
+            
+            # Headers for the count request
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://www.kcarauction.com",
+                "Referer": "https://www.kcarauction.com/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
+                "User-Agent": self.ua.random,
+                "X-Requested-With": "XMLHttpRequest",
+            }
+            
+            # Common data for both requests
+            base_data = {
+                "MNUFTR_CD": "",
+                "MODEL_GRP_CD": "",
+                "MODEL_CD": "",
+                "AUC_TYPE": "weekly",
+                "SRC_OPT": "weekly",
+                "PAGE_TYPE": "wCfm",
+                "TO_DATE": "",
+                "FROM_DATE": "",
+                "AUC_SEQ": "",
+                "CAR_STAT_CD": "",
+                "TODAY": "",
+                "CAR_TYPE": "",
+                "CARMD_CD": "",
+                "IPTCAR_DCD": "",
+                "START_DATE": "",
+                "END_DATE": "",
+                "AUC_PLC_CD": "",
+            }
+            
+            # Fetch LANE A count
+            data_a = {**base_data, "LANE_TYPE": "A"}
+            logger.info("📊 Fetching KCar count for LANE A...")
+            
+            response_a = self.session.post(
+                f"{self.base_url}/kcar/auction/auctionCarCount_ajax.do",
+                data=data_a,
+                headers=headers,
+                timeout=10,
+                verify=False
+            )
+            
+            lane_a_count = 0
+            if response_a.status_code == 200:
+                try:
+                    data = response_a.json()
+                    if "modelVo" in data and len(data["modelVo"]) > 0:
+                        lane_a_count = int(data["modelVo"][0].get("TOT_CNT", "0"))
+                        logger.info(f"✅ LANE A count: {lane_a_count}")
+                except Exception as e:
+                    logger.error(f"❌ Error parsing LANE A response: {e}")
+            else:
+                logger.error(f"❌ Failed to fetch LANE A count: {response_a.status_code}")
+            
+            # Fetch LANE B count
+            data_b = {**base_data, "LANE_TYPE": "B"}
+            logger.info("📊 Fetching KCar count for LANE B...")
+            
+            response_b = self.session.post(
+                f"{self.base_url}/kcar/auction/auctionCarCount_ajax.do",
+                data=data_b,
+                headers=headers,
+                timeout=10,
+                verify=False
+            )
+            
+            lane_b_count = 0
+            if response_b.status_code == 200:
+                try:
+                    data = response_b.json()
+                    if "modelVo" in data and len(data["modelVo"]) > 0:
+                        lane_b_count = int(data["modelVo"][0].get("TOT_CNT", "0"))
+                        logger.info(f"✅ LANE B count: {lane_b_count}")
+                except Exception as e:
+                    logger.error(f"❌ Error parsing LANE B response: {e}")
+            else:
+                logger.error(f"❌ Failed to fetch LANE B count: {response_b.status_code}")
+            
+            total = lane_a_count + lane_b_count
+            logger.info(f"📊 KCar Total Count: {total} (LANE A: {lane_a_count}, LANE B: {lane_b_count})")
+            
+            return {
+                "lane_a_count": lane_a_count,
+                "lane_b_count": lane_b_count,
+                "total_count": total
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Unexpected error fetching KCar count: {e}")
+            return {
+                "lane_a_count": 0,
+                "lane_b_count": 0,
+                "total_count": 0
+            }

@@ -11,6 +11,7 @@ from app.models.kcar import (
     KCarGenerationsResponse,
     KCarSearchResponse,
     KCarSearchFilters,
+    KCarCountResponse,
     KCAR_MANUFACTURERS,
 )
 from app.services.kcar_service import KCarService
@@ -488,6 +489,40 @@ async def get_kcar_info():
 # =============================================================================
 # ЭНДПОИНТЫ СИСТЕМЫ ФИЛЬТРАЦИИ
 # =============================================================================
+
+
+@router.get("/total-count", response_model=KCarCountResponse)
+async def get_total_count():
+    """
+    Get total car count for KCar auction (LANE A + LANE B)
+    
+    Returns the count for each lane separately and the total sum.
+    """
+    try:
+        logger.info("📊 Request for KCar total count")
+        
+        # Fetch counts from service
+        counts = kcar_service.fetch_total_count()
+        
+        logger.info(f"✅ KCar count retrieved - Total: {counts['total_count']} (A: {counts['lane_a_count']}, B: {counts['lane_b_count']})")
+        
+        return KCarCountResponse(
+            lane_a_count=counts['lane_a_count'],
+            lane_b_count=counts['lane_b_count'],
+            total_count=counts['total_count'],
+            success=True,
+            message="Count retrieved successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting KCar total count: {e}")
+        return KCarCountResponse(
+            lane_a_count=0,
+            lane_b_count=0,
+            total_count=0,
+            success=False,
+            message=f"Failed to get count: {str(e)}"
+        )
 
 
 @router.get("/manufacturers")
