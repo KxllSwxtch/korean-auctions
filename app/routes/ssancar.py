@@ -161,14 +161,24 @@ async def get_total_count(
     ```
     """
     try:
-        ssancar_logger.info("📊 Request for total car count")
+        ssancar_logger.info(f"📊 Request for total car count with week_number: {week_number}")
+        
+        # Determine week number - use provided or default based on current day
+        if week_number:
+            week_no = week_number
+        else:
+            # Default to Tuesday (2) or Friday (5) based on current day
+            from datetime import datetime as dt
+            current_day = dt.now().weekday()  # 0=Monday, 6=Sunday
+            # If it's Thursday-Sunday, use Friday auction (5), otherwise use Tuesday (2)
+            week_no = "5" if current_day >= 3 else "2"
         
         # Build filters if any provided
         filters = None
         if any([manufacturer, model, fuel, year_from != 2000, year_to != 2025, 
-                price_from != 0, price_to != 200000, week_number]):
+                price_from != 0, price_to != 200000, week_no]):
             filters = SSANCARFilters(
-                weekNo=week_number or "",
+                weekNo=week_no,  # Always pass a week number
                 maker=manufacturer or "",
                 model=model or "",
                 fuel=fuel or "",
@@ -202,7 +212,7 @@ async def get_total_count(
         if week_number:
             filters_applied["week_number"] = week_number
         
-        ssancar_logger.info(f"✅ Total count retrieved: {total_count}")
+        ssancar_logger.info(f"✅ Total count retrieved: {total_count} (week_no: {week_no})")
         
         return SSANCARTotalCountResponse(
             success=True,

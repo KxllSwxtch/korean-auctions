@@ -511,36 +511,54 @@ class SSANCARService:
             Total count of cars matching the filters
         """
         try:
-            # Build the data string for the request
-            if filters:
-                # Convert filters to the expected format
-                data_parts = []
-                data_parts.append(f"weekNo={filters.weekNo or ''}")
-                data_parts.append(f"maker={filters.maker or ''}")
-                data_parts.append(f"model={filters.model or ''}")
-                data_parts.append(f"yearFrom={filters.yearFrom or '2000'}")
-                data_parts.append(f"yearTo={filters.yearTo or '2025'}")
-                data_parts.append(f"priceFrom={filters.priceFrom or '0'}")
-                data_parts.append(f"priceTo={filters.priceTo or '200000'}")
-                data_parts.append(f"kmFrom=0")
-                data_parts.append(f"kmTo=500000")
-                data_parts.append(f"gearbox=")
-                data_parts.append(f"list=15")
-                data_parts.append(f"pages=1")
-                data_parts.append(f"sorts=Low.Price")
-                
-                data_string = "^&".join(data_parts)
+            # Build the data string for the request - format must be exactly like: weekNo=2^&maker=^&model=^&...
+            if filters and filters.weekNo:
+                # Use provided week number
+                week_no = filters.weekNo
             else:
-                # Default data string for all cars
-                data_string = "weekNo=^&maker=^&model=^&yearFrom=2000^&yearTo=2025^&priceFrom=0^&priceTo=200000^&kmFrom=0^&kmTo=500000^&gearbox=^&list=15^&pages=1^&sorts=Low.Price"
+                # Default to Tuesday (2) or Friday (5) based on current day
+                from datetime import datetime
+                current_day = datetime.now().weekday()  # 0=Monday, 6=Sunday
+                # If it's Thursday-Sunday, use Friday auction (5), otherwise use Tuesday (2)
+                week_no = "5" if current_day >= 3 else "2"
+            
+            if filters:
+                # Build data string with proper format: value^&
+                data_string = (
+                    f"weekNo={week_no}^&"
+                    f"maker={filters.maker or ''}^&"
+                    f"model={filters.model or ''}^&"
+                    f"yearFrom={filters.yearFrom or '2000'}^&"
+                    f"yearTo={filters.yearTo or '2025'}^&"
+                    f"priceFrom={filters.priceFrom or '0'}^&"
+                    f"priceTo={filters.priceTo or '200000'}^&"
+                    f"kmFrom=0^&"
+                    f"kmTo=500000^&"
+                    f"gearbox=^&"
+                    f"list=15^&"
+                    f"pages=1^&"
+                    f"sorts=Low.Price"
+                )
+            else:
+                # Default data string for all cars with proper week number
+                data_string = f"weekNo={week_no}^&maker=^&model=^&yearFrom=2000^&yearTo=2025^&priceFrom=0^&priceTo=200000^&kmFrom=0^&kmTo=500000^&gearbox=^&list=15^&pages=1^&sorts=Low.Price"
             
             logger.info(f"📊 Fetching total count from SSANCAR with data: {data_string[:100]}...")
+            
+            # Prepare headers specifically for this request (matching the working example)
+            count_headers = {
+                **self.DEFAULT_HEADERS,
+                "Sec-GPC": "1",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+            }
             
             # Make the request to ajax_car_num.php
             response = self.session.post(
                 self.AJAX_CAR_NUM_URL,
                 data=data_string,
-                headers=self.headers,
+                headers=count_headers,
                 timeout=10
             )
             
