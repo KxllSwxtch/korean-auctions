@@ -373,3 +373,12 @@ class LotteCarHistoryResponse(BaseModel):
     message: str
     data: Optional[LotteCarHistory] = None
     error: Optional[str] = None
+
+
+class LotteCountResponse(BaseModel):
+    """Response model for Lotte auction total car count"""
+    
+    success: bool = Field(..., description="Whether the request was successful")
+    total_count: int = Field(default=0, description="Total number of cars available")
+    message: str = Field(..., description="Response message")
+    timestamp: datetime = Field(default_factory=datetime.now, description="Timestamp of the response")

@@ -21,6 +21,7 @@ from app.models.lotte import (
     LotteCarDetail,
     LotteCarHistory,
     LotteCarHistoryResponse,
+    LotteCountResponse,
 )
 from app.parsers.lotte_parser import (
     LotteParser,
@@ -547,6 +548,95 @@ class LotteService:
         self.authenticated = False
         self.session = None
         logger.info("Аутентификация Lotte сброшена")
+
+    async def fetch_total_count(self) -> LotteCountResponse:
+        """Fetch total car count using mobile API endpoint"""
+        try:
+            # Get auction date first
+            auction_date = await self.get_auction_date()
+            if not auction_date:
+                return LotteCountResponse(
+                    success=False,
+                    total_count=0,
+                    message="Не удалось получить дату аукциона",
+                    timestamp=datetime.now()
+                )
+            
+            # Format date for API (YYYYMMDD)
+            date_str = auction_date.auction_date.replace("-", "")
+            
+            # Mobile endpoint URL
+            url = "https://m.lotteautoauction.net/hp/auct/myp/entry/selectMypEntryListCnt.do"
+            
+            # Mobile headers
+            headers = {
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+                "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
+                "Connection": "keep-alive",
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "Origin": "https://m.lotteautoauction.net",
+                "Referer": "https://m.lotteautoauction.net/mo/cmm/actionMenuLinkPage.do",
+                "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors",
+                "Sec-Fetch-Site": "same-origin",
+                "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+                "X-Requested-With": "XMLHttpRequest",
+            }
+            
+            # Form data
+            data = {
+                "pageIndex": "1",
+                "searchAuctDt": date_str,  # Use auction date
+                "search_grntVal": "",
+                "search_concVal": "",
+                "search_preVal": "",
+                "searchLaneDiv": "",
+                "set_search_maker": "",
+                "set_search_mdl": "",
+                "set_search_chk_carGrp": "",
+                "set_search_chk_mpriceCar": "",
+                "search_fuelCd": "",
+                "search_trnsCd": "",
+                "search_exhiNo": "",
+            }
+            
+            # Make request
+            response = requests.post(
+                url,
+                headers=headers,
+                data=data,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                count = result.get("listCnt", 0)
+                
+                logger.info(f"Lotte total count fetched: {count} cars")
+                
+                return LotteCountResponse(
+                    success=True,
+                    total_count=count,
+                    message=f"Всего {count} автомобилей на аукционе {auction_date.auction_date}",
+                    timestamp=datetime.now()
+                )
+            else:
+                logger.error(f"Failed to fetch Lotte count: {response.status_code}")
+                return LotteCountResponse(
+                    success=False,
+                    total_count=0,
+                    message=f"Ошибка получения данных: HTTP {response.status_code}",
+                    timestamp=datetime.now()
+                )
+                
+        except Exception as e:
+            logger.error(f"Error fetching Lotte total count: {e}")
+            return LotteCountResponse(
+                success=False,
+                total_count=0,
+                message=f"Ошибка: {str(e)}",
+                timestamp=datetime.now()
+            )
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Статистика кеша"""

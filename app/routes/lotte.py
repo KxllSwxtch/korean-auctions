@@ -11,6 +11,7 @@ from app.models.lotte import (
     LotteAuctionDate,
     LotteCarResponse,
     LotteCarHistoryResponse,
+    LotteCountResponse,
 )
 from app.services.lotte_service import LotteService
 from app.core.logging import logger
