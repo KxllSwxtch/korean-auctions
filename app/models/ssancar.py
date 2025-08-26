@@ -244,3 +244,12 @@ class SSANCARFilterOptionsResponse(BaseModel):
     price_range: Dict[str, int] = Field(default={"min": 0, "max": 200000})
     mileage_range: Dict[str, int] = Field(default={"min": 0, "max": 500000})
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class SSANCARTotalCountResponse(BaseModel):
+    """Response for total car count"""
+    success: bool
+    total_count: int
+    message: str
+    filters_applied: Dict[str, Any] = Field(default_factory=dict)
+    timestamp: datetime = Field(default_factory=datetime.now)

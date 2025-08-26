@@ -6,7 +6,8 @@ from loguru import logger
 from app.models.ssancar import (
     SSANCARResponse, SSANCARDetailResponse, SSANCARFilters,
     SSANCARManufacturersResponse, SSANCARModelsResponse,
-    SSANCARHealthResponse, SSANCARFilterOptionsResponse
+    SSANCARHealthResponse, SSANCARFilterOptionsResponse,
+    SSANCARTotalCountResponse
 )
 from app.services.ssancar_service import SSANCARService
 from app.core.logging import get_logger
@@ -135,6 +136,90 @@ async def search_ssancar_cars(
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
+        )
+
+
+@router.get("/total-count", response_model=SSANCARTotalCountResponse)
+async def get_total_count(
+    week_number: Optional[str] = Query(None, description="Week number (2 for Tuesday, 5 for Friday)"),
+    manufacturer: Optional[str] = Query(None, description="Manufacturer in Korean"),
+    model: Optional[str] = Query(None, description="Model code"),
+    fuel: Optional[str] = Query(None, description="Fuel type in Korean"),
+    year_from: Optional[int] = Query(2000, description="Year from"),
+    year_to: Optional[int] = Query(2025, description="Year to"),
+    price_from: Optional[int] = Query(0, description="Price from in USD"),
+    price_to: Optional[int] = Query(200000, description="Price to in USD"),
+    service: SSANCARService = Depends(get_ssancar_service)
+) -> SSANCARTotalCountResponse:
+    """
+    Get total count of cars in SSANCAR auction
+    
+    **Example usage:**
+    ```
+    GET /api/v1/ssancar/total-count
+    GET /api/v1/ssancar/total-count?manufacturer=현대&model=460
+    ```
+    """
+    try:
+        ssancar_logger.info("📊 Request for total car count")
+        
+        # Build filters if any provided
+        filters = None
+        if any([manufacturer, model, fuel, year_from != 2000, year_to != 2025, 
+                price_from != 0, price_to != 200000, week_number]):
+            filters = SSANCARFilters(
+                weekNo=week_number or "",
+                maker=manufacturer or "",
+                model=model or "",
+                fuel=fuel or "",
+                yearFrom=str(year_from),
+                yearTo=str(year_to),
+                priceFrom=str(price_from),
+                priceTo=str(price_to),
+                list="15",
+                pages="0"
+            )
+        
+        # Get total count
+        total_count = service.fetch_total_count(filters)
+        
+        # Build filters applied dict for response
+        filters_applied = {}
+        if manufacturer:
+            filters_applied["manufacturer"] = manufacturer
+        if model:
+            filters_applied["model"] = model
+        if fuel:
+            filters_applied["fuel"] = fuel
+        if year_from != 2000:
+            filters_applied["year_from"] = year_from
+        if year_to != 2025:
+            filters_applied["year_to"] = year_to
+        if price_from != 0:
+            filters_applied["price_from"] = price_from
+        if price_to != 200000:
+            filters_applied["price_to"] = price_to
+        if week_number:
+            filters_applied["week_number"] = week_number
+        
+        ssancar_logger.info(f"✅ Total count retrieved: {total_count}")
+        
+        return SSANCARTotalCountResponse(
+            success=True,
+            total_count=total_count,
+            message="Total count retrieved successfully",
+            filters_applied=filters_applied,
+            timestamp=datetime.now()
+        )
+        
+    except Exception as e:
+        ssancar_logger.error(f"❌ Error getting total count: {e}")
+        return SSANCARTotalCountResponse(
+            success=False,
+            total_count=0,
+            message=f"Failed to get total count: {str(e)}",
+            filters_applied={},
+            timestamp=datetime.now()
         )
 
 

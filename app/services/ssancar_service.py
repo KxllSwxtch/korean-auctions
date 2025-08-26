@@ -500,3 +500,69 @@ class SSANCARService:
                 mileage_range={"min": 0, "max": 500000}
             )
             return error_response.model_dump()
+    
+    def fetch_total_count(self, filters: Optional[SSANCARFilters] = None) -> int:
+        """Fetch total car count from SSANCAR
+        
+        Args:
+            filters: Optional filters to apply for count
+            
+        Returns:
+            Total count of cars matching the filters
+        """
+        try:
+            # Build the data string for the request
+            if filters:
+                # Convert filters to the expected format
+                data_parts = []
+                data_parts.append(f"weekNo={filters.weekNo or ''}")
+                data_parts.append(f"maker={filters.maker or ''}")
+                data_parts.append(f"model={filters.model or ''}")
+                data_parts.append(f"yearFrom={filters.yearFrom or '2000'}")
+                data_parts.append(f"yearTo={filters.yearTo or '2025'}")
+                data_parts.append(f"priceFrom={filters.priceFrom or '0'}")
+                data_parts.append(f"priceTo={filters.priceTo or '200000'}")
+                data_parts.append(f"kmFrom=0")
+                data_parts.append(f"kmTo=500000")
+                data_parts.append(f"gearbox=")
+                data_parts.append(f"list=15")
+                data_parts.append(f"pages=1")
+                data_parts.append(f"sorts=Low.Price")
+                
+                data_string = "^&".join(data_parts)
+            else:
+                # Default data string for all cars
+                data_string = "weekNo=^&maker=^&model=^&yearFrom=2000^&yearTo=2025^&priceFrom=0^&priceTo=200000^&kmFrom=0^&kmTo=500000^&gearbox=^&list=15^&pages=1^&sorts=Low.Price"
+            
+            logger.info(f"📊 Fetching total count from SSANCAR with data: {data_string[:100]}...")
+            
+            # Make the request to ajax_car_num.php
+            response = self.session.post(
+                self.AJAX_CAR_NUM_URL,
+                data=data_string,
+                headers=self.headers,
+                timeout=10
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"❌ Non-200 status from SSANCAR car num: {response.status_code}")
+                return 0
+            
+            # The response should be a simple HTML with just a number
+            count_text = response.text.strip()
+            
+            # Try to extract the number
+            try:
+                total_count = int(count_text)
+                logger.info(f"✅ Successfully fetched total count: {total_count}")
+                return total_count
+            except ValueError:
+                logger.error(f"❌ Could not parse count from response: {count_text[:100]}")
+                return 0
+                
+        except requests.RequestException as e:
+            logger.error(f"❌ Request error fetching total count: {e}")
+            return 0
+        except Exception as e:
+            logger.error(f"❌ Unexpected error fetching total count: {e}")
+            return 0
