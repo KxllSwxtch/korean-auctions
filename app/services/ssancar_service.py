@@ -16,6 +16,7 @@ from app.models.ssancar import (
 )
 from app.parsers.ssancar_parser import SSANCARParser
 from app.core.session_manager import SessionManager
+from app.core.proxy_config import get_proxy_config
 
 
 class SSANCARService:
@@ -104,8 +105,22 @@ class SSANCARService:
         self._load_or_set_cookies()
     
     def _create_session(self) -> requests.Session:
-        """Create a requests session with retry logic"""
+        """Create a requests session with retry logic and proxy support"""
         session = requests.Session()
+        
+        # Try to get proxy configuration from environment first
+        proxy_config = get_proxy_config()
+        if not proxy_config:
+            # Fallback to hardcoded proxy for SSANCAR to avoid blocking
+            proxy_config = {
+                "http": "http://oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us@geo.iproyal.com:12321",
+                "https": "http://oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us@geo.iproyal.com:12321"
+            }
+            logger.info(f"🔐 Using default proxy configuration for SSANCAR")
+        else:
+            logger.info(f"🔐 Using environment proxy configuration for SSANCAR")
+        
+        session.proxies = proxy_config
         
         # Setup retry strategy
         retry_strategy = Retry(
@@ -502,7 +517,7 @@ class SSANCARService:
             return error_response.model_dump()
     
     def fetch_total_count(self, filters: Optional[SSANCARFilters] = None) -> int:
-        """Fetch total car count from SSANCAR
+        """Fetch total car count from SSANCAR using the same pattern as fetch_cars
         
         Args:
             filters: Optional filters to apply for count
@@ -511,55 +526,40 @@ class SSANCARService:
             Total count of cars matching the filters
         """
         try:
-            # Build the data string for the request - format must be exactly like: weekNo=2^&maker=^&model=^&...
+            # Determine week number - same logic as fetch_cars
             if filters and filters.weekNo:
-                # Use provided week number
                 week_no = filters.weekNo
             else:
-                # Default to Tuesday (2) or Friday (5) based on current day
-                from datetime import datetime
-                current_day = datetime.now().weekday()  # 0=Monday, 6=Sunday
-                # If it's Thursday-Sunday, use Friday auction (5), otherwise use Tuesday (2)
-                week_no = "5" if current_day >= 3 else "2"
+                week_no = self._get_week_number()
+                logger.info(f"📅 Auto-set weekNo to {week_no} for total count")
             
-            if filters:
-                # Build data string with proper format: value^&
-                data_string = (
-                    f"weekNo={week_no}^&"
-                    f"maker={filters.maker or ''}^&"
-                    f"model={filters.model or ''}^&"
-                    f"yearFrom={filters.yearFrom or '2000'}^&"
-                    f"yearTo={filters.yearTo or '2025'}^&"
-                    f"priceFrom={filters.priceFrom or '0'}^&"
-                    f"priceTo={filters.priceTo or '200000'}^&"
-                    f"kmFrom=0^&"
-                    f"kmTo=500000^&"
-                    f"gearbox=^&"
-                    f"list=15^&"
-                    f"pages=1^&"
-                    f"sorts=Low.Price"
-                )
-            else:
-                # Default data string for all cars with proper week number
-                data_string = f"weekNo={week_no}^&maker=^&model=^&yearFrom=2000^&yearTo=2025^&priceFrom=0^&priceTo=200000^&kmFrom=0^&kmTo=500000^&gearbox=^&list=15^&pages=1^&sorts=Low.Price"
-            
-            logger.info(f"📊 Fetching total count from SSANCAR with data: {data_string[:100]}...")
-            
-            # Prepare headers specifically for this request (matching the working example)
-            count_headers = {
-                **self.DEFAULT_HEADERS,
-                "Sec-GPC": "1",
-                "Sec-Fetch-Dest": "empty",
-                "Sec-Fetch-Mode": "cors",
-                "Sec-Fetch-Site": "same-origin",
+            # Build data dictionary - NOT a string! Same format as fetch_cars
+            data = {
+                "weekNo": week_no,
+                "maker": filters.maker or "" if filters else "",
+                "model": filters.model or "" if filters else "",
+                "fuel": filters.fuel or "" if filters else "",
+                "color": filters.color or "" if filters else "",
+                "yearFrom": filters.yearFrom or "2000" if filters else "2000",
+                "yearTo": filters.yearTo or "2025" if filters else "2025",
+                "priceFrom": filters.priceFrom or "0" if filters else "0",
+                "priceTo": filters.priceTo or "200000" if filters else "200000",
+                "kmFrom": "0",
+                "kmTo": "500000",
+                "gearbox": "",
+                "list": "15",
+                "pages": "1",
+                "sorts": "Low.Price",
+                "no": filters.no or "" if filters else "",
             }
             
-            # Make the request to ajax_car_num.php
+            logger.info(f"📊 Fetching total count from SSANCAR with filters: {data}")
+            
+            # Make the request using the same pattern as fetch_cars
             response = self.session.post(
                 self.AJAX_CAR_NUM_URL,
-                data=data_string,
-                headers=count_headers,
-                timeout=10
+                data=data,  # Send as dictionary, NOT string!
+                timeout=15  # Same timeout as fetch_cars
             )
             
             if response.status_code != 200:
