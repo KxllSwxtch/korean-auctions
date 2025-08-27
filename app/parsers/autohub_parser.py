@@ -675,68 +675,85 @@ class AutohubParser:
         financial = {}
 
         try:
-            # Grid format - ищем в кнопках или тексте
-            buttons = car_block.find_all("button")
-            for button in buttons:
-                onclick = button.get("onclick", "")
-                # receive_rc_autoTender_pop('RC202507230743','N','3710','1001')
-                if "receive_rc_autoTender_pop" in onclick:
-                    match = re.search(
-                        r"receive_rc_autoTender_pop\([^,]+,[^,]+,['\"]([^'\"]+)['\"].*\)",
-                        onclick,
-                    )
-                    if match:
-                        price_str = match.group(1)
-                        if price_str.isdigit():
-                            financial["starting_price"] = int(price_str)
-                            logger.debug(
-                                f"Найдена цена в onclick: {financial['starting_price']} 만원"
-                            )
-                            break
-
-            # Table format
-            cells = car_block.find_all("td")
-
-            # Цена обычно в 3-й ячейке (после названия и оценки)
-            if len(cells) > 2:
-                # Ищем ячейку с ценой по классу
-                for idx, cell in enumerate(cells):
-                    cell_text = cell.get_text(strip=True)
-
-                    # Проверяем содержит ли текст признаки цены
-                    if "만원" in cell_text or re.search(
-                        r"\d{3,}", cell_text.replace(",", "")
-                    ):
-                        # Парсим цену
-                        price_match = re.search(r"([\d,]+)\s*만원", cell_text)
-                        if price_match:
-                            price_str = price_match.group(1).replace(",", "")
-                            financial["starting_price"] = int(price_str)
-                            logger.debug(
-                                f"Найдена стартовая цена: {financial['starting_price']} 만원"
-                            )
-                        else:
-                            # Пробуем найти просто числа
-                            numbers = re.findall(r"\d{3,}", cell_text.replace(",", ""))
-                            if numbers:
-                                financial["starting_price"] = int(numbers[0])
-                                logger.debug(
-                                    f"Найдена цена (альтернативный): {financial['starting_price']}"
-                                )
-                        break
-
-            # Дополнительный поиск в strong тегах
-            if "starting_price" not in financial:
-                strong_tags = car_block.find_all("strong")
-                for strong in strong_tags:
-                    text = strong.get_text(strip=True)
-                    # Ищем числа с запятыми (форматированные цены)
-                    if re.match(r"^[\d,]+$", text):
-                        price_clean = text.replace(",", "")
-                        if price_clean.isdigit() and len(price_clean) >= 3:
+            # Ищем цену по структуре HTML с лейблом "시작가"
+            # Структура: <strong class="car_list_item">시작가 : </strong><strong class="i_comm_main_txt2">3,270</strong>
+            
+            # Сначала ищем все strong элементы с классом car_list_item
+            labels = car_block.find_all("strong", class_="car_list_item")
+            for label in labels:
+                label_text = label.get_text(strip=True)
+                if "시작가" in label_text:  # "Starting price" in Korean
+                    # Ищем следующий sibling strong с классом i_comm_main_txt2
+                    next_sibling = label.find_next_sibling("strong", class_="i_comm_main_txt2")
+                    if next_sibling:
+                        price_text = next_sibling.get_text(strip=True)
+                        # Убираем запятые и преобразуем в число
+                        price_clean = price_text.replace(",", "")
+                        if price_clean.isdigit():
                             financial["starting_price"] = int(price_clean)
-                            logger.debug(f"Найдена цена в strong теге: {price_clean}")
+                            logger.debug(f"Найдена цена по лейблу '시작가': {financial['starting_price']} 만원")
                             break
+            
+            # Альтернативный поиск - ищем все strong с классом i_comm_main_txt2
+            if "starting_price" not in financial:
+                price_elements = car_block.find_all("strong", class_="i_comm_main_txt2")
+                for elem in price_elements:
+                    # Проверяем, что перед этим элементом есть текст "시작가"
+                    parent = elem.parent
+                    if parent:
+                        parent_text = parent.get_text(strip=True)
+                        if "시작가" in parent_text:
+                            price_text = elem.get_text(strip=True)
+                            price_clean = price_text.replace(",", "")
+                            if price_clean.isdigit():
+                                financial["starting_price"] = int(price_clean)
+                                logger.debug(f"Найдена цена в i_comm_main_txt2: {financial['starting_price']} 만원")
+                                break
+            
+            # Grid format - ищем в кнопках или тексте (оставляем как fallback)
+            if "starting_price" not in financial:
+                buttons = car_block.find_all("button")
+                for button in buttons:
+                    onclick = button.get("onclick", "")
+                    # receive_rc_autoTender_pop('RC202507230743','N','3710','1001')
+                    if "receive_rc_autoTender_pop" in onclick:
+                        match = re.search(
+                            r"receive_rc_autoTender_pop\([^,]+,[^,]+,['\"]([^'\"]+)['\"].*\)",
+                            onclick,
+                        )
+                        if match:
+                            price_str = match.group(1)
+                            if price_str.isdigit() and int(price_str) > 1000:  # Исключаем явно неправильные значения
+                                financial["starting_price"] = int(price_str)
+                                logger.debug(
+                                    f"Найдена цена в onclick: {financial['starting_price']} 만원"
+                                )
+                                break
+
+            # Table format (оставляем как последний fallback)
+            if "starting_price" not in financial:
+                cells = car_block.find_all("td")
+                
+                # Цена обычно в 3-й ячейке (после названия и оценки)
+                if len(cells) > 2:
+                    # Ищем ячейку с ценой по классу
+                    for idx, cell in enumerate(cells):
+                        cell_text = cell.get_text(strip=True)
+                        
+                        # Проверяем содержит ли текст признаки цены
+                        if "만원" in cell_text or re.search(
+                            r"\d{3,}", cell_text.replace(",", "")
+                        ):
+                            # Парсим цену
+                            price_match = re.search(r"([\d,]+)\s*만원", cell_text)
+                            if price_match:
+                                price_str = price_match.group(1).replace(",", "")
+                                if int(price_str) > 1000:  # Исключаем явно неправильные значения
+                                    financial["starting_price"] = int(price_str)
+                                    logger.debug(
+                                        f"Найдена стартовая цена: {financial['starting_price']} 만원"
+                                    )
+                                    break
 
         except Exception as e:
             logger.error(f"Ошибка при извлечении financial_info: {e}")
