@@ -486,7 +486,17 @@ class KCarParser:
                             logger.debug(f"🏃 Найден пробег: {car.mileage}")
                             break
 
-                # 5. Ищем топливо в carinfo секции
+                # 5. Ищем дату первой регистрации в carinfo секции
+                # Ищем элемент p, который содержит текст "최초등록일"
+                for p_tag in soup.find_all("p"):
+                    if p_tag.get_text() and "최초등록일" in p_tag.get_text():
+                        reg_date_span = p_tag.find("span")
+                        if reg_date_span:
+                            car.registration_date = reg_date_span.get_text(strip=True)
+                            logger.debug(f"📅 Найдена дата регистрации: {car.registration_date}")
+                            break
+
+                # 6. Ищем топливо в carinfo секции
                 fuel_p = soup.find("p", string=lambda text: text and "연료" in text)
                 if fuel_p:
                     fuel_span = fuel_p.find("span")
@@ -494,7 +504,7 @@ class KCarParser:
                         car.fuel_type = fuel_span.get_text(strip=True)
                         logger.debug(f"⛽ Найдено топливо: {car.fuel_type}")
 
-                # 6. Ищем коробку передач в таблице
+                # 7. Ищем коробку передач в таблице
                 transmission_row = soup.find("td", class_="table_tit", string="미션")
                 if transmission_row:
                     transmission_cell = transmission_row.find_next_sibling("td")
@@ -504,7 +514,7 @@ class KCarParser:
                             car.transmission = transmission_p.get_text(strip=True)
                             logger.debug(f"⚙️ Найдена КПП: {car.transmission}")
 
-                # 7. Ищем топливо и цвет в таблице
+                # 8. Ищем топливо и цвет в таблице
                 fuel_color_row = soup.find("td", class_="table_tit", string="연료/색상")
                 if fuel_color_row:
                     fuel_color_cell = fuel_color_row.find_next_sibling("td")
@@ -521,7 +531,7 @@ class KCarParser:
                                     f"🎨 Найдены топливо/цвет: {car.fuel_type}/{car.exterior_color}"
                                 )
 
-                # 8. Ищем главное изображение
+                # 9. Ищем главное изображение
                 main_img = soup.find("img", id="main_img")
                 if main_img and main_img.get("src"):
                     main_img_src = main_img.get("src")
@@ -531,7 +541,7 @@ class KCarParser:
                         car.main_image = main_img_src
                     logger.debug(f"📸 Найдено главное изображение: {car.main_image}")
 
-                # 9. Ищем все изображения автомобиля (фильтруем элементы интерфейса)
+                # 10. Ищем все изображения автомобиля (фильтруем элементы интерфейса)
                 all_images = []
                 img_tags = soup.find_all("img")
 
