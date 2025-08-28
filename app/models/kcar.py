@@ -661,57 +661,57 @@ KCAR_UI_TO_API_MAPPING = {
     "001_004": "005",  # KG Mobility (SsangYong) -> SsangYong
     "001_088": "008",  # Daewoo Bus -> Others
     "001_006": "008",  # Other Domestic -> Others
-    # Все импортные производители
-    "002_013": "007",  # Mercedes-Benz -> Import
-    "002_012": "007",  # BMW -> Import
-    "002_011": "007",  # Audi -> Import
-    "002_014": "007",  # Volkswagen -> Import
-    "002_054": "007",  # MINI -> Import
-    "002_017": "007",  # Volvo -> Import
-    "002_091": "007",  # Polestar -> Import
-    "002_015": "007",  # Porsche -> Import
-    "002_081": "007",  # Smart -> Import
-    "002_053": "007",  # Maserati -> Import
-    "002_019": "007",  # Jaguar -> Import
-    "002_020": "007",  # Land Rover -> Import
-    "002_021": "007",  # Peugeot -> Import
-    "002_022": "007",  # Citroën -> Import
-    "002_018": "007",  # Fiat -> Import
-    "002_041": "007",  # Ferrari -> Import
-    "002_049": "007",  # Lamborghini -> Import
-    "002_084": "007",  # McLaren -> Import
-    "002_080": "007",  # Maybach -> Import
-    "002_050": "007",  # Bentley -> Import
-    "002_047": "007",  # Rolls-Royce -> Import
-    "002_016": "007",  # Saab -> Import
-    "002_070": "007",  # Aston Martin -> Import
-    "002_035": "007",  # Lexus -> Import
-    "002_031": "007",  # Toyota -> Import
-    "002_058": "007",  # Infiniti -> Import
-    "002_027": "007",  # Honda -> Import
-    "002_033": "007",  # Nissan -> Import
-    "002_030": "007",  # Mitsubishi -> Import
-    "002_037": "007",  # Suzuki -> Import
-    "002_029": "007",  # Mazda -> Import
-    "002_028": "007",  # Isuzu -> Import
-    "002_052": "007",  # Subaru -> Import
-    "002_051": "007",  # Daihatsu -> Import
-    "002_057": "007",  # Acura -> Import
-    "002_087": "007",  # Tesla -> Import
-    "002_024": "007",  # Ford -> Import
-    "002_083": "007",  # Jeep -> Import
-    "002_043": "007",  # Cadillac -> Import
-    "002_023": "007",  # Chrysler -> Import
-    "002_044": "007",  # Lincoln -> Import
-    "002_056": "007",  # GMC -> Import
-    "002_034": "007",  # Dodge -> Import
-    "002_038": "007",  # Chevrolet -> Import
-    "002_048": "007",  # Hummer -> Import
-    "002_090": "007",  # Dongfeng Sokon -> Import
-    "002_086": "007",  # BAIC -> Import
-    "002_085": "007",  # Foton -> Import
-    "002_093": "007",  # BYD -> Import
-    "002_092": "007",  # Sunlong Bus -> Import
+    # Импортные производители - используем фактические коды
+    "002_013": "013",  # Mercedes-Benz
+    "002_012": "012",  # BMW
+    "002_011": "011",  # Audi
+    "002_014": "014",  # Volkswagen
+    "002_054": "054",  # MINI
+    "002_017": "017",  # Volvo
+    "002_091": "091",  # Polestar
+    "002_015": "015",  # Porsche
+    "002_081": "081",  # Smart
+    "002_053": "053",  # Maserati
+    "002_019": "019",  # Jaguar
+    "002_020": "020",  # Land Rover
+    "002_021": "021",  # Peugeot
+    "002_022": "022",  # Citroën
+    "002_018": "018",  # Fiat
+    "002_041": "041",  # Ferrari
+    "002_049": "049",  # Lamborghini
+    "002_084": "084",  # McLaren
+    "002_080": "080",  # Maybach
+    "002_050": "050",  # Bentley
+    "002_047": "047",  # Rolls-Royce
+    "002_016": "016",  # Saab
+    "002_070": "070",  # Aston Martin
+    "002_035": "035",  # Lexus
+    "002_031": "031",  # Toyota
+    "002_058": "058",  # Infiniti
+    "002_027": "027",  # Honda
+    "002_033": "033",  # Nissan
+    "002_030": "030",  # Mitsubishi
+    "002_037": "037",  # Suzuki
+    "002_029": "029",  # Mazda
+    "002_028": "028",  # Isuzu
+    "002_052": "052",  # Subaru
+    "002_051": "051",  # Daihatsu
+    "002_057": "057",  # Acura
+    "002_087": "087",  # Tesla
+    "002_024": "024",  # Ford
+    "002_083": "083",  # Jeep
+    "002_043": "043",  # Cadillac
+    "002_023": "023",  # Chrysler
+    "002_044": "044",  # Lincoln
+    "002_056": "056",  # GMC
+    "002_034": "034",  # Dodge
+    "002_038": "038",  # Chevrolet
+    "002_048": "048",  # Hummer
+    "002_090": "090",  # Dongfeng Sokon
+    "002_086": "086",  # BAIC
+    "002_085": "085",  # Foton
+    "002_093": "093",  # BYD
+    "002_092": "092",  # Sunlong Bus
     # Коммерческие автомобили
     "003_005": "008",  # Cargo Truck -> Others
     "003_003": "008",  # Wing Body/Top -> Others

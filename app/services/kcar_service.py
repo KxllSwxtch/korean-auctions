@@ -356,6 +356,22 @@ class KCarService:
             # Объединяем с переданными параметрами
             if params:
                 default_params.update(params)
+                
+                # Преобразуем код производителя и устанавливаем IPTCAR_DCD
+                if "MNUFTR_CD" in params and params["MNUFTR_CD"]:
+                    # Проверяем если это UI код (например, 002_012)
+                    ui_code = params["MNUFTR_CD"]
+                    if "_" in ui_code:
+                        # Это UI код, преобразуем
+                        api_manufacturer_code = convert_ui_to_api_code(ui_code)
+                        default_params["MNUFTR_CD"] = api_manufacturer_code
+                        
+                        # Для иностранных производителей устанавливаем IPTCAR_DCD
+                        if ui_code.startswith("002_"):
+                            default_params["IPTCAR_DCD"] = "002"
+                            logger.info(f"🌍 Иностранный производитель {ui_code}, используем IPTCAR_DCD=002")
+                        
+                        logger.info(f"🔄 Преобразование кода производителя: {ui_code} -> {api_manufacturer_code}")
 
             # Логируем финальные параметры для отправки
             logger.info("📋 Финальные параметры для API запроса:")
@@ -1306,27 +1322,6 @@ class KCarService:
         """
         try:
             logger.info(f"📋 Получение моделей для производителя {manufacturer_code}")
-            
-            # Для иностранных производителей возвращаем универсальный список
-            # так как KCar API не предоставляет специфичные модели для импортных марок
-            if manufacturer_code.startswith("002_"):
-                logger.info(f"🌍 Иностранный производитель {manufacturer_code}, возвращаем универсальный список моделей")
-                from app.models.kcar import KCarModel
-                
-                # Возвращаем единый вариант "Все модели" для иностранных производителей
-                universal_models = [
-                    {
-                        "MNUFTR_CD": manufacturer_code,  # Требуемое поле
-                        "MODEL_GRP_CD": "ALL",
-                        "MODEL_GRP_NM": "모든 모델 (All Models)"
-                    }
-                ]
-                
-                return KCarModelsResponse(
-                    models=universal_models,
-                    success=True,
-                    message="Для импортных марок используется универсальный выбор моделей"
-                )
 
             if not self.authenticated:
                 logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
@@ -1341,12 +1336,11 @@ class KCarService:
                 f"🔄 Преобразование кода: {manufacturer_code} -> {api_manufacturer_code}"
             )
             
-            # Для иностранных производителей (002_xxx) используем специальный IPTCAR_DCD
-            # API ожидает IPTCAR_DCD="007" для импортных марок, а не "002"
+            # Для иностранных производителей (002_xxx) используем IPTCAR_DCD="002"
             if manufacturer_code.startswith("002_"):
-                actual_input_car_code = "007"  # Используем "007" для всех импортных марок
+                actual_input_car_code = "002"  # Используем "002" для импортных марок
                 logger.info(
-                    f"🌍 Иностранный производитель, используем IPTCAR_DCD={actual_input_car_code} вместо {input_car_code}"
+                    f"🌍 Иностранный производитель, используем IPTCAR_DCD={actual_input_car_code}"
                 )
             else:
                 actual_input_car_code = input_car_code
@@ -1431,28 +1425,6 @@ class KCarService:
                 f"📋 Получение поколений для модели {model_group_code} производителя {manufacturer_code}"
             )
             
-            # Для иностранных производителей возвращаем пустой список поколений
-            # так как KCar API не предоставляет эти данные для импортных марок
-            if manufacturer_code.startswith("002_"):
-                logger.info(f"🌍 Иностранный производитель {manufacturer_code}, поколения не доступны")
-                from app.models.kcar import KCarGeneration
-                
-                # Возвращаем единственный вариант для всех поколений
-                universal_generations = [
-                    {
-                        "MODEL_CD": "ALL",
-                        "MODEL_NM": "All Models",
-                        "MODEL_DETAIL_NM": "모든 세대 (All Generations)",
-                        "MNUFTR_CD": manufacturer_code
-                    }
-                ]
-                
-                return KCarGenerationsResponse(
-                    generations=universal_generations,
-                    success=True,
-                    message="Для импортных марок поколения не детализируются"
-                )
-
             if not self.authenticated:
                 logger.warning("⚠️ Не авторизован, выполняю авторизацию...")
                 if not self._authenticate():
@@ -1466,12 +1438,11 @@ class KCarService:
                 f"🔄 Преобразование кода: {manufacturer_code} -> {api_manufacturer_code}"
             )
             
-            # Для иностранных производителей (002_xxx) используем специальный IPTCAR_DCD
-            # API ожидает IPTCAR_DCD="007" для импортных марок, а не "002"
+            # Для иностранных производителей (002_xxx) используем IPTCAR_DCD="002"
             if manufacturer_code.startswith("002_"):
-                actual_input_car_code = "007"  # Используем "007" для всех импортных марок
+                actual_input_car_code = "002"  # Используем "002" для импортных марок
                 logger.info(
-                    f"🌍 Иностранный производитель, используем IPTCAR_DCD={actual_input_car_code} вместо {input_car_code}"
+                    f"🌍 Иностранный производитель, используем IPTCAR_DCD={actual_input_car_code}"
                 )
             else:
                 actual_input_car_code = input_car_code
@@ -1612,6 +1583,11 @@ class KCarService:
                     f"🔄 Преобразование кода в поиске: {filters.manufacturer_code} -> {api_manufacturer_code}"
                 )
                 data["MNUFTR_CD"] = api_manufacturer_code
+                
+                # Для иностранных производителей используем IPTCAR_DCD="002"
+                if filters.manufacturer_code.startswith("002_"):
+                    data["IPTCAR_DCD"] = "002"
+                    logger.info(f"🌍 Иностранный производитель, используем IPTCAR_DCD=002")
             if filters.model_group_code:
                 logger.info(f"  - Установлен MODEL_GRP_CD: {filters.model_group_code}")
                 data["MODEL_GRP_CD"] = filters.model_group_code
