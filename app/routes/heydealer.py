@@ -2581,12 +2581,13 @@ async def get_car_accident_repairs_demo(car_hash_id: str):
 
 
 @router.get("/cars/{car_hash_id}/accident-diagram")
-async def get_car_accident_diagram(car_hash_id: str):
+async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
     """
     Получает диаграмму повреждений автомобиля
     
     Args:
         car_hash_id: Уникальный ID автомобиля
+        use_scraper: Использовать Playwright scraper для получения полных данных
         
     Returns:
         URL изображения диаграммы и данные о повреждениях
@@ -2594,6 +2595,33 @@ async def get_car_accident_diagram(car_hash_id: str):
     try:
         logger.info(f"Получение диаграммы повреждений для автомобиля {car_hash_id}")
         
+        # Если use_scraper=True, пробуем использовать Playwright для полных данных
+        if use_scraper:
+            try:
+                from app.services.heydealer_playwright_scraper import scrape_car_diagram
+                import asyncio
+                
+                logger.info(f"Использование Playwright scraper для {car_hash_id}")
+                scraped_data = await scrape_car_diagram(car_hash_id)
+                
+                if scraped_data.get("success"):
+                    # Добавляем метки для маркеров если их нет
+                    for repair in scraped_data.get("data", {}).get("accident_repairs", []):
+                        if not repair.get("label"):
+                            if repair.get("repair") == "weld":
+                                repair["label"] = "W"
+                            elif repair.get("repair") == "painted":
+                                repair["label"] = "P"
+                            elif repair.get("repair") == "exchange":
+                                repair["label"] = "E"
+                    
+                    scraped_data["timestamp"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT")
+                    return scraped_data
+                    
+            except Exception as e:
+                logger.warning(f"Playwright scraper failed, falling back to API: {e}")
+        
+        # Fallback to API method
         # Получаем валидную сессию
         cookies, headers = heydealer_auth.get_valid_session()
         
