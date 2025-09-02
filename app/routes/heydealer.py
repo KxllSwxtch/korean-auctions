@@ -2631,6 +2631,51 @@ async def get_car_accident_diagram(car_hash_id: str):
         # Получаем данные
         diagram_data = response.json()
         
+        # Логируем полученные данные для отладки
+        logger.info(f"Получены данные диаграммы: {json.dumps(diagram_data, ensure_ascii=False, indent=2)[:1000]}")
+        
+        # Обрабатываем данные о повреждениях
+        accident_repairs = []
+        raw_repairs = diagram_data.get("accident_repairs", [])
+        
+        for repair in raw_repairs:
+            # Преобразуем данные о повреждениях с учетом возможных вариантов структуры
+            repair_item = {
+                "part": repair.get("part", ""),
+                "part_display": repair.get("part_display", repair.get("part", "")),
+                "repair": repair.get("repair", "none"),
+                "repair_display": repair.get("repair_display", repair.get("repair", "")),
+                "position": repair.get("position", [0, 0]),
+                "category": repair.get("category", "etc"),
+                "max_reduction_ratio": repair.get("max_reduction_ratio", {
+                    "exchange": 0,
+                    "weld": 0
+                })
+            }
+            
+            # Добавляем тип покраски если есть
+            if repair.get("repair") == "painted" or repair.get("repair_type") == "painted":
+                repair_item["repair"] = "painted"
+                repair_item["repair_display"] = "도색 (Painted)"
+            
+            accident_repairs.append(repair_item)
+        
+        # Подсчитываем типы повреждений
+        damage_counts = {
+            "exchange": 0,
+            "weld": 0,
+            "painted": 0,
+            "none": 0
+        }
+        
+        for repair in accident_repairs:
+            repair_type = repair.get("repair", "none")
+            if repair_type in damage_counts:
+                damage_counts[repair_type] += 1
+            elif repair_type != "none":
+                # Для неизвестных типов считаем как exchange
+                damage_counts["exchange"] += 1
+        
         # Извлекаем информацию о диаграмме
         result = {
             "success": True,
@@ -2638,25 +2683,13 @@ async def get_car_accident_diagram(car_hash_id: str):
                 "type": diagram_data.get("type"),
                 "image_url": diagram_data.get("image_url"),
                 "image_width": diagram_data.get("image_width", 420),
-                "accident_repairs": diagram_data.get("accident_repairs", []),
-                "total_damages": len([
-                    repair for repair in diagram_data.get("accident_repairs", [])
-                    if repair.get("repair") != "none"
+                "accident_repairs": accident_repairs,
+                "total_damages": sum([
+                    damage_counts["exchange"],
+                    damage_counts["weld"],
+                    damage_counts["painted"]
                 ]),
-                "damage_summary": {
-                    "exchange": len([
-                        repair for repair in diagram_data.get("accident_repairs", [])
-                        if repair.get("repair") == "exchange"
-                    ]),
-                    "weld": len([
-                        repair for repair in diagram_data.get("accident_repairs", [])
-                        if repair.get("repair") == "weld"
-                    ]),
-                    "none": len([
-                        repair for repair in diagram_data.get("accident_repairs", [])
-                        if repair.get("repair") == "none"
-                    ])
-                }
+                "damage_summary": damage_counts
             },
             "message": "Диаграмма повреждений успешно получена",
             "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
