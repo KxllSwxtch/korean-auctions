@@ -2662,6 +2662,54 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         # Логируем полученные данные для отладки
         logger.info(f"Получены данные диаграммы: {json.dumps(diagram_data, ensure_ascii=False, indent=2)[:1000]}")
         
+        # Get actual damage data from car details API
+        try:
+            logger.info(f"Fetching car details for actual damage data")
+            detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
+            detail_response = requests.get(detail_url, headers=headers, cookies=cookies, timeout=30)
+            
+            if detail_response.status_code == 200:
+                car_details = detail_response.json()
+                detail_section = car_details.get('detail', {})
+                
+                # Get actual accident repairs from car details
+                actual_repairs = detail_section.get('accident_repairs', [])
+                logger.info(f"Found {len(actual_repairs)} actual repairs: {actual_repairs}")
+                
+                # Merge actual repairs with diagram template
+                if actual_repairs:
+                    # Create a map of part names to repair types
+                    repair_map = {}
+                    for repair in actual_repairs:
+                        part = repair.get('part', '')
+                        repair_type = repair.get('repair', 'none')
+                        if part and repair_type != 'none':
+                            repair_map[part] = repair_type
+                    
+                    # Update the accident_repairs array with actual damage data
+                    for diagram_repair in diagram_data.get('accident_repairs', []):
+                        part_name = diagram_repair.get('part', '')
+                        
+                        # Check if this part has actual damage
+                        if part_name in repair_map:
+                            diagram_repair['repair'] = repair_map[part_name]
+                            # Update repair display
+                            repair_displays = {
+                                'weld': '용접 (Welded)',
+                                'painted': '도색 (Painted)', 
+                                'exchange': '교환 (Exchanged)',
+                                'none': '없음 (None)'
+                            }
+                            diagram_repair['repair_display'] = repair_displays.get(repair_map[part_name], repair_map[part_name])
+                            logger.info(f"Updated {part_name} to {repair_map[part_name]}")
+                    
+                    logger.info(f"Successfully merged actual damage data")
+            else:
+                logger.warning(f"Could not fetch car details: {detail_response.status_code}")
+                
+        except Exception as e:
+            logger.warning(f"Could not get actual damage data from car details: {e}")
+        
         # Обрабатываем данные о повреждениях
         accident_repairs = []
         raw_repairs = diagram_data.get("accident_repairs", [])
@@ -2678,31 +2726,44 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
                 "max_reduction_ratio": repair.get("max_reduction_ratio", {
                     "exchange": 0,
                     "weld": 0
-                })
+                }),
+                "label": ""  # Add label field
             }
             
-            # Добавляем тип покраски если есть
-            if repair.get("repair") == "painted" or repair.get("repair_type") == "painted":
-                repair_item["repair"] = "painted"
-                repair_item["repair_display"] = "도색 (Painted)"
+            # Add label based on repair type
+            if repair_item["repair"] == "weld":
+                repair_item["label"] = "W"
+            elif repair_item["repair"] == "painted":
+                repair_item["label"] = "P"
+            elif repair_item["repair"] == "exchange":
+                repair_item["label"] = "E"
             
             accident_repairs.append(repair_item)
         
         # Подсчитываем типы повреждений
-        damage_counts = {
+        damage_counts = diagram_data.get("damage_summary", {
             "exchange": 0,
             "weld": 0,
             "painted": 0,
             "none": 0
-        }
+        })
         
-        for repair in accident_repairs:
-            repair_type = repair.get("repair", "none")
-            if repair_type in damage_counts:
-                damage_counts[repair_type] += 1
-            elif repair_type != "none":
-                # Для неизвестных типов считаем как exchange
-                damage_counts["exchange"] += 1
+        # If damage_summary is not in diagram_data, calculate it
+        if "damage_summary" not in diagram_data:
+            damage_counts = {
+                "exchange": 0,
+                "weld": 0,
+                "painted": 0,
+                "none": 0
+            }
+            
+            for repair in accident_repairs:
+                repair_type = repair.get("repair", "none")
+                if repair_type in damage_counts:
+                    damage_counts[repair_type] += 1
+                elif repair_type != "none":
+                    # Для неизвестных типов считаем как exchange
+                    damage_counts["exchange"] += 1
         
         # Извлекаем информацию о диаграмме
         result = {
