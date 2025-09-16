@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     # Учётные данные для Autohub
-    autohub_username: str = "785701"
+    autohub_username: str = "837301"
     autohub_password: str = "782312"
 
     # Настройки для Glovis
