@@ -933,6 +933,16 @@ class AutohubService:
                     )
 
             # Подготавливаем параметры для POST запроса к Autohub
+            # ВАЖНО: Autohub использует дублированные поля для фильтров!
+            # Tab 1 использует: i_sMakerCodeD, i_sCarName1CodeD (основные поля)
+            # Tab 1 также требует: i_sMakerCodeD1, i_sCarName1CodeD1 (дубликаты)
+            # Поля i_sMakerCode, i_sCarName1Code остаются пустыми при использовании Tab 1
+
+            # Форматируем auction temp параметр
+            auction_temp_value = ""
+            if search_params.auction_no and search_params.auction_date and search_params.auction_code:
+                auction_temp_value = f"{search_params.auction_no}@@{search_params.auction_date}@@{search_params.auction_code}"
+
             post_data = {
                 "i_iNowPageNo": str(search_params.page),
                 "i_sReturnUrl": "/newfront/receive/rc/receive_rc_list.do",
@@ -946,22 +956,29 @@ class AutohubService:
                 "i_sAucCode": search_params.auction_code or "",
                 "i_sSortFlag": "entry",
                 "i_sMainModel": "",
-                "i_sMakerCodeD": "",
-                "i_sCarName1CodeD": "",
-                "tabActiveIdx": "",
-                "listTabActiveIdx": "",
+                # ИСПРАВЛЕНИЕ: Эти поля должны содержать фильтры для Tab 1
+                "i_sMakerCodeD": search_params.manufacturer_code or "",
+                "i_sCarName1CodeD": search_params.model_code or "",
+                # ИСПРАВЛЕНИЕ: Tab index должен быть "1" для фильтрации
+                "tabActiveIdx": "1",
+                "listTabActiveIdx": "1",
                 "receivecd": "",
-                "i_sAucNoTempStr": "",
-                "i_sMakerCodeD1": "",
-                "i_sCarName1CodeD1": "",
-                "i_sAucNoTemp1": "",
+                # ИСПРАВЛЕНИЕ: Должен содержать название аукциона
+                "i_sAucNoTempStr": search_params.auction_title or "",
+                # ИСПРАВЛЕНИЕ: Дубликаты полей фильтров для Tab 1
+                "i_sMakerCodeD1": search_params.manufacturer_code or "",
+                "i_sCarName1CodeD1": search_params.model_code or "",
+                # ИСПРАВЛЕНИЕ: Форматированный параметр аукциона
+                "i_sAucNoTemp1": auction_temp_value,
                 "i_entryNoYn": "ALL",
                 "i_parkingNoYn": "Y",
                 "noSelect": "E",
                 "i_sNo": "",
-                # Важно: добавляем фильтры производителя и модели
-                "i_sMakerCode": search_params.manufacturer_code or "",
-                "i_sCarName1Code": search_params.model_code or "",
+                # ИСПРАВЛЕНИЕ: Эти поля остаются пустыми при использовании Tab 1 фильтров
+                # Tab 1 использует i_sMakerCodeD/i_sCarName1CodeD вместо этих полей
+                "i_sMakerCode": "",
+                "i_sCarName1Code": "",
+                # Tab 2 поля (поколение и детализация) работают независимо
                 "i_sCarName2Code": search_params.generation_code or "",
                 "i_sCarName3Code": search_params.detail_code or "",
                 "i_sFueltypecode": (
