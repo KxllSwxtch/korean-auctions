@@ -58,6 +58,10 @@ test_*.py
 glovis-post-curl-response.html
 glovis-post-curl-example.py
 
+# Debug files (auto-generated during testing)
+debug_*.html
+debug_*.json
+
 # Documentation (будем создавать на сервере)
 README_*.md
 *_REPORT.md
