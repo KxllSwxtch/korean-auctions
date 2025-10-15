@@ -51,6 +51,11 @@ class AutohubService:
 
         self.parser = AutohubParser(self.base_url)
 
+        # Cache for auction code (valid for 24 hours)
+        self._cached_auction_code: Optional[str] = None
+        self._cache_timestamp: Optional[float] = None
+        self._CACHE_DURATION = 86400  # 24 hours in seconds
+
     @property
     def session(self) -> requests.Session:
         """Получить настроенную сессию для HTTP запросов"""
@@ -2163,6 +2168,120 @@ class AutohubService:
                 total_count=0,
             )
 
+    async def _fetch_real_auction_code_from_web(self) -> Optional[str]:
+        """
+        Fetch the actual auction code from Autohub website by scraping
+
+        This method scrapes the live auction listing page to get the real
+        auction code that Autohub is currently using, eliminating the need
+        to generate/guess the code.
+
+        Returns:
+            str: Auction code (e.g., 'AC202510010001') or None if failed
+        """
+        try:
+            url = "https://www.autohubauction.co.kr/newfront/receive/rc/receive_rc_list.do"
+
+            logger.info("🌐 Fetching real auction code from Autohub website...")
+
+            # Fetch the page HTML
+            html = await self._fetch_html_simple(url)
+            if not html:
+                logger.warning("Failed to fetch HTML for auction code extraction")
+                return None
+
+            # Parse HTML to extract auction code
+            from bs4 import BeautifulSoup
+
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Strategy 1: Find the hidden input field with auction code
+            auction_code_input = soup.find(
+                "input", {"id": "i_sAucCode", "name": "i_sAucCode"}
+            )
+
+            if auction_code_input and auction_code_input.get("value"):
+                auction_code = auction_code_input["value"]
+
+                # Validate the code format
+                if self._validate_auction_code(auction_code):
+                    logger.info(
+                        f"✅ Fetched real auction code from hidden input: {auction_code}"
+                    )
+                    return auction_code
+                else:
+                    logger.warning(
+                        f"⚠️ Fetched auction code has invalid format: {auction_code}"
+                    )
+
+            # Strategy 2: Fallback - try to extract from dropdown option
+            select_option = soup.find("select", {"id": "i_sAucNoTemp2"})
+            if select_option:
+                option = select_option.find("option", selected=True)
+                if option and option.get("value"):
+                    # Format: "1345@@2025-10-15@@AC202510010001"
+                    parts = option["value"].split("@@")
+                    if len(parts) == 3:
+                        auction_code = parts[2]
+
+                        # Validate the code format
+                        if self._validate_auction_code(auction_code):
+                            logger.info(
+                                f"✅ Fetched auction code from dropdown: {auction_code}"
+                            )
+                            return auction_code
+                        else:
+                            logger.warning(
+                                f"⚠️ Dropdown auction code has invalid format: {auction_code}"
+                            )
+
+            logger.warning("❌ Could not extract valid auction code from HTML")
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching real auction code from web: {e}")
+            return None
+
+    async def _fetch_real_auction_code(self) -> Optional[str]:
+        """
+        Fetch the actual auction code with 24-hour caching
+
+        This method first checks if we have a cached auction code that's
+        still valid (less than 24 hours old). If not, it fetches a fresh
+        code from the Autohub website.
+
+        Returns:
+            str: Auction code (e.g., 'AC202510010001') or None if failed
+        """
+        import time
+
+        # Check cache first
+        if self._cached_auction_code and self._cache_timestamp:
+            age = time.time() - self._cache_timestamp
+            if age < self._CACHE_DURATION:
+                logger.info(
+                    f"📦 Using cached auction code: {self._cached_auction_code} (age: {int(age)}s / {self._CACHE_DURATION}s)"
+                )
+                return self._cached_auction_code
+            else:
+                logger.info(
+                    f"⏰ Cached auction code expired (age: {int(age)}s > {self._CACHE_DURATION}s)"
+                )
+
+        # Cache miss or expired - fetch fresh code from web
+        logger.info("🔄 Cache miss or expired, fetching fresh auction code...")
+        auction_code = await self._fetch_real_auction_code_from_web()
+
+        if auction_code:
+            # Update cache
+            self._cached_auction_code = auction_code
+            self._cache_timestamp = time.time()
+            logger.info(f"💾 Cached new auction code: {auction_code}")
+        else:
+            logger.warning("⚠️ Failed to fetch fresh auction code from web")
+
+        return auction_code
+
     async def get_auction_sessions(self) -> AutohubAuctionSessionsResponse:
         """
         Получает список активных сессий аукциона
@@ -2176,8 +2295,22 @@ class AutohubService:
             # Get current auction date with 6PM cutoff logic
             auction_date = self._get_current_auction_date()
 
-            # Generate auction code and number based on date
-            auction_code = self._generate_auction_code(auction_date)
+            # Try to fetch real auction code from Autohub first (PRIMARY)
+            auction_code = await self._fetch_real_auction_code()
+
+            # Fallback: generate if fetch fails (BACKUP)
+            if not auction_code:
+                logger.warning(
+                    "⚠️ Failed to fetch real auction code, using generated fallback"
+                )
+                auction_code = self._generate_auction_code(auction_date)
+                logger.info(f"📝 Using generated fallback auction code: {auction_code}")
+            else:
+                logger.info(
+                    f"✅ Using real auction code from Autohub: {auction_code}"
+                )
+
+            # Calculate auction number
             auction_no = self._calculate_auction_number(auction_date)
 
             # Format auction title
@@ -2263,6 +2396,30 @@ class AutohubService:
         )
 
         return auction_date_str
+
+    def _validate_auction_code(self, code: str) -> bool:
+        """
+        Validate auction code format
+
+        Expected format: ACYYYYMMDD0001
+        Example: AC202510010001
+
+        Args:
+            code: Auction code to validate
+
+        Returns:
+            bool: True if valid format, False otherwise
+        """
+        import re
+
+        pattern = r'^AC\d{8}0001$'
+
+        if not re.match(pattern, code):
+            logger.warning(f"⚠️ Invalid auction code format: {code}")
+            return False
+
+        logger.debug(f"✅ Valid auction code format: {code}")
+        return True
 
     def _generate_auction_code(self, auction_date: str) -> str:
         """
