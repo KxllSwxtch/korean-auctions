@@ -933,10 +933,11 @@ class AutohubService:
                     )
 
             # Подготавливаем параметры для POST запроса к Autohub
-            # ВАЖНО: Autohub использует дублированные поля для фильтров!
-            # Tab 1 использует: i_sMakerCodeD, i_sCarName1CodeD (основные поля)
-            # Tab 1 также требует: i_sMakerCodeD1, i_sCarName1CodeD1 (дубликаты)
-            # Поля i_sMakerCode, i_sCarName1Code остаются пустыми при использовании Tab 1
+            # ИСПРАВЛЕНО: Используем правильные поля как в рабочих cURL примерах
+            # i_sMakerCode - код производителя
+            # i_sCarName1Code - код модели
+            # i_sCarName2Code - код поколения
+            # i_sCarName3Code - код детализации/конфигурации
 
             # Форматируем auction temp параметр
             auction_temp_value = ""
@@ -956,29 +957,27 @@ class AutohubService:
                 "i_sAucCode": search_params.auction_code or "",
                 "i_sSortFlag": "entry",
                 "i_sMainModel": "",
-                # ИСПРАВЛЕНИЕ: Эти поля должны содержать фильтры для Tab 1
-                "i_sMakerCodeD": search_params.manufacturer_code or "",
-                "i_sCarName1CodeD": search_params.model_code or "",
-                # ИСПРАВЛЕНИЕ: Tab index должен быть "1" для фильтрации
-                "tabActiveIdx": "1",
+                # Очищаем поля для Tab 1 (не используем)
+                "i_sMakerCodeD": "",
+                "i_sCarName1CodeD": "",
+                # ИСПРАВЛЕНО: Tab index должен быть "2" для фильтрации (как в рабочих примерах)
+                "tabActiveIdx": "2",
                 "listTabActiveIdx": "1",
                 "receivecd": "",
-                # ИСПРАВЛЕНИЕ: Должен содержать название аукциона
+                # Название аукциона
                 "i_sAucNoTempStr": search_params.auction_title or "",
-                # ИСПРАВЛЕНИЕ: Дубликаты полей фильтров для Tab 1
-                "i_sMakerCodeD1": search_params.manufacturer_code or "",
-                "i_sCarName1CodeD1": search_params.model_code or "",
-                # ИСПРАВЛЕНИЕ: Форматированный параметр аукциона
-                "i_sAucNoTemp1": auction_temp_value,
+                # Удалены дубликаты полей (не нужны для Tab 2)
+                "i_sCarName1CodeD1": "",
+                # Форматированный параметр аукциона
+                "i_sAucNoTemp2": auction_temp_value,
                 "i_entryNoYn": "ALL",
                 "i_parkingNoYn": "Y",
                 "noSelect": "E",
                 "i_sNo": "",
-                # ИСПРАВЛЕНИЕ: Эти поля остаются пустыми при использовании Tab 1 фильтров
-                # Tab 1 использует i_sMakerCodeD/i_sCarName1CodeD вместо этих полей
-                "i_sMakerCode": "",
-                "i_sCarName1Code": "",
-                # Tab 2 поля (поколение и детализация) работают независимо
+                # ИСПРАВЛЕНО: Основные поля фильтров (как в рабочих cURL примерах)
+                "i_sMakerCode": search_params.manufacturer_code or "",
+                "i_sCarName1Code": search_params.model_code or "",
+                # Поколение и детализация
                 "i_sCarName2Code": search_params.generation_code or "",
                 "i_sCarName3Code": search_params.detail_code or "",
                 "i_sFueltypecode": (
@@ -2268,41 +2267,41 @@ class AutohubService:
     def _generate_auction_code(self, auction_date: str) -> str:
         """
         Generate auction code based on date
-        
-        The auction code uses the date of the previous Wednesday (7 days before).
-        Format: ACYYYYMMDD0001
+
+        The auction code uses the first day of the auction month.
+        Format: ACYYYYMM010001 (always uses day 01)
 
         Args:
             auction_date: Date in YYYY-MM-DD format (should be a Wednesday)
 
         Returns:
-            str: Auction code in format ACYYYYMMDD0001
+            str: Auction code in format ACYYYYMM010001
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         # Parse the auction date
         date_obj = datetime.strptime(auction_date, "%Y-%m-%d")
-        
+
         # Verify it's a Wednesday (weekday = 2)
         if date_obj.weekday() != 2:
             logger.warning(
                 f"⚠️ Auction date {auction_date} is not a Wednesday (weekday={date_obj.weekday()})"
             )
 
-        # The auction code uses the previous Wednesday's date (7 days before)
-        # This is the date when the auction was announced/registered
-        code_date = date_obj - timedelta(days=7)
+        # The auction code uses the first day of the auction month
+        # Autohub uses ACYYYYMM010001 format for all auctions in a given month
+        code_date = date_obj.replace(day=1)
 
-        # Format as YYYYMMDD
+        # Format as YYYYMMDD (will always end with 01 for day)
         date_no_hyphens = code_date.strftime("%Y%m%d")
 
         # Generate code - AC + date + 0001
         auction_code = f"AC{date_no_hyphens}0001"
-        
+
         logger.info(
             f"📝 Generated auction code: {auction_code} (for auction on {auction_date})"
         )
-        
+
         return auction_code
 
     def _calculate_auction_number(self, auction_date: str) -> str:
