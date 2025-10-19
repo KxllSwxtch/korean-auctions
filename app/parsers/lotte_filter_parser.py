@@ -16,6 +16,38 @@ from app.core.logging import logger
 class LotteFilterParser:
     """Парсер для фильтров Lotte"""
 
+    def _clean_name(self, name: str) -> str:
+        """
+        Очистка названия от нежелательных суффиксов и префиксов
+
+        Args:
+            name: Исходное название
+
+        Returns:
+            Очищенное название
+        """
+        if not name:
+            return name
+
+        # Удаляем "Automatic", "Manual", "차" и "자동" (корейские слова для "автомобиль")
+        cleaned = name
+
+        # Удаляем "Automatic" (может быть в начале, середине или конце)
+        cleaned = re.sub(r'Automatic', '', cleaned, flags=re.IGNORECASE)
+
+        # Удаляем "Manual"
+        cleaned = re.sub(r'Manual', '', cleaned, flags=re.IGNORECASE)
+
+        # Удаляем корейские слова "자동차" (автомобиль), "자동" (авто), "차" (машина) в конце
+        cleaned = re.sub(r'자동차$', '', cleaned)
+        cleaned = re.sub(r'자동$', '', cleaned)
+        cleaned = re.sub(r'차$', '', cleaned)
+
+        # Удаляем лишние пробелы
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+        return cleaned
+
     def parse_manufacturers(self, json_response: str) -> List[LotteManufacturer]:
         """
         Парсинг списка производителей из JSON ответа
@@ -40,8 +72,10 @@ class LotteFilterParser:
             manufacturers = []
             for item in data["result"]:
                 if isinstance(item, dict) and "code" in item and "name" in item:
+                    # Очищаем название от "Automatic", "Manual" и "차"
+                    cleaned_name = self._clean_name(item["name"])
                     manufacturer = LotteManufacturer(
-                        code=item["code"], name=item["name"]
+                        code=item["code"], name=cleaned_name
                     )
                     manufacturers.append(manufacturer)
 
@@ -79,9 +113,11 @@ class LotteFilterParser:
             models = []
             for item in data["result"]:
                 if isinstance(item, dict) and "code" in item and "name" in item:
+                    # Очищаем название от "Automatic", "Manual" и "차"
+                    cleaned_name = self._clean_name(item["name"])
                     model = LotteModel(
                         code=item["code"],
-                        name=item["name"],
+                        name=cleaned_name,
                         manufacturer_code=manufacturer_code,
                     )
                     models.append(model)
@@ -122,8 +158,10 @@ class LotteFilterParser:
             car_groups = []
             for item in data["result"]:
                 if isinstance(item, dict) and "code" in item and "name" in item:
+                    # Очищаем название от "Automatic", "Manual" и "차"
+                    cleaned_name = self._clean_name(item["name"])
                     car_group = LotteCarGroup(
-                        code=item["code"], name=item["name"], model_code=model_code
+                        code=item["code"], name=cleaned_name, model_code=model_code
                     )
                     car_groups.append(car_group)
 
@@ -163,9 +201,11 @@ class LotteFilterParser:
             mprice_cars = []
             for item in data["result"]:
                 if isinstance(item, dict) and "code" in item and "name" in item:
+                    # Очищаем название от "Automatic", "Manual" и "차"
+                    cleaned_name = self._clean_name(item["name"])
                     mprice_car = LotteMPriceCar(
                         code=item["code"],
-                        name=item["name"],
+                        name=cleaned_name,
                         car_group_code=car_group_code,
                     )
                     mprice_cars.append(mprice_car)

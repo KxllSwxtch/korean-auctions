@@ -395,7 +395,7 @@ async def clear_cache(service: LotteFilterService = Depends(get_filter_service))
 
 @router.post("/search-cars", response_model=LotteSearchResponse)
 async def search_cars_with_parsing(
-    search_request: LotteSearchRequest = Body(
+    filter_request: LotteFilterRequest = Body(
         ..., description="Параметры поиска автомобилей"
     ),
     service: LotteFilterService = Depends(get_filter_service),
@@ -467,10 +467,10 @@ async def search_cars_with_parsing(
     ```
     """
     try:
-        logger.info(f"Поиск автомобилей с парсингом: {search_request.model_dump()}")
+        logger.info(f"Поиск автомобилей с парсингом: {filter_request.model_dump()}")
 
         # Выполняем поиск с парсингом через сервис
-        response = service.search_cars_with_parsing(search_request)
+        response = service.search_cars_with_parsing(filter_request)
 
         if not response.success:
             return JSONResponse(status_code=500, content=response.model_dump())

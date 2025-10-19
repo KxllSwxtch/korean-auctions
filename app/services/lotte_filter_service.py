@@ -528,18 +528,9 @@ class LotteFilterService:
             if filter_request.transmission_code:
                 search_data["search_trnsCd"] = filter_request.transmission_code
 
-            # Группы автомобилей (множественный выбор)
-            if filter_request.car_group_codes:
-                # Для одной группы
-                if len(filter_request.car_group_codes) == 1:
-                    search_data["set_search_chk_carGrp"] = (
-                        filter_request.car_group_codes[0]
-                    )
-                else:
-                    # Для множественных групп используем массив
-                    search_data["set_search_chk_carGrp"] = (
-                        filter_request.car_group_codes
-                    )
+            # Группа автомобилей (одиночный выбор)
+            if filter_request.car_group_code:
+                search_data["set_search_chk_carGrp"] = filter_request.car_group_code
 
             # Подмодели с ценами (множественный выбор)
             if filter_request.mprice_car_codes:
@@ -606,55 +597,74 @@ class LotteFilterService:
             }
 
     def search_cars_with_parsing(
-        self, search_request: LotteSearchRequest
+        self, filter_request: LotteFilterRequest
     ) -> LotteSearchResponse:
         """
         Поиск автомобилей с полным парсингом результатов
 
         Args:
-            search_request: Параметры поиска
+            filter_request: Параметры фильтрации и поиска
 
         Returns:
             LotteSearchResponse с результатами поиска
         """
         try:
-            logger.info(f"Поиск автомобилей с парсингом: {search_request.model_dump()}")
+            logger.info(f"Поиск автомобилей с парсингом: {filter_request.model_dump()}")
 
             # Подготовка данных для поиска
             search_data = {
-                "searchPageUnit": str(search_request.per_page),
-                "pageIndex": str(search_request.page),
-                "search_grntVal": search_request.grant_val or "",
-                "search_concVal": search_request.conc_val or "",
-                "search_preVal": search_request.pre_val or "",
-                "excelDiv": search_request.excel_div or "",
-                "searchLaneDiv": search_request.lane_division or "",
-                "search_doimCd": search_request.doim_code or "",
-                "search_exhiNo": search_request.exhibition_number or "",
-                "search_fuelCd": search_request.fuel_code or "",
-                "search_trnsCd": search_request.transmission_code or "",
-                "search_startPrice": search_request.min_price or "",
-                "search_endPrice": search_request.max_price or "",
-                "search_startYyyy": search_request.min_year or "",
-                "search_endYyyy": search_request.max_year or "",
-                "search_startPrice_s": search_request.min_price or "",
-                "search_endPrice_s": search_request.max_price or "",
+                "searchPageUnit": str(filter_request.per_page),
+                "pageIndex": str(filter_request.page),
+                "search_grntVal": "",
+                "search_concVal": "",
+                "search_preVal": "",
+                "excelDiv": "",
+                "searchLaneDiv": filter_request.lane_division or "",
+                "search_doimCd": "",
+                "search_exhiNo": filter_request.exhibition_number or "",
             }
 
             # Основные фильтры
-            if search_request.manufacturer_code:
-                search_data["set_search_maker"] = search_request.manufacturer_code
+            if filter_request.manufacturer_code:
+                search_data["set_search_maker"] = filter_request.manufacturer_code
 
-            if search_request.model_code:
-                search_data["set_search_mdl"] = search_request.model_code
+            if filter_request.model_code:
+                search_data["set_search_mdl"] = filter_request.model_code
 
             # Дата аукциона
-            if search_request.auction_date:
-                search_data["searchAuctDt"] = search_request.auction_date
+            if filter_request.auction_date:
+                search_data["searchAuctDt"] = filter_request.auction_date
 
-            # Группа автомобилей
-            if search_request.car_group_code:
-                search_data["set_search_chk_carGrp"] = search_request.car_group_code
+            # Ценовые фильтры
+            if filter_request.min_price is not None:
+                search_data["search_startPrice"] = str(filter_request.min_price)
+                search_data["search_startPrice_s"] = str(filter_request.min_price)
+
+            if filter_request.max_price is not None:
+                search_data["search_endPrice"] = str(filter_request.max_price)
+                search_data["search_endPrice_s"] = str(filter_request.max_price)
+
+            # Год выпуска
+            if filter_request.min_year is not None:
+                search_data["search_startYyyy"] = str(filter_request.min_year)
+
+            if filter_request.max_year is not None:
+                search_data["search_endYyyy"] = str(filter_request.max_year)
+
+            # Тип топлива и трансмиссия
+            if filter_request.fuel_code:
+                search_data["search_fuelCd"] = filter_request.fuel_code
+
+            if filter_request.transmission_code:
+                search_data["search_trnsCd"] = filter_request.transmission_code
+
+            # Группа автомобилей (одиночный выбор)
+            if filter_request.car_group_code:
+                search_data["set_search_chk_carGrp"] = filter_request.car_group_code
+
+            # Подмодели с ценами (множественный выбор)
+            if filter_request.mprice_car_codes:
+                search_data["set_search_chk_mpriceCar"] = filter_request.mprice_car_codes
 
             # Выполняем поиск
             session = self._init_session()
@@ -691,9 +701,9 @@ class LotteFilterService:
                     message=f"HTTP ошибка {response.status_code}",
                     cars=[],
                     total_count=0,
-                    page=search_request.page,
-                    per_page=search_request.per_page,
-                    filters_applied=search_request.model_dump(),
+                    page=filter_request.page,
+                    per_page=filter_request.per_page,
+                    filters_applied=filter_request.model_dump(),
                 )
 
             # Парсим HTML результаты
@@ -703,22 +713,22 @@ class LotteFilterService:
 
             # Рассчитываем пагинацию
             total_pages = (
-                total_count + search_request.per_page - 1
-            ) // search_request.per_page
-            has_next = search_request.page < total_pages
-            has_previous = search_request.page > 1
+                total_count + filter_request.per_page - 1
+            ) // filter_request.per_page
+            has_next = filter_request.page < total_pages
+            has_previous = filter_request.page > 1
 
             response_data = LotteSearchResponse(
                 success=True,
                 message=f"Найдено {len(cars)} автомобилей из {total_count} общих",
                 cars=cars,
                 total_count=total_count,
-                page=search_request.page,
-                per_page=search_request.per_page,
+                page=filter_request.page,
+                per_page=filter_request.per_page,
                 total_pages=total_pages,
                 has_next=has_next,
                 has_previous=has_previous,
-                filters_applied=search_request.model_dump(),
+                filters_applied=filter_request.model_dump(),
             )
 
             logger.info(f"Поиск завершен: {len(cars)} автомобилей, всего {total_count}")
@@ -731,7 +741,7 @@ class LotteFilterService:
                 message=f"Ошибка поиска: {str(e)}",
                 cars=[],
                 total_count=0,
-                page=search_request.page,
-                per_page=search_request.per_page,
-                filters_applied=search_request.model_dump(),
+                page=filter_request.page,
+                per_page=filter_request.per_page,
+                filters_applied=filter_request.model_dump(),
             )

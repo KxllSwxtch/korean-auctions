@@ -42,9 +42,7 @@ class LotteFilterRequest(BaseModel):
     # Основные фильтры
     manufacturer_code: Optional[str] = Field(None, description="Код производителя")
     model_code: Optional[str] = Field(None, description="Код модели")
-    car_group_codes: Optional[List[str]] = Field(
-        None, description="Коды групп автомобилей"
-    )
+    car_group_code: Optional[str] = Field(None, description="Код группы автомобилей")
     mprice_car_codes: Optional[List[str]] = Field(None, description="Коды подмоделей")
 
     # Дата аукциона
