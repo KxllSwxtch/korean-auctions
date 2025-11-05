@@ -457,6 +457,10 @@ class KCarParser:
                     if car_name_cell:
                         car.car_name = car_name_cell.get_text(strip=True)
                         logger.debug(f"🚗 Найдено название: {car.car_name}")
+                    else:
+                        logger.warning(f"⚠️ Не найдена ячейка с названием автомобиля для {car_id}")
+                else:
+                    logger.warning(f"⚠️ Не найден элемент <td class='ttable_tit'>차명</td> для {car_id}")
 
                 # 2. Ищем номер автомобиля в таблице
                 car_number_row = soup.find("td", class_="table_tit", string="차량번호")
@@ -540,6 +544,8 @@ class KCarParser:
                     else:
                         car.main_image = main_img_src
                     logger.debug(f"📸 Найдено главное изображение: {car.main_image}")
+                else:
+                    logger.warning(f"⚠️ Не найдено главное изображение <img id='main_img'> для {car_id}")
 
                 # 10. Ищем все изображения автомобиля (фильтруем элементы интерфейса)
                 all_images = []
@@ -603,19 +609,21 @@ class KCarParser:
                 if start_price_elem:
                     car.start_price = start_price_elem.get_text(strip=True)
                     logger.debug(f"💰 Найдена стартовая цена: {car.start_price}만원")
-                
+                else:
+                    logger.warning(f"⚠️ Не найдена стартовая цена <strong id='auc_strt_prc'> для {car_id}")
+
                 # 13. Извлекаем ожидаемую цену (если есть)
                 expected_price_elem = soup.find("strong", {"id": "auc_strt_hope"})
                 if expected_price_elem:
                     car.expected_price = expected_price_elem.get_text(strip=True)
                     logger.debug(f"💰 Найдена ожидаемая цена: {car.expected_price}만원")
-                
+
                 # 14. Извлекаем дату аукциона
                 auction_date_elem = soup.find("strong", {"id": "auc_strt_dt"})
                 if auction_date_elem:
                     car.auction_date = auction_date_elem.get_text(strip=True)
                     logger.debug(f"📅 Найдена дата аукциона: {car.auction_date}")
-                
+
                 # 15. Извлекаем статус аукциона
                 auction_status_elem = soup.find("strong", {"id": "auc_stat"})
                 if auction_status_elem:
@@ -638,16 +646,51 @@ class KCarParser:
             except Exception as parse_error:
                 logger.warning(f"⚠️ Ошибка извлечения данных из HTML: {parse_error}")
 
+            # Валидация: проверяем, были ли извлечены критические данные
+            has_critical_data = bool(car.car_name or car.main_image or car.start_price)
+
+            if not has_critical_data:
+                logger.error(
+                    f"❌ {self.name}: Критические данные не извлечены для {car_id}. "
+                    f"car_name={car.car_name}, main_image={car.main_image}, start_price={car.start_price}"
+                )
+
+                # Сохраняем HTML для отладки
+                try:
+                    import os
+                    from datetime import datetime
+
+                    # Создаем директорию для отладочных файлов
+                    debug_dir = "debug_html"
+                    os.makedirs(debug_dir, exist_ok=True)
+
+                    # Сохраняем HTML с временной меткой
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    debug_filename = f"{debug_dir}/kcar_empty_detail_{car_id}_{timestamp}.html"
+
+                    with open(debug_filename, "w", encoding="utf-8") as f:
+                        f.write(html_content)
+
+                    logger.info(f"💾 HTML сохранен для отладки: {debug_filename}")
+                except Exception as save_error:
+                    logger.warning(f"⚠️ Не удалось сохранить HTML для отладки: {save_error}")
+
             response = KCarDetailResponse(
                 car=car,
-                success=True,
-                message="Детальная информация получена успешно",
+                success=has_critical_data,  # Успех только если данные извлечены
+                message="Детальная информация получена успешно" if has_critical_data else "Не удалось извлечь критические данные из HTML",
                 source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}",
             )
 
-            logger.success(
-                f"✅ {self.name}: Детальная информация для автомобиля {car_id} обработана успешно"
-            )
+            if has_critical_data:
+                logger.success(
+                    f"✅ {self.name}: Детальная информация для автомобиля {car_id} обработана успешно"
+                )
+            else:
+                logger.warning(
+                    f"⚠️ {self.name}: Детальная информация для автомобиля {car_id} обработана, но критические данные не найдены"
+                )
+
             return response
 
         except Exception as e:
