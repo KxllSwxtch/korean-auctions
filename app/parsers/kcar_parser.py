@@ -846,12 +846,12 @@ class KCarParser:
                     part_number = part_id[-4:]
                     
                     # Определяем тип работы по префиксу
-                    if part_id.startswith("aw"):  # 교환 (replacement)
-                        body_parts["replaced"].append(part_number)
-                        damage_type_by_part[part_number] = "replaced"
-                    elif part_id.startswith("ax"):  # 판금 (panel beating)
+                    if part_id.startswith("aw"):  # 판금 (panel beating) - W
                         body_parts["panel_beaten"].append(part_number)
                         damage_type_by_part[part_number] = "panel_beaten"
+                    elif part_id.startswith("ax"):  # 교환 (replacement) - X
+                        body_parts["replaced"].append(part_number)
+                        damage_type_by_part[part_number] = "replaced"
                     elif part_id.startswith("ac"):  # 부식 (corrosion)
                         body_parts["corroded"].append(part_number)
                         damage_type_by_part[part_number] = "corroded"
