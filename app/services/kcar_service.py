@@ -1094,37 +1094,46 @@ class KCarService:
                 "AUC_CD": auction_code,
             }
 
-            # Данные для POST запроса
-            data = {
-                "setSearch": "",
-            }
-
-            # Заголовки для запроса детальной страницы
+            # Заголовки для запроса детальной страницы (GET request)
             detail_headers = {
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
                 "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
                 "Cache-Control": "max-age=0",
                 "Connection": "keep-alive",
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Origin": self.base_url,
                 "Referer": f"{self.base_url}/kcar/auction/weekly_auction/colAuction.do?PAGE_TYPE=wCfm&LANE_TYPE=A",
                 "Sec-Fetch-Dest": "document",
                 "Sec-Fetch-Mode": "navigate",
                 "Sec-Fetch-Site": "same-origin",
                 "Sec-Fetch-User": "?1",
                 "Upgrade-Insecure-Requests": "1",
-                "User-Agent": self.ua.random,
+                "User-Agent": self.session.headers.get("User-Agent", self.ua.random),
                 "sec-ch-ua": '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
                 "sec-ch-ua-mobile": "?0",
                 "sec-ch-ua-platform": '"macOS"',
             }
 
-            logger.info(f"📡 Отправляю запрос детальной информации: {detail_url}")
+            logger.info(f"📡 Отправляю GET запрос детальной информации: {detail_url}")
             logger.debug(f"🔍 Параметры: {params}")
+            logger.debug(f"🍪 Активные cookies: {list(self.session.cookies.keys())}")
 
-            response = self.session.post(
-                detail_url, params=params, data=data, headers=detail_headers, timeout=30
+            response = self.session.get(
+                detail_url, params=params, headers=detail_headers, timeout=30
             )
+
+            # Проверка редиректов
+            if response.history:
+                logger.warning(f"⚠️ Обнаружены редиректы: {[r.url for r in response.history]}")
+                logger.warning(f"⚠️ Конечный URL: {response.url}")
+
+            # Проверка, что мы попали на правильную страницу
+            if response.url != detail_url and not response.url.startswith(detail_url):
+                logger.error(f"❌ Редирект на другую страницу: {response.url}")
+                logger.error(f"❌ Ожидаемый URL: {detail_url}")
+                return KCarDetailResponse(
+                    car=None,
+                    success=False,
+                    message=f"Редирект на неожиданную страницу: {response.url}"
+                )
 
             if response.status_code == 200:
                 logger.info(f"✅ Получена детальная страница автомобиля {car_id}")
