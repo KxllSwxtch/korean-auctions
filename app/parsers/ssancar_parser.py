@@ -80,7 +80,8 @@ class SSANCARParser:
                         grade=grade,
                         bid_price=bid_price,
                         thumbnail_url=thumbnail_url,
-                        detail_url=detail_url
+                        detail_url=detail_url,
+                        source="SSANCAR"
                     )
                     
                     cars.append(car)

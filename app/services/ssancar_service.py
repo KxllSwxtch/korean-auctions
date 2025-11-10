@@ -237,10 +237,24 @@ class SSANCARService:
             )
             
             response.raise_for_status()
-            
+
             # Parse HTML response
             cars = self.parser.parse_car_list(response.text)
-            
+
+            # CRITICAL: Always filter to ensure ONLY SSANCAR cars are returned
+            # The SSANCAR website may aggregate cars from multiple sources
+            original_count = len(cars)
+            cars = [car for car in cars if car.source.upper() == "SSANCAR"]
+            filtered_count = len(cars)
+
+            if original_count != filtered_count:
+                logger.warning(
+                    f"⚠️ Filtered out {original_count - filtered_count} non-SSANCAR cars! "
+                    f"Returning {filtered_count} SSANCAR-only cars"
+                )
+            else:
+                logger.info(f"✅ All {filtered_count} cars are from SSANCAR source")
+
             # Get total count (would need separate request)
             total_count = len(cars)  # Simplified for now
             current_page = int(filters.pages) + 1  # Convert 0-based to 1-based

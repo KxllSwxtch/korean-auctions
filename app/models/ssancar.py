@@ -19,6 +19,7 @@ class SSANCARCar(BaseModel):
     bid_price: int = Field(..., description="Starting bid price in USD")
     thumbnail_url: str = Field(..., description="Thumbnail image URL")
     detail_url: str = Field(..., description="Detail page URL")
+    source: str = Field("SSANCAR", description="Auction source (SSANCAR/Glovis)")
     
     class Config:
         json_schema_extra = {
@@ -172,6 +173,7 @@ class SSANCARFilters(BaseModel):
     list: str = Field("15", description="Items per page")
     pages: str = Field("0", description="Page number (0-based)")
     no: Optional[str] = Field("", description="Stock number search")
+    source: Optional[str] = Field("SSANCAR", description="Auction source filter (SSANCAR/Glovis)")
 
 
 class SSANCARResponse(BaseModel):
