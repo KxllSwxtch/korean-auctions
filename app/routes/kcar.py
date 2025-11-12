@@ -352,13 +352,30 @@ async def get_kcar_car_detail(
 
         if not result.success:
             logger.error(f"❌ Ошибка получения детальной информации: {result.message}")
+
+            # Определяем HTTP статус код на основе типа ошибки
+            status_code = 404  # По умолчанию
+            if result.error_type == "authentication_failed":
+                status_code = 401
+            elif result.error_type == "timeout":
+                status_code = 504
+            elif result.error_type == "http_error":
+                status_code = 502
+            elif result.error_type == "network_error":
+                status_code = 503
+            elif result.error_type in ["car_not_found", "redirect"]:
+                status_code = 404
+            elif result.error_type == "parsing_failed":
+                status_code = 500
+
             raise HTTPException(
-                status_code=404,
+                status_code=status_code,
                 detail={
                     "error": "Не удалось получить детальную информацию об автомобиле",
                     "message": result.message,
                     "car_id": car_id,
                     "auction_code": auction_code,
+                    "error_type": result.error_type,
                 },
             )
 

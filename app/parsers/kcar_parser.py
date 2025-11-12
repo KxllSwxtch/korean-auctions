@@ -678,8 +678,9 @@ class KCarParser:
             response = KCarDetailResponse(
                 car=car,
                 success=has_critical_data,  # Успех только если данные извлечены
-                message="Детальная информация получена успешно" if has_critical_data else "Не удалось извлечь критические данные из HTML",
+                message="Детальная информация получена успешно" if has_critical_data else "Не удалось извлечь критические данные из HTML. Возможно, автомобиль более недоступен или был удален с аукциона.",
                 source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}",
+                error_type=None if has_critical_data else "car_not_found",
             )
 
             if has_critical_data:
@@ -701,6 +702,7 @@ class KCarParser:
                 car=None,
                 success=False,
                 message=f"Ошибка парсинга детальной информации: {str(e)}",
+                error_type="parsing_failed",
             )
 
     def _parse_technical_sheet(self, soup) -> Optional[TechnicalSheet]:

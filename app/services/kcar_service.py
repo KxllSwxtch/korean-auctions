@@ -1079,7 +1079,10 @@ class KCarService:
                 logger.warning("⚠️ Не авторизован, пытаюсь авторизоваться...")
                 if not self._authenticate():
                     return KCarDetailResponse(
-                        car=None, success=False, message="Ошибка авторизации"
+                        car=None,
+                        success=False,
+                        message="Ошибка авторизации",
+                        error_type="authentication_failed"
                     )
 
             # URL для получения детальной информации
@@ -1132,7 +1135,8 @@ class KCarService:
                 return KCarDetailResponse(
                     car=None,
                     success=False,
-                    message=f"Редирект на неожиданную страницу: {response.url}"
+                    message=f"Редирект на неожиданную страницу: {response.url}",
+                    error_type="redirect"
                 )
 
             if response.status_code == 200:
@@ -1157,22 +1161,42 @@ class KCarService:
             else:
                 error_msg = f"HTTP ошибка получения детальной информации: {response.status_code}"
                 logger.error(f"❌ {error_msg}")
-                return KCarDetailResponse(car=None, success=False, message=error_msg)
+                return KCarDetailResponse(
+                    car=None,
+                    success=False,
+                    message=error_msg,
+                    error_type="http_error"
+                )
 
         except requests.exceptions.Timeout:
             error_msg = "Таймаут получения детальной информации"
             logger.error(f"⏱️ {error_msg}")
-            return KCarDetailResponse(car=None, success=False, message=error_msg)
+            return KCarDetailResponse(
+                car=None,
+                success=False,
+                message=error_msg,
+                error_type="timeout"
+            )
 
         except requests.exceptions.RequestException as e:
             error_msg = f"Ошибка запроса детальной информации: {str(e)}"
             logger.error(f"❌ {error_msg}")
-            return KCarDetailResponse(car=None, success=False, message=error_msg)
+            return KCarDetailResponse(
+                car=None,
+                success=False,
+                message=error_msg,
+                error_type="network_error"
+            )
 
         except Exception as e:
             error_msg = f"Неожиданная ошибка получения детальной информации: {str(e)}"
             logger.error(f"❌ {error_msg}")
-            return KCarDetailResponse(car=None, success=False, message=error_msg)
+            return KCarDetailResponse(
+                car=None,
+                success=False,
+                message=error_msg,
+                error_type="network_error"
+            )
 
     def close(self):
         """Закрытие сервиса"""

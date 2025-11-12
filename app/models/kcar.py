@@ -358,6 +358,10 @@ class KCarDetailResponse(BaseModel):
     success: bool = Field(True, description="Статус успешности")
     message: Optional[str] = Field(None, description="Сообщение об ошибке или успехе")
     source_url: Optional[str] = Field(None, description="URL источника данных")
+    error_type: Optional[str] = Field(
+        None,
+        description="Тип ошибки: 'authentication_failed', 'car_not_found', 'parsing_failed', 'redirect', 'timeout', 'http_error', 'network_error'"
+    )
 
     class Config:
         populate_by_name = True
