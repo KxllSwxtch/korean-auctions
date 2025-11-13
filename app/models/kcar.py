@@ -362,6 +362,14 @@ class KCarDetailResponse(BaseModel):
         None,
         description="Тип ошибки: 'authentication_failed', 'car_not_found', 'parsing_failed', 'redirect', 'timeout', 'http_error', 'network_error'"
     )
+    missing_fields: Optional[List[str]] = Field(
+        None,
+        description="Список полей, которые не удалось извлечь из HTML"
+    )
+    extraction_stats: Optional[Dict[str, bool]] = Field(
+        None,
+        description="Статистика извлечения по каждому полю (True = успешно, False = не извлечено)"
+    )
 
     class Config:
         populate_by_name = True

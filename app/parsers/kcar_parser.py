@@ -19,9 +19,102 @@ from app.models.kcar import (
 class KCarParser:
     """Парсер для обработки JSON ответов от KCar API"""
 
+    # Конфигурация fallback селекторов для робастности парсинга
+    # Формат: (tag, class, text_to_find_in_label)
+    SELECTOR_FALLBACKS = {
+        "car_name": [
+            ("td", "ttable_tit", "차명"),
+            ("td", "ttable-tit", "차명"),
+            ("td", "table_tit", "차명"),
+            ("td", "table-tit", "차명"),
+            ("span", "car-name-label", "차명"),
+        ],
+        "car_number": [
+            ("td", "table_tit", "차량번호"),
+            ("td", "table-tit", "차량번호"),
+            ("td", "ttable_tit", "차량번호"),
+            ("span", "car-number-label", "차량번호"),
+        ],
+        "year": [
+            ("td", "ttable_tit", "연식"),
+            ("td", "ttable-tit", "연식"),
+            ("td", "table_tit", "연식"),
+            ("span", "year-label", "연식"),
+        ],
+        "transmission": [
+            ("td", "table_tit", "미션"),
+            ("td", "table-tit", "미션"),
+            ("td", "ttable_tit", "미션"),
+            ("span", "transmission-label", "미션"),
+        ],
+        "vin": [
+            ("td", "ttable_tit", "차대번호"),
+            ("td", "ttable-tit", "차대번호"),
+            ("td", "table_tit", "차대번호"),
+            ("span", "vin-label", "차대번호"),
+        ],
+        "displacement": [
+            ("td", "table_tit", "배기량"),
+            ("td", "table-tit", "배기량"),
+            ("td", "ttable_tit", "배기량"),
+            ("span", "displacement-label", "배기량"),
+        ],
+        "fuel_color": [
+            ("td", "table_tit", "연료/색상"),
+            ("td", "table-tit", "연료/색상"),
+            ("td", "ttable_tit", "연료/색상"),
+        ],
+    }
+
     def __init__(self):
         self.name = "KCar Parser"
         logger.info(f"🔧 {self.name} инициализирован")
+
+    def _find_with_fallbacks(self, soup, field_name: str):
+        """
+        Попытка найти элемент используя множественные fallback селекторы.
+
+        Args:
+            soup: BeautifulSoup объект страницы
+            field_name: Название поля из SELECTOR_FALLBACKS
+
+        Returns:
+            Найденный элемент или None
+        """
+        fallbacks = self.SELECTOR_FALLBACKS.get(field_name, [])
+
+        if not fallbacks:
+            logger.warning(f"⚠️ No fallbacks configured for field: {field_name}")
+            return None
+
+        for idx, (tag, css_class, text) in enumerate(fallbacks):
+            try:
+                if text:
+                    # Поиск по тексту с гибким матчингом (игнорируем пробелы)
+                    element = soup.find(
+                        tag,
+                        class_=css_class,
+                        string=lambda s: text in s.strip() if s else False
+                    )
+                else:
+                    # Поиск только по тегу и классу
+                    element = soup.find(tag, class_=css_class)
+
+                if element:
+                    logger.debug(
+                        f"✅ Found '{field_name}' using fallback #{idx+1}: "
+                        f"{tag}.{css_class}" + (f" with text '{text}'" if text else "")
+                    )
+                    return element
+
+            except Exception as e:
+                logger.debug(f"⚠️ Fallback #{idx+1} failed for '{field_name}': {e}")
+                continue
+
+        logger.warning(
+            f"⚠️ Failed to find '{field_name}' with all {len(fallbacks)} fallback(s)"
+        )
+        return None
 
     def parse_cars_json(
         self,
@@ -450,8 +543,8 @@ class KCarParser:
 
             # Пытаемся извлечь базовую информацию
             try:
-                # 1. Ищем название автомобиля в таблице с классом "ttable_tit"
-                car_name_row = soup.find("td", class_="ttable_tit", string="차명")
+                # 1. Ищем название автомобиля с использованием fallback селекторов
+                car_name_row = self._find_with_fallbacks(soup, "car_name")
                 if car_name_row:
                     car_name_cell = car_name_row.find_next_sibling("td")
                     if car_name_cell:
@@ -460,10 +553,10 @@ class KCarParser:
                     else:
                         logger.warning(f"⚠️ Не найдена ячейка с названием автомобиля для {car_id}")
                 else:
-                    logger.warning(f"⚠️ Не найден элемент <td class='ttable_tit'>차명</td> для {car_id}")
+                    logger.warning(f"⚠️ Не найден элемент названия автомобиля для {car_id}")
 
-                # 2. Ищем номер автомобиля в таблице
-                car_number_row = soup.find("td", class_="table_tit", string="차량번호")
+                # 2. Ищем номер автомобиля в таблице с fallback селекторами
+                car_number_row = self._find_with_fallbacks(soup, "car_number")
                 if car_number_row:
                     car_number_cell = car_number_row.find_next_sibling("td")
                     if car_number_cell:
@@ -472,8 +565,8 @@ class KCarParser:
                             car.car_number = car_number_p.get_text(strip=True)
                             logger.debug(f"🔢 Найден номер: {car.car_number}")
 
-                # 3. Ищем год в таблице
-                year_row = soup.find("td", class_="ttable_tit", string="연식")
+                # 3. Ищем год в таблице с fallback селекторами
+                year_row = self._find_with_fallbacks(soup, "year")
                 if year_row:
                     year_cell = year_row.find_next_sibling("td")
                     if year_cell:
@@ -508,8 +601,8 @@ class KCarParser:
                         car.fuel_type = fuel_span.get_text(strip=True)
                         logger.debug(f"⛽ Найдено топливо: {car.fuel_type}")
 
-                # 7. Ищем коробку передач в таблице
-                transmission_row = soup.find("td", class_="table_tit", string="미션")
+                # 7. Ищем коробку передач в таблице с fallback селекторами
+                transmission_row = self._find_with_fallbacks(soup, "transmission")
                 if transmission_row:
                     transmission_cell = transmission_row.find_next_sibling("td")
                     if transmission_cell:
@@ -518,8 +611,8 @@ class KCarParser:
                             car.transmission = transmission_p.get_text(strip=True)
                             logger.debug(f"⚙️ Найдена КПП: {car.transmission}")
 
-                # 8. Ищем топливо и цвет в таблице
-                fuel_color_row = soup.find("td", class_="table_tit", string="연료/색상")
+                # 8. Ищем топливо и цвет в таблице с fallback селекторами
+                fuel_color_row = self._find_with_fallbacks(soup, "fuel_color")
                 if fuel_color_row:
                     fuel_color_cell = fuel_color_row.find_next_sibling("td")
                     if fuel_color_cell:
@@ -584,16 +677,16 @@ class KCarParser:
                 car.all_images = all_images
                 logger.debug(f"📸 Найдено {len(all_images)} изображений")
 
-                # 10. Ищем VIN номер
-                vin_row = soup.find("td", class_="ttable_tit", string="차대번호")
+                # 10. Ищем VIN номер с fallback селекторами
+                vin_row = self._find_with_fallbacks(soup, "vin")
                 if vin_row:
                     vin_cell = vin_row.find_next_sibling("td")
                     if vin_cell:
                         car.vin = vin_cell.get_text(strip=True)
                         logger.debug(f"🔐 Найден VIN: {car.vin}")
 
-                # 11. Ищем объем двигателя
-                displacement_row = soup.find("td", class_="table_tit", string="배기량")
+                # 11. Ищем объем двигателя с fallback селекторами
+                displacement_row = self._find_with_fallbacks(soup, "displacement")
                 if displacement_row:
                     displacement_cell = displacement_row.find_next_sibling("td")
                     if displacement_cell:
@@ -647,12 +740,34 @@ class KCarParser:
                 logger.warning(f"⚠️ Ошибка извлечения данных из HTML: {parse_error}")
 
             # Валидация: проверяем, были ли извлечены критические данные
-            has_critical_data = bool(car.car_name or car.main_image or car.start_price)
+            critical_fields = {
+                "car_name": car.car_name,
+                "main_image": car.main_image,
+                "start_price": car.start_price,
+                "car_number": car.car_number,
+            }
+
+            # Создаем статистику извлечения для всех важных полей
+            extraction_stats = {
+                "car_name": bool(car.car_name),
+                "car_number": bool(car.car_number),
+                "year": bool(car.year),
+                "mileage": bool(car.mileage),
+                "main_image": bool(car.main_image),
+                "start_price": bool(car.start_price),
+                "transmission": bool(car.transmission),
+                "fuel_type": bool(car.fuel_type),
+                "vin": bool(car.vin),
+                "displacement": bool(car.displacement),
+            }
+
+            missing_fields = [k for k, v in critical_fields.items() if not v]
+            has_critical_data = len(missing_fields) == 0
 
             if not has_critical_data:
                 logger.error(
                     f"❌ {self.name}: Критические данные не извлечены для {car_id}. "
-                    f"car_name={car.car_name}, main_image={car.main_image}, start_price={car.start_price}"
+                    f"Отсутствуют поля: {', '.join(missing_fields)}"
                 )
 
                 # Сохраняем HTML для отладки
@@ -678,9 +793,11 @@ class KCarParser:
             response = KCarDetailResponse(
                 car=car,
                 success=has_critical_data,  # Успех только если данные извлечены
-                message="Детальная информация получена успешно" if has_critical_data else "Не удалось извлечь критические данные из HTML. Возможно, автомобиль более недоступен или был удален с аукциона.",
+                message="Детальная информация получена успешно" if has_critical_data else f"Не удалось извлечь критические данные из HTML. Отсутствуют поля: {', '.join(missing_fields)}. Возможно, автомобиль более недоступен или был удален с аукциона.",
                 source_url=f"https://www.kcarauction.com/kcar/auction/weekly_detail/auction_detail_view.do?CAR_ID={car_id}&AUC_CD={auction_code}",
                 error_type=None if has_critical_data else "car_not_found",
+                missing_fields=missing_fields if not has_critical_data else None,
+                extraction_stats=extraction_stats,
             )
 
             if has_critical_data:

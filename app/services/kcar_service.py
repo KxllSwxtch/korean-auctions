@@ -49,6 +49,13 @@ class KCarService:
         self.username = "autobaza"
         self.password = "for1657721@"
 
+        # Отслеживание состояния сессии
+        from datetime import datetime
+        self.session_created_at = datetime.now()
+        self.session_last_used = datetime.now()
+        self.consecutive_failures = 0
+        self.session_max_age_minutes = 25  # Обновлять сессию каждые 25 минут
+
         logger.info("🔧 KCar Service инициализирован (только weekly аукционы)")
         self._initialize_session()
 
@@ -173,6 +180,68 @@ class KCarService:
         except Exception as e:
             logger.error(f"❌ Ошибка авторизации KCar: {e}")
             return False
+
+    def _is_session_expired(self) -> bool:
+        """
+        Проверка, истекла ли сессия по возрасту
+
+        Returns:
+            bool: True если сессия старше session_max_age_minutes
+        """
+        from datetime import datetime, timedelta
+
+        if not hasattr(self, 'session_created_at'):
+            return True
+
+        age = datetime.now() - self.session_created_at
+        max_age = timedelta(minutes=self.session_max_age_minutes)
+
+        if age > max_age:
+            logger.warning(
+                f"⏰ Сессия устарела: возраст {age.total_seconds() / 60:.1f} мин, "
+                f"максимум {self.session_max_age_minutes} мин"
+            )
+            return True
+
+        return False
+
+    def _refresh_session_if_needed(self) -> bool:
+        """
+        Обновление сессии при необходимости
+
+        Returns:
+            bool: True если сессия валидна (или успешно обновлена)
+        """
+        from datetime import datetime
+
+        # Проверка 1: Истекла ли сессия по возрасту
+        if self._is_session_expired():
+            logger.info("🔄 Обновляю сессию (истекло время)...")
+            if self._authenticate():
+                self.session_created_at = datetime.now()
+                self.consecutive_failures = 0
+                return True
+            else:
+                self.consecutive_failures += 1
+                logger.error(f"❌ Не удалось обновить сессию (попытка #{self.consecutive_failures})")
+                return False
+
+        # Проверка 2: Есть ли последовательные ошибки
+        if self.consecutive_failures >= 3:
+            logger.warning(
+                f"⚠️ Обнаружено {self.consecutive_failures} последовательных ошибок, "
+                f"принудительно обновляю сессию..."
+            )
+            if self._authenticate():
+                self.session_created_at = datetime.now()
+                self.consecutive_failures = 0
+                return True
+            else:
+                self.consecutive_failures += 1
+                return False
+
+        # Сессия валидна
+        return True
 
     def _send_bid_agreement(self) -> bool:
         """
@@ -1075,9 +1144,19 @@ class KCarService:
         try:
             logger.info(f"🔍 Получение детальной информации для автомобиля {car_id}")
 
+            # Проверяем и обновляем сессию при необходимости
+            if not self._refresh_session_if_needed():
+                return KCarDetailResponse(
+                    car=None,
+                    success=False,
+                    message="Ошибка обновления сессии",
+                    error_type="authentication_failed"
+                )
+
             if not self.authenticated:
                 logger.warning("⚠️ Не авторизован, пытаюсь авторизоваться...")
                 if not self._authenticate():
+                    self.consecutive_failures += 1
                     return KCarDetailResponse(
                         car=None,
                         success=False,
@@ -1148,13 +1227,21 @@ class KCarService:
                 )
 
                 if detail_response.success:
+                    # Успешный запрос - сбрасываем счетчик ошибок
+                    from datetime import datetime
+                    self.consecutive_failures = 0
+                    self.session_last_used = datetime.now()
+
                     logger.success(
                         f"✅ Детальная информация успешно извлечена для {car_id}"
                     )
                     return detail_response
                 else:
+                    # Парсинг не удался - увеличиваем счетчик
+                    self.consecutive_failures += 1
                     logger.error(
-                        f"❌ Ошибка парсинга детальной информации: {detail_response.message}"
+                        f"❌ Ошибка парсинга детальной информации: {detail_response.message} "
+                        f"(последовательных ошибок: {self.consecutive_failures})"
                     )
                     return detail_response
 
