@@ -12,6 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.core.logging import logger
+from loguru import logger as base_logger
 from app.models.lotte import (
     LotteCar,
     LotteResponse,
@@ -268,6 +269,10 @@ class LotteService(BaseAuctionService):
         self.cache[key] = (data, time.time())
         logger.info(f"Данные сохранены в кеш: {key}")
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_auction_date(self) -> Optional[LotteAuctionDate]:
         """Получение даты аукциона"""
         cache_key = "lotte_auction_date"
@@ -283,7 +288,14 @@ class LotteService(BaseAuctionService):
                 auth_success = await self._authenticate()
                 if not auth_success:
                     logger.error("Не удалось аутентифицироваться")
+                    self._record_failure(Exception("Authentication failed"))
                     return None
+
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for auction date")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
 
             session = self._init_session()
 
@@ -295,6 +307,7 @@ class LotteService(BaseAuctionService):
                 logger.error(
                     f"Не удалось получить главную страницу: {response.status_code}"
                 )
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
             logger.info(
@@ -307,9 +320,12 @@ class LotteService(BaseAuctionService):
             if auction_date:
                 self._save_to_cache(cache_key, auction_date)
                 logger.info(f"✅ Дата аукциона получена: {auction_date.auction_date}")
+                # Record success
+                self._record_success()
             else:
                 logger.warning("Не удалось найти дату аукциона на странице")
                 logger.info(f"Начало контента страницы: {response.text[:500]}...")
+                self._record_failure(Exception("Failed to parse auction date"))
 
             return auction_date
 
@@ -318,6 +334,8 @@ class LotteService(BaseAuctionService):
             import traceback
 
             logger.error(f"Traceback: {traceback.format_exc()}")
+            # Record failure
+            self._record_failure(e)
             return None
 
     async def get_cars(self, limit: int = 20, offset: int = 0) -> List[LotteCar]:
@@ -336,44 +354,18 @@ class LotteService(BaseAuctionService):
                     raise Exception("Не удалось аутентифицироваться")
 
             # Получаем страницу с автомобилями с пагинацией
+            # _fetch_cars_page already handles session refresh and retries
             cars_response = await self._fetch_cars_page(limit, offset)
 
-            if not cars_response or len(cars_response.text) < 1000:
-                logger.warning(f"Некорректный ответ от сервера (размер: {len(cars_response.text) if cars_response else 0} символов)")
-                # Пробуем переаутентифицироваться
-                logger.info("Пробуем переаутентифицироваться...")
-                self.authenticated = False
-                auth_success = await self._authenticate()
-                if auth_success:
-                    logger.info("Переаутентификация успешна, повторяем запрос...")
-                    cars_response = await self._fetch_cars_page(limit, offset)
-                    if not cars_response or len(cars_response.text) < 1000:
-                        logger.error(f"Все еще некорректный ответ после переаутентификации (размер: {len(cars_response.text) if cars_response else 0})")
-                        return []
-                else:
-                    logger.error("Не удалось переаутентифицироваться")
-                    return []
+            if not cars_response:
+                logger.error("Не удалось получить ответ от сервера")
+                return []
 
             # Парсим автомобили (пагинация уже применена на сервере)
             cars = self._parse_cars(cars_response.text)
             logger.info(
                 f"Найдено {len(cars)} автомобилей на странице (пагинация на сервере)"
             )
-            
-            # Если не нашли автомобили, проверяем, может быть сессия истекла
-            # Проверяем: нет машин И (маленький ответ ИЛИ есть признаки логина)
-            if len(cars) == 0 and (len(cars_response.text) < 1000 or 'login' in cars_response.text.lower()):
-                logger.warning(f"Похоже, сессия истекла (размер ответа: {len(cars_response.text)} символов)")
-                if len(cars_response.text) < 100:
-                    logger.debug(f"Содержимое короткого ответа: {cars_response.text}")
-                    
-                self.authenticated = False
-                auth_success = await self._authenticate()
-                if auth_success:
-                    cars_response = await self._fetch_cars_page(limit, offset)
-                    if cars_response:
-                        cars = self._parse_cars(cars_response.text)
-                        logger.info(f"После переаутентификации найдено {len(cars)} автомобилей")
 
             return cars
 
@@ -381,11 +373,21 @@ class LotteService(BaseAuctionService):
             logger.error(f"Ошибка при получении автомобилей: {e}")
             raise e
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def _get_car_details(
         self, car_basic_data: Dict[str, Any]
     ) -> Optional[LotteCar]:
         """Получение детальной информации об автомобиле"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car details")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             session = self._init_session()
 
             # Формируем URL для получения деталей
@@ -402,6 +404,7 @@ class LotteService(BaseAuctionService):
                 logger.warning(
                     f"Не удалось получить детали автомобиля {car_basic_data['id']}: {response.status_code}"
                 )
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
             # Парсим детальную информацию
@@ -409,11 +412,16 @@ class LotteService(BaseAuctionService):
 
             if detailed_car:
                 logger.info(f"Получены детали для автомобиля: {detailed_car.name}")
+                # Record success
+                self._record_success()
+            else:
+                self._record_failure(Exception("Failed to parse car details"))
 
             return detailed_car
 
         except Exception as e:
             logger.error(f"Ошибка при получении деталей автомобиля: {e}")
+            self._record_failure(e)
             return None
 
     async def get_cars_with_date_check(
@@ -622,9 +630,19 @@ class LotteService(BaseAuctionService):
             "authenticated": self.authenticated,
         }
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def _fetch_cars_page(self, limit: int = 20, offset: int = 0):
         """Получение страницы с автомобилями с пагинацией"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for cars page")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             session = self._init_session()
             cars_url = urljoin(self.base_url, self.urls["cars_list"])
 
@@ -687,32 +705,37 @@ class LotteService(BaseAuctionService):
             )
 
             logger.info(f"Статус ответа: {response.status_code}")
-            
+
             if response.status_code == 200:
                 logger.info(f"✅ Получен ответ: {len(response.text)} символов")
-                
+
                 # Проверяем размер ответа
                 if len(response.text) < 1000:
                     logger.warning(f"⚠️ Подозрительно маленький ответ: {len(response.text)} символов")
                     logger.debug(f"Полный ответ: {response.text}")
-                    
+
                 # Проверяем, содержит ли ответ таблицу с автомобилями
                 if 'tbl-t02' in response.text:
                     logger.info("✅ Найдена таблица с автомобилями")
+                    # Record success
+                    self._record_success()
                 else:
                     logger.warning("⚠️ Таблица с автомобилями не найдена в ответе")
                     if len(response.text) < 5000:
                         logger.debug(f"Начало ответа: {response.text[:1000]}")
-                        
+                    self._record_failure(Exception("No car table found in response"))
+
                 return response
             else:
                 logger.error(
                     f"Ошибка получения страницы автомобилей: {response.status_code}"
                 )
                 logger.error(f"Response text: {response.text[:500]}")
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
         except Exception as e:
             logger.error(f"Ошибка при запросе страницы автомобилей: {e}")
+            self._record_failure(e)
             return None
 
     def _parse_cars(self, html: str) -> List[LotteCar]:
@@ -778,6 +801,10 @@ class LotteService(BaseAuctionService):
             logger.error(f"Ошибка при получении общего количества автомобилей: {e}")
             return 0
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     def get_car_detail(
         self, search_mng_div_cd: str, search_mng_no: str, search_exhi_regi_seq: str
     ) -> LotteCarResponse:
@@ -793,6 +820,16 @@ class LotteService(BaseAuctionService):
             LotteCarResponse: Ответ с детальной информацией об автомобиле
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car detail")
+                self._record_failure(Exception("Session refresh failed"))
+                return LotteCarResponse(
+                    success=False,
+                    message="Session refresh failed",
+                    error="Session expired"
+                )
+
             # Параметры запроса для детальной страницы
             params = {
                 "searchMngDivCd": search_mng_div_cd,
@@ -832,6 +869,9 @@ class LotteService(BaseAuctionService):
             # Парсим детальную информацию
             car_detail = parse_lotte_car_detail(response.text, source_url)
 
+            # Record success
+            self._record_success()
+
             return LotteCarResponse(
                 success=True,
                 message="Детальная информация об автомобиле успешно получена",
@@ -840,11 +880,13 @@ class LotteService(BaseAuctionService):
 
         except requests.RequestException as e:
             logger.error(f"Ошибка HTTP запроса к Lotte car detail: {e}")
+            self._record_failure(e)
             return LotteCarResponse(
                 success=False, message=f"Ошибка сети: {str(e)}", error=str(e)
             )
         except Exception as e:
             logger.error(f"Ошибка получения детальной информации Lotte: {e}")
+            self._record_failure(e)
             return LotteCarResponse(
                 success=False, message=f"Внутренняя ошибка: {str(e)}", error=str(e)
             )
@@ -886,14 +928,18 @@ class LotteService(BaseAuctionService):
         except Exception as e:
             logger.error(f"Ошибка при восстановлении сессии: {e}")
     
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_car_history(self, search_mng_no: str, car_number: str = None) -> LotteCarHistoryResponse:
         """
         Получает историю автомобиля из Lotte
-        
+
         Args:
             search_mng_no: Номер управления (например, "KS202507090027")
             car_number: Номерной знак автомобиля (опционально)
-        
+
         Returns:
             LotteCarHistoryResponse: История автомобиля
         """
@@ -903,11 +949,22 @@ class LotteService(BaseAuctionService):
                 logger.info("Требуется аутентификация для получения истории автомобиля")
                 auth_success = await self._authenticate()
                 if not auth_success:
+                    self._record_failure(Exception("Authentication failed"))
                     return LotteCarHistoryResponse(
                         success=False,
                         message="Не удалось аутентифицироваться",
                         error="Authentication failed"
                     )
+
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car history")
+                self._record_failure(Exception("Session refresh failed"))
+                return LotteCarHistoryResponse(
+                    success=False,
+                    message="Session refresh failed",
+                    error="Session expired"
+                )
             
             session = self._init_session()
             
@@ -958,49 +1015,24 @@ class LotteService(BaseAuctionService):
             )
             
             logger.info(f"Статус ответа истории: {response.status_code}")
-            
+
             if response.status_code != 200:
                 logger.error(f"Ошибка получения истории: HTTP {response.status_code}")
                 logger.error(f"Response text: {response.text[:500]}")
-                
-                # Проверяем, не истекла ли сессия
-                if response.status_code == 302 or 'login' in response.text.lower():
-                    logger.warning("Похоже, сессия истекла, пробуем переаутентифицироваться")
-                    self.authenticated = False
-                    auth_success = await self._authenticate()
-                    if auth_success:
-                        # Повторяем запрос
-                        response = session.post(
-                            history_url,
-                            data=data,
-                            headers=headers,
-                            timeout=30,
-                            verify=False
-                        )
-                        if response.status_code != 200:
-                            return LotteCarHistoryResponse(
-                                success=False,
-                                message=f"Ошибка получения истории после переаутентификации: HTTP {response.status_code}",
-                                error=f"HTTP {response.status_code}"
-                            )
-                    else:
-                        return LotteCarHistoryResponse(
-                            success=False,
-                            message="Сессия истекла и не удалось переаутентифицироваться",
-                            error="Session expired"
-                        )
-                else:
-                    return LotteCarHistoryResponse(
-                        success=False,
-                        message=f"Ошибка получения истории: HTTP {response.status_code}",
-                        error=f"HTTP {response.status_code}"
-                    )
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
+                return LotteCarHistoryResponse(
+                    success=False,
+                    message=f"Ошибка получения истории: HTTP {response.status_code}",
+                    error=f"HTTP {response.status_code}"
+                )
             
             # Парсим историю
             car_history = parse_car_history(response.text)
-            
+
             if car_history:
                 logger.info(f"✅ История автомобиля успешно получена: {car_history.car_number}")
+                # Record success
+                self._record_success()
                 return LotteCarHistoryResponse(
                     success=True,
                     message="История автомобиля успешно получена",
@@ -1013,18 +1045,20 @@ class LotteService(BaseAuctionService):
                     logger.debug(f"Полный ответ: {response.text}")
                 else:
                     logger.debug(f"Начало ответа: {response.text[:1000]}")
-                    
+
+                self._record_failure(Exception("Parse error"))
                 return LotteCarHistoryResponse(
                     success=False,
                     message="Не удалось распарсить историю автомобиля",
                     error="Parse error"
                 )
-            
+
         except Exception as e:
             logger.error(f"Ошибка при получении истории автомобиля: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            
+
+            self._record_failure(e)
             return LotteCarHistoryResponse(
                 success=False,
                 message=f"Внутренняя ошибка: {str(e)}",
