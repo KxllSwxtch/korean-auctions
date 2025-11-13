@@ -2,6 +2,7 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from enum import Enum
 from datetime import datetime
+from app.models.base_auction import AuctionErrorType
 
 
 class FuelType(str, Enum):
@@ -135,6 +136,17 @@ class LotteResponse(BaseModel):
     timestamp: str = Field(..., description="Временная метка запроса")
     request_duration: Optional[float] = Field(
         None, description="Время выполнения запроса в секундах"
+    )
+
+    # Обработка ошибок
+    error_type: Optional[AuctionErrorType] = Field(
+        None, description="Тип ошибки для обработки на клиенте"
+    )
+    missing_fields: Optional[List[str]] = Field(
+        None, description="Список полей, которые не удалось извлечь при парсинге"
+    )
+    extraction_stats: Optional[Dict[str, bool]] = Field(
+        None, description="Статистика извлечения полей из HTML"
     )
 
 
@@ -300,6 +312,17 @@ class LotteCarResponse(BaseModel):
     data: Optional[LotteCarDetail] = None
     error: Optional[str] = None
 
+    # Обработка ошибок
+    error_type: Optional[AuctionErrorType] = Field(
+        None, description="Тип ошибки для обработки на клиенте"
+    )
+    missing_fields: Optional[List[str]] = Field(
+        None, description="Список полей, которые не удалось извлечь при парсинге"
+    )
+    extraction_stats: Optional[Dict[str, bool]] = Field(
+        None, description="Статистика извлечения полей из HTML"
+    )
+
 
 class LotteAccidentRecord(BaseModel):
     """Запись об отдельном страховом случае"""
@@ -368,11 +391,22 @@ class LotteCarHistory(BaseModel):
 
 class LotteCarHistoryResponse(BaseModel):
     """Ответ API для истории автомобиля"""
-    
+
     success: bool
     message: str
     data: Optional[LotteCarHistory] = None
     error: Optional[str] = None
+
+    # Обработка ошибок
+    error_type: Optional[AuctionErrorType] = Field(
+        None, description="Тип ошибки для обработки на клиенте"
+    )
+    missing_fields: Optional[List[str]] = Field(
+        None, description="Список полей, которые не удалось извлечь при парсинге"
+    )
+    extraction_stats: Optional[Dict[str, bool]] = Field(
+        None, description="Статистика извлечения полей из HTML"
+    )
 
 
 class LotteCountResponse(BaseModel):

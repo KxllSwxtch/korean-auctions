@@ -1,6 +1,6 @@
 import re
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from bs4 import BeautifulSoup, Tag
 
 from app.models.lotte import (
@@ -22,13 +22,91 @@ from app.models.lotte import (
     LotteOwnerChange,
 )
 from app.core.logging import logger
+from app.parsers.base_auction_parser import BaseAuctionParser
 
 
-class LotteParser:
-    """Парсер для извлечения данных с аукциона Lotte"""
+class LotteParser(BaseAuctionParser):
+    """
+    Парсер для извлечения данных с аукциона Lotte
+
+    Наследует от BaseAuctionParser для робастного парсинга с fallback селекторами
+    """
+
+    # Fallback селекторы для критических полей
+    # Формат: (tag, class, text_to_find_in_label)
+    SELECTOR_FALLBACKS: Dict[str, List[Tuple[str, str, Optional[str]]]] = {
+        "auction_date_block": [
+            ("p", "auction-date", None),
+            ("p", "auction_date", None),
+            ("div", "auction-date", None),
+            ("div", "date-block", None),
+        ],
+        "table": [
+            ("table", "tbl-t02", None),
+            ("table", "tbl_t02", None),
+            ("table", "table-t02", None),
+            ("table", "car-table", None),
+            ("table", "tbl-v02", None),
+        ],
+        "car_name": [
+            ("td", "car-name", None),
+            ("td", "carname", None),
+            ("span", "car-name", None),
+            ("div", "car-title", None),
+            ("h2", "tit", None),
+        ],
+        "price": [
+            ("span", "price", None),
+            ("span", "auction-price", None),
+            ("td", "price-cell", None),
+            ("div", "price-value", None),
+            ("p", "starting-price", None),
+        ],
+        "vehicle_info": [
+            ("div", "vehicle-info", None),
+            ("div", "vehicleinfo", None),
+            ("div", "car-info", None),
+        ],
+        "main_image": [
+            ("img", "main-img", None),
+            ("img", "vehicle-img", None),
+            ("img", "car-image", None),
+        ],
+        "detail_table": [
+            ("table", "tbl-v02", None),
+            ("table", "tbl_v02", None),
+            ("table", "detail-table", None),
+        ],
+    }
 
     def __init__(self):
+        super().__init__("Lotte Parser")
         self.logger = logger
+
+    def parse(self, html_content: str, parse_type: str = "cars_list", **kwargs) -> Any:
+        """
+        Main parse method - delegates to specific parsers based on parse_type
+
+        Args:
+            html_content: HTML content to parse
+            parse_type: Type of parsing ("cars_list", "car_detail", "auction_date")
+            **kwargs: Additional arguments for specific parsers
+
+        Returns:
+            Parsed data based on parse_type
+        """
+        if parse_type == "cars_list":
+            return self.parse_cars_list(html_content)
+        elif parse_type == "auction_date":
+            return self.parse_auction_date(html_content)
+        elif parse_type == "car_detail":
+            car_basic_data = kwargs.get("car_basic_data", {})
+            return self.parse_car_details(html_content, car_basic_data)
+        elif parse_type == "total_count":
+            return self.parse_total_count(html_content)
+        else:
+            self.logger.error(f"Unknown parse_type: {parse_type}")
+            return None
 
     def parse_auction_date(self, html_content: str) -> Optional[LotteAuctionDate]:
         """
@@ -42,11 +120,14 @@ class LotteParser:
         """
         try:
             soup = BeautifulSoup(html_content, "html.parser")
+            self._reset_stats()  # Сброс статистики для новой операции парсинга
 
-            # Ищем блок с датой аукциона
-            auction_date_block = soup.find("p", class_="auction-date")
+            # Ищем блок с датой аукциона используя fallback селекторы
+            auction_date_block = self._find_with_fallbacks(soup, "auction_date_block")
+            self._track_extraction("auction_date_block", auction_date_block)
+
             if not auction_date_block:
-                self.logger.warning("Не найден блок с датой аукциона class='auction-date'")
+                self.logger.warning("Не найден блок с датой аукциона")
                 # Пробуем альтернативные способы поиска
                 auction_date_block = soup.find("p", {"class": lambda x: x and "auction" in str(x).lower()})
                 if not auction_date_block:
@@ -112,22 +193,22 @@ class LotteParser:
         """
         try:
             soup = BeautifulSoup(html_content, "html.parser")
+            self._reset_stats()  # Сброс статистики перед парсингом
             cars = []
 
-            # Ищем таблицу с автомобилями
-            table = soup.find("table", class_="tbl-t02")
+            # Ищем таблицу с автомобилями используя fallback селекторы
+            table = self._find_with_fallbacks(soup, "table")
+            self._track_extraction("table", table)
+
             if not table:
-                self.logger.warning("Не найдена таблица с автомобилями class='tbl-t02'")
-                # Пробуем альтернативные селекторы
-                table = soup.find("table", {"class": lambda x: x and "tbl" in x})
-                if not table:
-                    self.logger.error("Не найдена ни одна таблица с автомобилями")
-                    # Логируем доступные таблицы для отладки
-                    all_tables = soup.find_all("table")
-                    self.logger.debug(f"Найдено таблиц на странице: {len(all_tables)}")
-                    for idx, tbl in enumerate(all_tables[:3]):
-                        self.logger.debug(f"Таблица {idx}: class={tbl.get('class', 'no-class')}")
-                    return cars
+                self.logger.error("Не найдена таблица с автомобилями")
+                self._save_debug_html(html_content, "unknown", "table_not_found")
+                # Логируем доступные таблицы для отладки
+                all_tables = soup.find_all("table")
+                self.logger.debug(f"Найдено таблиц на странице: {len(all_tables)}")
+                for idx, tbl in enumerate(all_tables[:3]):
+                    self.logger.debug(f"Таблица {idx}: class={tbl.get('class', 'no-class')}")
+                return cars
 
             tbody = table.find("tbody")
             if not tbody:
@@ -450,8 +531,19 @@ class LotteParser:
         details = {}
 
         try:
-            # Ищем таблицу с детальной информацией
-            detail_tables = soup.find_all("table", class_="tbl-v02")
+            # Ищем таблицу с детальной информацией используя fallback селекторы
+            detail_table = self._find_with_fallbacks(soup, "detail_table")
+            self._track_extraction("detail_table", detail_table)
+
+            if not detail_table:
+                self.logger.warning("Не найдена таблица с детальной информацией")
+                return details
+
+            detail_tables = [detail_table]
+            # Ищем все таблицы с детальной информацией на странице
+            additional_tables = soup.find_all("table", class_="tbl-v02")
+            if additional_tables:
+                detail_tables.extend(additional_tables)
 
             for table in detail_tables:
                 rows = table.find_all("tr")

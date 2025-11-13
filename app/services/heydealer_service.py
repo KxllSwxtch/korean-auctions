@@ -19,14 +19,24 @@ from app.models.heydealer import (
 )
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
+from app.services.base_auction_service import BaseAuctionService
+from loguru import logger as base_logger
+from tenacity import retry, stop_after_attempt, wait_exponential
+from app.models.base_auction import AuctionErrorType
 
 logger = logging.getLogger(__name__)
 
 
-class HeyDealerService:
-    """Сервис для работы с API HeyDealer"""
+class HeyDealerService(BaseAuctionService):
+    """
+    Сервис для работы с API HeyDealer
+
+    Наследует от BaseAuctionService для робастного управления сессиями
+    и отслеживания здоровья запросов
+    """
 
     def __init__(self):
+        super().__init__("HeyDealer Service")
         self.base_url = "https://api.heydealer.com"
         self.session_manager = SessionManager()
         self.service_name = "heydealer"
@@ -35,6 +45,37 @@ class HeyDealerService:
         self._session_id = None
         self._csrf_token = None
         self._cookies = {}
+
+        # Session management is now handled by BaseAuctionService
+        # - self.session (from base class)
+        # - self.authenticated (from base class)
+        # - self.session_created_at (from base class)
+        # - self.consecutive_failures (from base class)
+
+    def _authenticate(self) -> bool:
+        """
+        Synchronous wrapper for authentication (required by BaseAuctionService).
+        Delegates to heydealer_auth service for actual authentication.
+
+        Returns:
+            True if authentication successful, False otherwise
+        """
+        try:
+            # Use the heydealer_auth service which handles async authentication
+            valid_session = heydealer_auth.get_valid_session()
+            if valid_session:
+                self._cookies = valid_session.get("cookies", {})
+                self._session_id = valid_session.get("session_id")
+                self._csrf_token = valid_session.get("csrf_token")
+                self.authenticated = True
+                base_logger.info(f"✅ {self.name}: Authentication successful")
+                return True
+            else:
+                base_logger.error(f"❌ {self.name}: Authentication failed")
+                return False
+        except Exception as e:
+            base_logger.error(f"❌ {self.name}: Authentication error: {e}")
+            return False
 
     def _get_headers(self) -> Dict[str, str]:
         """Получает заголовки для запросов"""
@@ -196,6 +237,10 @@ class HeyDealerService:
             logger.error(f"Ошибка при обеспечении аутентификации: {e}")
             return False
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_user_info(self, user_hash_id: str) -> Optional[Dict[str, Any]]:
         """
         Получает информацию о пользователе
@@ -207,6 +252,12 @@ class HeyDealerService:
             Информация о пользователе или None при ошибке
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for user info")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             response = await self.http_client.get(
                 url=f"{self.base_url}/v2/dealers/web/users/{user_hash_id}/",
                 headers=self._get_headers(),
@@ -214,17 +265,28 @@ class HeyDealerService:
             )
 
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                # Record success
+                self._record_success()
+                return data
             else:
                 logger.error(
                     f"Ошибка получения информации о пользователе: {response.status_code}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
         except Exception as e:
             logger.error(f"Исключение при получении информации о пользователе: {e}")
+            # Record failure
+            self._record_failure(e)
             return None
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_cars(self, filters: HeyDealerFilters) -> Optional[HeyDealerCarList]:
         """
         Получает список автомобилей с фильтрами
@@ -236,6 +298,12 @@ class HeyDealerService:
             Список автомобилей или None при ошибке
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             # Подготавливаем параметры запроса
             params = {
                 "page": str(filters.page),
@@ -258,15 +326,23 @@ class HeyDealerService:
 
                 # Парсим данные через HeyDealerParser
                 parsed_data = self.parser.parse_car_list(raw_data)
+
+                # Record success
+                self._record_success()
+
                 return parsed_data
             else:
                 logger.error(
                     f"Ошибка получения списка автомобилей: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
         except Exception as e:
             logger.error(f"Исключение при получении списка автомобилей: {e}")
+            # Record failure
+            self._record_failure(e)
             return None
 
     async def fetch_cars_with_auth(
@@ -300,6 +376,10 @@ class HeyDealerService:
             logger.error(f"Исключение при получении автомобилей с аутентификацией: {e}")
             return None
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_car_detail(self, car_hash_id: str) -> Optional[HeyDealerDetailedCar]:
         """
         Получает детальную информацию об автомобиле
@@ -311,6 +391,12 @@ class HeyDealerService:
             Детальная информация об автомобиле или None при ошибке
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car detail")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             response = await self.http_client.get(
                 url=f"{self.base_url}/v2/dealers/web/cars/{car_hash_id}/",
                 headers=self._get_headers(),
@@ -325,6 +411,8 @@ class HeyDealerService:
                     logger.info(
                         f"Получена детальная информация об автомобиле {car_hash_id}"
                     )
+                    # Record success
+                    self._record_success()
                     return detailed_car
                 else:
                     logger.error(
@@ -377,9 +465,19 @@ class HeyDealerService:
 
     # === МЕТОДЫ ДЛЯ ФИЛЬТРОВ ===
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_brands(self) -> List[Dict[str, Any]]:
         """Получает список марок автомобилей"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for brands")
+                self._record_failure(Exception("Session refresh failed"))
+                return []
+
             logger.info("🔍 Начинаю получение списка марок...")
 
             # Используем автоматический сервис авторизации
@@ -392,6 +490,7 @@ class HeyDealerService:
                 logger.error(
                     "❌ Не удалось получить валидную сессию для получения марок"
                 )
+                self._record_failure(Exception("Invalid session"))
                 return []
 
             # Параметры для запроса
@@ -418,20 +517,36 @@ class HeyDealerService:
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"✅ Получено {len(data)} марок")
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"❌ Ошибка получения марок: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return []
 
         except Exception as e:
             logger.error(f"💥 Исключение при получении марок: {e}")
+            # Record failure
+            self._record_failure(e)
             return []
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_brand_models(self, brand_hash_id: str) -> Dict[str, Any]:
         """Получает список моделей для указанной марки"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for brand models")
+                self._record_failure(Exception("Session refresh failed"))
+                return {}
+
             # Используем автоматический сервис авторизации
             cookies, headers = heydealer_auth.get_valid_session()
 
@@ -439,6 +554,7 @@ class HeyDealerService:
                 logger.error(
                     "Не удалось получить валидную сессию для получения моделей"
                 )
+                self._record_failure(Exception("Invalid session"))
                 return {}
 
             # Параметры для запроса
@@ -459,20 +575,36 @@ class HeyDealerService:
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"Получены модели для марки {brand_hash_id}")
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"Ошибка получения моделей: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return {}
 
         except Exception as e:
             logger.error(f"Исключение при получении моделей: {e}")
+            # Record failure
+            self._record_failure(e)
             return {}
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_model_generations(self, model_group_hash_id: str) -> Dict[str, Any]:
         """Получает список поколений для указанной модели"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for model generations")
+                self._record_failure(Exception("Session refresh failed"))
+                return {}
+
             # Используем автоматический сервис авторизации
             cookies, headers = heydealer_auth.get_valid_session()
 
@@ -480,6 +612,7 @@ class HeyDealerService:
                 logger.error(
                     "Не удалось получить валидную сессию для получения поколений"
                 )
+                self._record_failure(Exception("Invalid session"))
                 return {}
 
             # Параметры для запроса
@@ -501,20 +634,36 @@ class HeyDealerService:
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"Получены поколения для модели {model_group_hash_id}")
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"Ошибка получения поколений: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return {}
 
         except Exception as e:
             logger.error(f"Исключение при получении поколений: {e}")
+            # Record failure
+            self._record_failure(e)
             return {}
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_model_configurations(self, model_hash_id: str) -> Dict[str, Any]:
         """Получает список конфигураций для указанного поколения"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for model configurations")
+                self._record_failure(Exception("Session refresh failed"))
+                return {}
+
             # Используем автоматический сервис авторизации
             cookies, headers = heydealer_auth.get_valid_session()
 
@@ -522,6 +671,7 @@ class HeyDealerService:
                 logger.error(
                     "Не удалось получить валидную сессию для получения конфигураций"
                 )
+                self._record_failure(Exception("Invalid session"))
                 return {}
 
             # Параметры для запроса
@@ -543,20 +693,36 @@ class HeyDealerService:
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"Получены конфигурации для поколения {model_hash_id}")
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"Ошибка получения конфигураций: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return {}
 
         except Exception as e:
             logger.error(f"Исключение при получении конфигураций: {e}")
+            # Record failure
+            self._record_failure(e)
             return {}
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_filtered_cars(self, filters: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Получает отфильтрованный список автомобилей"""
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for filtered cars")
+                self._record_failure(Exception("Session refresh failed"))
+                return []
+
             logger.info("🔍 Начинаю получение отфильтрованных автомобилей...")
 
             # Используем автоматический сервис авторизации
@@ -569,6 +735,7 @@ class HeyDealerService:
                 logger.error(
                     "❌ Не удалось получить валидную сессию для фильтрации автомобилей"
                 )
+                self._record_failure(Exception("Invalid session"))
                 return []
 
             # Подготавливаем параметры запроса
@@ -617,19 +784,29 @@ class HeyDealerService:
             if response.status_code == 200:
                 data = response.json()
                 logger.info(f"✅ Получено {len(data)} отфильтрованных автомобилей")
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"❌ Ошибка получения отфильтрованных автомобилей: {response.status_code} - {response.text[:200]}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return []
 
         except Exception as e:
             logger.error(
                 f"💥 Исключение при получении отфильтрованных автомобилей: {e}"
             )
+            # Record failure
+            self._record_failure(e)
             return []
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_cars_with_auto_auth(
         self, filters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
@@ -643,10 +820,17 @@ class HeyDealerService:
             Список автомобилей или пустой список в случае ошибки
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for auto auth cars")
+                self._record_failure(Exception("Session refresh failed"))
+                return []
+
             # Получаем заголовки и куки от сервиса аутентификации
             headers, cookies = heydealer_auth.get_headers_and_cookies()
             if not headers or not cookies:
                 logger.error("❌ Не удалось получить данные аутентификации")
+                self._record_failure(Exception("Authentication failed"))
                 return []
 
             # Подготавливаем параметры запроса
@@ -689,17 +873,27 @@ class HeyDealerService:
                 data = response.json()
                 # Нормализуем данные для возврата
                 normalized_cars = self.parser.normalize_cars(data.get("cars", []))
+                # Record success
+                self._record_success()
                 return normalized_cars
             else:
                 logger.error(
                     f"❌ Ошибка при получении автомобилей: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return []
 
         except Exception as e:
             logger.error(f"❌ Исключение при получении автомобилей: {e}")
+            # Record failure
+            self._record_failure(e)
             return []
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10)
+    )
     async def get_accident_repairs(self, car_hash_id: str) -> Optional[Dict[str, Any]]:
         """
         Получает технический лист (accident repairs) для автомобиля
@@ -711,12 +905,19 @@ class HeyDealerService:
             Данные технического листа или None в случае ошибки
         """
         try:
+            # Check and refresh session if needed
+            if not self._refresh_session_if_needed():
+                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for accident repairs")
+                self._record_failure(Exception("Session refresh failed"))
+                return None
+
             # Получаем заголовки и куки от сервиса аутентификации
             headers, cookies = heydealer_auth.get_headers_and_cookies()
             if not headers or not cookies:
                 logger.error(
                     "❌ Не удалось получить данные аутентификации для технического листа"
                 )
+                self._record_failure(Exception("Authentication failed"))
                 return None
 
             # Подготавливаем параметры запроса
@@ -737,17 +938,23 @@ class HeyDealerService:
                 logger.info(
                     f"✅ Успешно получен технический лист для автомобиля {car_hash_id}"
                 )
+                # Record success
+                self._record_success()
                 return data
             else:
                 logger.error(
                     f"❌ Ошибка при получении технического листа для {car_hash_id}: {response.status_code} - {response.text}"
                 )
+                # Record failure
+                self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
         except Exception as e:
             logger.error(
                 f"❌ Исключение при получении технического листа для {car_hash_id}: {e}"
             )
+            # Record failure
+            self._record_failure(e)
             return None
 
     async def get_car_with_accident_repairs(

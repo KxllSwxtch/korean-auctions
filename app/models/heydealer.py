@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 from datetime import datetime
+from app.models.base_auction import AuctionErrorType
 
 
 class LoginRequest(BaseModel):
@@ -161,6 +162,17 @@ class HeyDealerResponse(BaseModel):
     message: str = Field(..., description="Сообщение о результате")
     total_count: int = Field(default=0, description="Общее количество автомобилей")
     current_page: int = Field(default=1, description="Текущая страница")
+
+    # Обработка ошибок
+    error_type: Optional[AuctionErrorType] = Field(
+        None, description="Тип ошибки для обработки на клиенте"
+    )
+    missing_fields: Optional[List[str]] = Field(
+        None, description="Список полей, которые не удалось извлечь при парсинге"
+    )
+    extraction_stats: Optional[Dict[str, bool]] = Field(
+        None, description="Статистика извлечения полей из API"
+    )
 
 
 class ColorInfo(BaseModel):

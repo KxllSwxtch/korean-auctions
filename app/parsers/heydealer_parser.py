@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import logging
 from app.models.heydealer import (
     HeyDealerCar,
@@ -24,17 +24,167 @@ from app.models.heydealer import (
     AuctionHistory,
     UserHistory,
 )
+from app.parsers.base_auction_parser import BaseAuctionParser
+from loguru import logger as base_logger
 
 logger = logging.getLogger(__name__)
 
 
-class HeyDealerParser:
-    """Парсер для обработки данных HeyDealer API"""
+class HeyDealerParser(BaseAuctionParser):
+    """
+    Парсер для обработки данных HeyDealer API
 
-    @staticmethod
-    def parse_car_list(raw_data: List[Dict[str, Any]]) -> Optional[HeyDealerCarList]:
+    Наследует от BaseAuctionParser для робастного парсинга с fallback путями
+    и статистикой извлечения данных
+    """
+
+    # Fallback пути для JSON полей
+    # Формат: (путь_к_полю_1, путь_к_полю_2, ...)
+    # Каждый путь представлен как список ключей для навигации по JSON
+    SELECTOR_FALLBACKS: Dict[str, List[Tuple[str, ...]]] = {
+        "hash_id": [
+            ("hash_id",),
+            ("id",),
+            ("car_id",),
+        ],
+        "full_name": [
+            ("detail", "full_name"),
+            ("detail", "name"),
+            ("car_detail", "full_name"),
+            ("car_name",),
+        ],
+        "model_part_name": [
+            ("detail", "model_part_name"),
+            ("detail", "model"),
+            ("model",),
+        ],
+        "year": [
+            ("detail", "year"),
+            ("year",),
+            ("car_year",),
+        ],
+        "mileage": [
+            ("detail", "mileage"),
+            ("mileage",),
+            ("car_mileage",),
+        ],
+        "main_image_url": [
+            ("detail", "main_image_url"),
+            ("detail", "image_url"),
+            ("image_url",),
+            ("main_image",),
+        ],
+        "image_urls": [
+            ("detail", "image_urls"),
+            ("detail", "images"),
+            ("images",),
+        ],
+        "car_number": [
+            ("detail", "car_number"),
+            ("car_number",),
+            ("license_plate",),
+        ],
+        "desired_price": [
+            ("auction", "desired_price"),
+            ("desired_price",),
+            ("price",),
+            ("starting_price",),
+        ],
+        "auction_type": [
+            ("auction", "auction_type"),
+            ("auction_type",),
+            ("type",),
+        ],
+    }
+
+    def __init__(self):
+        super().__init__("HeyDealer Parser")
+        # Keep standard logger for compatibility
+        self.std_logger = logger
+
+    def _find_with_fallbacks_json(
+        self,
+        data: Dict[str, Any],
+        field_name: str,
+        log_success: bool = True
+    ) -> Optional[Any]:
         """
-        Парсит список автомобилей из ответа HeyDealer API
+        JSON-specific version of _find_with_fallbacks.
+        Tries multiple JSON paths until one succeeds.
+
+        Args:
+            data: JSON dictionary to search
+            field_name: Name of field to find (must exist in SELECTOR_FALLBACKS)
+            log_success: Whether to log successful finds
+
+        Returns:
+            Found value or None
+        """
+        fallback_paths = self.SELECTOR_FALLBACKS.get(field_name, [])
+
+        if not fallback_paths:
+            base_logger.warning(
+                f"⚠️ {self.name}: No fallback paths configured for field '{field_name}'"
+            )
+            return None
+
+        for idx, path in enumerate(fallback_paths):
+            try:
+                # Navigate through the JSON path
+                current = data
+                for key in path:
+                    if isinstance(current, dict):
+                        current = current.get(key)
+                        if current is None:
+                            break
+                    else:
+                        current = None
+                        break
+
+                if current is not None:
+                    if log_success:
+                        base_logger.debug(
+                            f"✅ {self.name}: Found '{field_name}' using fallback #{idx+1}: "
+                            f"{'.'.join(path)}"
+                        )
+                    return current
+
+            except Exception as e:
+                base_logger.debug(
+                    f"⚠️ {self.name}: Fallback #{idx+1} failed for '{field_name}': {e}"
+                )
+                continue
+
+        base_logger.warning(
+            f"⚠️ {self.name}: Failed to find '{field_name}' with all {len(fallback_paths)} fallback(s)"
+        )
+        return None
+
+    def parse(self, raw_data: Any, parse_type: str = "car_list", **kwargs) -> Any:
+        """
+        Main parse method - delegates to specific parsers based on parse_type
+
+        Args:
+            raw_data: Raw JSON data to parse
+            parse_type: Type of parsing ("car_list", "single_car", "detailed_car")
+            **kwargs: Additional arguments for specific parsers
+
+        Returns:
+            Parsed data based on parse_type
+        """
+        if parse_type == "car_list":
+            return self.parse_car_list(raw_data)
+        elif parse_type == "single_car":
+            return self._parse_single_car_tracked(raw_data)
+        elif parse_type == "detailed_car":
+            return self.parse_detailed_car(raw_data)
+        else:
+            base_logger.error(f"Unknown parse_type: {parse_type}")
+            return None
+
+    def parse_car_list(self, raw_data: List[Dict[str, Any]]) -> Optional[HeyDealerCarList]:
+        """
+        Парсит список автомобилей из ответа HeyDealer API с отслеживанием
 
         Args:
             raw_data: Сырые данные от API
@@ -50,7 +200,7 @@ class HeyDealerParser:
             cars = []
             for car_data in raw_data:
                 try:
-                    car = HeyDealerParser._parse_single_car(car_data)
+                    car = self._parse_single_car(car_data)
                     if car:
                         cars.append(car)
                 except Exception as e:
@@ -69,9 +219,8 @@ class HeyDealerParser:
             logger.error(f"Ошибка парсинга списка автомобилей: {e}")
             return None
 
-    @staticmethod
     def parse_car_list_with_pagination(
-        raw_data: List[Dict[str, Any]], total_count: int, page: int, page_size: int
+        self, raw_data: List[Dict[str, Any]], total_count: int, page: int, page_size: int
     ) -> Optional[HeyDealerCarList]:
         """
         Парсит список автомобилей с информацией о пагинации из HTTP заголовков
@@ -93,7 +242,7 @@ class HeyDealerParser:
             cars = []
             for car_data in raw_data:
                 try:
-                    car = HeyDealerParser._parse_single_car(car_data)
+                    car = self._parse_single_car(car_data)
                     if car:
                         cars.append(car)
                 except Exception as e:
@@ -116,10 +265,9 @@ class HeyDealerParser:
             logger.error(f"Ошибка парсинга списка автомобилей с пагинацией: {e}")
             return None
 
-    @staticmethod
-    def _parse_single_car(car_data: Dict[str, Any]) -> Optional[HeyDealerCar]:
+    def _parse_single_car(self, car_data: Dict[str, Any]) -> Optional[HeyDealerCar]:
         """
-        Парсит данные одного автомобиля
+        Парсит данные одного автомобиля с отслеживанием извлечения полей
 
         Args:
             car_data: Данные автомобиля от API
@@ -128,8 +276,31 @@ class HeyDealerParser:
             Обработанные данные автомобиля или None при ошибке
         """
         try:
+            # Reset stats for new car parsing
+            self._reset_stats()
+
+            # Extract and track hash_id
+            hash_id = self._find_with_fallbacks_json(car_data, "hash_id")
+            self._track_extraction("hash_id", hash_id)
+
             # Парсим детальную информацию
             detail_data = car_data.get("detail", {})
+
+            # Extract and track critical fields
+            full_name = self._find_with_fallbacks_json(car_data, "full_name")
+            self._track_extraction("full_name", full_name)
+
+            model_part_name = self._find_with_fallbacks_json(car_data, "model_part_name")
+            self._track_extraction("model_part_name", model_part_name)
+
+            year = self._find_with_fallbacks_json(car_data, "year")
+            self._track_extraction("year", year)
+
+            mileage = self._find_with_fallbacks_json(car_data, "mileage")
+            self._track_extraction("mileage", mileage)
+
+            main_image_url = self._find_with_fallbacks_json(car_data, "main_image_url")
+            self._track_extraction("main_image_url", main_image_url)
 
             # Парсим interior_info если есть
             interior_info = None
@@ -209,14 +380,35 @@ class HeyDealerParser:
                 )
             )
 
-            return HeyDealerCar(
-                hash_id=car_data.get("hash_id", ""),
+            # Validate critical fields
+            missing_fields, has_all_critical = self._get_missing_fields([
+                "hash_id", "full_name", "year", "mileage"
+            ])
+
+            if not has_all_critical:
+                base_logger.warning(
+                    f"⚠️ {self.name}: Missing critical fields for car {hash_id or 'unknown'}: {missing_fields}"
+                )
+
+            # Build car object using tracked values
+            car = HeyDealerCar(
+                hash_id=hash_id or car_data.get("hash_id", ""),
                 status=car_data.get("status", ""),
                 status_display=car_data.get("status_display", ""),
                 detail=detail,
                 auction=auction,
                 etc=etc,
             )
+
+            # Log extraction summary
+            if not has_all_critical:
+                summary = self._get_extraction_summary()
+                base_logger.debug(
+                    f"📊 {self.name}: Extraction rate {summary['success_rate']:.1f}% "
+                    f"({summary['extracted_count']}/{summary['total_fields']} fields)"
+                )
+
+            return car
 
         except Exception as e:
             logger.error(f"Ошибка парсинга автомобиля: {e}")
@@ -376,10 +568,9 @@ class HeyDealerParser:
             "message": f"Успешно получено {len(normalized_cars)} автомобилей",
         }
 
-    @staticmethod
-    def parse_detailed_car(raw_data: Dict[str, Any]) -> Optional[HeyDealerDetailedCar]:
+    def parse_detailed_car(self, raw_data: Dict[str, Any]) -> Optional[HeyDealerDetailedCar]:
         """
-        Парсит детальную информацию об автомобиле
+        Парсит детальную информацию об автомобиле с отслеживанием извлечения полей
 
         Args:
             raw_data: Сырые данные от API
@@ -392,8 +583,31 @@ class HeyDealerParser:
                 logger.warning("Получены пустые данные автомобиля")
                 return None
 
+            # Reset stats for new detailed car parsing
+            self._reset_stats()
+
+            # Extract and track hash_id
+            hash_id = raw_data.get("hash_id", "")
+            self._track_extraction("hash_id", hash_id)
+
             # Парсим детальную информацию
             detail_data = raw_data.get("detail", {})
+
+            # Extract and track critical fields from detail
+            full_name = detail_data.get("full_name", "")
+            self._track_extraction("full_name", full_name)
+
+            year = detail_data.get("year", 0)
+            self._track_extraction("year", year)
+
+            mileage = detail_data.get("mileage", 0)
+            self._track_extraction("mileage", mileage)
+
+            main_image_url = detail_data.get("main_image_url", "")
+            self._track_extraction("main_image_url", main_image_url)
+
+            model_part_name = detail_data.get("model_part_name", "")
+            self._track_extraction("model_part_name", model_part_name)
 
             # Парсим группы изображений
             image_groups = []
@@ -664,8 +878,26 @@ class HeyDealerParser:
                 revision=etc_data.get("revision", 0),
             )
 
+            # Validate critical fields
+            missing_fields, has_all_critical = self._get_missing_fields([
+                "hash_id", "full_name", "year", "mileage"
+            ])
+
+            if not has_all_critical:
+                base_logger.warning(
+                    f"⚠️ {self.name}: Missing critical fields for detailed car {hash_id or 'unknown'}: {missing_fields}"
+                )
+
+            # Log extraction summary
+            if not has_all_critical:
+                summary = self._get_extraction_summary()
+                base_logger.debug(
+                    f"📊 {self.name}: Detailed car extraction rate {summary['success_rate']:.1f}% "
+                    f"({summary['extracted_count']}/{summary['total_fields']} fields)"
+                )
+
             return HeyDealerDetailedCar(
-                hash_id=raw_data.get("hash_id", ""),
+                hash_id=hash_id,
                 status=raw_data.get("status", ""),
                 status_display=raw_data.get("status_display", ""),
                 detail=detail,
@@ -677,8 +909,7 @@ class HeyDealerParser:
             logger.error(f"Ошибка парсинга детальной информации автомобиля: {e}")
             return None
 
-    @staticmethod
-    def parse_detailed_car_simple(raw_data: Dict[str, Any]) -> Optional[HeyDealerCar]:
+    def parse_detailed_car_simple(self, raw_data: Dict[str, Any]) -> Optional[HeyDealerCar]:
         """
         Упрощенный парсинг детальной информации об автомобиле (используя базовую модель)
 
@@ -694,17 +925,16 @@ class HeyDealerParser:
                 return None
 
             # Адаптируем детальные данные к формату списка
-            adapted_data = HeyDealerParser._adapt_detail_to_list_format(raw_data)
+            adapted_data = self._adapt_detail_to_list_format(raw_data)
 
             # Используем существующий метод для парсинга
-            return HeyDealerParser._parse_single_car(adapted_data)
+            return self._parse_single_car(adapted_data)
 
         except Exception as e:
             logger.error(f"Ошибка упрощенного парсинга автомобиля: {e}")
             return None
 
-    @staticmethod
-    def _adapt_detail_to_list_format(detail_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _adapt_detail_to_list_format(self, detail_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Адаптирует данные детальной страницы к формату списка автомобилей
 
@@ -1067,7 +1297,7 @@ class HeyDealerParser:
 
             for car_data in cars_list:
                 # Используем существующий метод _parse_single_car
-                parsed_car = HeyDealerParser._parse_single_car(car_data)
+                parsed_car = self._parse_single_car(car_data)
                 if parsed_car:
                     parsed_cars.append(parsed_car)
 

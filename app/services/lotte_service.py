@@ -29,16 +29,16 @@ from app.parsers.lotte_parser import (
     parse_car_history,
 )
 from app.core.session_manager import SessionManager
+from app.services.base_auction_service import BaseAuctionService
 
 
-class LotteService:
-    """Сервис для работы с аукционом Lotte"""
+class LotteService(BaseAuctionService):
+    """Сервис для работы с аукционом Lotte с робастным управлением сессиями"""
 
     def __init__(self):
+        super().__init__("Lotte Service")
         self.base_url = "https://www.lotteautoauction.net"
         self.parser = LotteParser()
-        self.session = None
-        self.authenticated = False
         self.cache = {}
         self.cache_ttl = 300  # 5 минут
         self.session_manager = SessionManager()  # Для сохранения сессий
