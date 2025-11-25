@@ -49,7 +49,7 @@ class SKAuctionService:
         "generations": "/sys/comnCombo/selectMultiComboVehi.do",
         "fuel_types": "/sys/comnCd/selectCodeList.do",
         "years": "/sys/comnCd/selectCodeList.do",
-        "login": "/sys/login/memberLogin.do",
+        "login": "/main/actionLogin.do",
         "car_detail": "/pc/No",  # HTML page
     }
 
@@ -186,25 +186,51 @@ class SKAuctionService:
                 "returnUrl": "",
             }
 
+            # Add Referer header for better request authenticity
+            headers = {
+                "Referer": f"{self.BASE_URL}/pc/main/selectLoginFormView.do",
+            }
+
             response = self._session.post(
                 login_url,
                 data=data,
+                headers=headers,
                 timeout=30,
                 allow_redirects=True,
             )
 
+            # Successful login redirects to main page (302 -> 200)
+            # Check if we're on the main page after redirect
             if response.status_code == 200:
-                # Check if login was successful by looking for SESSION cookie
-                session_cookie = self._session.cookies.get("SESSION")
-                if session_cookie:
+                # Check for any session cookie (JSESSIONID or SESSION)
+                cookies = self._session.cookies.get_dict()
+                has_session_cookie = any(
+                    k.upper() in ["SESSION", "JSESSIONID"] for k in cookies.keys()
+                )
+
+                if has_session_cookie:
                     self._authenticated = True
                     self._last_auth_check = datetime.now()
-                    logger.info(f"✅ SK Auction authentication successful, SESSION: {session_cookie[:20]}...")
+                    logger.info("✅ SK Auction authentication successful (session cookie found)")
                     return True
-                else:
-                    logger.warning("⚠️ No SESSION cookie received after login")
+
+                # Even without explicit session cookie, check if logged in by content
+                if "로그아웃" in response.text or "actionLogout.do" in response.text:
+                    self._authenticated = True
+                    self._last_auth_check = datetime.now()
+                    logger.info("✅ SK Auction authentication successful (verified by page content)")
+                    return True
+
+                # Check if redirected to main page
+                if "/main/selectMainView.do" in response.url:
+                    self._authenticated = True
+                    self._last_auth_check = datetime.now()
+                    logger.info("✅ SK Auction authentication successful (redirected to main)")
+                    return True
+
+                logger.warning("⚠️ Login response OK but no session indicator found")
             else:
-                logger.error(f"❌ SK Auction login failed with status {response.status_code}")
+                logger.error(f"❌ SK Auction login failed: status={response.status_code}, url={response.url}")
 
             self._authenticated = False
             return False
