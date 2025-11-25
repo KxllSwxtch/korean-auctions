@@ -17,6 +17,7 @@ from app.routes import (
     ssancar,
     bikemart,
     encar,
+    sk_auction,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -78,6 +79,9 @@ app.include_router(bikemart.router, prefix="/api/v1/bikemart", tags=["Bikemart"]
 
 # Encar routes - Encar catalog
 app.include_router(encar.router, prefix="/api/v1/encar", tags=["Encar"])
+
+# SK Auction routes - SK Car Rental Auction
+app.include_router(sk_auction.router, tags=["SK Auction"])
 
 
 @app.get("/")
