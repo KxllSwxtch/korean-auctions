@@ -177,18 +177,29 @@ class SKAuctionService:
         try:
             logger.info(f"🔐 Authenticating with SK Auction as {self._username}")
 
+            # First, visit the login page to get initial SESSION cookie
+            login_page_url = f"{self.BASE_URL}/pc/main/selectLoginFormView.do"
+            try:
+                self._session.get(login_page_url, timeout=30)
+            except Exception as e:
+                logger.warning(f"Failed to fetch login page: {e}")
+
             login_url = f"{self.BASE_URL}{self.ENDPOINTS['login']}"
 
             # Login form data
+            # membDiv: hidden field indicating auction member type
+            # encPwd: password field (form copies userPwd to encPwd before submit)
             data = {
+                "membDiv": "AUCT",
                 "userId": self._username,
-                "userPw": self._password,
-                "returnUrl": "",
+                "encPwd": self._password,
             }
 
-            # Add Referer header for better request authenticity
+            # Add headers for proper form submission
             headers = {
-                "Referer": f"{self.BASE_URL}/pc/main/selectLoginFormView.do",
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": self.BASE_URL,
+                "Referer": login_page_url,
             }
 
             response = self._session.post(
