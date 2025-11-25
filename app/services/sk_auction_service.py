@@ -566,8 +566,7 @@ class SKAuctionService:
             url = f"{self.BASE_URL}{self.ENDPOINTS['models']}"
             data = {
                 "searchFlag": "mdl",
-                "search_mkrCd": brand_code,
-                "search_doimCd": region_code,
+                "searchCode": brand_code,
             }
 
             logger.info(f"📥 Fetching SK Auction models for brand {brand_code}")
@@ -622,8 +621,7 @@ class SKAuctionService:
             url = f"{self.BASE_URL}{self.ENDPOINTS['generations']}"
             data = {
                 "searchFlag": "carGrp",
-                "search_mdlCd": model_code,
-                "search_doimCd": region_code,
+                "searchCode": model_code,
             }
 
             logger.info(f"📥 Fetching SK Auction generations for model {model_code}")
