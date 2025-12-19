@@ -18,6 +18,7 @@ from app.routes import (
     bikemart,
     encar,
     sk_auction,
+    pan_auto,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -82,6 +83,9 @@ app.include_router(encar.router, prefix="/api/v1/encar", tags=["Encar"])
 
 # SK Auction routes - SK Car Rental Auction
 app.include_router(sk_auction.router, tags=["SK Auction"])
+
+# Pan-Auto routes - HP and Russian customs costs data
+app.include_router(pan_auto.router, prefix="/api/v1/pan-auto", tags=["Pan-Auto"])
 
 
 @app.get("/")
