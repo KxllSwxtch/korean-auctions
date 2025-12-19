@@ -6,6 +6,7 @@ Provides HP (horsepower) and Russian customs costs data
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
+import re
 
 from app.core.http_client import AsyncHttpClient
 from app.models.pan_auto import (
@@ -205,6 +206,27 @@ class PanAutoService:
                     KRW=costs_data.get("KRW"),
                 )
 
+        # Extract year value from Russian format like "Июнь, 2020 год"
+        year = None
+        year_raw = data.get("year")
+        if year_raw is not None:
+            try:
+                year = int(year_raw)
+            except (ValueError, TypeError):
+                # Extract 4-digit year from Russian date string
+                year_match = re.search(r'\b(19|20)\d{2}\b', str(year_raw))
+                if year_match:
+                    year = int(year_match.group())
+
+        # Fallback to formYear if year couldn't be parsed
+        if year is None:
+            form_year = data.get("formYear")
+            if form_year is not None:
+                try:
+                    year = int(form_year)
+                except (ValueError, TypeError):
+                    pass
+
         return PanAutoCarDetail(
             id=str(car_id),
             hp=hp,
@@ -212,7 +234,7 @@ class PanAutoService:
             costs=costs,
             title=data.get("title"),
             price=data.get("price"),
-            year=data.get("year"),
+            year=year,
             mileage=data.get("mileage"),
             displacement=data.get("displacement"),
         )
