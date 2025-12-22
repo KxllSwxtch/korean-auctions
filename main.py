@@ -8,10 +8,7 @@ from app.routes import (
     lotte,
     lotte_filters,
     kcar,
-    plc_auction,
     enhanced_lotte,
-    glovis_detail,
-    glovis_windows_auth,
     heydealer,
     heydealer_filters,
     ssancar,
@@ -56,16 +53,9 @@ app.include_router(
 app.include_router(lotte.router, tags=["Lotte Auction"])
 app.include_router(lotte_filters.router, tags=["Lotte Filters"])
 app.include_router(kcar.router, tags=["KCar Auction"])
-app.include_router(plc_auction.router, tags=["Glovis Auction"])
 
 # Новые улучшенные маршруты
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
-app.include_router(
-    glovis_detail.router, prefix="/api/v1/glovis", tags=["Glovis Car Details"]
-)
-app.include_router(
-    glovis_windows_auth.router, prefix="/api/v1", tags=["Glovis Windows Auth"]
-)
 app.include_router(heydealer.router, prefix="/api/v1", tags=["HeyDealer Auction"])
 app.include_router(
     heydealer_filters.router,
