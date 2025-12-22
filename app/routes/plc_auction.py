@@ -397,3 +397,96 @@ async def get_ssancar_car_detail(
     # For PLC auction, we need to find or construct the proper slug
     # For now, we'll use car_no as slug (may need adjustment based on actual mapping)
     return await get_car_detail(car_no, service)
+
+
+@router.post("/cookies/update")
+async def update_plc_cookies(
+    cookies: Dict[str, str] = Body(..., description="Dictionary of cookie name-value pairs"),
+    service: PLCAuctionService = Depends(get_plc_auction_service)
+) -> Dict[str, Any]:
+    """
+    Update PLC Auction cookies manually to bypass Cloudflare protection.
+
+    Use this endpoint when you see 403 errors in the logs.
+
+    **How to get fresh cookies:**
+    1. Open https://plc.auction in your browser
+    2. Pass any Cloudflare challenge
+    3. Open DevTools (F12) > Application > Cookies
+    4. Copy the values for: cf_clearance, XSRF-TOKEN, __session
+
+    **Example request body:**
+    ```json
+    {
+        "cf_clearance": "your_cf_clearance_value",
+        "XSRF-TOKEN": "your_xsrf_token_value",
+        "__session": "your_session_value"
+    }
+    ```
+    """
+    try:
+        plc_logger.info("📥 Received cookie update request")
+
+        # Validate required cookies
+        required_cookies = ["cf_clearance"]
+        missing = [c for c in required_cookies if c not in cookies]
+        if missing:
+            plc_logger.warning(f"⚠️ Missing required cookies: {missing}")
+
+        # Update cookies in service
+        service.update_cookies_manual(cookies)
+
+        plc_logger.info(f"✅ Successfully updated {len(cookies)} cookies")
+
+        return {
+            "success": True,
+            "message": f"Updated {len(cookies)} cookies successfully",
+            "updated_cookies": list(cookies.keys()),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        plc_logger.error(f"❌ Error updating cookies: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update cookies: {str(e)}"
+        )
+
+
+@router.get("/cookies/status")
+async def get_cookie_status(
+    service: PLCAuctionService = Depends(get_plc_auction_service)
+) -> Dict[str, Any]:
+    """
+    Check the current status of PLC Auction cookies.
+
+    Returns information about which essential cookies are present
+    and their approximate validity.
+    """
+    try:
+        is_valid = service._validate_cookies()
+
+        # Get list of current cookie names (not values for security)
+        cookie_names = list(service.session.cookies.keys())
+
+        essential = ["cf_clearance", "XSRF-TOKEN", "__session"]
+        present = [c for c in essential if c in cookie_names]
+        missing = [c for c in essential if c not in cookie_names]
+
+        return {
+            "success": True,
+            "cookies_valid": is_valid,
+            "essential_cookies_present": present,
+            "essential_cookies_missing": missing,
+            "total_cookies": len(cookie_names),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        plc_logger.error(f"❌ Error checking cookie status: {e}")
+        return {
+            "success": False,
+            "cookies_valid": False,
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }

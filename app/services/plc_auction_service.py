@@ -663,6 +663,44 @@ class PLCAuctionService:
             # Fallback to default cookies
             self._apply_default_cookies()
     
+    def update_cookies_manual(self, cookies: Dict[str, str]) -> None:
+        """
+        Manually update cookies from a dictionary.
+
+        This method is called from the /cookies/update API endpoint
+        when fresh cookies are provided by the user.
+
+        Args:
+            cookies: Dictionary of cookie name-value pairs
+        """
+        logger.info(f"🍪 Manually updating {len(cookies)} cookies")
+
+        # Clear existing cookies to avoid conflicts
+        self.session.cookies.clear()
+
+        # Update the cookies dict
+        self.cookies.update(cookies)
+
+        # Apply cookies to session with proper domain
+        for name, value in cookies.items():
+            if value:  # Skip empty values
+                self.session.cookies.set(name, value, domain=".plc.auction", path="/")
+                logger.debug(f"  ✅ Set cookie: {name}")
+
+        # Also apply default cookies that weren't provided
+        for name, value in self.DEFAULT_COOKIES.items():
+            if name not in cookies and value:
+                self.session.cookies.set(name, value, domain=".plc.auction", path="/")
+
+        # Save to session file
+        self._save_cookies()
+
+        # Reinitialize browser session with new cookies
+        logger.info("🔄 Reinitializing browser session with new cookies")
+        self._initialize_browser_session()
+
+        logger.info("✅ Cookies updated successfully")
+
     def update_cookies_from_curl(self, curl_file_path: str = "Glovis/cars.py") -> bool:
         """
         Update cookies from a curl file (like Glovis/cars.py)

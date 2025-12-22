@@ -122,11 +122,11 @@ class SKAuctionCar(BaseModel):
 
     # Auction info
     exhi_no: str = Field(..., description="Exhibition number (e.g., 0001)")
-    auction_date: str = Field(..., description="Auction date (YYYYMMDD)")
-    lane_div: str = Field(..., description="Lane division (A, B, etc.)")
+    auction_date: Optional[str] = Field(default="", description="Auction date (YYYYMMDD)")
+    lane_div: Optional[str] = Field(default="", description="Lane division (A, B, etc.)")
     exhi_div_cd: str = Field(default="01", description="Exhibition division code")
     exhi_stat_cd: str = Field(default="02", description="Exhibition status code")
-    exhi_regi_stat_cd: str = Field(default="02", description="Exhibition registration status code")
+    exhi_regi_stat_cd: Optional[str] = Field(default="02", description="Exhibition registration status code")
 
     # Vehicle info from codes
     mdl_cd: str = Field(..., description="Model code")
@@ -168,7 +168,7 @@ class SKAuctionCar(BaseModel):
     # Status names
     exhi_div_name: str = Field(default="", description="Exhibition division name")
     exhi_stat_name: str = Field(default="", description="Exhibition status name")
-    exhi_regi_stat_name: str = Field(default="", description="Exhibition registration status name")
+    exhi_regi_stat_name: Optional[str] = Field(default="", description="Exhibition registration status name")
 
     # Image URL (constructed from mng_no)
     main_image_url: Optional[str] = Field(None, description="Main thumbnail image URL")
