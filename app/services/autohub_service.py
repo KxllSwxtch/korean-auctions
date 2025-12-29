@@ -2351,51 +2351,57 @@ class AutohubService:
     def _get_current_auction_date(self) -> str:
         """
         Get current auction date based on Wednesday auction schedule
-        
+
         Autohub auctions are held every Wednesday.
         Cars are viewable from Tuesday 6PM Seoul time.
 
         Returns:
             str: Auction date in YYYY-MM-DD format (always a Wednesday)
         """
-        from datetime import datetime, timedelta
-        import pytz
+        # TEMPORARY OVERRIDE: Auction moved to Tuesday Dec 30, 2025 (one day only)
+        # TODO: Remove this after December 30, 2025 and uncomment the code below
+        logger.info("📅 TEMPORARY OVERRIDE: Using Tuesday Dec 30, 2025 auction date")
+        return "2025-12-30"
 
-        # Get current Seoul time
-        seoul_tz = pytz.timezone("Asia/Seoul")
-        seoul_time = datetime.now(seoul_tz)
-        
-        # Get current day of week (0=Monday, 6=Sunday)
-        current_weekday = seoul_time.weekday()
-        current_hour = seoul_time.hour
-        
-        logger.info(
-            f"📅 Current Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S')} (weekday: {current_weekday})"
-        )
-        
-        # Calculate next auction date based on current day and time
-        if current_weekday == 2:  # Wednesday
-            # If it's Wednesday, use today's date
-            auction_date = seoul_time
-        elif current_weekday == 1 and current_hour >= 18:  # Tuesday after 6PM
-            # If it's Tuesday after 6PM, use next day (Wednesday)
-            auction_date = seoul_time + timedelta(days=1)
-        elif current_weekday < 2:  # Monday or Tuesday before 6PM
-            # Find this week's Wednesday
-            days_until_wednesday = 2 - current_weekday
-            auction_date = seoul_time + timedelta(days=days_until_wednesday)
-        else:  # Thursday, Friday, Saturday, Sunday
-            # Find next week's Wednesday
-            days_until_wednesday = (7 - current_weekday) + 2
-            auction_date = seoul_time + timedelta(days=days_until_wednesday)
-        
-        auction_date_str = auction_date.strftime("%Y-%m-%d")
-        
-        logger.info(
-            f"📅 Using auction date: {auction_date_str} (Wednesday) - viewable from Tuesday 6PM"
-        )
-
-        return auction_date_str
+        # Original code (uncomment after Dec 30, 2025):
+        # from datetime import datetime, timedelta
+        # import pytz
+        #
+        # # Get current Seoul time
+        # seoul_tz = pytz.timezone("Asia/Seoul")
+        # seoul_time = datetime.now(seoul_tz)
+        #
+        # # Get current day of week (0=Monday, 6=Sunday)
+        # current_weekday = seoul_time.weekday()
+        # current_hour = seoul_time.hour
+        #
+        # logger.info(
+        #     f"📅 Current Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S')} (weekday: {current_weekday})"
+        # )
+        #
+        # # Calculate next auction date based on current day and time
+        # if current_weekday == 2:  # Wednesday
+        #     # If it's Wednesday, use today's date
+        #     auction_date = seoul_time
+        # elif current_weekday == 1 and current_hour >= 18:  # Tuesday after 6PM
+        #     # If it's Tuesday after 6PM, use next day (Wednesday)
+        #     auction_date = seoul_time + timedelta(days=1)
+        # elif current_weekday < 2:  # Monday or Tuesday before 6PM
+        #     # Find this week's Wednesday
+        #     days_until_wednesday = 2 - current_weekday
+        #     auction_date = seoul_time + timedelta(days=days_until_wednesday)
+        # else:  # Thursday, Friday, Saturday, Sunday
+        #     # Find next week's Wednesday
+        #     days_until_wednesday = (7 - current_weekday) + 2
+        #     auction_date = seoul_time + timedelta(days=days_until_wednesday)
+        #
+        # auction_date_str = auction_date.strftime("%Y-%m-%d")
+        #
+        # logger.info(
+        #     f"📅 Using auction date: {auction_date_str} (Wednesday) - viewable from Tuesday 6PM"
+        # )
+        #
+        # return auction_date_str
 
     def _validate_auction_code(self, code: str) -> bool:
         """
