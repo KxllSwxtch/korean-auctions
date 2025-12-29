@@ -314,6 +314,15 @@ class LotteService(BaseAuctionService):
                 f"✅ Получена главная страница, размер: {len(response.text)} символов"
             )
 
+            # Проверяем на ошибку аутентификации
+            if len(response.text) < 1000:
+                if "fail_notAuctLogin" in response.text or "notAuctLogin" in response.text:
+                    logger.error("🔐 Сессия истекла при получении даты аукциона! Требуется повторная аутентификация")
+                    self.authenticated = False
+                    self.session = None
+                    self._record_failure(Exception("Session expired - fail_notAuctLogin"))
+                    raise Exception("Session expired - need re-authentication")
+
             # Парсим дату
             auction_date = self.parser.parse_auction_date(response.text)
 
@@ -713,6 +722,16 @@ class LotteService(BaseAuctionService):
                 if len(response.text) < 1000:
                     logger.warning(f"⚠️ Подозрительно маленький ответ: {len(response.text)} символов")
                     logger.debug(f"Полный ответ: {response.text}")
+
+                    # Проверяем на ошибку аутентификации
+                    if "fail_notAuctLogin" in response.text or "notAuctLogin" in response.text:
+                        logger.error("🔐 Сессия истекла! Требуется повторная аутентификация")
+                        # Сбрасываем аутентификацию для следующей попытки
+                        self.authenticated = False
+                        self.session = None
+                        self._record_failure(Exception("Session expired - fail_notAuctLogin"))
+                        # Raise exception to trigger retry with re-authentication
+                        raise Exception("Session expired - need re-authentication")
 
                 # Проверяем, содержит ли ответ таблицу с автомобилями
                 if 'tbl-t02' in response.text:
