@@ -23,9 +23,9 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
     if not use_proxy:
         return None
 
-    # Default proxy configuration (Oxylabs)
+    # Default proxy configuration (Oxylabs - Korean targeting)
     proxy_host = os.getenv("PROXY_HOST", "pr.oxylabs.io:7777")
-    proxy_auth = os.getenv("PROXY_AUTH", "customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2")
+    proxy_auth = os.getenv("PROXY_AUTH", "customer-arman_zVdZn-cc-kr:~eEYPgwRzO+I2")
 
     if proxy_host and proxy_auth:
         proxy_url = f"http://{proxy_auth}@{proxy_host}"
