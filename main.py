@@ -14,6 +14,7 @@ from app.routes import (
     ssancar,
     bikemart,
     encar,
+    encar_truck,
     sk_auction,
     pan_auto,
 )
@@ -70,6 +71,9 @@ app.include_router(bikemart.router, prefix="/api/v1/bikemart", tags=["Bikemart"]
 
 # Encar routes - Encar catalog
 app.include_router(encar.router, prefix="/api/v1/encar", tags=["Encar"])
+
+# Encar Truck routes - Trucks and special equipment
+app.include_router(encar_truck.router, prefix="/api/v1/encar", tags=["Encar Trucks"])
 
 # SK Auction routes - SK Car Rental Auction
 app.include_router(sk_auction.router, tags=["SK Auction"])
