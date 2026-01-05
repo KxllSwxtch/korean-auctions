@@ -53,18 +53,22 @@ class EncarCache:
 
 
 class EncarService:
-    """Service for interacting with Encar API via proxy"""
+    """Service for interacting with Encar API via Oxylabs proxy"""
 
-    PROXY_BASE_URL = "https://encar-proxy-main.onrender.com/api"
+    # Direct Encar API URL
+    ENCAR_API_URL = "http://api.encar.com"
 
     def __init__(self):
-        self.http_client = AsyncHttpClient(timeout=60)  # Increased timeout for external proxy
+        # Use proxy-enabled HTTP client for direct Encar access
+        self.http_client = AsyncHttpClient(timeout=60, use_proxy=True)
         self.cache = EncarCache(ttl_seconds=300)  # 5 minute cache
 
         self.headers = {
             "accept": "application/json, text/plain, */*",
-            "accept-language": "en,ru;q=0.9,en-CA;q=0.8,ko;q=0.5",
+            "accept-language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
             "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+            "origin": "http://www.encar.com",
+            "referer": "http://www.encar.com/",
         }
 
     async def get_catalog(
@@ -106,16 +110,16 @@ class EncarService:
                 "count": "true" if count else "false",
             }
 
-            # Build URL
-            url = f"{self.PROXY_BASE_URL}/catalog?{urlencode(params)}"
+            # Build URL - Direct Encar API with Oxylabs proxy
+            url = f"{self.ENCAR_API_URL}/search/car/list/premium?{urlencode(params)}"
 
-            logger.info(f"Fetching Encar catalog: {url}")
+            logger.info(f"Fetching Encar catalog via Oxylabs proxy: {url}")
 
-            # Fetch data from proxy
+            # Fetch data from Encar API through Oxylabs proxy
             response = await self.http_client.get(url, headers=self.headers)
 
             if not response or response.status_code != 200:
-                error_msg = f"Failed response from Encar proxy: status {response.status_code if response else 'None'}"
+                error_msg = f"Failed response from Encar API: status {response.status_code if response else 'None'}"
                 logger.error(error_msg)
                 return EncarCatalogResponse(
                     Count=0,

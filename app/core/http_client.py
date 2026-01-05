@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any, Union
 from urllib.parse import urljoin
 
 from app.core.logging import get_logger
+from app.core.proxy_config import get_proxy_config
 
 logger = get_logger("async_http_client")
 
@@ -37,11 +38,19 @@ class AsyncHttpResponse:
 
 
 class AsyncHttpClient:
-    """Асинхронный HTTP клиент"""
+    """Асинхронный HTTP клиент с поддержкой прокси"""
 
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 30, use_proxy: bool = False):
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: Optional[aiohttp.ClientSession] = None
+        self.use_proxy = use_proxy
+        self._proxy_url: Optional[str] = None
+
+        if use_proxy:
+            proxy_config = get_proxy_config()
+            if proxy_config:
+                self._proxy_url = proxy_config.get("http")
+                logger.info(f"🔐 AsyncHttpClient using proxy: {self._proxy_url.split('@')[-1] if self._proxy_url else 'None'}")
 
     @property
     async def session(self) -> aiohttp.ClientSession:
@@ -54,6 +63,11 @@ class AsyncHttpClient:
                 connector=connector, timeout=self.timeout
             )
         return self._session
+
+    @property
+    def proxy(self) -> Optional[str]:
+        """Получить URL прокси для запросов"""
+        return self._proxy_url if self.use_proxy else None
 
     async def get(
         self,
@@ -84,7 +98,8 @@ class AsyncHttpClient:
         )
 
         try:
-            logger.debug(f"🌐 GET запрос к {url}")
+            proxy_info = f" via proxy" if self.proxy else ""
+            logger.debug(f"🌐 GET запрос к {url}{proxy_info}")
 
             async with session.get(
                 url,
@@ -92,6 +107,7 @@ class AsyncHttpClient:
                 cookies=cookies,
                 params=params,
                 timeout=request_timeout,
+                proxy=self.proxy,
             ) as response:
                 text = await response.text()
 
@@ -143,7 +159,8 @@ class AsyncHttpClient:
         )
 
         try:
-            logger.debug(f"🌐 POST запрос к {url}")
+            proxy_info = f" via proxy" if self.proxy else ""
+            logger.debug(f"🌐 POST запрос к {url}{proxy_info}")
 
             async with session.post(
                 url,
@@ -152,6 +169,7 @@ class AsyncHttpClient:
                 headers=headers,
                 cookies=cookies,
                 timeout=request_timeout,
+                proxy=self.proxy,
             ) as response:
                 text = await response.text()
 

@@ -12,8 +12,8 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
 
     Environment variables:
     - USE_PROXY: Set to 'true' to enable proxy
-    - PROXY_HOST: Proxy host and port (e.g., 'geo.iproyal.com:12321')
-    - PROXY_AUTH: Proxy authentication (e.g., 'username:password_country-us')
+    - PROXY_HOST: Proxy host and port (default: 'pr.oxylabs.io:7777')
+    - PROXY_AUTH: Proxy authentication (default: Oxylabs credentials)
 
     Returns:
         Dict with 'http' and 'https' proxy URLs, or None if proxy is disabled
@@ -23,9 +23,9 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
     if not use_proxy:
         return None
 
-    # Default proxy configuration
-    proxy_host = os.getenv("PROXY_HOST", "geo.iproyal.com:12321")
-    proxy_auth = os.getenv("PROXY_AUTH", "oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us")
+    # Default proxy configuration (Oxylabs)
+    proxy_host = os.getenv("PROXY_HOST", "pr.oxylabs.io:7777")
+    proxy_auth = os.getenv("PROXY_AUTH", "customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2")
 
     if proxy_host and proxy_auth:
         proxy_url = f"http://{proxy_auth}@{proxy_host}"

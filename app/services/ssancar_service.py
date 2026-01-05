@@ -111,12 +111,12 @@ class SSANCARService:
         # Try to get proxy configuration from environment first
         proxy_config = get_proxy_config()
         if not proxy_config:
-            # Fallback to hardcoded proxy for SSANCAR to avoid blocking
+            # Fallback to hardcoded Oxylabs proxy for SSANCAR to avoid blocking
             proxy_config = {
-                "http": "http://oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us@geo.iproyal.com:12321",
-                "https": "http://oGKgjVaIooWADkOR:O8J73QYtjYWgQj4m_country-us@geo.iproyal.com:12321"
+                "http": "http://customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2@pr.oxylabs.io:7777",
+                "https": "http://customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2@pr.oxylabs.io:7777"
             }
-            logger.info(f"🔐 Using default proxy configuration for SSANCAR")
+            logger.info(f"🔐 Using default Oxylabs proxy configuration for SSANCAR")
         else:
             logger.info(f"🔐 Using environment proxy configuration for SSANCAR")
         
