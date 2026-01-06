@@ -2,7 +2,6 @@ from typing import Optional, Dict, Any, List
 import logging
 import asyncio
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
 
 from app.core.http_client import AsyncHttpClient
 from app.models.encar import (
@@ -103,15 +102,13 @@ class EncarService:
                     logger.info("Returning cached catalog response")
                     return cached_response
 
-            # Build query parameters
-            params = {
-                "q": q,
-                "sr": sr,
-                "count": "true" if count else "false",
-            }
+            # Build URL - DO NOT encode ANY characters
+            # Encar API expects raw UTF-8 Korean characters AND spaces in the query
+            # The HTTP client will handle the proper encoding
+            count_str = "true" if count else "false"
 
             # Build URL - Direct Encar API with Oxylabs proxy
-            url = f"{self.ENCAR_API_URL}/search/car/list/premium?{urlencode(params)}"
+            url = f"{self.ENCAR_API_URL}/search/car/list/premium?q={q}&sr={sr}&count={count_str}"
 
             logger.info(f"Fetching Encar catalog via Oxylabs proxy: {url}")
 

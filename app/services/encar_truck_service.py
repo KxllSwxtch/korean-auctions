@@ -6,7 +6,6 @@ Handles truck catalog and vehicle details
 from typing import Optional, Dict, Any
 import logging
 from datetime import datetime, timedelta
-from urllib.parse import urlencode
 
 from app.core.http_client import AsyncHttpClient
 from app.models.encar_truck import (
@@ -113,15 +112,14 @@ class EncarTruckService:
                     logger.info("Returning cached truck catalog response")
                     return cached_response
 
-            # Build query parameters
-            params = {
-                "q": q,
-                "sr": sr,
-                "count": "true" if count else "false",
-            }
+            # Build URL - DO NOT encode ANY characters
+            # Encar API expects raw UTF-8 Korean characters AND spaces in the query
+            # The HTTP client will handle the proper encoding
+            count_str = "true" if count else "false"
 
-            # Build URL
-            url = f"{self.TRUCK_LIST_URL}?{urlencode(params)}"
+            url = f"{self.TRUCK_LIST_URL}?q={q}&sr={sr}&count={count_str}"
+            print(f"DEBUG: Constructed Encar URL: {url}", flush=True)
+            logger.info(f"Constructed Encar URL: {url}")
 
             logger.info(f"Fetching Encar truck catalog via Oxylabs proxy: {url}")
 
@@ -129,13 +127,21 @@ class EncarTruckService:
             response = await self.http_client.get(url, headers=self.headers)
 
             if not response or response.status_code != 200:
-                error_msg = f"Failed response from Encar Truck API: status {response.status_code if response else 'None'}"
-                logger.error(error_msg)
+                status_code = response.status_code if response else None
+                # Log response body for debugging encoding issues
+                response_body = ""
+                try:
+                    response_body = response.text[:500] if response else ""
+                except Exception:
+                    pass
+                error_msg = f"Failed response from Encar Truck API: status {status_code}"
+                logger.error(f"{error_msg}. Response body: {response_body}")
                 return EncarTruckListResponse(
                     Count=0,
                     SearchResults=[],
                     success=False,
-                    message=error_msg
+                    message=error_msg,
+                    status_code=status_code
                 )
 
             # Parse JSON response

@@ -50,6 +50,7 @@ class EncarTruckListResponse(BaseModel):
     SearchResults: List[EncarTruck] = Field(default_factory=list, description="List of trucks")
     success: bool = True
     message: Optional[str] = None
+    status_code: Optional[int] = Field(None, description="HTTP status code from external API (for error handling)")
 
 
 # ============================================

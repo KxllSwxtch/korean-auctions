@@ -95,8 +95,15 @@ async def get_trucks(
 
         if not response.success:
             logger.error(f"Failed to fetch Encar trucks: {response.message}")
+            # Use the actual status code from external API if available (e.g., 400 for bad request)
+            # Otherwise default to 500 for unknown errors
+            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+            if response.status_code == 400:
+                http_status = status.HTTP_400_BAD_REQUEST
+            elif response.status_code == 404:
+                http_status = status.HTTP_404_NOT_FOUND
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=http_status,
                 detail=response.message or "Failed to fetch Encar trucks"
             )
 
