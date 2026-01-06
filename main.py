@@ -17,6 +17,7 @@ from app.routes import (
     encar_truck,
     sk_auction,
     pan_auto,
+    green_equipment,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -80,6 +81,9 @@ app.include_router(sk_auction.router, tags=["SK Auction"])
 
 # Pan-Auto routes - HP and Russian customs costs data
 app.include_router(pan_auto.router, prefix="/api/v1/pan-auto", tags=["Pan-Auto"])
+
+# Green Heavy Equipment routes - 4396200.com heavy equipment marketplace
+app.include_router(green_equipment.router, prefix="/api/v1/green", tags=["Green Heavy Equipment"])
 
 
 @app.get("/")
