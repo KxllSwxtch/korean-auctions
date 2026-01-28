@@ -28,6 +28,9 @@ class FuelType(str, Enum):
     DIESEL = "경유"
     ELECTRIC = "전기"
     HYBRID = "하이브리드"
+    LPG = "LPG"
+    CNG = "CNG"
+    HYDROGEN = "수소"
 
 
 class CarCondition(str, Enum):

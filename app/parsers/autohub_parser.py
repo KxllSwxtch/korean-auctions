@@ -886,6 +886,12 @@ class AutohubParser:
             return FuelType.ELECTRIC
         elif "하이브리드" in text:
             return FuelType.HYBRID
+        elif "LPG" in text.upper():
+            return FuelType.LPG
+        elif "CNG" in text.upper():
+            return FuelType.CNG
+        elif "수소" in text:
+            return FuelType.HYDROGEN
         return FuelType.GASOLINE
 
     def _parse_status(self, text: str) -> CarStatus:
@@ -1169,6 +1175,12 @@ def parse_car_info(soup: BeautifulSoup) -> AutohubCar:
             car_info["fuel_type"] = FuelType.ELECTRIC
         elif "하이브리드" in fuel:
             car_info["fuel_type"] = FuelType.HYBRID
+        elif "LPG" in fuel.upper():
+            car_info["fuel_type"] = FuelType.LPG
+        elif "CNG" in fuel.upper():
+            car_info["fuel_type"] = FuelType.CNG
+        elif "수소" in fuel:
+            car_info["fuel_type"] = FuelType.HYDROGEN
         else:
             car_info["fuel_type"] = FuelType.GASOLINE  # default
 
