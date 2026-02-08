@@ -1,5 +1,7 @@
 import requests
 import json
+import time
+import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any, List
 from urllib3.exceptions import InsecureRequestWarning
@@ -50,11 +52,15 @@ class KCarService:
         self.password = "for1657721@"
 
         # Отслеживание состояния сессии
-        from datetime import datetime
         self.session_created_at = datetime.now()
         self.session_last_used = datetime.now()
         self.consecutive_failures = 0
         self.session_max_age_minutes = 25  # Обновлять сессию каждые 25 минут
+
+        # In-memory cache with tiered TTL
+        self._cache: Dict[str, tuple] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
 
         logger.info("🔧 KCar Service инициализирован (только weekly аукционы)")
         self._initialize_session()
@@ -89,6 +95,41 @@ class KCarService:
 
         except Exception as e:
             logger.error(f"❌ Ошибка инициализации сессии: {e}")
+
+    def _get_from_cache(self, key: str, ttl: int = 300) -> Optional[Any]:
+        """Get data from in-memory cache with per-key TTL."""
+        if key in self._cache:
+            data, timestamp = self._cache[key]
+            if time.time() - timestamp < ttl:
+                self._cache_hits += 1
+                return data
+            del self._cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _save_to_cache(self, key: str, data: Any) -> None:
+        """Save data to in-memory cache."""
+        self._cache[key] = (data, time.time())
+
+    def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
+        """Create a cache key from prefix and optional params dict."""
+        if params:
+            param_str = json.dumps(params, sort_keys=True)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"kcar:{prefix}:{param_hash}"
+        return f"kcar:{prefix}"
+
+    def _get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "service": "KCar",
+            "cache_entries": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate_percent": round(hit_rate, 2),
+        }
 
     def _authenticate(self) -> bool:
         """
@@ -205,6 +246,40 @@ class KCarService:
 
         return False
 
+    def _is_session_still_valid(self) -> bool:
+        """
+        Lightweight session validation - try a quick request to verify
+        the session is still active before doing full re-auth.
+
+        Returns:
+            bool: True if session is still valid
+        """
+        try:
+            # Use a lightweight endpoint to test session
+            test_url = f"{self.base_url}/kcar/user/mypage_main.do"
+            response = self.session.get(test_url, timeout=10, allow_redirects=False)
+
+            # If we get a redirect to login page, session is dead
+            if response.status_code in [302, 303]:
+                location = response.headers.get("Location", "")
+                if "login" in location.lower():
+                    logger.info("🔍 Session validation: redirected to login - session expired")
+                    return False
+
+            # If we get 200, session is likely still valid
+            if response.status_code == 200:
+                # Check if the response contains login form (indicating session is dead)
+                if "user_login.do" in response.text[:1000]:
+                    logger.info("🔍 Session validation: login form detected - session expired")
+                    return False
+                logger.info("🔍 Session validation: session still active")
+                return True
+
+            return False
+        except Exception as e:
+            logger.debug(f"🔍 Session validation failed: {e}")
+            return False
+
     def _refresh_session_if_needed(self) -> bool:
         """
         Обновление сессии при необходимости
@@ -216,6 +291,12 @@ class KCarService:
 
         # Проверка 1: Истекла ли сессия по возрасту
         if self._is_session_expired():
+            # Try lightweight validation first before full re-auth
+            if self._is_session_still_valid():
+                logger.info("✅ Session expired by age but still valid, extending...")
+                self.session_created_at = datetime.now()
+                return True
+
             logger.info("🔄 Обновляю сессию (истекло время)...")
             if self._authenticate():
                 self.session_created_at = datetime.now()
@@ -314,6 +395,12 @@ class KCarService:
             KCarResponse: Ответ с автомобилями
         """
         try:
+            # Check cache first (car list: 3min TTL)
+            cache_key = self._make_cache_key("cars", params)
+            cached = self._get_from_cache(cache_key, ttl=180)
+            if cached is not None:
+                return cached
+
             logger.info(
                 "🚗 Получаю список автомобилей с KCar (только weekly аукционы)..."
             )
@@ -876,6 +963,7 @@ class KCarService:
                 logger.success(
                     f"✅ Объединено {total_count} автомобилей из лейнов {lanes_to_process} (страница {page_number}/{total_pages})"
                 )
+                self._save_to_cache(cache_key, result)
                 return result
             else:
                 # Пустой список - это нормально (торги закончились или нет активных аукционов)
@@ -1411,12 +1499,18 @@ class KCarService:
             List[Dict]: Список производителей
         """
         try:
+            cache_key = self._make_cache_key("manufacturers")
+            cached = self._get_from_cache(cache_key, ttl=86400)  # 24h
+            if cached is not None:
+                return cached
+
             logger.info("📋 Получение списка производителей KCar")
 
             manufacturers = []
             for manufacturer in KCAR_MANUFACTURERS:
                 manufacturers.append(manufacturer.model_dump())
 
+            self._save_to_cache(cache_key, manufacturers)
             logger.success(f"✅ Возвращено {len(manufacturers)} производителей")
             return manufacturers
 
@@ -1441,6 +1535,11 @@ class KCarService:
             KCarModelsResponse: Ответ с списком моделей
         """
         try:
+            cache_key = self._make_cache_key("models", {"mfr": manufacturer_code, "car": input_car_code})
+            cached = self._get_from_cache(cache_key, ttl=86400)  # 24h
+            if cached is not None:
+                return cached
+
             logger.info(f"📋 Получение моделей для производителя {manufacturer_code}")
 
             if not self.authenticated:
@@ -1495,6 +1594,8 @@ class KCarService:
                     # Парсим ответ
                     result = self.parser.parse_models_json(json_data)
 
+                    if result.success:
+                        self._save_to_cache(cache_key, result)
                     logger.success(
                         f"✅ Получено {len(result.models)} моделей для производителя {manufacturer_code}"
                     )
@@ -1903,11 +2004,17 @@ class KCarService:
     
     def fetch_total_count(self) -> Dict[str, int]:
         """Fetch total car count for both LANE A and LANE B
-        
+
         Returns:
             Dictionary with lane_a_count, lane_b_count, and total_count
         """
         try:
+            # Check cache first (count: 2min TTL)
+            cache_key = self._make_cache_key("total_count")
+            cached = self._get_from_cache(cache_key, ttl=120)
+            if cached is not None:
+                return cached
+
             # Ensure we're authenticated
             if not self.authenticated:
                 if not self.authenticate():
@@ -2000,12 +2107,14 @@ class KCarService:
             
             total = lane_a_count + lane_b_count
             logger.info(f"📊 KCar Total Count: {total} (LANE A: {lane_a_count}, LANE B: {lane_b_count})")
-            
-            return {
+
+            result = {
                 "lane_a_count": lane_a_count,
                 "lane_b_count": lane_b_count,
                 "total_count": total
             }
+            self._save_to_cache(cache_key, result)
+            return result
             
         except Exception as e:
             logger.error(f"❌ Unexpected error fetching KCar count: {e}")

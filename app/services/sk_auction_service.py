@@ -6,6 +6,8 @@ URL: https://auction.skcarrental.com
 """
 
 import time
+import json
+import hashlib
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import requests
@@ -69,6 +71,11 @@ class SKAuctionService:
         self._username = "094200"
         self._password = "baza9851@@"
 
+        # In-memory cache with tiered TTL
+        self._cache: Dict[str, tuple] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
         # Default headers for all requests
         self._default_headers = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
@@ -114,6 +121,41 @@ class SKAuctionService:
         if self._session is None or self._needs_session_refresh():
             self._create_session()
         return self._session
+
+    def _get_from_cache(self, key: str, ttl: int = 300) -> Optional[Any]:
+        """Get data from in-memory cache with per-key TTL."""
+        if key in self._cache:
+            data, timestamp = self._cache[key]
+            if time.time() - timestamp < ttl:
+                self._cache_hits += 1
+                return data
+            del self._cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _save_to_cache(self, key: str, data: Any) -> None:
+        """Save data to in-memory cache."""
+        self._cache[key] = (data, time.time())
+
+    def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
+        """Create a cache key from prefix and optional params dict."""
+        if params:
+            param_str = json.dumps(params, sort_keys=True, default=str)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"sk:{prefix}:{param_hash}"
+        return f"sk:{prefix}"
+
+    def _get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "service": "SK Auction",
+            "cache_entries": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate_percent": round(hit_rate, 2),
+        }
 
     def _create_session(self) -> None:
         """Create a new authenticated session"""
@@ -281,11 +323,24 @@ class SKAuctionService:
         start_time = time.time()
 
         try:
-            self._ensure_authenticated()
-
             # Default auction date to today
             if auction_date is None:
                 auction_date = datetime.now().strftime("%Y%m%d")
+
+            # Check cache (3min TTL for car listings)
+            cache_params = {
+                "filters": filters.model_dump() if filters else None,
+                "page": page,
+                "page_size": page_size,
+                "auction_date": auction_date,
+            }
+            cache_key = self._make_cache_key("cars", cache_params)
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
+            if cached is not None:
+                logger.debug(f"📦 SK Auction cars cache hit: {cache_key}")
+                return cached
+
+            self._ensure_authenticated()
 
             # Build request data
             data = self._build_cars_request_data(filters, page, page_size, auction_date)
@@ -310,6 +365,10 @@ class SKAuctionService:
             result = self.parser.parse_cars_json(json_data, page, page_size)
             result.request_duration = time.time() - start_time
             result.auction_date = auction_date
+
+            # Cache successful result
+            if result.success:
+                self._save_to_cache(cache_key, result)
 
             logger.info(f"✅ Fetched {len(result.cars)} cars in {result.request_duration:.2f}s")
             return result
@@ -430,6 +489,13 @@ class SKAuctionService:
         start_time = time.time()
 
         try:
+            # Check cache (30min TTL for car details)
+            cache_key = self._make_cache_key("detail", {"mng_div_cd": mng_div_cd, "mng_no": mng_no, "exhi_regi_seq": exhi_regi_seq})
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_detail)
+            if cached is not None:
+                logger.debug(f"📦 SK Auction car detail cache hit: {mng_no}")
+                return cached
+
             self._ensure_authenticated()
 
             # Build URL for car detail page
@@ -461,11 +527,13 @@ class SKAuctionService:
 
             if car_detail:
                 logger.info(f"✅ Parsed car detail for {mng_no}")
-                return SKAuctionDetailResponse(
+                result = SKAuctionDetailResponse(
                     success=True,
                     message="Car detail retrieved successfully",
                     data=car_detail,
                 )
+                self._save_to_cache(cache_key, result)
+                return result
             else:
                 logger.warning(f"⚠️ Failed to parse car detail for {mng_no}")
                 return SKAuctionDetailResponse(
@@ -509,6 +577,13 @@ class SKAuctionService:
             SKAuctionBrandsResponse with brands list
         """
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = self._make_cache_key("brands", {"region": region_code})
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
+            if cached is not None:
+                logger.debug(f"📦 SK Auction brands cache hit")
+                return cached
+
             self._ensure_authenticated()
 
             url = f"{self.BASE_URL}{self.ENDPOINTS['brands']}"
@@ -533,12 +608,14 @@ class SKAuctionService:
             brands = self.parser.parse_brands_json(json_data)
 
             logger.info(f"✅ Fetched {len(brands)} brands")
-            return SKAuctionBrandsResponse(
+            result = SKAuctionBrandsResponse(
                 success=True,
                 message=f"Retrieved {len(brands)} brands",
                 brands=brands,
                 total_count=len(brands),
             )
+            self._save_to_cache(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"❌ SK Auction brands error: {e}")
@@ -561,6 +638,13 @@ class SKAuctionService:
             SKAuctionModelsResponse with models list
         """
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = self._make_cache_key("models", {"brand": brand_code, "region": region_code})
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
+            if cached is not None:
+                logger.debug(f"📦 SK Auction models cache hit for brand {brand_code}")
+                return cached
+
             self._ensure_authenticated()
 
             url = f"{self.BASE_URL}{self.ENDPOINTS['models']}"
@@ -586,13 +670,15 @@ class SKAuctionService:
             models = self.parser.parse_models_json(json_data, brand_code)
 
             logger.info(f"✅ Fetched {len(models)} models for brand {brand_code}")
-            return SKAuctionModelsResponse(
+            result = SKAuctionModelsResponse(
                 success=True,
                 message=f"Retrieved {len(models)} models",
                 models=models,
                 brand_code=brand_code,
                 total_count=len(models),
             )
+            self._save_to_cache(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"❌ SK Auction models error: {e}")
@@ -616,6 +702,13 @@ class SKAuctionService:
             SKAuctionGenerationsResponse with generations list
         """
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = self._make_cache_key("generations", {"model": model_code, "region": region_code})
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
+            if cached is not None:
+                logger.debug(f"📦 SK Auction generations cache hit for model {model_code}")
+                return cached
+
             self._ensure_authenticated()
 
             url = f"{self.BASE_URL}{self.ENDPOINTS['generations']}"
@@ -641,13 +734,15 @@ class SKAuctionService:
             generations = self.parser.parse_generations_json(json_data, model_code)
 
             logger.info(f"✅ Fetched {len(generations)} generations for model {model_code}")
-            return SKAuctionGenerationsResponse(
+            result = SKAuctionGenerationsResponse(
                 success=True,
                 message=f"Retrieved {len(generations)} generations",
                 generations=generations,
                 model_code=model_code,
                 total_count=len(generations),
             )
+            self._save_to_cache(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"❌ SK Auction generations error: {e}")
@@ -667,6 +762,13 @@ class SKAuctionService:
             SKAuctionFuelTypesResponse with fuel types list
         """
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = self._make_cache_key("fuel_types")
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
+            if cached is not None:
+                logger.debug("📦 SK Auction fuel types cache hit")
+                return cached
+
             self._ensure_authenticated()
 
             url = f"{self.BASE_URL}{self.ENDPOINTS['fuel_types']}"
@@ -691,11 +793,13 @@ class SKAuctionService:
             fuel_types = self.parser.parse_fuel_types_json(json_data)
 
             logger.info(f"✅ Fetched {len(fuel_types)} fuel types")
-            return SKAuctionFuelTypesResponse(
+            result = SKAuctionFuelTypesResponse(
                 success=True,
                 message=f"Retrieved {len(fuel_types)} fuel types",
                 fuel_types=fuel_types,
             )
+            self._save_to_cache(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"❌ SK Auction fuel types error: {e}")
@@ -713,6 +817,13 @@ class SKAuctionService:
             SKAuctionYearsResponse with years list
         """
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = self._make_cache_key("years")
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
+            if cached is not None:
+                logger.debug("📦 SK Auction years cache hit")
+                return cached
+
             self._ensure_authenticated()
 
             url = f"{self.BASE_URL}{self.ENDPOINTS['years']}"
@@ -737,11 +848,13 @@ class SKAuctionService:
             years = self.parser.parse_years_json(json_data)
 
             logger.info(f"✅ Fetched {len(years)} years")
-            return SKAuctionYearsResponse(
+            result = SKAuctionYearsResponse(
                 success=True,
                 message=f"Retrieved {len(years)} years",
                 years=years,
             )
+            self._save_to_cache(cache_key, result)
+            return result
 
         except Exception as e:
             logger.error(f"❌ SK Auction years error: {e}")

@@ -130,12 +130,58 @@ class BaseAuctionService(ABC):
 
     # === Управление аутентификацией ===
 
+    def _is_session_still_valid(self) -> bool:
+        """
+        Lightweight session validity check before full re-authentication.
+
+        Tries a cheap HEAD request to verify the session is still alive,
+        avoiding unnecessary multi-roundtrip re-auth when session is actually valid.
+
+        Returns:
+            True if session appears still valid
+        """
+        if not self.authenticated:
+            return False
+
+        try:
+            session = self.client.session_manager.get_session()
+            response = session.head(
+                self.base_url, timeout=10, allow_redirects=False
+            )
+            # Redirect to login page means session expired
+            if response.status_code in [301, 302, 303]:
+                location = response.headers.get("Location", "").lower()
+                if "login" in location or "signin" in location:
+                    logger.debug(
+                        f"{self.auction_name}: Lightweight check - redirect to login, session expired"
+                    )
+                    return False
+            if response.status_code < 400:
+                logger.debug(
+                    f"{self.auction_name}: Lightweight check - session still valid (HTTP {response.status_code})"
+                )
+                return True
+            if response.status_code in [401, 403]:
+                return False
+        except Exception as e:
+            logger.debug(f"{self.auction_name}: Lightweight check failed: {e}")
+            return False
+
+        return False
+
     async def ensure_authenticated(self) -> bool:
         """Убедиться, что аутентификация актуальна"""
         current_time = time.time()
 
         # Проверяем, нужна ли повторная аутентификация
         if not self.authenticated or current_time - self.auth_timestamp > self.auth_ttl:
+            # Before full re-auth, try lightweight validation
+            if self._is_session_still_valid():
+                logger.info(
+                    f"{self.auction_name}: Сессия истекла по времени, но ещё работает - продлеваем"
+                )
+                self.auth_timestamp = time.time()
+                return True
 
             logger.info(f"Требуется аутентификация для {self.auction_name}")
             return await self.authenticate()

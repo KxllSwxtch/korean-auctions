@@ -30,10 +30,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/heydealer", tags=["HeyDealer"])
 
+# Глобальный экземпляр сервиса (singleton)
+_heydealer_service = None
+
 
 def get_heydealer_service() -> HeyDealerService:
-    """Dependency для получения сервиса HeyDealer"""
-    return HeyDealerService()
+    """Dependency для получения сервиса HeyDealer (singleton)"""
+    global _heydealer_service
+    if _heydealer_service is None:
+        _heydealer_service = HeyDealerService()
+    return _heydealer_service
 
 
 @router.get("/cars")
@@ -1629,7 +1635,7 @@ async def get_heydealer_car_debug_json(
 async def get_brands():
     """Получение списка марок автомобилей"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         brands_data = await service.get_brands()
 
         if brands_data:
@@ -1654,7 +1660,7 @@ async def get_brands():
 async def get_brand_models(brand_hash_id: str):
     """Получение списка моделей для выбранной марки"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         brand_data = await service.get_brand_models(brand_hash_id)
 
         if brand_data:
@@ -1681,7 +1687,7 @@ async def get_brand_models(brand_hash_id: str):
 async def get_model_generations(model_group_hash_id: str):
     """Получение списка поколений для выбранной модели"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         model_data = await service.get_model_generations(model_group_hash_id)
 
         if model_data:
@@ -1707,7 +1713,7 @@ async def get_model_generations(model_group_hash_id: str):
 async def get_model_configurations(model_hash_id: str):
     """Получение списка конфигураций для выбранного поколения"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         config_data = await service.get_model_configurations(model_hash_id)
 
         if config_data:
@@ -1735,7 +1741,7 @@ async def get_model_configurations(model_hash_id: str):
 async def get_brands_raw():
     """Получение сырых данных марок для отладки"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         brands_data = await service.get_brands()
 
         return {
@@ -2013,7 +2019,7 @@ async def get_filtered_cars_direct(
 async def find_brand_by_name(brand_name: str) -> Optional[str]:
     """Поиск hash_id бренда по названию (на английском или корейском)"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
         brands_data = await service.get_brands()
 
         if not brands_data:
@@ -2096,7 +2102,7 @@ async def get_brand_models_by_name(brand_name: str):
 async def get_filters():
     """Получение всех доступных фильтров для frontend"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем список брендов
         brands_data = await service.get_brands()
@@ -2178,7 +2184,7 @@ async def find_model_group_by_name(model_group_name: str) -> Optional[str]:
 
         # Поскольку у нас нет полного списка всех model_groups,
         # попробуем найти через бренды
-        service = HeyDealerService()
+        service = get_heydealer_service()
         brands_data = await service.get_brands()
 
         if not brands_data:
@@ -2243,7 +2249,7 @@ async def get_model_generations_by_name(model_group_name: str):
 async def get_car_debug(car_hash_id: str):
     """Отладочная информация об автомобиле"""
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем детальные данные
         car_detail = await service.get_car_detail(car_hash_id)
@@ -2291,7 +2297,7 @@ async def get_car_accident_repairs(car_hash_id: str):
         Технический лист с информацией о состоянии всех частей автомобиля
     """
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем технический лист
         accident_repairs = await service.get_accident_repairs(car_hash_id)
@@ -2333,7 +2339,7 @@ async def get_car_with_accident_repairs(car_hash_id: str):
         Полная информация об автомобиле включая технический лист
     """
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем комбинированные данные
         combined_data = await service.get_car_with_accident_repairs(car_hash_id)
@@ -2380,7 +2386,7 @@ async def get_car_accident_repairs_raw(car_hash_id: str):
         Необработанные данные технического листа от API
     """
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем сырые данные
         raw_data = await service.get_accident_repairs(car_hash_id)
@@ -2417,7 +2423,7 @@ async def get_car_accident_repairs_summary(car_hash_id: str):
         Краткая сводка о состоянии автомобиля
     """
     try:
-        service = HeyDealerService()
+        service = get_heydealer_service()
 
         # Получаем технический лист
         accident_repairs = await service.get_accident_repairs(car_hash_id)

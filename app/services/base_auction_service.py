@@ -7,9 +7,12 @@ and error handling.
 
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
+import time
 import requests
 from loguru import logger
+
+from app.core.config import get_settings
 
 
 class BaseAuctionService(ABC):
@@ -52,6 +55,12 @@ class BaseAuctionService(ABC):
         self.successful_requests = 0
         self.failed_requests = 0
 
+        # Cache
+        self._cache: Dict[str, tuple] = {}  # key -> (data, timestamp)
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._settings = get_settings()
+
         logger.info(f"🔧 {self.name} инициализирован с управлением сессиями")
 
     def _is_session_expired(self) -> bool:
@@ -79,6 +88,57 @@ class BaseAuctionService(ABC):
 
         return False
 
+    def _is_session_still_valid(self) -> bool:
+        """
+        Lightweight session validity check before full re-authentication.
+
+        Tries a cheap request to verify the session is still alive,
+        avoiding unnecessary 3-roundtrip re-auth when session is actually valid.
+
+        Subclasses can override this with a service-specific URL check.
+        Default implementation checks if the session has cookies set.
+
+        Returns:
+            True if session appears still valid
+        """
+        if not self.authenticated:
+            return False
+
+        # If session has no cookies at all, it's definitely invalid
+        if not self.session.cookies:
+            return False
+
+        # If we have a base_url, try a lightweight HEAD request
+        base_url = getattr(self, 'base_url', None)
+        if base_url:
+            try:
+                response = self.session.head(
+                    base_url, timeout=10, allow_redirects=False
+                )
+                # Redirect to login page means session expired
+                if response.status_code in [301, 302, 303]:
+                    location = response.headers.get("Location", "").lower()
+                    if "login" in location or "signin" in location:
+                        logger.debug(
+                            f"{self.name}: Lightweight check - redirect to login, session expired"
+                        )
+                        return False
+                # 200 or other non-error codes mean session is likely valid
+                if response.status_code < 400:
+                    logger.debug(
+                        f"{self.name}: Lightweight check - session still valid (HTTP {response.status_code})"
+                    )
+                    return True
+                # 403/401 means session expired
+                if response.status_code in [401, 403]:
+                    return False
+            except Exception as e:
+                logger.debug(f"{self.name}: Lightweight check failed: {e}")
+                return False
+
+        # Fallback: if cookies exist, assume session might still be valid
+        return True
+
     def _refresh_session_if_needed(self) -> bool:
         """
         Refresh session if needed (expired or too many failures).
@@ -91,6 +151,14 @@ class BaseAuctionService(ABC):
         """
         # Check 1: Is session expired by age?
         if self._is_session_expired():
+            # Before full re-auth, try lightweight validation
+            if self._is_session_still_valid():
+                logger.info(
+                    f"{self.name}: Сессия истекла по времени, но ещё работает - продлеваем"
+                )
+                self.session_created_at = datetime.now()
+                return True
+
             logger.info(f"🔄 {self.name}: Обновляю сессию (истекло время)...")
             if self._authenticate():
                 self.session_created_at = datetime.now()
@@ -230,6 +298,48 @@ class BaseAuctionService(ABC):
             True if authentication successful
         """
         pass
+
+    def _get_from_cache(self, key: str, ttl: Optional[int] = None) -> Optional[Any]:
+        """
+        Get data from in-memory cache with per-key TTL.
+
+        Args:
+            key: Cache key
+            ttl: TTL in seconds. If None, uses default cache_ttl from settings.
+
+        Returns:
+            Cached data or None if expired/missing
+        """
+        if key in self._cache:
+            data, timestamp = self._cache[key]
+            effective_ttl = ttl if ttl is not None else self._settings.cache_ttl
+            if time.time() - timestamp < effective_ttl:
+                self._cache_hits += 1
+                return data
+            del self._cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _save_to_cache(self, key: str, data: Any) -> None:
+        """Save data to in-memory cache with current timestamp."""
+        self._cache[key] = (data, time.time())
+
+    def _clear_cache(self) -> None:
+        """Clear all cached data."""
+        self._cache.clear()
+        logger.info(f"🗑️ {self.name}: Кеш очищен")
+
+    def _get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "service": self.name,
+            "cache_entries": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate_percent": round(hit_rate, 2),
+        }
 
     def close(self) -> None:
         """Close session and cleanup resources."""

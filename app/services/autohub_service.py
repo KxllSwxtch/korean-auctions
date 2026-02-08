@@ -1,6 +1,7 @@
 import asyncio
 import time
 import json
+import hashlib
 from typing import List, Optional, Dict, Any
 import requests
 from requests.adapters import HTTPAdapter
@@ -56,12 +57,52 @@ class AutohubService:
         self._cache_timestamp: Optional[float] = None
         self._CACHE_DURATION = 86400  # 24 hours in seconds
 
+        # In-memory cache with tiered TTL
+        self._cache: Dict[str, tuple] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
     @property
     def session(self) -> requests.Session:
         """Получить настроенную сессию для HTTP запросов"""
         if self._session is None:
             self._session = self._create_session()
         return self._session
+
+    def _get_from_cache(self, key: str, ttl: int = 300) -> Optional[Any]:
+        """Get data from in-memory cache with per-key TTL."""
+        if key in self._cache:
+            data, timestamp = self._cache[key]
+            if time.time() - timestamp < ttl:
+                self._cache_hits += 1
+                return data
+            del self._cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _save_to_cache(self, key: str, data: Any) -> None:
+        """Save data to in-memory cache."""
+        self._cache[key] = (data, time.time())
+
+    def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
+        """Create a cache key from prefix and optional params dict."""
+        if params:
+            param_str = json.dumps(params, sort_keys=True, default=str)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"autohub:{prefix}:{param_hash}"
+        return f"autohub:{prefix}"
+
+    def _get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "service": "Autohub",
+            "cache_entries": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate_percent": round(hit_rate, 2),
+        }
 
     def _create_session(self) -> requests.Session:
         """Создает настроенную сессию с retry стратегией"""
@@ -1223,6 +1264,13 @@ class AutohubService:
         Returns:
             AutohubModelsResponse: Список моделей
         """
+        # Check cache (24h TTL for static metadata)
+        cache_key = self._make_cache_key("models", {"mfr": manufacturer_code})
+        cached = self._get_from_cache(cache_key, ttl=86400)
+        if cached is not None:
+            logger.debug(f"📦 Autohub models cache hit for {manufacturer_code}")
+            return cached
+
         try:
             logger.info(f"Получение моделей для производителя {manufacturer_code}")
 
@@ -1446,13 +1494,16 @@ class AutohubService:
                                 f"Загружено {len(models)} моделей из резервных данных"
                             )
 
-                return AutohubModelsResponse(
+                result = AutohubModelsResponse(
                     success=True,
                     message=f"Список моделей для {manufacturer_code} получен успешно",
                     models=models,
                     manufacturer_code=manufacturer_code,
                     total_count=len(models),
                 )
+                if models:
+                    self._save_to_cache(cache_key, result)
+                return result
             else:
                 logger.error(f"Ошибка от API: {response_data.get('message')}")
                 return AutohubModelsResponse(
@@ -1582,6 +1633,13 @@ class AutohubService:
         Returns:
             AutohubGenerationsResponse: Список поколений (часто пустой)
         """
+        # Check cache (24h TTL for static metadata)
+        cache_key = self._make_cache_key("generations", {"model": model_code})
+        cached = self._get_from_cache(cache_key, ttl=86400)
+        if cached is not None:
+            logger.debug(f"📦 Autohub generations cache hit for {model_code}")
+            return cached
+
         try:
             logger.info(f"Получение поколений для модели {model_code}")
 
@@ -1784,13 +1842,15 @@ class AutohubService:
                         logger.info(f"Применяем fallback для {model_code}")
                         generations = self._get_fallback_generations(model_code)
 
-                return AutohubGenerationsResponse(
+                result = AutohubGenerationsResponse(
                     success=True,
                     message=f"Список поколений для {model_code} получен успешно",
                     generations=generations,
                     model_code=model_code,
                     total_count=len(generations),
                 )
+                self._save_to_cache(cache_key, result)
+                return result
             else:
                 logger.error(f"Ошибка от API: {response_data.get('message')}")
                 return AutohubGenerationsResponse(
@@ -1984,6 +2044,13 @@ class AutohubService:
         Returns:
             AutohubConfigurationsResponse: Список конфигураций
         """
+        # Check cache (24h TTL for static metadata)
+        cache_key = self._make_cache_key("configurations", {"gen": generation_code, "model": model_code})
+        cached = self._get_from_cache(cache_key, ttl=86400)
+        if cached is not None:
+            logger.debug(f"📦 Autohub configurations cache hit for {generation_code}")
+            return cached
+
         try:
             logger.info(
                 f"Получение конфигураций для поколения {generation_code} модели {model_code}"
@@ -2132,13 +2199,15 @@ class AutohubService:
                     f"Успешно получено {len(configurations)} конфигураций для поколения {generation_code}"
                 )
 
-                return AutohubConfigurationsResponse(
+                result = AutohubConfigurationsResponse(
                     success=True,
                     message=f"Список конфигураций для поколения {generation_code} получен успешно",
                     configurations=configurations,
                     generation_code=generation_code,
                     total_count=len(configurations),
                 )
+                self._save_to_cache(cache_key, result)
+                return result
             else:
                 logger.error(f"Ошибка от API: {response_data.get('message')}")
                 return AutohubConfigurationsResponse(

@@ -142,7 +142,7 @@ class RequestsSessionManager:
         )
 
         adapter = HTTPAdapter(
-            max_retries=retry_strategy, pool_connections=10, pool_maxsize=20
+            max_retries=retry_strategy, pool_connections=20, pool_maxsize=30
         )
         session.mount("http://", adapter)
         session.mount("https://", adapter)
@@ -230,6 +230,34 @@ class RequestsSessionManager:
         logger.info("Все сессии закрыты")
 
 
+# Per-domain delay profiles to balance speed vs. block risk
+DOMAIN_DELAY_PROFILES: Dict[str, Dict[str, float]] = {
+    # REST APIs - no delay needed
+    "api.heydealer.com": {"min": 0.0, "max": 0.0},
+    "api.encar.com": {"min": 0.0, "max": 0.0},
+    # Light delay - less aggressive anti-bot
+    "auction.skcarrental.com": {"min": 0.2, "max": 0.5},
+    # Standard delay - moderate anti-bot detection
+    "www.kcar.com": {"min": 0.5, "max": 1.5},
+    "www.autohubauction.co.kr": {"min": 0.5, "max": 1.5},
+    "www.lotteautoauction.net": {"min": 0.5, "max": 1.5},
+    "www.ssancar.com": {"min": 0.5, "max": 1.5},
+}
+
+
+def get_delay_for_domain(url: str) -> tuple:
+    """Get delay profile for a given URL's domain."""
+    from urllib.parse import urlparse
+    try:
+        domain = urlparse(url).netloc
+        if domain in DOMAIN_DELAY_PROFILES:
+            profile = DOMAIN_DELAY_PROFILES[domain]
+            return profile["min"], profile["max"]
+    except Exception:
+        pass
+    return None, None
+
+
 class AntiBlockClient:
     """Клиент с продвинутой защитой от блокировок"""
 
@@ -254,12 +282,24 @@ class AntiBlockClient:
         self.max_delay = max_delay
         self.last_request_time = 0
 
-    def _add_random_delay(self):
-        """Добавить случайную задержку между запросами"""
+    def _add_random_delay(self, url: Optional[str] = None):
+        """Добавить случайную задержку между запросами (domain-aware)"""
         current_time = time.time()
         elapsed = current_time - self.last_request_time
 
-        delay = random.uniform(self.min_delay, self.max_delay)
+        # Use per-domain delay if available
+        min_d, max_d = self.min_delay, self.max_delay
+        if url:
+            domain_min, domain_max = get_delay_for_domain(url)
+            if domain_min is not None:
+                min_d, max_d = domain_min, domain_max
+
+        # Skip delay if profile says 0
+        if max_d <= 0:
+            self.last_request_time = time.time()
+            return
+
+        delay = random.uniform(min_d, max_d)
 
         if elapsed < delay:
             sleep_time = delay - elapsed
@@ -279,7 +319,7 @@ class AntiBlockClient:
     ) -> requests.Response:
         """Выполнить HTTP запрос с защитой от блокировок"""
 
-        self._add_random_delay()
+        self._add_random_delay(url)
 
         session = self.session_manager.get_session(session_id)
 

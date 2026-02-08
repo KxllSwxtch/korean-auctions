@@ -149,7 +149,7 @@ async def get_test_cars(
     try:
         logger.info("Получение тестовых данных")
 
-        response = service.get_test_data()
+        response = await asyncio.to_thread(service.get_test_data)
         return response
 
     except Exception as e:
@@ -398,7 +398,7 @@ async def get_car_detail(request: AutohubCarDetailRequest):
     - **sort_flag**: Флаг сортировки (по умолчанию "entry")
     """
     try:
-        result = autohub_service.get_car_detail(request)
+        result = await asyncio.to_thread(autohub_service.get_car_detail, request)
 
         if not result.success:
             raise HTTPException(
@@ -538,7 +538,7 @@ async def get_manufacturers(
     try:
         logger.info("Получение списка производителей")
         
-        response = service.get_manufacturers()
+        response = await asyncio.to_thread(service.get_manufacturers)
         
         if not response.success:
             raise HTTPException(

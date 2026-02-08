@@ -1,5 +1,6 @@
 import requests
 import json
+import hashlib
 import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -298,6 +299,15 @@ class HeyDealerService(BaseAuctionService):
             Список автомобилей или None при ошибке
         """
         try:
+            # Check cache (3min TTL for car listings)
+            filter_dict = filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters)
+            param_str = json.dumps(filter_dict, sort_keys=True, default=str)
+            cache_key = f"heydealer:cars:{hashlib.md5(param_str.encode()).hexdigest()[:12]}"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_car_list)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Cars cache hit")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed")
@@ -329,6 +339,10 @@ class HeyDealerService(BaseAuctionService):
 
                 # Record success
                 self._record_success()
+
+                # Cache the result
+                if parsed_data is not None:
+                    self._save_to_cache(cache_key, parsed_data)
 
                 return parsed_data
             else:
@@ -391,6 +405,13 @@ class HeyDealerService(BaseAuctionService):
             Детальная информация об автомобиле или None при ошибке
         """
         try:
+            # Check cache (30min TTL for car details)
+            cache_key = f"heydealer:detail:{car_hash_id}"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_car_detail)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Car detail cache hit for {car_hash_id}")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car detail")
@@ -413,6 +434,8 @@ class HeyDealerService(BaseAuctionService):
                     )
                     # Record success
                     self._record_success()
+                    # Cache the result
+                    self._save_to_cache(cache_key, detailed_car)
                     return detailed_car
                 else:
                     logger.error(
@@ -472,6 +495,13 @@ class HeyDealerService(BaseAuctionService):
     async def get_brands(self) -> List[Dict[str, Any]]:
         """Получает список марок автомобилей"""
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = "heydealer:brands"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_static)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Brands cache hit")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed for brands")
@@ -519,6 +549,9 @@ class HeyDealerService(BaseAuctionService):
                 logger.info(f"✅ Получено {len(data)} марок")
                 # Record success
                 self._record_success()
+                # Cache the result
+                if data:
+                    self._save_to_cache(cache_key, data)
                 return data
             else:
                 logger.error(
@@ -541,6 +574,13 @@ class HeyDealerService(BaseAuctionService):
     async def get_brand_models(self, brand_hash_id: str) -> Dict[str, Any]:
         """Получает список моделей для указанной марки"""
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = f"heydealer:models:{brand_hash_id}"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_static)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Models cache hit for brand {brand_hash_id}")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed for brand models")
@@ -577,6 +617,9 @@ class HeyDealerService(BaseAuctionService):
                 logger.info(f"Получены модели для марки {brand_hash_id}")
                 # Record success
                 self._record_success()
+                # Cache the result
+                if data:
+                    self._save_to_cache(cache_key, data)
                 return data
             else:
                 logger.error(
@@ -599,6 +642,13 @@ class HeyDealerService(BaseAuctionService):
     async def get_model_generations(self, model_group_hash_id: str) -> Dict[str, Any]:
         """Получает список поколений для указанной модели"""
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = f"heydealer:generations:{model_group_hash_id}"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_static)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Generations cache hit for model {model_group_hash_id}")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed for model generations")
@@ -636,6 +686,9 @@ class HeyDealerService(BaseAuctionService):
                 logger.info(f"Получены поколения для модели {model_group_hash_id}")
                 # Record success
                 self._record_success()
+                # Cache the result
+                if data:
+                    self._save_to_cache(cache_key, data)
                 return data
             else:
                 logger.error(
@@ -658,6 +711,13 @@ class HeyDealerService(BaseAuctionService):
     async def get_model_configurations(self, model_hash_id: str) -> Dict[str, Any]:
         """Получает список конфигураций для указанного поколения"""
         try:
+            # Check cache (24h TTL for static metadata)
+            cache_key = f"heydealer:configurations:{model_hash_id}"
+            cached = self._get_from_cache(cache_key, ttl=self._settings.cache_ttl_static)
+            if cached is not None:
+                base_logger.debug(f"📦 {self.name}: Configurations cache hit for model {model_hash_id}")
+                return cached
+
             # Check and refresh session if needed
             if not self._refresh_session_if_needed():
                 base_logger.warning(f"⚠️ {self.name}: Session refresh failed for model configurations")
@@ -695,6 +755,9 @@ class HeyDealerService(BaseAuctionService):
                 logger.info(f"Получены конфигурации для поколения {model_hash_id}")
                 # Record success
                 self._record_success()
+                # Cache the result
+                if data:
+                    self._save_to_cache(cache_key, data)
                 return data
             else:
                 logger.error(

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from typing import Optional, Dict, Any
 from datetime import datetime
 from loguru import logger
+import asyncio
 
 from app.models.ssancar import (
     SSANCARResponse, SSANCARDetailResponse, SSANCARFilters,
@@ -75,8 +76,8 @@ async def get_ssancar_cars(
         )
         
         # Get data
-        result = service.fetch_cars(filters)
-        
+        result = await asyncio.to_thread(service.fetch_cars, filters)
+
         if result.success:
             ssancar_logger.info(f"✅ Successfully fetched {len(result.cars)} cars from SSANCAR")
         else:
@@ -119,8 +120,8 @@ async def search_ssancar_cars(
     try:
         ssancar_logger.info(f"🔍 Search SSANCAR cars with filters")
         
-        result = service.search_cars(filters)
-        
+        result = await asyncio.to_thread(service.search_cars, filters)
+
         if result.success:
             ssancar_logger.info(
                 f"✅ Found {result.total_count} cars "
@@ -191,7 +192,7 @@ async def get_total_count(
             )
         
         # Get total count
-        total_count = service.fetch_total_count(filters)
+        total_count = await asyncio.to_thread(service.fetch_total_count, filters)
         
         # Build filters applied dict for response
         filters_applied = {}
@@ -250,7 +251,7 @@ async def get_manufacturers(
     try:
         ssancar_logger.info("🏭 Request for manufacturers list")
         
-        manufacturers, success = service.get_manufacturers()
+        manufacturers, success = await asyncio.to_thread(service.get_manufacturers)
         
         if success:
             ssancar_logger.info(f"✅ Retrieved {len(manufacturers)} manufacturers")
@@ -298,7 +299,7 @@ async def get_models(
     try:
         ssancar_logger.info(f"🚗 Request for models of manufacturer {manufacturer_code}")
         
-        models, success = service.get_models(manufacturer_code)
+        models, success = await asyncio.to_thread(service.get_models, manufacturer_code)
         
         if success:
             ssancar_logger.info(f"✅ Retrieved {len(models)} models")
@@ -348,7 +349,7 @@ async def get_car_detail(
     try:
         ssancar_logger.info(f"📥 Request for car detail: {car_no}")
         
-        car_detail = service.get_car_detail(car_no)
+        car_detail = await asyncio.to_thread(service.get_car_detail, car_no)
         
         if car_detail:
             ssancar_logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
@@ -398,14 +399,14 @@ async def update_cookies(
         
         # Update service cookies
         service.update_cookies(cookies)
-        
+
         # Test if cookies work
         test_filters = SSANCARFilters(
             weekNo="2",
             list="1",
             pages="0"
         )
-        test_result = service.fetch_cars(test_filters)
+        test_result = await asyncio.to_thread(service.fetch_cars, test_filters)
         
         return {
             "success": True,
@@ -483,7 +484,7 @@ async def get_filter_options(
     try:
         ssancar_logger.info("🔧 Request for filter options")
         
-        filter_options = service.get_filter_options()
+        filter_options = await asyncio.to_thread(service.get_filter_options)
         
         if filter_options.get("success"):
             ssancar_logger.info("✅ Filter options retrieved successfully")

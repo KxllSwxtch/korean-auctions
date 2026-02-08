@@ -1,4 +1,5 @@
 import json
+import hashlib
 import re
 import time
 from datetime import datetime, timedelta
@@ -98,11 +99,51 @@ class SSANCARService:
     def __init__(self):
         # Load car list data first
         self._load_carlist_data()
-        
+
         self.session_manager = SessionManager()
         self.parser = SSANCARParser()
         self.session = self._create_session()
         self._load_or_set_cookies()
+
+        # In-memory cache with tiered TTL
+        self._cache: Dict[str, tuple] = {}
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+    def _get_from_cache(self, key: str, ttl: int = 300) -> Optional[Any]:
+        """Get data from in-memory cache with per-key TTL."""
+        if key in self._cache:
+            data, timestamp = self._cache[key]
+            if time.time() - timestamp < ttl:
+                self._cache_hits += 1
+                return data
+            del self._cache[key]
+        self._cache_misses += 1
+        return None
+
+    def _save_to_cache(self, key: str, data: Any) -> None:
+        """Save data to in-memory cache."""
+        self._cache[key] = (data, time.time())
+
+    def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
+        """Create a cache key from prefix and optional params dict."""
+        if params:
+            param_str = json.dumps(params, sort_keys=True, default=str)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"ssancar:{prefix}:{param_hash}"
+        return f"ssancar:{prefix}"
+
+    def _get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "service": "SSANCAR",
+            "cache_entries": len(self._cache),
+            "cache_hits": self._cache_hits,
+            "cache_misses": self._cache_misses,
+            "hit_rate_percent": round(hit_rate, 2),
+        }
     
     def _create_session(self) -> requests.Session:
         """Create a requests session with retry logic and proxy support"""
@@ -210,6 +251,14 @@ class SSANCARService:
             if not filters.weekNo or filters.weekNo == "4":
                 filters.weekNo = self._get_week_number()
                 logger.info(f"📅 Auto-set weekNo to {filters.weekNo} based on current day")
+
+            # Check cache (3min TTL for car listings)
+            cache_params = filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters)
+            cache_key = self._make_cache_key("cars", cache_params)
+            cached = self._get_from_cache(cache_key, ttl=180)
+            if cached is not None:
+                logger.debug(f"📦 SSANCAR cars cache hit")
+                return cached
             
             # Prepare POST data
             data = {
@@ -260,7 +309,7 @@ class SSANCARService:
             current_page = int(filters.pages) + 1  # Convert 0-based to 1-based
             page_size = int(filters.list)
             
-            return SSANCARResponse(
+            result = SSANCARResponse(
                 success=True,
                 message="Cars fetched successfully",
                 cars=cars,
@@ -270,6 +319,8 @@ class SSANCARService:
                 has_next_page=len(cars) == page_size,
                 has_prev_page=current_page > 1
             )
+            self._save_to_cache(cache_key, result)
+            return result
             
         except requests.RequestException as e:
             logger.error(f"❌ Request error fetching SSANCAR cars: {e}")
@@ -362,6 +413,13 @@ class SSANCARService:
     def get_car_detail(self, car_no: str) -> Optional[SSANCARCarDetail]:
         """Get detailed information about a specific car"""
         try:
+            # Check cache (30min TTL for car details)
+            cache_key = self._make_cache_key("detail", {"car_no": car_no})
+            cached = self._get_from_cache(cache_key, ttl=1800)
+            if cached is not None:
+                logger.debug(f"📦 SSANCAR car detail cache hit: {car_no}")
+                return cached
+
             url = f"{self.CAR_VIEW_URL}?car_no={car_no}"
             logger.info(f"📄 Fetching car detail from: {url}")
             
@@ -406,6 +464,7 @@ class SSANCARService:
                 car_detail.fuel_type = car_detail.fuel
             
             logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
+            self._save_to_cache(cache_key, car_detail)
             return car_detail
             
         except requests.RequestException as e:
@@ -426,8 +485,15 @@ class SSANCARService:
     def get_filter_options(self) -> Dict[str, Any]:
         """Get all available filter options for SSANCAR"""
         try:
+            # Check cache (1h TTL for filter metadata)
+            cache_key = self._make_cache_key("filter_options")
+            cached = self._get_from_cache(cache_key, ttl=3600)
+            if cached is not None:
+                logger.debug("📦 SSANCAR filter options cache hit")
+                return cached
+
             from app.models.ssancar import SSANCARFilterOption, SSANCARFilterOptionsResponse
-            
+
             logger.info("🔧 Getting SSANCAR filter options")
             
             # Get manufacturers (already implemented)
@@ -509,7 +575,9 @@ class SSANCARService:
             )
             
             logger.info("✅ SSANCAR filter options retrieved")
-            return response.model_dump()
+            result = response.model_dump()
+            self._save_to_cache(cache_key, result)
+            return result
             
         except Exception as e:
             logger.error(f"❌ Error getting filter options: {e}")
@@ -532,10 +600,10 @@ class SSANCARService:
     
     def fetch_total_count(self, filters: Optional[SSANCARFilters] = None) -> int:
         """Fetch total car count from SSANCAR using the same pattern as fetch_cars
-        
+
         Args:
             filters: Optional filters to apply for count
-            
+
         Returns:
             Total count of cars matching the filters
         """
@@ -546,6 +614,16 @@ class SSANCARService:
             else:
                 week_no = self._get_week_number()
                 logger.info(f"📅 Auto-set weekNo to {week_no} for total count")
+
+            # Check cache (5min TTL for total count)
+            cache_params = {"week_no": week_no}
+            if filters:
+                cache_params.update(filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters))
+            cache_key = self._make_cache_key("total_count", cache_params)
+            cached = self._get_from_cache(cache_key, ttl=300)
+            if cached is not None:
+                logger.debug("📦 SSANCAR total count cache hit")
+                return cached
             
             # Build data dictionary - NOT a string! Same format as fetch_cars
             data = {
@@ -587,6 +665,7 @@ class SSANCARService:
             try:
                 total_count = int(count_text)
                 logger.info(f"✅ Successfully fetched total count: {total_count}")
+                self._save_to_cache(cache_key, total_count)
                 return total_count
             except ValueError:
                 logger.error(f"❌ Could not parse count from response: {count_text[:100]}")

@@ -361,20 +361,30 @@ class EnhancedLotteService(BaseAuctionService):
                     car for car in detailed_cars if not isinstance(car, Exception)
                 ]
             else:
-                # Синхронный способ - последовательные запросы
-                for car_data in cars_basic:
-                    try:
-                        car_id = car_data.get("id") or car_data.get("auction_number")
-                        if car_id:
-                            details = await self.get_car_details(str(car_id), car_data)
-                            detailed_cars.append(details or car_data)
-                        else:
-                            detailed_cars.append(car_data)
-                    except Exception as e:
-                        logger.error(
-                            f"Ошибка получения деталей для {car_data.get('id', 'unknown')}: {e}"
-                        )
-                        detailed_cars.append(car_data)
+                # Parallel detail fetching with semaphore to limit concurrency
+                import asyncio
+
+                semaphore = asyncio.Semaphore(5)
+
+                async def _limited_detail(car_data):
+                    async with semaphore:
+                        try:
+                            car_id = car_data.get("id") or car_data.get("auction_number")
+                            if car_id:
+                                details = await self.get_car_details(str(car_id), car_data)
+                                return details or car_data
+                            return car_data
+                        except Exception as e:
+                            logger.error(
+                                f"Ошибка получения деталей для {car_data.get('id', 'unknown')}: {e}"
+                            )
+                            return car_data
+
+                tasks = [_limited_detail(car) for car in cars_basic]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                detailed_cars = [
+                    car for car in results if not isinstance(car, Exception)
+                ]
 
             logger.info(f"Получено {len(detailed_cars)} автомобилей с деталями")
             return detailed_cars

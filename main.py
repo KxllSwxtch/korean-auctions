@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
+from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
 
 from app.routes import (
@@ -35,7 +37,11 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    default_response_class=ORJSONResponse,
 )
+
+# GZip compression (before CORS to compress all responses)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS middleware
 app.add_middleware(
@@ -94,6 +100,129 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "message": "Service is running"}
+
+
+@app.get("/api/v1/cache/stats", tags=["Cache"])
+async def cache_stats():
+    """Get cache statistics for all services"""
+    stats = []
+
+    # Collect cache stats from each service that has _get_cache_stats
+    try:
+        from app.routes.kcar import kcar_service
+        if kcar_service and hasattr(kcar_service, '_get_cache_stats'):
+            stats.append(kcar_service._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.lotte import get_lotte_service
+        svc = get_lotte_service()
+        if svc and hasattr(svc, '_get_cache_stats'):
+            stats.append(svc._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.heydealer import get_heydealer_service
+        svc = get_heydealer_service()
+        if svc and hasattr(svc, '_get_cache_stats'):
+            stats.append(svc._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.sk_auction import sk_auction_service
+        if sk_auction_service and hasattr(sk_auction_service, '_get_cache_stats'):
+            stats.append(sk_auction_service._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.ssancar import get_ssancar_service
+        svc = get_ssancar_service()
+        if svc and hasattr(svc, '_get_cache_stats'):
+            stats.append(svc._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.autohub import get_autohub_service
+        svc = get_autohub_service()
+        if svc and hasattr(svc, '_get_cache_stats'):
+            stats.append(svc._get_cache_stats())
+    except Exception:
+        pass
+
+    return {"services": stats, "total_services": len(stats)}
+
+
+@app.post("/api/v1/cache/clear", tags=["Cache"])
+async def clear_cache():
+    """Clear all service caches"""
+    cleared = []
+
+    try:
+        from app.routes.kcar import kcar_service
+        if kcar_service and hasattr(kcar_service, '_cache'):
+            kcar_service._cache.clear()
+            kcar_service._cache_hits = 0
+            kcar_service._cache_misses = 0
+            cleared.append("KCar")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.lotte import get_lotte_service
+        svc = get_lotte_service()
+        if svc and hasattr(svc, '_clear_cache'):
+            svc._clear_cache()
+            cleared.append("Lotte")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.heydealer import get_heydealer_service
+        svc = get_heydealer_service()
+        if svc and hasattr(svc, '_clear_cache'):
+            svc._clear_cache()
+            cleared.append("HeyDealer")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.sk_auction import sk_auction_service
+        if sk_auction_service and hasattr(sk_auction_service, '_cache'):
+            sk_auction_service._cache.clear()
+            sk_auction_service._cache_hits = 0
+            sk_auction_service._cache_misses = 0
+            cleared.append("SK Auction")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.ssancar import get_ssancar_service
+        svc = get_ssancar_service()
+        if svc and hasattr(svc, '_cache'):
+            svc._cache.clear()
+            svc._cache_hits = 0
+            svc._cache_misses = 0
+            cleared.append("SSANCAR")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.autohub import get_autohub_service
+        svc = get_autohub_service()
+        if svc and hasattr(svc, '_cache'):
+            svc._cache.clear()
+            svc._cache_hits = 0
+            svc._cache_misses = 0
+            cleared.append("Autohub")
+    except Exception:
+        pass
+
+    return {"cleared": cleared, "message": f"Cleared cache for {len(cleared)} services"}
 
 
 if __name__ == "__main__":

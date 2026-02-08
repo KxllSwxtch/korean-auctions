@@ -12,7 +12,7 @@ from urllib.parse import urljoin, urlparse
 from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 
-from app.core.anti_block import UserAgentRotator, ProxyConfig
+from app.core.anti_block import UserAgentRotator, ProxyConfig, DOMAIN_DELAY_PROFILES
 from app.core.logging import logger
 
 
@@ -157,11 +157,22 @@ class AsyncAntiBlockClient:
         self._blocked_domains: Set[str] = set()
 
     async def _add_random_delay(self, domain: str = "default"):
-        """Добавить случайную задержку между запросами для домена"""
+        """Добавить случайную задержку между запросами для домена (domain-aware)"""
         current_time = time.time()
         last_request = self._last_request_times.get(domain, 0)
 
-        delay = random.uniform(self.min_delay, self.max_delay)
+        # Use per-domain delay profile if available
+        min_d, max_d = self.min_delay, self.max_delay
+        if domain in DOMAIN_DELAY_PROFILES:
+            profile = DOMAIN_DELAY_PROFILES[domain]
+            min_d, max_d = profile["min"], profile["max"]
+
+        # Skip delay if profile says 0
+        if max_d <= 0:
+            self._last_request_times[domain] = time.time()
+            return
+
+        delay = random.uniform(min_d, max_d)
         elapsed = current_time - last_request
 
         if elapsed < delay:

@@ -281,15 +281,15 @@ class LotteService(BaseAuctionService):
         ]
         return any(indicator in html for indicator in login_indicators)
 
-    def _get_from_cache(self, key: str) -> Optional[Any]:
-        """Получение данных из кеша"""
+    def _get_from_cache(self, key: str, ttl: int = None) -> Optional[Any]:
+        """Получение данных из кеша с поддержкой per-key TTL"""
         if key in self.cache:
             cached_data, timestamp = self.cache[key]
-            if time.time() - timestamp < self.cache_ttl:
+            effective_ttl = ttl if ttl is not None else self.cache_ttl
+            if time.time() - timestamp < effective_ttl:
                 logger.info(f"Данные получены из кеша: {key}")
                 return cached_data
             else:
-                # Удаляем устаревшие данные
                 del self.cache[key]
         return None
 
@@ -306,8 +306,8 @@ class LotteService(BaseAuctionService):
         """Получение даты аукциона"""
         cache_key = "lotte_auction_date"
 
-        # Проверяем кеш
-        cached_data = self._get_from_cache(cache_key)
+        # Проверяем кеш (auction date: 12h TTL)
+        cached_data = self._get_from_cache(cache_key, ttl=43200)
         if cached_data:
             return cached_data
 
@@ -473,8 +473,8 @@ class LotteService(BaseAuctionService):
         """Получение списка автомобилей с проверкой даты аукциона"""
         cache_key = f"lotte_cars_{limit}_{offset}"
 
-        # Проверяем кеш
-        cached_data = self._get_from_cache(cache_key)
+        # Проверяем кеш (car list: 3min TTL)
+        cached_data = self._get_from_cache(cache_key, ttl=180)
         if cached_data:
             return cached_data
 

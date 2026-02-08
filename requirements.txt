@@ -4,6 +4,7 @@ starlette==0.46.2
 uvicorn==0.34.3
 gunicorn==21.2.0
 python-multipart==0.0.20
+orjson==3.10.12
 
 # HTTP clients and networking
 httpx==0.28.1

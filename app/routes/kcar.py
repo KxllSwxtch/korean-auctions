@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import List, Optional, Dict, Any
 from loguru import logger
+import asyncio
 
 from app.models.kcar import (
     KCarResponse,
@@ -90,8 +91,8 @@ async def get_kcar_cars(
         if lane_type:
             params["lane_type"] = lane_type
 
-        # Получаем данные
-        result = kcar_service.get_cars(params)
+        # Получаем данные (wrap sync call to unblock event loop)
+        result = await asyncio.to_thread(kcar_service.get_cars, params)
 
         if not result.success:
             # Только если это реальная ошибка (не пустой список), показываем fallback
@@ -99,7 +100,7 @@ async def get_kcar_cars(
             logger.info("🎭 Переключаюсь на демо данные вместо ошибки")
 
             # Вместо ошибки возвращаем демо данные
-            demo_result = kcar_service.get_test_cars(page_size)
+            demo_result = await asyncio.to_thread(kcar_service.get_test_cars, page_size)
             if demo_result.success:
                 # Добавляем информацию о том, что это демо данные
                 demo_result.message = f"Произошла ошибка API. Показаны демо данные ({len(demo_result.car_list)} автомобилей)"
@@ -148,7 +149,7 @@ async def get_kcar_test_cars(
     try:
         logger.info(f"🧪 Запрос {count} тестовых автомобилей KCar")
 
-        result = kcar_service.get_test_cars(count)
+        result = await asyncio.to_thread(kcar_service.get_test_cars, count)
 
         logger.success(f"✅ Возвращаю {len(result.car_list)} тестовых автомобилей KCar")
         return result
@@ -174,7 +175,7 @@ async def get_kcar_demo_cars(
         logger.info(f"🎭 Запрос {count} демо автомобилей KCar")
 
         # Генерируем демо данные с вариациями
-        base_result = kcar_service.get_test_cars(count)
+        base_result = await asyncio.to_thread(kcar_service.get_test_cars, count)
 
         # Добавляем разнообразие в демо данные
         if base_result.success and base_result.car_list:
@@ -250,14 +251,14 @@ async def get_kcar_stats(
 
         # Получаем данные для расчета статистики
         params = {"AUC_TYPE": auction_type, "PAGE_CNT": "100"}
-        cars_result = kcar_service.get_cars(params)
+        cars_result = await asyncio.to_thread(kcar_service.get_cars, params)
 
         if not cars_result.success:
             # Если не удалось получить реальные данные, используем тестовые
             logger.warning(
                 "⚠️ Не удалось получить реальные данные, используем тестовые для статистики"
             )
-            cars_result = kcar_service.get_test_cars(50)
+            cars_result = await asyncio.to_thread(kcar_service.get_test_cars, 50)
 
         # Рассчитываем статистику
         stats = kcar_service.parser.calculate_stats(cars_result.car_list)
@@ -286,7 +287,7 @@ async def get_kcar_count(
         logger.info(f"📊 Запрос количества автомобилей KCar (тип: {auction_type})")
 
         params = {"AUC_TYPE": auction_type}
-        result = kcar_service.get_car_count(params)
+        result = await asyncio.to_thread(kcar_service.get_car_count, params)
 
         if result.get("count", 0) == 0:
             logger.info("ℹ️ Торги завершены или не активны, показываю демо значение")
@@ -348,7 +349,7 @@ async def get_kcar_car_detail(
             )
 
         # Получаем детальную информацию
-        result = kcar_service.get_car_detail(car_id, auction_code, page_type)
+        result = await asyncio.to_thread(kcar_service.get_car_detail, car_id, auction_code, page_type)
 
         if not result.success:
             logger.error(f"❌ Ошибка получения детальной информации: {result.message}")
@@ -426,7 +427,7 @@ async def search_car_by_number(
             )
 
         # Поиск автомобиля
-        search_result = kcar_service.find_car_id_by_number(car_number, auction_code)
+        search_result = await asyncio.to_thread(kcar_service.find_car_id_by_number, car_number, auction_code)
 
         if not search_result["success"]:
             logger.warning(f"⚠️ Автомобиль с номером {car_number} не найден")
@@ -519,7 +520,7 @@ async def get_total_count():
         logger.info("📊 Request for KCar total count")
         
         # Fetch counts from service
-        counts = kcar_service.fetch_total_count()
+        counts = await asyncio.to_thread(kcar_service.fetch_total_count)
         
         logger.info(f"✅ KCar count retrieved - Total: {counts['total_count']} (A: {counts['lane_a_count']}, B: {counts['lane_b_count']})")
         
@@ -552,7 +553,7 @@ async def get_manufacturers():
     try:
         logger.info("📋 Запрос списка производителей KCar")
 
-        manufacturers = kcar_service.get_manufacturers()
+        manufacturers = await asyncio.to_thread(kcar_service.get_manufacturers)
 
         logger.success(f"✅ Возвращено {len(manufacturers)} производителей")
         return {
@@ -583,7 +584,7 @@ async def get_models(
     try:
         logger.info(f"📋 Запрос моделей для производителя {manufacturer_code}")
 
-        result = kcar_service.get_models(manufacturer_code, input_car_code)
+        result = await asyncio.to_thread(kcar_service.get_models, manufacturer_code, input_car_code)
 
         if not result.success:
             logger.warning(
@@ -632,8 +633,8 @@ async def get_generations(
             f"📋 Запрос поколений для модели {model_group_code} производителя {manufacturer_code}"
         )
 
-        result = kcar_service.get_generations(
-            manufacturer_code, model_group_code, input_car_code
+        result = await asyncio.to_thread(
+            kcar_service.get_generations, manufacturer_code, model_group_code, input_car_code
         )
 
         if not result.success:
@@ -686,7 +687,7 @@ async def search_cars(filters: KCarSearchFilters):
         logger.info(f"  - lane_type: {filters.lane_type}")
         logger.debug(f"🔍 Все параметры поиска: {filters.model_dump()}")
 
-        result = kcar_service.search_cars(filters)
+        result = await asyncio.to_thread(kcar_service.search_cars, filters)
 
         if not result.success:
             logger.warning(f"⚠️ Ошибка расширенного поиска: {result.message}")

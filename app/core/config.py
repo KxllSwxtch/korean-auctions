@@ -56,8 +56,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_file: str = "logs/app.log"
 
-    # Настройки для cache (если понадобится)
-    cache_ttl: int = 300  # 5 минут
+    # Настройки для cache
+    cache_ttl: int = 300  # 5 минут (default, backward compat)
+    cache_ttl_static: int = 86400       # 24h - manufacturers, models, generations
+    cache_ttl_auction_date: int = 43200  # 12h - auction dates
+    cache_ttl_car_list: int = 180        # 3min - car listings
+    cache_ttl_car_detail: int = 1800     # 30min - car details
+    cache_ttl_filters: int = 3600        # 1h - filter metadata
 
     class Config:
         env_file = ".env"

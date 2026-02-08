@@ -8,6 +8,7 @@ URL: https://auction.skcarrental.com
 from fastapi import APIRouter, HTTPException, Query, Path
 from typing import List, Optional
 from loguru import logger
+import asyncio
 
 from app.models.sk_auction import (
     SKAuctionResponse,
@@ -94,7 +95,8 @@ async def get_cars(
                 region_code=region_code,
             )
 
-        result = sk_auction_service.get_cars(
+        result = await asyncio.to_thread(
+            sk_auction_service.get_cars,
             filters=filters,
             page=page,
             page_size=page_size,
@@ -139,7 +141,8 @@ async def search_cars(
     try:
         logger.info(f"🔍 SK Auction search request: {filters.model_dump()}")
 
-        result = sk_auction_service.search_cars(
+        result = await asyncio.to_thread(
+            sk_auction_service.search_cars,
             filters=filters,
             page=page,
             page_size=page_size,
@@ -196,7 +199,8 @@ async def get_car_detail(
     try:
         logger.info(f"🔍 SK Auction detail request: {mng_div_cd}/{mng_no}/{exhi_regi_seq}")
 
-        result = sk_auction_service.get_car_detail(
+        result = await asyncio.to_thread(
+            sk_auction_service.get_car_detail,
             mng_div_cd=mng_div_cd,
             mng_no=mng_no,
             exhi_regi_seq=exhi_regi_seq,
@@ -245,7 +249,7 @@ async def get_brands(
     try:
         logger.info("📋 SK Auction brands request")
 
-        result = sk_auction_service.get_brands(region_code=region_code)
+        result = await asyncio.to_thread(sk_auction_service.get_brands, region_code=region_code)
 
         if not result.success:
             logger.warning(f"⚠️ SK Auction brands failed: {result.message}")
@@ -283,7 +287,8 @@ async def get_models(
     try:
         logger.info(f"📋 SK Auction models request for brand: {brand_code}")
 
-        result = sk_auction_service.get_models(
+        result = await asyncio.to_thread(
+            sk_auction_service.get_models,
             brand_code=brand_code,
             region_code=region_code,
         )
@@ -325,7 +330,8 @@ async def get_generations(
     try:
         logger.info(f"📋 SK Auction generations request for model: {model_code}")
 
-        result = sk_auction_service.get_generations(
+        result = await asyncio.to_thread(
+            sk_auction_service.get_generations,
             model_code=model_code,
             region_code=region_code,
         )
@@ -364,7 +370,7 @@ async def get_fuel_types():
     try:
         logger.info("📋 SK Auction fuel types request")
 
-        result = sk_auction_service.get_fuel_types()
+        result = await asyncio.to_thread(sk_auction_service.get_fuel_types)
 
         if not result.success:
             logger.warning(f"⚠️ SK Auction fuel types failed: {result.message}")
@@ -400,7 +406,7 @@ async def get_years():
     try:
         logger.info("📋 SK Auction years request")
 
-        result = sk_auction_service.get_years()
+        result = await asyncio.to_thread(sk_auction_service.get_years)
 
         if not result.success:
             logger.warning(f"⚠️ SK Auction years failed: {result.message}")
@@ -441,7 +447,7 @@ async def get_total_count(
     try:
         logger.info(f"📊 SK Auction total count request: date={auction_date}")
 
-        result = sk_auction_service.get_total_count(auction_date=auction_date)
+        result = await asyncio.to_thread(sk_auction_service.get_total_count, auction_date=auction_date)
 
         if not result.success:
             logger.warning(f"⚠️ SK Auction count failed: {result.message}")
@@ -479,7 +485,7 @@ async def health_check():
     try:
         logger.info("🏥 SK Auction health check")
 
-        result = sk_auction_service.health_check()
+        result = await asyncio.to_thread(sk_auction_service.health_check)
         return result
 
     except Exception as e:
