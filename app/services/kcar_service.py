@@ -2057,53 +2057,35 @@ class KCarService:
                 "AUC_PLC_CD": "",
             }
             
-            # Fetch LANE A count
-            data_a = {**base_data, "LANE_TYPE": "A"}
-            logger.info("📊 Fetching KCar count for LANE A...")
-            
-            response_a = self.session.post(
-                f"{self.base_url}/kcar/auction/auctionCarCount_ajax.do",
-                data=data_a,
-                headers=headers,
-                timeout=10,
-                verify=False
-            )
-            
-            lane_a_count = 0
-            if response_a.status_code == 200:
+            # Fetch LANE A and LANE B counts in parallel
+            url = f"{self.base_url}/kcar/auction/auctionCarCount_ajax.do"
+
+            def _fetch_lane_count(lane_type: str) -> int:
+                logger.info(f"📊 Fetching KCar count for LANE {lane_type}...")
+                data = {**base_data, "LANE_TYPE": lane_type}
                 try:
-                    data = response_a.json()
-                    if "modelVo" in data and len(data["modelVo"]) > 0:
-                        lane_a_count = int(data["modelVo"][0].get("TOT_CNT", "0"))
-                        logger.info(f"✅ LANE A count: {lane_a_count}")
+                    response = self.session.post(
+                        url, data=data, headers=headers, timeout=10, verify=False
+                    )
+                    if response.status_code == 200:
+                        result = response.json()
+                        if "modelVo" in result and len(result["modelVo"]) > 0:
+                            count = int(result["modelVo"][0].get("TOT_CNT", "0"))
+                            logger.info(f"✅ LANE {lane_type} count: {count}")
+                            return count
+                    else:
+                        logger.error(f"❌ Failed to fetch LANE {lane_type} count: {response.status_code}")
                 except Exception as e:
-                    logger.error(f"❌ Error parsing LANE A response: {e}")
-            else:
-                logger.error(f"❌ Failed to fetch LANE A count: {response_a.status_code}")
-            
-            # Fetch LANE B count
-            data_b = {**base_data, "LANE_TYPE": "B"}
-            logger.info("📊 Fetching KCar count for LANE B...")
-            
-            response_b = self.session.post(
-                f"{self.base_url}/kcar/auction/auctionCarCount_ajax.do",
-                data=data_b,
-                headers=headers,
-                timeout=10,
-                verify=False
-            )
-            
-            lane_b_count = 0
-            if response_b.status_code == 200:
-                try:
-                    data = response_b.json()
-                    if "modelVo" in data and len(data["modelVo"]) > 0:
-                        lane_b_count = int(data["modelVo"][0].get("TOT_CNT", "0"))
-                        logger.info(f"✅ LANE B count: {lane_b_count}")
-                except Exception as e:
-                    logger.error(f"❌ Error parsing LANE B response: {e}")
-            else:
-                logger.error(f"❌ Failed to fetch LANE B count: {response_b.status_code}")
+                    logger.error(f"❌ Error fetching LANE {lane_type} count: {e}")
+                return 0
+
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                future_a = executor.submit(_fetch_lane_count, "A")
+                future_b = executor.submit(_fetch_lane_count, "B")
+                lane_a_count = future_a.result(timeout=15)
+                lane_b_count = future_b.result(timeout=15)
             
             total = lane_a_count + lane_b_count
             logger.info(f"📊 KCar Total Count: {total} (LANE A: {lane_a_count}, LANE B: {lane_b_count})")

@@ -143,6 +143,11 @@ class BaseAuctionService(ABC):
         if not self.authenticated:
             return False
 
+        # Async clients use aiohttp — can't do sync HEAD request here.
+        # Fall back to checking if we have active sessions (cookie existence).
+        if self.use_async:
+            return bool(self.client.session_manager._sessions)
+
         try:
             session = self.client.session_manager.get_session()
             response = session.head(

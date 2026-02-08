@@ -325,6 +325,48 @@ class EnhancedLotteService(BaseAuctionService):
                 "error": "INTERNAL_ERROR",
             }
 
+    def _sync_get_car_detail(
+        self, car_id: str, car_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Synchronous car detail fetcher for use with asyncio.to_thread.
+        Mirrors get_car_details() but without async/await.
+        """
+        cache_key = f"car_details_{car_id}"
+        cached_details = self.get_from_cache(cache_key)
+        if cached_details:
+            return cached_details
+
+        try:
+            urls = self.get_urls()
+            details_url = urljoin(self.base_url, urls.get("car_details", "/"))
+            params = {"id": car_id}
+
+            response = self.client.request(
+                "GET", details_url,
+                session_id=self.auction_name,
+                params=params,
+            )
+            content = response.text
+
+            car_details = self.parser.parse_car_details(content, car_data)
+
+            if car_details:
+                car_dict = car_details.model_dump()
+                car_dict["auction_name"] = "lotte"
+                car_dict["detailed_parsed_at"] = datetime.now().isoformat()
+                self.save_to_cache(cache_key, car_dict)
+                self.save_persistent_cache(cache_key, car_dict)
+                return car_dict
+
+            return None
+
+        except Exception as e:
+            logger.error(
+                f"Ошибка получения деталей автомобиля {car_id} в {self.auction_name}: {e}"
+            )
+            return None
+
     async def get_cars_with_details(
         self, limit: int = 10, offset: int = 0
     ) -> List[Dict[str, Any]]:
@@ -361,7 +403,8 @@ class EnhancedLotteService(BaseAuctionService):
                     car for car in detailed_cars if not isinstance(car, Exception)
                 ]
             else:
-                # Parallel detail fetching with semaphore to limit concurrency
+                # Sync client: wrap blocking calls with asyncio.to_thread
+                # so asyncio.gather can run them in parallel threads
                 import asyncio
 
                 semaphore = asyncio.Semaphore(5)
@@ -371,7 +414,9 @@ class EnhancedLotteService(BaseAuctionService):
                         try:
                             car_id = car_data.get("id") or car_data.get("auction_number")
                             if car_id:
-                                details = await self.get_car_details(str(car_id), car_data)
+                                details = await asyncio.to_thread(
+                                    self._sync_get_car_detail, str(car_id), car_data
+                                )
                                 return details or car_data
                             return car_data
                         except Exception as e:
