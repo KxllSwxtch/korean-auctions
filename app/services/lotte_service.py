@@ -99,7 +99,7 @@ class LotteService(BaseAuctionService):
     @retry(
         stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
     )
-    async def _authenticate(self) -> bool:
+    def _authenticate(self) -> bool:
         """Аутентификация в системе Lotte (двухэтапный процесс)"""
         try:
             session = self._init_session()
@@ -200,23 +200,15 @@ class LotteService(BaseAuctionService):
                     logger.debug(f"Финальный логин headers: {final_response.headers}")
                     
                     if final_response.status_code in [200, 302, 303]:
-                        self.authenticated = True
-                        logger.info("✅ Аутентификация в Lotte успешна!")
-                        logger.debug(f"Cookies после аутентификации: {session.cookies.get_dict()}")
-                        
-                        # Сохраняем сессию для дальнейшего использования
-                        try:
-                            if "JSESSIONID" in session.cookies:
-                                jsessionid = session.cookies.get('JSESSIONID')
-                                if jsessionid:
-                                    logger.info(f"JSESSIONID получен: {str(jsessionid)[:20]}...")
-                        except Exception as e:
-                            logger.debug(f"Не удалось получить JSESSIONID: {e}")
-                        
-                        # Сохраняем cookies в файл
-                        self._save_session()
-                        
-                        return True
+                        # Verify the session actually works by hitting a protected page
+                        if self._validate_session():
+                            self.authenticated = True
+                            logger.info("✅ Аутентификация в Lotte успешна и проверена!")
+                            self._save_session()
+                            return True
+                        else:
+                            logger.error("Login POST succeeded but session validation failed")
+                            return False
                     else:
                         logger.error(
                             f"Ошибка финального логина: HTTP {final_response.status_code}"
@@ -252,6 +244,30 @@ class LotteService(BaseAuctionService):
             logger.error(f"Ошибка при аутентификации в Lotte: {e}")
             return False
 
+    def _validate_session(self) -> bool:
+        """Validate current session by making a test request to a protected page."""
+        try:
+            session = self._init_session()
+            test_url = urljoin(self.base_url, self.urls["home"])
+            response = session.get(test_url, timeout=15, verify=False)
+            if response.status_code != 200:
+                return False
+            if self._is_login_page(response.text):
+                return False
+            return True
+        except Exception as e:
+            logger.warning(f"Session validation error: {e}")
+            return False
+
+    def _is_login_page(self, html: str) -> bool:
+        """Detect if response is a login page redirect instead of actual content."""
+        login_indicators = [
+            "<title>로그인 | 롯데오토옥션</title>",
+            "fail_notAuctLogin",
+            "notAuctLogin",
+        ]
+        return any(indicator in html for indicator in login_indicators)
+
     def _get_from_cache(self, key: str) -> Optional[Any]:
         """Получение данных из кеша"""
         if key in self.cache:
@@ -285,7 +301,7 @@ class LotteService(BaseAuctionService):
         try:
             # Аутентификация если нужно
             if not self.authenticated:
-                auth_success = await self._authenticate()
+                auth_success = self._authenticate()
                 if not auth_success:
                     logger.error("Не удалось аутентифицироваться")
                     self._record_failure(Exception("Authentication failed"))
@@ -314,14 +330,13 @@ class LotteService(BaseAuctionService):
                 f"✅ Получена главная страница, размер: {len(response.text)} символов"
             )
 
-            # Проверяем на ошибку аутентификации
-            if len(response.text) < 1000:
-                if "fail_notAuctLogin" in response.text or "notAuctLogin" in response.text:
-                    logger.error("🔐 Сессия истекла при получении даты аукциона! Требуется повторная аутентификация")
-                    self.authenticated = False
-                    self.session = None
-                    self._record_failure(Exception("Session expired - fail_notAuctLogin"))
-                    raise Exception("Session expired - need re-authentication")
+            # Проверяем на ошибку аутентификации (login page redirect или JSON fail)
+            if self._is_login_page(response.text):
+                logger.error("🔐 Login page detected - session is invalid")
+                self.authenticated = False
+                self.session = None
+                self._record_failure(Exception("Session expired - login page detected"))
+                raise Exception("Session expired - need re-authentication")
 
             # Парсим дату
             auction_date = self.parser.parse_auction_date(response.text)
@@ -357,7 +372,7 @@ class LotteService(BaseAuctionService):
             # Аутентификация если нужно
             if not self.authenticated:
                 logger.info("Требуется аутентификация для получения списка автомобилей")
-                auth_success = await self._authenticate()
+                auth_success = self._authenticate()
                 if not auth_success:
                     logger.error("Не удалось аутентифицироваться для получения автомобилей")
                     raise Exception("Не удалось аутентифицироваться")
@@ -416,6 +431,12 @@ class LotteService(BaseAuctionService):
                 self._record_failure(Exception(f"HTTP {response.status_code}"))
                 return None
 
+            if self._is_login_page(response.text):
+                logger.error("🔐 Login page detected - session is invalid")
+                self.authenticated = False
+                self._record_failure(Exception("Session expired - login page detected"))
+                raise Exception("Session expired - need re-authentication")
+
             # Парсим детальную информацию
             detailed_car = self.parser.parse_car_details(response.text, car_basic_data)
 
@@ -447,7 +468,7 @@ class LotteService(BaseAuctionService):
         try:
             # Аутентификация если нужно
             if not self.authenticated:
-                auth_success = await self._authenticate()
+                auth_success = self._authenticate()
                 if not auth_success:
                     logger.error("Не удалось аутентифицироваться")
                     return []
@@ -718,20 +739,13 @@ class LotteService(BaseAuctionService):
             if response.status_code == 200:
                 logger.info(f"✅ Получен ответ: {len(response.text)} символов")
 
-                # Проверяем размер ответа
-                if len(response.text) < 1000:
-                    logger.warning(f"⚠️ Подозрительно маленький ответ: {len(response.text)} символов")
-                    logger.debug(f"Полный ответ: {response.text}")
-
-                    # Проверяем на ошибку аутентификации
-                    if "fail_notAuctLogin" in response.text or "notAuctLogin" in response.text:
-                        logger.error("🔐 Сессия истекла! Требуется повторная аутентификация")
-                        # Сбрасываем аутентификацию для следующей попытки
-                        self.authenticated = False
-                        self.session = None
-                        self._record_failure(Exception("Session expired - fail_notAuctLogin"))
-                        # Raise exception to trigger retry with re-authentication
-                        raise Exception("Session expired - need re-authentication")
+                # Проверяем на ошибку аутентификации (login page redirect или JSON fail)
+                if self._is_login_page(response.text):
+                    logger.error("🔐 Login page detected - session is invalid")
+                    self.authenticated = False
+                    self.session = None
+                    self._record_failure(Exception("Session expired - login page detected"))
+                    raise Exception("Session expired - need re-authentication")
 
                 # Проверяем, содержит ли ответ таблицу с автомобилями
                 if 'tbl-t02' in response.text:
@@ -882,6 +896,12 @@ class LotteService(BaseAuctionService):
             )
             response.raise_for_status()
 
+            if self._is_login_page(response.text):
+                logger.error("🔐 Login page detected - session is invalid")
+                self.authenticated = False
+                self._record_failure(Exception("Session expired - login page detected"))
+                raise Exception("Session expired - need re-authentication")
+
             # Формируем source URL для отслеживания
             source_url = f"{url}?{requests.compat.urlencode(params)}"
 
@@ -911,41 +931,55 @@ class LotteService(BaseAuctionService):
             )
     
     def _save_session(self):
-        """Сохраняет текущую сессию в файл"""
+        """Save current session cookies to file."""
         try:
             if self.session and self.authenticated:
-                session_data = {
-                    'cookies': dict(self.session.cookies),
+                cookies = dict(self.session.cookies)
+                metadata = {
                     'authenticated': self.authenticated,
-                    'base_url': self.base_url
+                    'base_url': self.base_url,
                 }
-                self.session_manager.save_session('lotte', session_data)
-                logger.info("Сессия Lotte сохранена")
+                self.session_manager.save_session('lotte', cookies, metadata=metadata)
+                logger.info("✅ Lotte session saved")
         except Exception as e:
-            logger.error(f"Ошибка при сохранении сессии: {e}")
+            logger.error(f"Error saving Lotte session: {e}")
     
     def _restore_session(self):
-        """Восстанавливает сессию из файла"""
+        """Restore session from file and validate it."""
         try:
             session_data = self.session_manager.load_session('lotte')
-            if session_data:
-                self.session = self._init_session()
-                # Восстанавливаем cookies
-                for name, value in session_data.get('cookies', {}).items():
+            if not session_data:
+                return
+
+            # Reject sessions older than max age
+            age = self.session_manager.get_session_age('lotte')
+            if age and age > timedelta(minutes=self.session_max_age_minutes):
+                logger.warning(f"Saved Lotte session too old ({age.total_seconds()/60:.1f} min), discarding")
+                return
+
+            self.session = self._init_session()
+
+            # Handle both old double-nested and new flat cookie formats
+            cookies = session_data if isinstance(session_data, dict) else {}
+            # Old format: session_data = {'cookies': {...}, 'authenticated': True, ...}
+            if 'cookies' in cookies and isinstance(cookies.get('cookies'), dict):
+                cookies = cookies['cookies']
+            for name, value in cookies.items():
+                if isinstance(value, str):
                     self.session.cookies.set(name, value)
-                self.authenticated = session_data.get('authenticated', False)
-                logger.info(f"Сессия Lotte восстановлена, authenticated={self.authenticated}")
-                
-                # Проверяем, что сессия все еще валидна
-                try:
-                    if self.authenticated and 'JSESSIONID' in self.session.cookies:
-                        jsessionid = self.session.cookies.get('JSESSIONID')
-                        if jsessionid:
-                            logger.info(f"JSESSIONID восстановлен: {str(jsessionid)[:20]}...")
-                except Exception as e:
-                    logger.debug(f"Не удалось проверить JSESSIONID при восстановлении: {e}")
+
+            # Validate the restored session actually works
+            if self._validate_session():
+                self.authenticated = True
+                self.session_created_at = datetime.now()
+                logger.info("✅ Lotte session restored and validated")
+            else:
+                logger.warning("Restored Lotte session is invalid, will re-authenticate")
+                self.authenticated = False
+                self.session = None
         except Exception as e:
-            logger.error(f"Ошибка при восстановлении сессии: {e}")
+            logger.error(f"Error restoring Lotte session: {e}")
+            self.authenticated = False
     
     @retry(
         stop=stop_after_attempt(3),
@@ -966,7 +1000,7 @@ class LotteService(BaseAuctionService):
             # Аутентификация если нужно
             if not self.authenticated:
                 logger.info("Требуется аутентификация для получения истории автомобиля")
-                auth_success = await self._authenticate()
+                auth_success = self._authenticate()
                 if not auth_success:
                     self._record_failure(Exception("Authentication failed"))
                     return LotteCarHistoryResponse(
@@ -1034,6 +1068,12 @@ class LotteService(BaseAuctionService):
             )
             
             logger.info(f"Статус ответа истории: {response.status_code}")
+
+            if response.status_code == 200 and self._is_login_page(response.text):
+                logger.error("🔐 Login page detected - session is invalid")
+                self.authenticated = False
+                self._record_failure(Exception("Session expired - login page detected"))
+                raise Exception("Session expired - need re-authentication")
 
             if response.status_code != 200:
                 logger.error(f"Ошибка получения истории: HTTP {response.status_code}")
