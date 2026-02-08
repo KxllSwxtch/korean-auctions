@@ -56,9 +56,9 @@ class LotteService(BaseAuctionService):
         }
 
         self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
         ]
 
         logger.info("Инициализирован сервис Lotte")
@@ -177,6 +177,7 @@ class LotteService(BaseAuctionService):
                     final_login_data = {
                         "userId": login,
                         "userPwd": password,
+                        "resultCd": "",
                     }
 
                     # Убираем AJAX заголовки для обычного POST запроса
@@ -259,10 +260,14 @@ class LotteService(BaseAuctionService):
             session = self._init_session()
             test_url = urljoin(self.base_url, self.urls["home"])
             response = session.get(test_url, timeout=15, verify=False)
+            logger.debug(f"Session validation status: {response.status_code}")
             if response.status_code != 200:
+                logger.warning(f"Session validation: unexpected status {response.status_code}")
                 return False
             if self._is_login_page(response.text):
+                logger.warning(f"Session validation: response is login page (title snippet: {response.text[:200]})")
                 return False
+            logger.debug("Session validation: OK")
             return True
         except Exception as e:
             logger.warning(f"Session validation error: {e}")
@@ -272,8 +277,7 @@ class LotteService(BaseAuctionService):
         """Detect if response is a login page redirect instead of actual content."""
         login_indicators = [
             "<title>로그인 | 롯데오토옥션</title>",
-            "fail_notAuctLogin",
-            "notAuctLogin",
+            "경매회원전용 로그인",
         ]
         return any(indicator in html for indicator in login_indicators)
 
