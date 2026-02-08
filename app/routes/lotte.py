@@ -510,7 +510,7 @@ async def debug_authentication(service: LotteService = Depends(get_lotte_service
         service.reset_authentication()
 
         # Пробуем аутентифицироваться
-        auth_result = await service._authenticate()
+        auth_result = service._authenticate()
 
         return {
             "authentication_successful": auth_result,
@@ -540,7 +540,7 @@ async def debug_urls(service: LotteService = Depends(get_lotte_service)):
 
         # Убеждаемся, что аутентифицированы
         if not service.authenticated:
-            auth_result = await service._authenticate()
+            auth_result = service._authenticate()
             if not auth_result:
                 return {"error": "Не удалось аутентифицироваться"}
 
@@ -613,7 +613,7 @@ async def debug_page_content(service: LotteService = Depends(get_lotte_service))
 
         # Убеждаемся, что аутентифицированы
         if not service.authenticated:
-            auth_result = await service._authenticate()
+            auth_result = service._authenticate()
             if not auth_result:
                 return {"error": "Не удалось аутентифицироваться"}
 
@@ -681,7 +681,7 @@ async def debug_auction_date_direct(service: LotteService = Depends(get_lotte_se
 
         # Убеждаемся, что аутентифицированы
         if not service.authenticated:
-            auth_result = await service._authenticate()
+            auth_result = service._authenticate()
             if not auth_result:
                 return {"error": "Не удалось аутентифицироваться"}
 
@@ -716,7 +716,7 @@ async def debug_auction_date_verbose(
 
         # Убеждаемся, что аутентифицированы
         if not service.authenticated:
-            auth_result = await service._authenticate()
+            auth_result = service._authenticate()
             if not auth_result:
                 return {"error": "Не удалось аутентифицироваться"}
 
@@ -916,7 +916,7 @@ async def get_car_detail(
 
         # 🔧 ИСПРАВЛЕНИЕ: Принудительная аутентификация перед получением деталей
         logger.info("Проверка аутентификации перед получением деталей автомобиля...")
-        auth_result = await service._authenticate()
+        auth_result = service._authenticate()
         if not auth_result:
             logger.error("Не удалось аутентифицироваться в Lotte для получения деталей")
             return JSONResponse(
