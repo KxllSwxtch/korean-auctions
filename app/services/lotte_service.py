@@ -549,20 +549,15 @@ class LotteService(BaseAuctionService):
                 response.request_duration = time.time() - start_time
                 return response
 
-            # Проверяем дату аукциона
+            # Информация о дате аукциона (не блокирует получение автомобилей)
+            date_note = ""
             if not auction_date.is_today:
                 if auction_date.is_future:
-                    response.message = f"Аукцион не сегодня. Ближайший аукцион: {auction_date.auction_date}. Используйте /cars/upcoming для просмотра лотов."
+                    date_note = f" (ближайший аукцион: {auction_date.auction_date})"
                 else:
-                    response.message = (
-                        f"Дата аукциона уже прошла: {auction_date.auction_date}"
-                    )
+                    date_note = f" (дата аукциона прошла: {auction_date.auction_date})"
 
-                # Возвращаем только информацию о дате без автомобилей
-                response.request_duration = time.time() - start_time
-                return response
-
-            # Если аукцион сегодня, получаем автомобили
+            # Всегда получаем автомобили
             cars = await self.get_cars_with_date_check(limit, offset)
 
             # Получаем общее количество автомобилей для правильной пагинации
@@ -575,7 +570,7 @@ class LotteService(BaseAuctionService):
             response.total_pages = (
                 (total_count + limit - 1) // limit if total_count > 0 else 1
             )
-            response.message = f"Найдено {len(cars)} автомобилей на странице {response.page} из {total_count} общих на аукционе {auction_date.auction_date}"
+            response.message = f"Найдено {len(cars)} автомобилей на странице {response.page} из {total_count} общих{date_note}"
 
             response.request_duration = time.time() - start_time
             return response
