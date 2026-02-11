@@ -737,9 +737,9 @@ async def get_search_filters_info():
             "manufacturer_codes": {
                 "001": "현대 (Hyundai)",
                 "002": "기아 (Kia)",
-                "003": "삼성르노 (Samsung Renault)",
-                "004": "대우GM (Daewoo GM)",
-                "005": "쌍용 (SsangYong)",
+                "003": "쉐보레(GM대우) (Chevrolet/GM Daewoo)",
+                "004": "KG모빌리티(쌍용) (KG Mobility/SsangYong)",
+                "005": "르노코리아(삼성) (Renault Korea/Samsung)",
                 "006": "한국GM (GM Korea)",
                 "007": "수입 (Import)",
                 "008": "기타 (Others)",

@@ -654,9 +654,9 @@ KCAR_MANUFACTURERS = [
 KCAR_API_MANUFACTURERS = [
     KCarManufacturer(code="001", name="현대", name_en="Hyundai"),
     KCarManufacturer(code="002", name="기아", name_en="Kia"),
-    KCarManufacturer(code="003", name="삼성르노", name_en="Samsung Renault"),
-    KCarManufacturer(code="004", name="대우GM", name_en="Daewoo GM"),
-    KCarManufacturer(code="005", name="쌍용", name_en="SsangYong"),
+    KCarManufacturer(code="003", name="쉐보레(GM대우)", name_en="Chevrolet (GM Daewoo)"),
+    KCarManufacturer(code="004", name="KG모빌리티(쌍용)", name_en="KG Mobility (SsangYong)"),
+    KCarManufacturer(code="005", name="르노코리아(삼성)", name_en="Renault Korea (Samsung)"),
     KCarManufacturer(code="006", name="한국GM", name_en="GM Korea"),
     KCarManufacturer(code="007", name="수입", name_en="Import"),
     KCarManufacturer(code="008", name="기타", name_en="Others"),
@@ -668,9 +668,9 @@ KCAR_UI_TO_API_MAPPING = {
     "001_001": "001",  # Hyundai
     "001_007": "001",  # Genesis -> Hyundai
     "001_002": "002",  # Kia
-    "001_003": "004",  # Chevrolet (GM Daewoo) -> Daewoo GM
-    "001_005": "003",  # Renault Korea (Samsung) -> Samsung Renault
-    "001_004": "005",  # KG Mobility (SsangYong) -> SsangYong
+    "001_003": "003",  # Chevrolet (GM Daewoo)
+    "001_004": "004",  # KG Mobility (SsangYong)
+    "001_005": "005",  # Renault Korea (Samsung)
     "001_088": "008",  # Daewoo Bus -> Others
     "001_006": "008",  # Other Domestic -> Others
     # Импортные производители - используем фактические коды
