@@ -49,7 +49,7 @@ class KCarService:
 
         # Учетные данные из конфигурации
         self.username = "autobaza"
-        self.password = "for1657721@"
+        self.password = "baza9851!!"
 
         # Отслеживание состояния сессии
         self.session_created_at = datetime.now()
@@ -2017,7 +2017,7 @@ class KCarService:
 
             # Ensure we're authenticated
             if not self.authenticated:
-                if not self.authenticate():
+                if not self._authenticate():
                     logger.error("❌ Failed to authenticate for fetching count")
                     return {
                         "lane_a_count": 0,
