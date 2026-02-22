@@ -481,7 +481,7 @@ class LotteFilterService:
         try:
             logger.info(f"Поиск автомобилей с фильтрами: {filter_request.model_dump()}")
 
-            # Подготовка данных для поиска на основе примера results.py
+            # Подготовка данных для поиска — всегда включаем все поля (как реальная форма Lotte)
             search_data = {
                 "searchPageUnit": str(filter_request.per_page),
                 "pageIndex": str(filter_request.page),
@@ -490,53 +490,26 @@ class LotteFilterService:
                 "search_preVal": "",
                 "excelDiv": "",
                 "searchLaneDiv": filter_request.lane_division or "",
-                "search_doimCd": "",
+                "search_doimCd": filter_request.production_origin or "",
                 "search_exhiNo": filter_request.exhibition_number or "",
+                "set_search_maker": filter_request.manufacturer_code or "",
+                "set_search_mdl": filter_request.model_code or "",
+                "searchAuctDt": filter_request.auction_date or "",
+                "search_startPrice": str(filter_request.min_price) if filter_request.min_price is not None else "",
+                "search_endPrice": str(filter_request.max_price) if filter_request.max_price is not None else "",
+                "search_startYyyy": str(filter_request.min_year) if filter_request.min_year is not None else "",
+                "search_endYyyy": str(filter_request.max_year) if filter_request.max_year is not None else "",
+                "search_fuelCd": filter_request.fuel_code or "",
+                "search_trnsCd": filter_request.transmission_code or "",
             }
-
-            # Основные фильтры
-            if filter_request.manufacturer_code:
-                search_data["set_search_maker"] = filter_request.manufacturer_code
-
-            if filter_request.model_code:
-                search_data["set_search_mdl"] = filter_request.model_code
-
-            # Дата аукциона
-            if filter_request.auction_date:
-                search_data["searchAuctDt"] = filter_request.auction_date
-
-            # Ценовые фильтры
-            if filter_request.min_price is not None:
-                search_data["search_startPrice"] = str(filter_request.min_price)
-                search_data["search_startPrice_s"] = str(filter_request.min_price)
-
-            if filter_request.max_price is not None:
-                search_data["search_endPrice"] = str(filter_request.max_price)
-                search_data["search_endPrice_s"] = str(filter_request.max_price)
-
-            # Год выпуска
-            if filter_request.min_year is not None:
-                search_data["search_startYyyy"] = str(filter_request.min_year)
-
-            if filter_request.max_year is not None:
-                search_data["search_endYyyy"] = str(filter_request.max_year)
-
-            # Тип топлива и трансмиссия
-            if filter_request.fuel_code:
-                search_data["search_fuelCd"] = filter_request.fuel_code
-
-            if filter_request.transmission_code:
-                search_data["search_trnsCd"] = filter_request.transmission_code
 
             # Группа автомобилей (одиночный выбор)
             if filter_request.car_group_code:
                 search_data["set_search_chk_carGrp"] = filter_request.car_group_code
 
-            # Подмодели с ценами (множественный выбор)
+            # Подмодели с ценами (множественный выбор — список для requests)
             if filter_request.mprice_car_codes:
-                search_data["set_search_chk_mpriceCar"] = (
-                    filter_request.mprice_car_codes
-                )
+                search_data["set_search_chk_mpriceCar"] = filter_request.mprice_car_codes
 
             # Выполняем поиск
             session = self._init_session()
@@ -611,7 +584,7 @@ class LotteFilterService:
         try:
             logger.info(f"Поиск автомобилей с парсингом: {filter_request.model_dump()}")
 
-            # Подготовка данных для поиска
+            # Подготовка данных для поиска — всегда включаем все поля (как реальная форма Lotte)
             search_data = {
                 "searchPageUnit": str(filter_request.per_page),
                 "pageIndex": str(filter_request.page),
@@ -620,49 +593,24 @@ class LotteFilterService:
                 "search_preVal": "",
                 "excelDiv": "",
                 "searchLaneDiv": filter_request.lane_division or "",
-                "search_doimCd": "",
+                "search_doimCd": filter_request.production_origin or "",
                 "search_exhiNo": filter_request.exhibition_number or "",
+                "set_search_maker": filter_request.manufacturer_code or "",
+                "set_search_mdl": filter_request.model_code or "",
+                "searchAuctDt": filter_request.auction_date or "",
+                "search_startPrice": str(filter_request.min_price) if filter_request.min_price is not None else "",
+                "search_endPrice": str(filter_request.max_price) if filter_request.max_price is not None else "",
+                "search_startYyyy": str(filter_request.min_year) if filter_request.min_year is not None else "",
+                "search_endYyyy": str(filter_request.max_year) if filter_request.max_year is not None else "",
+                "search_fuelCd": filter_request.fuel_code or "",
+                "search_trnsCd": filter_request.transmission_code or "",
             }
-
-            # Основные фильтры
-            if filter_request.manufacturer_code:
-                search_data["set_search_maker"] = filter_request.manufacturer_code
-
-            if filter_request.model_code:
-                search_data["set_search_mdl"] = filter_request.model_code
-
-            # Дата аукциона
-            if filter_request.auction_date:
-                search_data["searchAuctDt"] = filter_request.auction_date
-
-            # Ценовые фильтры
-            if filter_request.min_price is not None:
-                search_data["search_startPrice"] = str(filter_request.min_price)
-                search_data["search_startPrice_s"] = str(filter_request.min_price)
-
-            if filter_request.max_price is not None:
-                search_data["search_endPrice"] = str(filter_request.max_price)
-                search_data["search_endPrice_s"] = str(filter_request.max_price)
-
-            # Год выпуска
-            if filter_request.min_year is not None:
-                search_data["search_startYyyy"] = str(filter_request.min_year)
-
-            if filter_request.max_year is not None:
-                search_data["search_endYyyy"] = str(filter_request.max_year)
-
-            # Тип топлива и трансмиссия
-            if filter_request.fuel_code:
-                search_data["search_fuelCd"] = filter_request.fuel_code
-
-            if filter_request.transmission_code:
-                search_data["search_trnsCd"] = filter_request.transmission_code
 
             # Группа автомобилей (одиночный выбор)
             if filter_request.car_group_code:
                 search_data["set_search_chk_carGrp"] = filter_request.car_group_code
 
-            # Подмодели с ценами (множественный выбор)
+            # Подмодели с ценами (множественный выбор — список для requests)
             if filter_request.mprice_car_codes:
                 search_data["set_search_chk_mpriceCar"] = filter_request.mprice_car_codes
 

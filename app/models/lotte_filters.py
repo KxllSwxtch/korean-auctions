@@ -68,6 +68,7 @@ class LotteFilterRequest(BaseModel):
     fuel_code: Optional[str] = Field(None, description="Код типа топлива")
     transmission_code: Optional[str] = Field(None, description="Код трансмиссии")
     lane_division: Optional[str] = Field(None, description="Разделение по полосам")
+    production_origin: Optional[str] = Field(None, description="Производство: '' (все), '1' (корейские), '2' (импорт)")
     exhibition_number: Optional[str] = Field(None, description="Номер выставки")
 
     # Пагинация

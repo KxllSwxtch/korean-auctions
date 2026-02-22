@@ -548,15 +548,18 @@ class LotteFilterParser:
         try:
             soup = BeautifulSoup(html_content, "html.parser")
 
-            # Ищем текст с общим количеством
-            total_text = soup.find(
-                "span", string=lambda text: text and "대의 차량이 있습니다" in text
-            )
-            if total_text:
-                # Извлекаем число из текста
-                match = re.search(r"총 <em>(\d+)</em>대의", str(total_text.parent))
-                if match:
-                    return int(match.group(1))
+            # Method 1: Find <em> inside the total count text
+            total_span = soup.find("em", string=re.compile(r"[\d,]+"))
+            if total_span:
+                parent_text = str(total_span.parent)
+                if "대의 차량이 있습니다" in parent_text:
+                    count_text = total_span.get_text(strip=True)
+                    return int(count_text.replace(",", ""))
+
+            # Method 2: Regex on raw HTML for comma-formatted numbers
+            match = re.search(r'총\s*<em>([\d,]+)</em>\s*대의', html_content)
+            if match:
+                return int(match.group(1).replace(",", ""))
 
             return 0
         except Exception as e:
