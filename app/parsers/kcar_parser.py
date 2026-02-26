@@ -1,4 +1,5 @@
 import json
+import re
 from typing import List, Dict, Any, Optional
 from loguru import logger
 
@@ -628,6 +629,24 @@ class KCarParser:
                                     f"🎨 Найдены топливо/цвет: {car.fuel_type}/{car.exterior_color}"
                                 )
 
+                # 8.5. Ищем номер лота (출품번호) и раунд аукциона (제XXX회차)
+                for span_tag in soup.find_all("span"):
+                    span_text = span_tag.get_text(strip=True)
+                    if "출품번호" in span_text:
+                        lot_num = span_text.replace("출품번호", "").strip()
+                        if lot_num:
+                            car.lot_number = lot_num
+                            logger.debug(f"🏷️ Найден номер лота: {car.lot_number}")
+                        break
+
+                for p_tag in soup.find_all("p"):
+                    p_text = p_tag.get_text(strip=True)
+                    match = re.search(r'제(\d+)회차', p_text)
+                    if match and "출품번호" in p_text:
+                        car.auction_round = f"제{match.group(1)}회차"
+                        logger.debug(f"🔄 Найден раунд аукциона: {car.auction_round}")
+                        break
+
                 # 9. Ищем главное изображение
                 main_img = soup.find("img", id="main_img")
                 if main_img and main_img.get("src"):
@@ -674,8 +693,16 @@ class KCarParser:
                             if full_url not in all_images:
                                 all_images.append(full_url)
 
-                car.all_images = all_images
-                logger.debug(f"📸 Найдено {len(all_images)} изображений")
+                # Нормализуем все URL к полноразмерным (_1180) и удаляем дубликаты
+                normalized = []
+                seen = set()
+                for url in all_images:
+                    full_url_normalized = re.sub(r'_(\d+)\.', '_1180.', url)
+                    if full_url_normalized not in seen:
+                        seen.add(full_url_normalized)
+                        normalized.append(full_url_normalized)
+                car.all_images = normalized
+                logger.debug(f"📸 Найдено {len(normalized)} уникальных изображений (нормализовано к _1180)")
 
                 # 10. Ищем VIN номер с fallback селекторами
                 vin_row = self._find_with_fallbacks(soup, "vin")
