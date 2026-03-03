@@ -28,6 +28,19 @@ from app.services.heydealer_client_filter import client_filter
 
 logger = logging.getLogger(__name__)
 
+
+def is_valid_hash_id(value: str) -> bool:
+    """Validate HeyDealer hash_id format.
+
+    Standard hash_ids are 6 alphanumeric characters.
+    Special category IDs like 'etc' (화물·특장·Other) are shorter but valid.
+    """
+    if not value or not value.strip():
+        return False
+    clean = value.replace("_", "").replace("-", "")
+    return 2 <= len(clean) <= 6 and clean.isalnum()
+
+
 router = APIRouter(prefix="/heydealer", tags=["HeyDealer"])
 
 # Глобальный экземпляр сервиса (singleton)
@@ -106,8 +119,8 @@ async def get_heydealer_cars(
 
         # Добавляем параметры фильтрации если они указаны (и не пустые)
         if brand and brand.strip():
-            # Проверяем, является ли brand hash_id (6 символов, содержит буквы и цифры)
-            if len(brand) == 6 and brand.replace("_", "").replace("-", "").isalnum():
+            # Проверяем, является ли brand валидным hash_id
+            if is_valid_hash_id(brand):
                 # Это hash_id, используем как есть
                 params["brand"] = brand
                 logger.info(f"Используем brand hash_id: {brand}")
@@ -119,42 +132,39 @@ async def get_heydealer_cars(
                     logger.info(f"Найден hash_id для бренда {brand}: {brand_hash_id}")
                 else:
                     logger.warning(
-                        f"Бренд {brand} не найден. Используйте hash_id из 6 символов"
+                        f"Бренд {brand} не найден. Ожидается валидный hash_id (2-6 символов)"
                     )
 
         # Обработка model_group - расширяем до generation IDs
         needs_model_group_expansion = False
         if model_group and model_group.strip() and not model:
             # Принимаем только hash_id (как в оригинальном API HeyDealer)
-            if (
-                len(model_group) == 6
-                and model_group.replace("_", "").replace("-", "").isalnum()
-            ):
+            if is_valid_hash_id(model_group):
                 # HeyDealer API не поддерживает model_group напрямую
                 needs_model_group_expansion = True
                 logger.info(f"🔧 model_group ({model_group}) будет расширен до generation IDs")
             else:
                 logger.warning(
-                    f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат model_group: {model_group}. Ожидается валидный hash_id (2-6 символов)"
                 )
         if model and model.strip():
             # Принимаем только hash_id для model (поколение)
-            if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
+            if is_valid_hash_id(model):
                 params["model"] = model
                 logger.info(f"Используем model hash_id: {model}")
             else:
                 logger.warning(
-                    f"Неверный формат model: {model}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат model: {model}. Ожидается валидный hash_id (2-6 символов)"
                 )
 
         if grade and grade.strip():
             # Принимаем только hash_id для grade (конфигурация)
-            if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
+            if is_valid_hash_id(grade):
                 params["grade"] = grade
                 logger.info(f"✅ Используем grade hash_id: {grade} для фильтрации")
             else:
                 logger.warning(
-                    f"⚠️ Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
+                    f"⚠️ Неверный формат grade: {grade}. Ожидается валидный hash_id (2-6 символов)"
                 )
 
         # Если нужно расширение model_group
@@ -536,34 +546,31 @@ async def get_filtered_cars(
         # Добавляем фильтры (только если они не пустые и валидные)
         if brand and brand.strip():
             # Проверяем формат hash_id для brand
-            if len(brand) == 6 and brand.replace("_", "").replace("-", "").isalnum():
+            if is_valid_hash_id(brand):
                 params["brand"] = brand
                 logger.info(f"Используем brand hash_id: {brand}")
             else:
                 logger.warning(
-                    f"Неверный формат brand: {brand}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат brand: {brand}. Ожидается валидный hash_id (2-6 символов)"
                 )
 
         # Обработка model_group - НЕ добавляем в params, так как API не поддерживает
         needs_model_group_expansion = False
         if model_group and model_group.strip() and not model:
             # Проверяем формат hash_id для model_group
-            if (
-                len(model_group) == 6
-                and model_group.replace("_", "").replace("-", "").isalnum()
-            ):
+            if is_valid_hash_id(model_group):
                 # HeyDealer API не поддерживает model_group напрямую
                 # Нужно будет сделать отдельные запросы для каждого generation
                 needs_model_group_expansion = True
                 logger.info(f"Model_group {model_group} будет расширен до generation IDs")
             else:
                 logger.warning(
-                    f"Неверный формат model_group: {model_group}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат model_group: {model_group}. Ожидается валидный hash_id (2-6 символов)"
                 )
 
         if model and model.strip():
             # Проверяем формат hash_id для model
-            if len(model) == 6 and model.replace("_", "").replace("-", "").isalnum():
+            if is_valid_hash_id(model):
                 params["model"] = model
                 logger.info(f"Используем model hash_id: {model}")
                 # Если указана конкретная модель (generation), удаляем brand для точной фильтрации
@@ -572,12 +579,12 @@ async def get_filtered_cars(
                     logger.info(f"Удален параметр brand, так как указана конкретная модель {model}")
             else:
                 logger.warning(
-                    f"Неверный формат model: {model}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат model: {model}. Ожидается валидный hash_id (2-6 символов)"
                 )
 
         if grade and grade.strip():
             # Проверяем формат hash_id для grade
-            if len(grade) == 6 and grade.replace("_", "").replace("-", "").isalnum():
+            if is_valid_hash_id(grade):
                 params["grade"] = grade
                 logger.info(f"Используем grade hash_id: {grade}")
                 # Если указана конкретная конфигурация (grade), удаляем более широкие фильтры
@@ -589,7 +596,7 @@ async def get_filtered_cars(
                     logger.info(f"Удален параметр model, так как указана конкретная конфигурация {grade}")
             else:
                 logger.warning(
-                    f"Неверный формат grade: {grade}. Ожидается hash_id из 6 символов"
+                    f"Неверный формат grade: {grade}. Ожидается валидный hash_id (2-6 символов)"
                 )
         if min_year:
             params["min_year"] = min_year

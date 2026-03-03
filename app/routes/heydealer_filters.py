@@ -137,12 +137,13 @@ async def get_model_generations(model_group_hash_id: str):
     try:
         logger.info(f"🔍 Запрос поколений для model_group: {model_group_hash_id}")
         
-        # Проверяем формат hash_id
-        if not model_group_hash_id or len(model_group_hash_id) != 6:
+        # Проверяем формат hash_id (2-6 алфанумерных символов, включая спец. категории вроде 'etc')
+        clean_id = model_group_hash_id.replace("_", "").replace("-", "") if model_group_hash_id else ""
+        if not model_group_hash_id or not (2 <= len(clean_id) <= 6 and clean_id.isalnum()):
             logger.error(f"❌ Неверный формат model_group_hash_id: {model_group_hash_id}")
             raise HTTPException(
                 status_code=400,
-                detail=f"Неверный формат model_group_hash_id. Ожидается 6 символов, получено: {model_group_hash_id}"
+                detail=f"Неверный формат model_group_hash_id. Ожидается 2-6 символов, получено: {model_group_hash_id}"
             )
         
         # Используем автоматический сервис авторизации

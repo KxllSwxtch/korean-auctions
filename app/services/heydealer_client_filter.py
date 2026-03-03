@@ -265,7 +265,7 @@ class HeyDealerClientFilter:
         self, cars: List[Dict[str, Any]], grade_hash_id: str
     ) -> List[Dict[str, Any]]:
         """Фильтрует автомобили по конфигурации (grade)"""
-        if not grade_hash_id or len(grade_hash_id) != 6:
+        if not grade_hash_id or len(grade_hash_id) < 2 or not grade_hash_id.replace("_", "").replace("-", "").isalnum():
             return cars
 
         filtered_cars = []
