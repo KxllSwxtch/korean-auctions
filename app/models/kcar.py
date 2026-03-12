@@ -53,6 +53,9 @@ class KCarCar(BaseModel):
 
     # Характеристики автомобиля
     year: Optional[str] = Field(None, alias="FORM_YR", description="Год выпуска")
+    first_registration_date: Optional[str] = Field(
+        None, alias="FST_REG_DT", description="Дата первой регистрации (YYYYMMDD)"
+    )
     mileage: Optional[str] = Field(None, alias="MILG", description="Пробег")
     displacement: Optional[str] = Field(
         None, alias="ENGDISPMNT", description="Объем двигателя"
