@@ -56,6 +56,9 @@ class HappyCarService:
         self.session = self._create_session()
         self._authenticated = False
 
+        # Cached model categories (parsed from full page, not available in AJAX)
+        self._model_categories = []
+
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
         self._cache_hits = 0
@@ -108,6 +111,12 @@ class HappyCarService:
             )
             main_resp.raise_for_status()
             logger.info(f"📄 Got main page, status={main_resp.status_code}")
+
+            # Parse model categories from the full page (not available in AJAX responses)
+            _, _, model_cats = self.parser.parse_car_list(main_resp.text)
+            if model_cats:
+                self._model_categories = model_cats
+                logger.info(f"📋 Parsed {len(model_cats)} model categories from full page")
 
             # Step 2: POST login credentials
             login_data = {
@@ -255,6 +264,10 @@ class HappyCarService:
 
             # Parse HTML
             cars, total_count, model_categories = self.parser.parse_car_list(response.text)
+
+            # Use cached model categories if AJAX response didn't include them
+            if not model_categories and self._model_categories:
+                model_categories = self._model_categories
 
             result = HappyCarResponse(
                 success=True,
