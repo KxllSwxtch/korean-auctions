@@ -34,7 +34,8 @@ class HappyCarParser:
                 logger.info(f"📊 Total count from setTotalCount: {total_count}")
 
             # Extract model categories from script: carModel_gubun('...');
-            model_matches = re.findall(r"carModel_gubun\('([^']*)'\)", html)
+            # Content may contain escaped quotes (\') inside HTML <li> elements
+            model_matches = re.findall(r"carModel_gubun\('((?:[^'\\]|\\.)*)'\)", html)
             if model_matches:
                 model_categories = self._parse_model_categories(model_matches)
 
@@ -213,32 +214,71 @@ class HappyCarParser:
         )
 
     def _parse_model_categories(self, raw_strings: List[str]) -> List[HappyCarModelCategory]:
-        """Parse model category strings from JavaScript calls."""
+        """Parse model category strings from JavaScript carModel_gubun() calls.
+
+        The server returns HTML <li> elements with escaped quotes, e.g.:
+        <li onclick="searchIns(\\'1\\', \\'기타\\');"><span>기타</span><span>67</span></li>
+        """
         categories = []
         try:
             for raw in raw_strings:
                 if not raw:
                     continue
-                # Expected format: "name|count" or just "name"
-                # The carModel_gubun might pass a serialized string
-                parts = raw.split('|')
-                if len(parts) >= 2:
-                    name = parts[0].strip()
-                    try:
-                        count = int(parts[1].strip())
-                    except ValueError:
-                        count = 0
-                    categories.append(HappyCarModelCategory(
-                        name=name,
-                        count=count,
-                        search_key=name,
-                    ))
-                elif parts[0].strip():
-                    categories.append(HappyCarModelCategory(
-                        name=parts[0].strip(),
-                        count=0,
-                        search_key=parts[0].strip(),
-                    ))
+
+                # Unescape \\' → ' so BeautifulSoup can parse the HTML
+                unescaped = raw.replace("\\'", "'")
+
+                # Check if it's HTML (contains <li> or <span>)
+                if '<' in unescaped and '>' in unescaped:
+                    soup = BeautifulSoup(unescaped, 'html.parser')
+                    all_lis = soup.find_all('li')
+                    if not all_lis:
+                        continue
+
+                    for li in all_lis:
+                        spans = li.find_all('span')
+                        if len(spans) < 2:
+                            continue
+
+                        name = spans[0].get_text(strip=True)
+                        try:
+                            count = int(spans[1].get_text(strip=True))
+                        except ValueError:
+                            count = 0
+
+                        # Extract search_key from onclick="searchIns('1', '기타')"
+                        onclick = li.get('onclick', '')
+                        search_key = name
+                        search_match = re.search(r"searchIns\([^,]*,\s*'([^']*)'\)", onclick)
+                        if search_match:
+                            search_key = search_match.group(1)
+
+                        if name:
+                            categories.append(HappyCarModelCategory(
+                                name=name,
+                                count=count,
+                                search_key=search_key,
+                            ))
+                else:
+                    # Fallback: pipe-delimited format "name|count"
+                    parts = raw.split('|')
+                    if len(parts) >= 2:
+                        name = parts[0].strip()
+                        try:
+                            count = int(parts[1].strip())
+                        except ValueError:
+                            count = 0
+                        categories.append(HappyCarModelCategory(
+                            name=name,
+                            count=count,
+                            search_key=name,
+                        ))
+                    elif parts[0].strip():
+                        categories.append(HappyCarModelCategory(
+                            name=parts[0].strip(),
+                            count=0,
+                            search_key=parts[0].strip(),
+                        ))
         except Exception as e:
             logger.error(f"❌ Error parsing model categories: {e}")
 

@@ -265,8 +265,11 @@ class HappyCarService:
             # Parse HTML
             cars, total_count, model_categories = self.parser.parse_car_list(response.text)
 
-            # Use cached model categories if AJAX response didn't include them
-            if not model_categories and self._model_categories:
+            # Update cached model categories when AJAX returns them (sale-type specific)
+            if model_categories:
+                self._model_categories = model_categories
+            elif self._model_categories:
+                # Fall back to cached categories only when AJAX didn't include any
                 model_categories = self._model_categories
 
             result = HappyCarResponse(
