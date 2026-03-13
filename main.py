@@ -21,6 +21,7 @@ from app.routes import (
     pan_auto,
     green_equipment,
     happycar,
+    exchange_rate,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -94,6 +95,9 @@ app.include_router(green_equipment.router, prefix="/api/v1/green", tags=["Green 
 
 # HappyCar Insurance Auction routes - Insurance salvage/scrap vehicles
 app.include_router(happycar.router, prefix="/api/v1/happycar", tags=["HappyCar Insurance Auction"])
+
+# SMMotors routes - Live USD/KRW and EUR/KRW from Naver
+app.include_router(exchange_rate.router, prefix="/api/v1/smmotors", tags=["SMMotors"])
 
 
 @app.get("/")

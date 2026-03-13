@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     cache_ttl_car_list: int = 180        # 3min - car listings
     cache_ttl_car_detail: int = 1800     # 30min - car details
     cache_ttl_filters: int = 3600        # 1h - filter metadata
+    cache_ttl_exchange_rate: int = 1800  # 30min - exchange rates
 
     class Config:
         env_file = ".env"
