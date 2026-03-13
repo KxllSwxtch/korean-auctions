@@ -20,6 +20,7 @@ from app.routes import (
     sk_auction,
     pan_auto,
     green_equipment,
+    happycar,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -91,6 +92,9 @@ app.include_router(pan_auto.router, prefix="/api/v1/pan-auto", tags=["Pan-Auto"]
 # Green Heavy Equipment routes - 4396200.com heavy equipment marketplace
 app.include_router(green_equipment.router, prefix="/api/v1/green", tags=["Green Heavy Equipment"])
 
+# HappyCar Insurance Auction routes - Insurance salvage/scrap vehicles
+app.include_router(happycar.router, prefix="/api/v1/happycar", tags=["HappyCar Insurance Auction"])
+
 
 @app.get("/")
 async def root():
@@ -149,6 +153,14 @@ async def cache_stats():
     try:
         from app.routes.autohub import get_autohub_service
         svc = get_autohub_service()
+        if svc and hasattr(svc, '_get_cache_stats'):
+            stats.append(svc._get_cache_stats())
+    except Exception:
+        pass
+
+    try:
+        from app.routes.happycar import get_happycar_service
+        svc = get_happycar_service()
         if svc and hasattr(svc, '_get_cache_stats'):
             stats.append(svc._get_cache_stats())
     except Exception:
@@ -219,6 +231,17 @@ async def clear_cache():
             svc._cache_hits = 0
             svc._cache_misses = 0
             cleared.append("Autohub")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.happycar import get_happycar_service
+        svc = get_happycar_service()
+        if svc and hasattr(svc, '_cache'):
+            svc._cache.clear()
+            svc._cache_hits = 0
+            svc._cache_misses = 0
+            cleared.append("HappyCar")
     except Exception:
         pass
 
