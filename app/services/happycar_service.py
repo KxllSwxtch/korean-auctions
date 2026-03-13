@@ -28,7 +28,7 @@ class HappyCarService:
     """
 
     BASE_URL = "https://www.happycarservice.com"
-    LOGIN_URL = f"{BASE_URL}/member/login_ok.html"
+    LOGIN_URL = f"{BASE_URL}/member/login.ajax.html"
     LIST_AJAX_URL = f"{BASE_URL}/content/auction_ins.ajax.html"
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
 
@@ -112,7 +112,7 @@ class HappyCarService:
             # Step 2: POST login credentials
             login_data = {
                 "member_id": settings.happycar_username,
-                "member_pw": settings.happycar_password,
+                "member_pwd": settings.happycar_password,
             }
             login_resp = self.session.post(
                 self.LOGIN_URL,
@@ -214,6 +214,14 @@ class HappyCarService:
                 logger.debug("📦 HappyCar cars cache hit")
                 return cached
 
+            # Map Korean sale type labels to numeric codes used by the website
+            SALE_TYPE_CODES = {
+                "구제": "2",
+                "폐차": "1",
+                "부품": "3",
+            }
+            au_gubun = SALE_TYPE_CODES.get(sale_type, sale_type)
+
             # Build POST form data matching the website's AJAX request
             data = {
                 "code": "",
@@ -223,9 +231,9 @@ class HappyCarService:
                 "gallerySel": "",
                 "sOrder": "",
                 "sOrderArrow": "",
-                "au_gubun": sale_type,
+                "au_gubun": au_gubun,
                 "search_name_text": model_filter,
-                "au_gubun_chk": sale_type,
+                "au_gubun_chk": au_gubun,
                 "start_auregModelY": year_start,
                 "start_auregModelM": month_start,
                 "end_auregModelY": year_end,
@@ -295,6 +303,8 @@ class HappyCarService:
             response = self.session.get(url, timeout=20)
             response.raise_for_status()
 
+            # Detail page uses EUC-KR encoding
+            response.encoding = "euc-kr"
             detail = self.parser.parse_car_detail(response.text)
 
             if not detail:

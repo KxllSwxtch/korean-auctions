@@ -131,21 +131,27 @@ class HappyCarParser:
 
         car_desc = item.find('span', class_='car-desc')
         if car_desc:
-            # Get all text segments between <em> separators
-            desc_text = car_desc.get_text(separator='|', strip=True)
-            parts = [p.strip() for p in desc_text.split('|') if p.strip()]
+            # Structure: "2015년 5월<em></em>디젤<em></em>오토<em></em>-<em></em>246,343km"
+            # Split by <em> tags to get ordered fields: [year, fuel, transmission, displacement, mileage]
+            desc_html = str(car_desc)
+            # Remove outer span tags
+            inner = re.sub(r'^<span[^>]*>', '', desc_html)
+            inner = re.sub(r'</span>$', '', inner)
+            # Split by <em></em> or <em/> separators
+            parts = re.split(r'<em\s*/?\s*>\s*(?:</em>)?', inner)
+            parts = [p.strip() for p in parts if p.strip()]
 
-            for part in parts:
-                if '년' in part and ('월' in part or re.match(r'\d{4}년', part)):
-                    year = part
-                elif part in ['LPG', '휘발유', '경유', '전기', '하이브리드', 'CNG', '수소', 'LNG']:
-                    fuel = part
-                elif part in ['오토', '수동', 'CVT', 'DCT', 'AT', 'MT']:
-                    transmission = part
-                elif 'cc' in part.lower():
-                    displacement = part
-                elif 'km' in part.lower() or part == '-':
-                    mileage = part
+            # Positional mapping: year, fuel, transmission, displacement, mileage
+            if len(parts) >= 1 and '년' in parts[0]:
+                year = parts[0]
+            if len(parts) >= 2 and parts[1] != '-':
+                fuel = parts[1]
+            if len(parts) >= 3 and parts[2] != '-':
+                transmission = parts[2]
+            if len(parts) >= 4 and parts[3] != '-':
+                displacement = parts[3]
+            if len(parts) >= 5 and parts[4] != '-':
+                mileage = parts[4]
 
         # Extract damage type (전손/분손)
         damage_type = None
@@ -171,26 +177,20 @@ class HappyCarParser:
 
         auc_info = item.find('div', class_='auc-info')
         if auc_info:
+            # Each <p> has two <span>: first is label, second is value
+            # Structure: <p><span>마감시간</span><span class='fc_red'>2026-03-13 12시 30분</span></p>
             info_items = auc_info.find_all('p')
             for p in info_items:
-                text = p.get_text(strip=True)
-                # Deadline contains date pattern
-                if re.search(r'\d{4}-\d{2}-\d{2}', text):
-                    deadline = text
-                # Min bid contains 원 (won)
-                elif '원' in text:
-                    min_bid = text
-                # Location is remaining text (Korean city/province)
-                elif text and not deadline and not min_bid:
-                    location = text
-
-        # Also try to find info in dt/dd or other patterns
-        if not deadline:
-            for elem in item.find_all(['span', 'p', 'dd']):
-                text = elem.get_text(strip=True)
-                if re.search(r'\d{4}-\d{2}-\d{2}.*\d{2}시', text):
-                    deadline = text
-                    break
+                spans = p.find_all('span')
+                if len(spans) >= 2:
+                    label = spans[0].get_text(strip=True)
+                    value = spans[1].get_text(strip=True)
+                    if '마감' in label:
+                        deadline = value if value and value != '-' else None
+                    elif '입찰' in label or '금액' in label:
+                        min_bid = value if value and value != '-' else None
+                    elif '보관' in label or '지역' in label:
+                        location = value if value and value != '-' else None
 
         detail_url = f"{self.BASE_URL}/content/ins_view.html?idx={idx}"
 
@@ -245,102 +245,145 @@ class HappyCarParser:
         return categories
 
     def parse_car_detail(self, html: str) -> Optional[HappyCarDetail]:
-        """Parse the detail page HTML for a single car."""
+        """Parse the detail page HTML for a single car.
+
+        Page structure (EUC-KR encoded):
+        - Images: background-image:url(...) on divs with /nBoard/upload/... paths
+        - Sale type: <label class="status2">폐차</label>
+        - Reg number: <span> with text "등재번호 : 2026-026458"
+        - Specs (detail-info01): <ul><li>label<p>value</p></li></ul>
+        - Damage + vehicle info (detail-info03[1]): key:value text block
+        - Insurance (detail-info02): raw text with labels
+        """
         try:
             soup = BeautifulSoup(html, 'html.parser')
 
-            # Extract idx from the page URL or hidden fields
+            # Extract idx
             idx = ""
             idx_match = re.search(r'idx=(\d+)', html)
             if idx_match:
                 idx = idx_match.group(1)
 
-            # Extract images from carousel/slider
+            # ── Images: background-image URLs with /nBoard/upload/ paths ──
             images = []
-            # Try swiper slides
-            for slide in soup.find_all('div', class_='swiper-slide'):
-                img = slide.find('img')
-                if img and img.get('src'):
-                    src = img['src']
-                    url = src if src.startswith('http') else f"{self.BASE_URL}{src}"
-                    if 'no_image' not in url:
-                        images.append(url)
-
-            # Also try regular img tags in image containers
-            if not images:
-                for container_cls in ['img-wrap', 'img-area', 'photo-area', 'slider-area', 'gallery']:
-                    container = soup.find(class_=container_cls)
-                    if container:
-                        for img in container.find_all('img'):
-                            src = img.get('src', '')
-                            if src and 'no_image' not in src:
-                                url = src if src.startswith('http') else f"{self.BASE_URL}{src}"
-                                images.append(url)
-
-            # Also check for background-image URLs
-            for div in soup.find_all('div', style=True):
+            seen = set()
+            for div in soup.find_all(style=True):
                 style = div.get('style', '')
-                bg_matches = re.findall(r"background-image\s*:\s*url\('?([^'\")\s]+)'?\)", style)
-                for bg_url in bg_matches:
-                    url = bg_url if bg_url.startswith('http') else f"{self.BASE_URL}{bg_url}"
-                    if 'no_image' not in url and url not in images:
-                        images.append(url)
+                m = re.search(r"background-image\s*:\s*url\('?([^'\")\s]+)'?\)", style)
+                if m:
+                    path = m.group(1)
+                    if 'upload' in path and 'no_img' not in path:
+                        url = path if path.startswith('http') else f"{self.BASE_URL}{path}"
+                        if url not in seen:
+                            seen.add(url)
+                            images.append(url)
 
-            # Extract title
-            title = ""
-            for cls in ['title', 'car-title', 'car-name']:
-                elem = soup.find(class_=cls)
-                if elem:
-                    title = elem.get_text(strip=True)
-                    break
-            if not title:
-                h2 = soup.find('h2')
-                if h2:
-                    title = h2.get_text(strip=True)
-
-            # Extract sale type from status labels
+            # ── Sale type from status label ──
             sale_type = ""
             for cls in ['status1', 'status2', 'status3', 'status4', 'status5']:
                 label = soup.find('label', class_=cls)
                 if label:
-                    sale_type = label.get_text(strip=True)
-                    break
-
-            # Extract registration number
-            registration_number = ""
-            subtitle = soup.find('span', class_='subtitle')
-            if subtitle:
-                registration_number = subtitle.get_text(strip=True)
-
-            # Parse spec table (차량 상세정보)
-            specs = self._parse_specs_table(soup)
-
-            # Parse damage description
-            damage_description = None
-            damage_section = soup.find(class_='damage-info')
-            if damage_section:
-                damage_description = damage_section.get_text(strip=True)
-            if not damage_description:
-                # Try finding by text content
-                for elem in soup.find_all(['div', 'p', 'span']):
-                    text = elem.get_text(strip=True)
-                    if '사고내용' in text or '손상내용' in text or '피해내용' in text:
-                        # Get the next sibling or parent's text
-                        parent = elem.parent
-                        if parent:
-                            damage_description = parent.get_text(strip=True)
+                    text = label.get_text(strip=True)
+                    if text in ['폐차', '구제', '부품']:
+                        sale_type = text
                         break
 
-            # Parse insurance history (보험이력)
-            insurance = self._parse_insurance_history(soup)
+            # ── Registration number from "등재번호 : XXXX" ──
+            registration_number = ""
+            for span in soup.find_all('span'):
+                text = span.get_text(strip=True)
+                m = re.match(r'등재번호\s*:\s*(.+)', text)
+                if m:
+                    registration_number = m.group(1).strip()
+                    break
 
-            # Parse vehicle info text block
-            vehicle_info = self._parse_vehicle_info(soup)
+            # ── Specs from detail-info01: <ul><li>label<p>value</p></li></ul> ──
+            specs = {}
+            info01 = soup.find(class_='detail-info01')
+            if info01:
+                for li in info01.find_all('li'):
+                    p_tag = li.find('p')
+                    if p_tag:
+                        # Label is the text node before <p>, value is inside <p>
+                        label_text = li.get_text(strip=True).replace(p_tag.get_text(strip=True), '').strip()
+                        value_text = p_tag.get_text(strip=True)
+                        if label_text and value_text and value_text != '-':
+                            self._map_spec_field(specs, label_text, value_text)
+
+            # ── Damage + vehicle info from second detail-info03 ──
+            damage_description = None
+            vehicle_info = {}
+            all_info03 = soup.find_all(class_='detail-info03')
+            if len(all_info03) >= 2:
+                # Second detail-info03 has damage text + vehicle info as key:value
+                damage_block = all_info03[1]
+                full_text = damage_block.get_text(separator='\n', strip=True)
+                lines = full_text.split('\n')
+
+                # Split into damage text (before key:value pairs) and vehicle info
+                damage_lines = []
+                for line in lines:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # Check if line is a key:value pair
+                    kv_match = re.match(r'^(차량명|차대번호|형식번호|형식년도|최초등록일|색상|주행거리|성능점검유효기간)\s*[:：]\s*(.+)', line)
+                    if kv_match:
+                        key, value = kv_match.group(1), kv_match.group(2).strip()
+                        self._map_vehicle_field(vehicle_info, key, value)
+                    else:
+                        damage_lines.append(line)
+
+                if damage_lines:
+                    damage_description = '\n'.join(damage_lines)
+
+            # ── Insurance history from detail-info02 ──
+            insurance = {}
+            info02 = soup.find(class_='detail-info02')
+            if info02:
+                text = info02.get_text(separator='|', strip=True)
+                parts = [p.strip() for p in text.split('|') if p.strip()]
+                # Parse pairs: label followed by value
+                i = 0
+                while i < len(parts) - 1:
+                    label = parts[i]
+                    value = parts[i + 1] if i + 1 < len(parts) else ''
+                    if '번호변경' in label:
+                        insurance['plate_changes'] = value
+                        i += 2
+                    elif '소유자변경' in label:
+                        insurance['owner_changes'] = value
+                        i += 2
+                    elif '내차피해' in label:
+                        insurance['my_damage'] = value
+                        i += 2
+                    elif '상대' in label and '피해' in label:
+                        insurance['other_damage'] = value
+                        i += 2
+                    else:
+                        i += 1
+
+            # ── Title: from car-desc or vehicle_info ──
+            title = vehicle_info.get('car_name_full', '')
+            if not title:
+                car_desc = soup.find(class_='car-desc')
+                if car_desc:
+                    # car-desc has specs, not title — get from hidden input or meta
+                    pass
+            # Try hidden input price (indicates we're on detail page)
+            if not title:
+                # Extract from first h2 before detail-info03
+                for h2 in soup.find_all('h2', class_='title'):
+                    h2_text = h2.get_text(strip=True)
+                    if '차량 상세정보' in h2_text or '보험이력' in h2_text or '유의사항' in h2_text:
+                        continue
+                    title = h2_text
+                    break
 
             detail = HappyCarDetail(
                 idx=idx,
-                title=title or specs.get('title', ''),
-                registration_number=registration_number or specs.get('registration_number', ''),
+                title=title,
+                registration_number=registration_number,
                 sale_type=sale_type,
                 year=specs.get('year'),
                 transmission=specs.get('transmission'),
@@ -368,7 +411,7 @@ class HappyCarParser:
                 images=images,
             )
 
-            logger.info(f"✅ Parsed car detail for idx={idx}, title={title}")
+            logger.info(f"✅ Parsed car detail for idx={idx}, title={title}, images={len(images)}")
             return detail
 
         except Exception as e:
@@ -418,6 +461,7 @@ class HappyCarParser:
             return
 
         key_mapping = {
+            '등록연식': 'year',
             '연식': 'year',
             '년식': 'year',
             '연월': 'year',
@@ -428,12 +472,14 @@ class HappyCarParser:
             '배기량': 'displacement',
             '주행거리': 'mileage',
             '주행': 'mileage',
+            '최소입찰금액': 'min_bid',
             '최저입찰가': 'min_bid',
             '최저가': 'min_bid',
             '입찰가': 'min_bid',
             '보관장소': 'location',
             '보관지': 'location',
             '위치': 'location',
+            '경매종료일시': 'deadline',
             '마감일': 'deadline',
             '마감': 'deadline',
             '발생비용처리': 'cost_processing',
@@ -522,19 +568,21 @@ class HappyCarParser:
             return
 
         field_mapping = {
-            '차명': 'car_name_full',
             '차량명': 'car_name_full',
+            '차명': 'car_name_full',
             '신차가격': 'msrp',
             '신차가': 'msrp',
             '차대번호': 'vin',
             'VIN': 'vin',
             '형식번호': 'form_number',
             '형식년도': 'form_year',
-            '최초등록': 'first_registration',
             '최초등록일': 'first_registration',
+            '최초등록': 'first_registration',
             '색상': 'color',
+            '주행거리': 'actual_mileage',
             '실주행': 'actual_mileage',
             '실주행거리': 'actual_mileage',
+            '성능점검유효기간': 'inspection_validity',
             '검사유효': 'inspection_validity',
             '검사유효기간': 'inspection_validity',
         }
