@@ -477,11 +477,12 @@ class HeyDealerParser(BaseAuctionParser):
                 "initial_registration_date": (
                     detail.initial_registration_date if detail else None
                 ),
-                "fuel_type": None,  # Добавляем для совместимости с тестами
-                "fuel": None,  # Будет извлекаться из сырых данных
-                "fuel_display": None,  # Будет извлекаться из сырых данных
-                "transmission": None,  # Будет извлекаться из сырых данных
-                "transmission_display": None,  # Будет извлекаться из сырых данных
+                "fuel_type": detail.fuel if detail else None,
+                "fuel": detail.fuel if detail else None,
+                "fuel_display": detail.fuel_display if detail else None,
+                "transmission": detail.transmission if detail else None,
+                "transmission_display": detail.transmission_display if detail else None,
+                "gear_display": detail.transmission_display if detail else None,
                 "dealer_zero_type": detail.dealer_zero_type if detail else None,
                 "zero_type": detail.zero_type if detail else None,
                 "category": auction.category if auction else None,
