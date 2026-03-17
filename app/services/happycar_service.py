@@ -1,5 +1,6 @@
 import hashlib
 import json
+import threading
 import time
 import urllib3
 from typing import Optional, Dict, Any
@@ -31,6 +32,7 @@ class HappyCarService:
     LOGIN_URL = f"{BASE_URL}/member/login.ajax.html"
     LIST_AJAX_URL = f"{BASE_URL}/content/auction_ins.ajax.html"
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
+    LOGOUT_URL = f"{BASE_URL}/member/logout.ajax.html"
 
     PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
 
@@ -55,6 +57,7 @@ class HappyCarService:
         self.parser = HappyCarParser()
         self.session = self._create_session()
         self._authenticated = False
+        self._auth_lock = threading.Lock()
 
         # Cached model categories (parsed from full page, not available in AJAX)
         self._model_categories = []
@@ -99,10 +102,10 @@ class HappyCarService:
 
     # ─── Authentication ───────────────────────────────────────────────
 
-    def _authenticate(self):
+    def _authenticate(self) -> bool:
         """Login to HappyCar to get a valid PHPSESSID."""
         try:
-            logger.info("🔐 Authenticating with HappyCar...")
+            logger.info("Authenticating with HappyCar...")
 
             # Step 1: GET the main page to pick up initial cookies
             main_resp = self.session.get(
@@ -110,13 +113,13 @@ class HappyCarService:
                 timeout=15,
             )
             main_resp.raise_for_status()
-            logger.info(f"📄 Got main page, status={main_resp.status_code}")
+            logger.info(f"Got main page, status={main_resp.status_code}")
 
             # Parse model categories from the full page (not available in AJAX responses)
             _, _, model_cats = self.parser.parse_car_list(main_resp.text)
             if model_cats:
                 self._model_categories = model_cats
-                logger.info(f"📋 Parsed {len(model_cats)} model categories from full page")
+                logger.info(f"Parsed {len(model_cats)} model categories from full page")
 
             # Step 2: POST login credentials
             login_data = {
@@ -131,30 +134,67 @@ class HappyCarService:
             )
             login_resp.raise_for_status()
 
-            # Check for actual login success in the response body
-            response_text = login_resp.text.strip().lower()
-            if '"result":"y"' in response_text or '"result": "y"' in response_text or 'success' in response_text:
-                self._authenticated = True
-                logger.info("✅ HappyCar authentication successful")
-            elif 'logout' in response_text:
-                # Already logged in (page contains logout link)
-                self._authenticated = True
-                logger.info("✅ HappyCar already authenticated (logout link found)")
-            else:
-                self._authenticated = False
-                logger.error(f"❌ HappyCar login failed, response: {login_resp.text[:200]}")
+            # Parse JSON response — HappyCar returns {"rst_code": 1, "rst_msg": ""} on success
+            raw = login_resp.text.strip()
+            try:
+                resp_json = json.loads(raw)
+                rst_code = resp_json.get("rst_code")
+
+                if rst_code == 1:
+                    self._authenticated = True
+                    logger.info(f"HappyCar authentication successful (rst_code={rst_code})")
+                    return True
+                elif rst_code == -6:
+                    # Already logged in — session is still valid
+                    self._authenticated = True
+                    logger.info("HappyCar already authenticated (rst_code=-6)")
+                    return True
+                else:
+                    rst_msg = resp_json.get("rst_msg", "")
+                    self._authenticated = False
+                    logger.error(f"HappyCar login failed: rst_code={rst_code}, rst_msg={rst_msg}")
+                    return False
+
+            except (json.JSONDecodeError, ValueError):
+                # Fallback: non-JSON response — check text heuristics
+                response_text = raw.lower()
+                if '"result":"y"' in response_text or '"result": "y"' in response_text or "success" in response_text:
+                    self._authenticated = True
+                    logger.info("HappyCar authentication successful (text fallback)")
+                    return True
+                elif "logout" in response_text:
+                    self._authenticated = True
+                    logger.info("HappyCar already authenticated (logout link found)")
+                    return True
+                else:
+                    self._authenticated = False
+                    logger.error(f"HappyCar login failed, response: {raw[:200]}")
+                    return False
 
         except requests.RequestException as e:
-            logger.error(f"❌ HappyCar authentication failed: {e}")
+            logger.error(f"HappyCar authentication failed: {e}")
             self._authenticated = False
+            return False
         except Exception as e:
-            logger.error(f"❌ Unexpected error during HappyCar auth: {e}")
+            logger.error(f"Unexpected error during HappyCar auth: {e}")
             self._authenticated = False
+            return False
+
+    def _logout(self):
+        """Logout from HappyCar to clear server-side session before re-auth."""
+        try:
+            self.session.get(self.LOGOUT_URL, timeout=10)
+            logger.info("HappyCar logout successful")
+        except Exception as e:
+            logger.debug(f"HappyCar logout failed (non-critical): {e}")
 
     def _ensure_authenticated(self):
-        """Ensure we have a valid session, re-authenticate if needed."""
-        if not self._authenticated:
-            self._authenticate()
+        """Ensure we have a valid session, re-authenticate if needed (thread-safe)."""
+        if self._authenticated:
+            return
+        with self._auth_lock:
+            if not self._authenticated:
+                self._authenticate()
 
     # ─── Caching ──────────────────────────────────────────────────────
 
@@ -329,16 +369,19 @@ class HappyCarService:
 
             # Detect login redirect — page requires auth but session expired
             if 'login.html' in html and 'location.href' in html:
-                logger.warning(f"⚠️ HappyCar detail page returned login redirect for idx={idx}, re-authenticating...")
-                self._authenticated = False
-                self._authenticate()
+                logger.warning(f"HappyCar detail page returned login redirect for idx={idx}, re-authenticating...")
+                with self._auth_lock:
+                    self._authenticated = False
+                    self._logout()
+                    self.session.cookies.clear()
+                    self._authenticate()
                 # Retry once
                 response = self.session.get(url, timeout=20)
                 response.raise_for_status()
                 response.encoding = "euc-kr"
                 html = response.text
                 if 'login.html' in html and 'location.href' in html:
-                    logger.error(f"❌ HappyCar: still redirected to login after re-auth for idx={idx}")
+                    logger.error(f"HappyCar: still redirected to login after re-auth for idx={idx}")
                     return HappyCarDetailResponse(
                         success=False,
                         message="Authentication failed — cannot access detail page",
