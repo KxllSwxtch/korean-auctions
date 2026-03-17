@@ -451,6 +451,11 @@ class HappyCarParser:
                 images=images,
             )
 
+            # Validate parsed detail has meaningful data (not a login redirect page)
+            if not detail.title and not detail.images and not detail.sale_type:
+                logger.warning(f"⚠️ Parsed detail for idx={idx} has no data — HTML may be a login page or changed structure")
+                return None
+
             logger.info(f"✅ Parsed car detail for idx={idx}, title={title}, images={len(images)}")
             return detail
 

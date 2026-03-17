@@ -131,14 +131,18 @@ class HappyCarService:
             )
             login_resp.raise_for_status()
 
-            # Check for successful login (redirect back or success indicator)
-            if login_resp.status_code in (200, 302) or 'logout' in login_resp.text.lower():
+            # Check for actual login success in the response body
+            response_text = login_resp.text.strip().lower()
+            if '"result":"y"' in response_text or '"result": "y"' in response_text or 'success' in response_text:
                 self._authenticated = True
                 logger.info("✅ HappyCar authentication successful")
-            else:
-                logger.warning(f"⚠️ HappyCar login response unclear: {login_resp.status_code}")
-                # Still set authenticated to try — session cookies might work
+            elif 'logout' in response_text:
+                # Already logged in (page contains logout link)
                 self._authenticated = True
+                logger.info("✅ HappyCar already authenticated (logout link found)")
+            else:
+                self._authenticated = False
+                logger.error(f"❌ HappyCar login failed, response: {login_resp.text[:200]}")
 
         except requests.RequestException as e:
             logger.error(f"❌ HappyCar authentication failed: {e}")
@@ -321,7 +325,26 @@ class HappyCarService:
 
             # Detail page uses EUC-KR encoding
             response.encoding = "euc-kr"
-            detail = self.parser.parse_car_detail(response.text)
+            html = response.text
+
+            # Detect login redirect — page requires auth but session expired
+            if 'login.html' in html and 'location.href' in html:
+                logger.warning(f"⚠️ HappyCar detail page returned login redirect for idx={idx}, re-authenticating...")
+                self._authenticated = False
+                self._authenticate()
+                # Retry once
+                response = self.session.get(url, timeout=20)
+                response.raise_for_status()
+                response.encoding = "euc-kr"
+                html = response.text
+                if 'login.html' in html and 'location.href' in html:
+                    logger.error(f"❌ HappyCar: still redirected to login after re-auth for idx={idx}")
+                    return HappyCarDetailResponse(
+                        success=False,
+                        message="Authentication failed — cannot access detail page",
+                    )
+
+            detail = self.parser.parse_car_detail(html)
 
             if not detail:
                 logger.error(f"❌ Failed to parse car detail for idx={idx}")
