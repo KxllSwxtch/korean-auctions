@@ -34,23 +34,36 @@ class HappyCarService:
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
     LOGOUT_URL = f"{BASE_URL}/member/logout.ajax.html"
 
-    PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
+    PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR_sessid-happycar1:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
 
-    DEFAULT_HEADERS = {
-        "Accept": "text/html, */*; q=0.01",
-        "Accept-Language": "en,ru;q=0.9,ko;q=0.5",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Origin": "https://www.happycarservice.com",
-        "Referer": "https://www.happycarservice.com/content/auction_ins.html",
-        "X-Requested-With": "XMLHttpRequest",
+    # Session-level headers — common to ALL requests
+    BASE_HEADERS = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/138.0.0.0 Safari/537.36"
         ),
+        "Accept-Language": "en,ru;q=0.9,ko;q=0.5",
+        "Sec-Fetch-Site": "same-origin",
+    }
+
+    # Per-request headers for AJAX/POST calls
+    AJAX_HEADERS = {
+        "Accept": "text/html, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Origin": "https://www.happycarservice.com",
+        "Referer": "https://www.happycarservice.com/content/auction_ins.html",
+        "X-Requested-With": "XMLHttpRequest",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
+    }
+
+    # Per-request headers for full-page GET navigation
+    BROWSER_HEADERS = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Upgrade-Insecure-Requests": "1",
     }
 
     def __init__(self):
@@ -87,7 +100,7 @@ class HappyCarService:
         session.mount("https://", adapter)
 
         # Default headers
-        session.headers.update(self.DEFAULT_HEADERS)
+        session.headers.update(self.BASE_HEADERS)
 
         # Proxy
         session.proxies = {
@@ -110,6 +123,7 @@ class HappyCarService:
             # Step 1: GET the main page to pick up initial cookies
             main_resp = self.session.get(
                 f"{self.BASE_URL}/content/auction_ins.html",
+                headers=self.BROWSER_HEADERS,
                 timeout=15,
             )
             main_resp.raise_for_status()
@@ -129,6 +143,7 @@ class HappyCarService:
             login_resp = self.session.post(
                 self.LOGIN_URL,
                 data=login_data,
+                headers=self.AJAX_HEADERS,
                 timeout=15,
                 allow_redirects=True,
             )
@@ -183,7 +198,7 @@ class HappyCarService:
     def _logout(self):
         """Logout from HappyCar to clear server-side session before re-auth."""
         try:
-            self.session.get(self.LOGOUT_URL, timeout=10)
+            self.session.get(self.LOGOUT_URL, headers=self.BROWSER_HEADERS, timeout=10)
             logger.info("HappyCar logout successful")
         except Exception as e:
             logger.debug(f"HappyCar logout failed (non-critical): {e}")
@@ -302,6 +317,7 @@ class HappyCarService:
             response = self.session.post(
                 self.LIST_AJAX_URL,
                 data=data,
+                headers=self.AJAX_HEADERS,
                 timeout=20,
             )
             response.raise_for_status()
@@ -360,7 +376,11 @@ class HappyCarService:
             url = f"{self.DETAIL_URL}?idx={idx}"
             logger.info(f"📄 Fetching HappyCar car detail: {url}")
 
-            response = self.session.get(url, timeout=20)
+            detail_headers = {
+                **self.BROWSER_HEADERS,
+                "Referer": f"{self.BASE_URL}/content/auction_ins.html",
+            }
+            response = self.session.get(url, headers=detail_headers, timeout=20)
             response.raise_for_status()
 
             # Detail page uses EUC-KR encoding
@@ -376,7 +396,7 @@ class HappyCarService:
                     self.session.cookies.clear()
                     self._authenticate()
                 # Retry once
-                response = self.session.get(url, timeout=20)
+                response = self.session.get(url, headers=detail_headers, timeout=20)
                 response.raise_for_status()
                 response.encoding = "euc-kr"
                 html = response.text
