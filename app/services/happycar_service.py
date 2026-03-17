@@ -71,6 +71,8 @@ class HappyCarService:
         self.session = self._create_session()
         self._authenticated = False
         self._auth_lock = threading.Lock()
+        self._auth_timestamp: float = 0.0
+        self._SESSION_TTL: int = 1500  # 25 min (5-min buffer before PHP's ~30-min expiry)
 
         # Cached model categories (parsed from full page, not available in AJAX)
         self._model_categories = []
@@ -113,7 +115,52 @@ class HappyCarService:
 
         return session
 
+    # ─── Diagnostics ──────────────────────────────────────────────────
+
+    def _log_cookies(self, label: str) -> None:
+        """Log cookie count, names+domains, and PHPSESSID presence."""
+        cookies = self.session.cookies
+        cookie_names = [f"{c.name}@{c.domain}" for c in cookies]
+        has_phpsessid = any(c.name == "PHPSESSID" for c in cookies)
+        logger.info(
+            f"[HappyCar cookies] {label}: count={len(cookie_names)}, "
+            f"PHPSESSID={'YES' if has_phpsessid else 'NO'}, names={cookie_names}"
+        )
+
+    def _log_proxy_ip(self) -> None:
+        """One-shot GET to httpbin.org/ip through proxy to verify outgoing IP."""
+        try:
+            resp = self.session.get("https://httpbin.org/ip", timeout=5)
+            logger.info(f"[HappyCar proxy] Outgoing IP: {resp.json().get('origin', 'unknown')}")
+        except Exception as e:
+            logger.warning(f"[HappyCar proxy] IP check failed: {e}")
+
     # ─── Authentication ───────────────────────────────────────────────
+
+    def _warm_up_list_context(self) -> None:
+        """POST to list AJAX endpoint to establish server-side navigation state.
+
+        Korean auction sites track navigation in $_SESSION. The detail page
+        checks that the session previously accessed the list endpoint. Without
+        this warm-up, the server sees a deep-link and redirects to login.
+        """
+        try:
+            data = {
+                "code": "", "mode": "list", "page": "1", "pageSize0": "",
+                "gallerySel": "", "sOrder": "", "sOrderArrow": "",
+                "au_gubun": "", "search_name_text": "", "au_gubun_chk": "",
+                "start_auregModelY": "", "start_auregModelM": "",
+                "end_auregModelY": "", "end_auregModelM": "",
+                "au_keepArea": "", "f_gbn": "", "f_text": "", "ajaxYn": "Y",
+            }
+            resp = self.session.post(
+                self.LIST_AJAX_URL, data=data,
+                headers=self.AJAX_HEADERS, timeout=15,
+            )
+            logger.info(f"[HappyCar] List warm-up: status={resp.status_code}, length={len(resp.text)}")
+            self._log_cookies("after list warm-up")
+        except Exception as e:
+            logger.warning(f"[HappyCar] List warm-up failed (non-critical): {e}")
 
     def _authenticate(self) -> bool:
         """Login to HappyCar to get a valid PHPSESSID."""
@@ -157,12 +204,20 @@ class HappyCarService:
 
                 if rst_code == 1:
                     self._authenticated = True
+                    self._auth_timestamp = time.time()
                     logger.info(f"HappyCar authentication successful (rst_code={rst_code})")
+                    self._log_cookies("after login")
+                    self._warm_up_list_context()
+                    self._log_proxy_ip()
                     return True
                 elif rst_code == -6:
                     # Already logged in — session is still valid
                     self._authenticated = True
+                    self._auth_timestamp = time.time()
                     logger.info("HappyCar already authenticated (rst_code=-6)")
+                    self._log_cookies("after login")
+                    self._warm_up_list_context()
+                    self._log_proxy_ip()
                     return True
                 else:
                     rst_msg = resp_json.get("rst_msg", "")
@@ -195,20 +250,18 @@ class HappyCarService:
             self._authenticated = False
             return False
 
-    def _logout(self):
-        """Logout from HappyCar to clear server-side session before re-auth."""
-        try:
-            self.session.get(self.LOGOUT_URL, headers=self.BROWSER_HEADERS, timeout=10)
-            logger.info("HappyCar logout successful")
-        except Exception as e:
-            logger.debug(f"HappyCar logout failed (non-critical): {e}")
-
     def _ensure_authenticated(self):
         """Ensure we have a valid session, re-authenticate if needed (thread-safe)."""
         if self._authenticated:
-            return
+            elapsed = time.time() - self._auth_timestamp
+            if elapsed < self._SESSION_TTL:
+                return
+            logger.info(f"[HappyCar] Session expired ({elapsed:.0f}s > {self._SESSION_TTL}s), re-authenticating...")
+            self._authenticated = False
+
         with self._auth_lock:
             if not self._authenticated:
+                self.session = self._create_session()
                 self._authenticate()
 
     # ─── Caching ──────────────────────────────────────────────────────
@@ -389,19 +442,25 @@ class HappyCarService:
 
             # Detect login redirect — page requires auth but session expired
             if 'login.html' in html and 'location.href' in html:
-                logger.warning(f"HappyCar detail page returned login redirect for idx={idx}, re-authenticating...")
+                logger.warning(f"HappyCar detail page returned login redirect for idx={idx}")
+                self._log_cookies("before re-auth (detail redirect)")
+
                 with self._auth_lock:
                     self._authenticated = False
-                    self._logout()
-                    self.session.cookies.clear()
+                    self.session = self._create_session()
                     self._authenticate()
-                # Retry once
+
+                self._log_cookies("after re-auth")
+
+                # Retry once with fresh session
                 response = self.session.get(url, headers=detail_headers, timeout=20)
                 response.raise_for_status()
                 response.encoding = "euc-kr"
                 html = response.text
+
                 if 'login.html' in html and 'location.href' in html:
                     logger.error(f"HappyCar: still redirected to login after re-auth for idx={idx}")
+                    self._log_cookies("STILL FAILING after re-auth")
                     return HappyCarDetailResponse(
                         success=False,
                         message="Authentication failed — cannot access detail page",
