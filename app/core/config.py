@@ -20,12 +20,8 @@ class Settings(BaseSettings):
     # Настройки для Autohub
     autohub_base_url: str = "https://www.autohubauction.co.kr"
     autohub_api_base_url: str = "https://api.ahsellcar.co.kr"
-    autohub_list_url: str = (
-        "https://www.autohubauction.co.kr/newfront/receive/rc/receive_rc_list.do"
-    )
-    autohub_login_url: str = (
-        "https://www.autohubauction.co.kr/newfront/user/login/user_login_ajax.do"
-    )
+    autohub_signin_url: str = "https://api.ahsellcar.co.kr/auth/rest/api/v1/auth/signin"
+    autohub_product_id: str = "03db628d-2795-11ef-8342-0e80fc1e2c3f"
 
     # Учётные данные для Autohub
     autohub_username: str = "837301"

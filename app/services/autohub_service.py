@@ -50,12 +50,17 @@ class AutohubService:
         self.settings = get_settings()
         self._session: Optional[requests.Session] = None
         self._jwt_token: Optional[str] = self.settings.autohub_jwt_token
+        self._refresh_token: Optional[str] = None
         self.api_base = self.settings.autohub_api_base_url
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
         self._cache_hits = 0
         self._cache_misses = 0
+
+        # Auto-authenticate if no valid token from env
+        if not self._is_token_valid():
+            self._authenticate()
 
     # ===== Session Management =====
 
@@ -109,6 +114,50 @@ class AutohubService:
             logger.warning(f"Failed to decode JWT token: {e}")
             return False
 
+    def _authenticate(self) -> bool:
+        """Login to Autohub API to obtain JWT access token."""
+        try:
+            logger.info("Authenticating with Autohub API...")
+            response = self.session.post(
+                self.settings.autohub_signin_url,
+                json={
+                    "userEmail": self.settings.autohub_username,
+                    "pw": self.settings.autohub_password,
+                    "productId": self.settings.autohub_product_id,
+                },
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                    "origin": "https://www.autohubauction.co.kr",
+                    "referer": "https://www.autohubauction.co.kr/",
+                },
+                timeout=self.settings.request_timeout,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("code") == "1" and data.get("data", {}).get("accessToken"):
+                self._jwt_token = data["data"]["accessToken"]
+                self._refresh_token = data["data"].get("refreshToken")
+                logger.info("Authentication successful")
+                return True
+            else:
+                msg = data.get("message", "Unknown error")
+                logger.error(f"Authentication failed: {msg}")
+                return False
+        except Exception as e:
+            logger.error(f"Authentication error: {e}")
+            return False
+
+    def _ensure_authenticated(self) -> None:
+        """Ensure we have a valid JWT token, authenticate if needed."""
+        if not self._is_token_valid():
+            if not self._authenticate():
+                raise requests.exceptions.HTTPError(
+                    "Failed to authenticate with Autohub API",
+                    response=type("Response", (), {"status_code": 401})(),
+                )
+
     def set_jwt_token(self, token: str) -> bool:
         """Set or update JWT token."""
         self._jwt_token = token
@@ -153,7 +202,8 @@ class AutohubService:
     # ===== API Methods =====
 
     def _api_get(self, path: str, params: Optional[Dict] = None) -> Dict[str, Any]:
-        """Make authenticated GET request to Autohub API."""
+        """Make authenticated GET request to Autohub API with auto-auth and 401 retry."""
+        self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"GET {url}")
         response = self.session.get(
@@ -162,11 +212,21 @@ class AutohubService:
             params=params,
             timeout=self.settings.request_timeout,
         )
+        if response.status_code == 401:
+            logger.warning("Got 401 on GET, re-authenticating...")
+            if self._authenticate():
+                response = self.session.get(
+                    url,
+                    headers=self._get_auth_headers(),
+                    params=params,
+                    timeout=self.settings.request_timeout,
+                )
         response.raise_for_status()
         return response.json()
 
     def _api_post(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        """Make authenticated POST request to Autohub API."""
+        """Make authenticated POST request to Autohub API with auto-auth and 401 retry."""
+        self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"POST {url}")
         response = self.session.post(
@@ -175,6 +235,15 @@ class AutohubService:
             json=body,
             timeout=self.settings.request_timeout,
         )
+        if response.status_code == 401:
+            logger.warning("Got 401 on POST, re-authenticating...")
+            if self._authenticate():
+                response = self.session.post(
+                    url,
+                    headers=self._get_auth_headers(),
+                    json=body,
+                    timeout=self.settings.request_timeout,
+                )
         response.raise_for_status()
         return response.json()
 
@@ -211,10 +280,10 @@ class AutohubService:
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response is not None else 0
             if status_code == 401:
-                logger.error("JWT token expired or invalid")
+                logger.error("Authentication failed after retry")
                 return AutohubResponse(
                     success=False,
-                    error="Authentication failed. Please update JWT token.",
+                    error="Authentication failed after retry. Check credentials.",
                     current_page=params.page,
                     page_size=params.page_size,
                 )
@@ -331,10 +400,11 @@ class AutohubService:
 
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response is not None else 0
+            error_msg = "Authentication failed after retry. Check credentials." if status_code == 401 else f"HTTP error: {status_code}"
             logger.error(f"HTTP error fetching car detail: {e}")
             return AutohubCarDetailResponse(
                 success=False,
-                error=f"HTTP error: {status_code}",
+                error=error_msg,
             )
         except Exception as e:
             logger.error(f"Error fetching car detail: {e}", exc_info=True)
@@ -364,10 +434,12 @@ class AutohubService:
         )
 
     def get_auth_status(self) -> Dict[str, Any]:
-        """Check JWT token validity."""
+        """Check JWT token validity and auto-login status."""
         return {
             "has_token": self._jwt_token is not None,
             "is_valid": self._is_token_valid(),
+            "auto_login_enabled": bool(self.settings.autohub_username and self.settings.autohub_password),
+            "has_refresh_token": self._refresh_token is not None,
             "cache_stats": self._get_cache_stats(),
         }
 
