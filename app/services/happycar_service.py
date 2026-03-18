@@ -179,7 +179,7 @@ class HappyCarService:
         IP-bound login slot. Uses the current session's PHPSESSID cookie.
         """
         try:
-            resp = self.session.get(self.LOGOUT_URL, headers=self.AJAX_HEADERS, timeout=10)
+            resp = self.session.get(self.LOGOUT_URL, headers=self.BROWSER_HEADERS, timeout=10)
             logger.info(f"[HappyCar] Logout: status={resp.status_code}")
         except Exception as e:
             logger.warning(f"[HappyCar] Logout failed (non-critical): {e}")
@@ -262,19 +262,21 @@ class HappyCarService:
                     self._log_proxy_ip("after auth")
                     return True
                 elif rst_code == -6:
-                    # IP already has an active login with a DIFFERENT PHPSESSID.
-                    # Current PHPSESSID is NOT authenticated. Logout + retry.
-                    logger.warning("HappyCar rst_code=-6: IP already logged in. Logging out + retrying...")
-                    self._logout()
-                    time.sleep(0.5)
+                    # Can't logout old session (don't have its PHPSESSID).
+                    # Rotate proxy to get a fresh IP with no existing sessions.
+                    logger.warning("HappyCar rst_code=-6: IP collision. Rotating proxy...")
+                    self._reset_proxy_session()
 
-                    # Re-GET main page for fresh PHPSESSID
-                    self.session.get(
+                    # Re-GET main page on new IP
+                    main_resp = self.session.get(
                         f"{self.BASE_URL}/content/auction_ins.html",
                         headers=self.BROWSER_HEADERS, timeout=15,
                     )
+                    _, _, model_cats = self.parser.parse_car_list(main_resp.text)
+                    if model_cats:
+                        self._model_categories = model_cats
 
-                    # Retry login
+                    # Retry login on new IP
                     retry_resp = self.session.post(
                         self.LOGIN_URL, data=login_data,
                         headers=self.AJAX_HEADERS, timeout=15, allow_redirects=True,
@@ -286,14 +288,14 @@ class HappyCarService:
                     if retry_code == 1:
                         self._authenticated = True
                         self._auth_timestamp = time.time()
-                        logger.info("HappyCar auth successful after logout+retry")
-                        self._log_cookies("after login (retry)")
+                        logger.info("HappyCar auth successful after proxy rotation")
+                        self._log_cookies("after login (proxy rotation)")
                         self._warm_up_list_context()
-                        self._log_proxy_ip("after auth (retry)")
+                        self._log_proxy_ip("after auth (proxy rotation)")
                         return True
                     else:
                         self._authenticated = False
-                        logger.error(f"HappyCar login failed after retry: rst_code={retry_code}")
+                        logger.error(f"HappyCar login failed after proxy rotation: rst_code={retry_code}")
                         return False
                 else:
                     rst_msg = resp_json.get("rst_msg", "")
@@ -328,26 +330,31 @@ class HappyCarService:
 
     def _ensure_authenticated(self):
         """Ensure we have a valid session, re-authenticate if needed (thread-safe)."""
-        # Check 1: Is proxy session about to expire? Reset proxy + full re-auth
-        if self._is_proxy_session_expiring():
-            with self._auth_lock:
-                self._logout()
-                self._reset_proxy_session()
-                self._authenticate()
-            return
-
-        # Check 2: Is PHP session expired?
         if self._authenticated:
             elapsed = time.time() - self._auth_timestamp
-            if elapsed < self._SESSION_TTL:
+            if elapsed < self._SESSION_TTL and not self._is_proxy_session_expiring():
                 return
-            logger.info(f"[HappyCar] Session expired ({elapsed:.0f}s > {self._SESSION_TTL}s), re-authenticating...")
-            self._authenticated = False
 
         with self._auth_lock:
-            if not self._authenticated:
+            # Re-check inside lock (another thread may have already refreshed)
+            if self._authenticated:
+                elapsed = time.time() - self._auth_timestamp
+                if elapsed < self._SESSION_TTL and not self._is_proxy_session_expiring():
+                    return
+
+            if self._is_proxy_session_expiring():
+                logger.info("[HappyCar] Proxy session expiring, rotating...")
+                self._logout()
+                self._reset_proxy_session()
+            else:
+                logger.info("[HappyCar] Session expired or not authenticated, refreshing...")
                 self._logout()
                 self.session = self._create_session()
+
+            if not self._authenticate():
+                # Last resort: rotate proxy and try once more
+                logger.warning("Auth failed, attempting proxy rotation as last resort...")
+                self._reset_proxy_session()
                 self._authenticate()
 
     # ─── Caching ──────────────────────────────────────────────────────
@@ -532,17 +539,15 @@ class HappyCarService:
                 self._log_cookies("before re-auth (detail redirect)")
                 self._log_proxy_ip("detail redirect")
 
-                if self._is_proxy_session_expiring():
-                    with self._auth_lock:
-                        self._logout()
-                        self._reset_proxy_session()
-                        self._authenticate()
-                else:
-                    with self._auth_lock:
-                        self._logout()
-                        self._authenticated = False
-                        self.session = self._create_session()
-                        self._authenticate()
+                with self._auth_lock:
+                    self._logout()
+                    self._reset_proxy_session()
+                    if not self._authenticate():
+                        logger.error("HappyCar: re-auth failed after proxy rotation")
+                        return HappyCarDetailResponse(
+                            success=False,
+                            message="Authentication failed after proxy rotation",
+                        )
 
                 self._log_cookies("after re-auth")
 
