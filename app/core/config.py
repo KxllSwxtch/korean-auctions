@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Optional
 import os
 
 
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
 
     # Настройки для Autohub
     autohub_base_url: str = "https://www.autohubauction.co.kr"
+    autohub_api_base_url: str = "https://api.ahsellcar.co.kr"
     autohub_list_url: str = (
         "https://www.autohubauction.co.kr/newfront/receive/rc/receive_rc_list.do"
     )
@@ -28,6 +30,7 @@ class Settings(BaseSettings):
     # Учётные данные для Autohub
     autohub_username: str = "837301"
     autohub_password: str = "782312"
+    autohub_jwt_token: Optional[str] = None
 
     # Настройки для Glovis
     glovis_base_url: str = "https://auction.autobell.co.kr"
