@@ -292,7 +292,7 @@ def map_inspection(insp_data: dict) -> AutohubInspectionReport:
     )
 
 
-def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
+def map_diagram(diagram_data: dict, legend_data: dict, perf_frame_data: dict = None) -> AutohubCarDiagram:
     """Map diagram and legend API responses."""
     data = diagram_data.get("data", diagram_data)
 
@@ -304,10 +304,27 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
         if draw_file_url:
             frame_draw_url = build_image_url(draw_file_url) if not draw_file_url.startswith("http") else draw_file_url
 
+    # Build damage lookup from perf_frame data
+    damage_lookup: Dict[str, tuple] = {}
+    if perf_frame_data:
+        pf_data = perf_frame_data.get("data", [])
+        if isinstance(pf_data, list):
+            for item in pf_data:
+                frame_id = item.get("carFrameId")
+                criterias = item.get("criterias", [])
+                if frame_id and criterias:
+                    first = criterias[0]
+                    damage_lookup[frame_id] = (
+                        first.get("perfFrameCriteria"),
+                        first.get("frameEvalType"),  # "P"=past, "C"=current
+                    )
+
     # Map parts from criteriaList
     parts = []
     for part in data.get("criteriaList", []):
         img_url = part.get("carFrameImgUrl")
+        frame_id = part.get("carFrameId")
+        damage_code, damage_type = damage_lookup.get(frame_id, (None, None))
         parts.append(AutohubCarDiagramPart(
             name_ko=part.get("carFrameNmKo") or part.get("carFrameNm"),
             name_en=part.get("carFrameNmEn"),
@@ -318,7 +335,8 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
             y=part.get("yPoint"),
             width=part.get("width"),
             height=part.get("height"),
-            damage_code=part.get("perfFrameCriteria"),
+            damage_code=damage_code,
+            damage_type=damage_type,
         ))
 
     # Map legend

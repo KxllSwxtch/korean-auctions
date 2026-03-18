@@ -181,6 +181,7 @@ class AutohubCarDiagramPart(BaseModel):
     width: Optional[float] = None
     height: Optional[float] = None
     damage_code: Optional[str] = None
+    damage_type: Optional[str] = None  # "P" (past) or "C" (current)
 
 
 class AutohubCarDiagramLegendItem(BaseModel):
