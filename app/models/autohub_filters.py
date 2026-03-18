@@ -135,17 +135,17 @@ class AutohubSearchRequest(BaseModel):
             body["carModelDetail"] = self.car_model_details
         if self.fuel_type and self.fuel_type != AutohubFuelType.ALL:
             body["fuelCode"] = self.fuel_type.value
-        if self.year_from:
+        if self.year_from is not None:
             body["carYearFrom"] = self.year_from
-        if self.year_to:
+        if self.year_to is not None:
             body["carYearTo"] = self.year_to
-        if self.mileage_from:
+        if self.mileage_from is not None:
             body["mileageFrom"] = self.mileage_from
-        if self.mileage_to:
+        if self.mileage_to is not None:
             body["mileageTo"] = self.mileage_to
-        if self.price_from:
+        if self.price_from is not None:
             body["startAmtFrom"] = self.price_from
-        if self.price_to:
+        if self.price_to is not None:
             body["startAmtTo"] = self.price_to
         if self.lane and self.lane != AutohubLane.ALL:
             body["aucLaneCode"] = self.lane.value
