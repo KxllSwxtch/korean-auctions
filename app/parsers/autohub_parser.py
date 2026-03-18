@@ -27,7 +27,7 @@ from app.models.autohub_filters import (
 
 logger = logging.getLogger(__name__)
 
-IMAGE_CDN_BASE = "https://api.ahsellcar.co.kr"
+IMAGE_CDN_BASE = "https://file.ahsellcar.co.kr/S4XEZ2O5NLF8"
 
 # Legend color mapping by perfFrameCriteria code
 LEGEND_COLORS: Dict[str, str] = {
@@ -115,13 +115,13 @@ def _translate_perf_value(value_ko: Optional[str]) -> Optional[str]:
     return None
 
 
-def build_image_url(file_id: str, proxy_base: str = "/api/v1/autohub/image") -> str:
-    """Construct image URL from file ID. Returns proxy URL for Autohub file IDs."""
+def build_image_url(file_id: str) -> str:
+    """Construct full CDN image URL from file ID."""
     if not file_id:
         return ""
     if file_id.startswith("http"):
         return file_id
-    return f"{proxy_base}/{file_id}"
+    return f"{IMAGE_CDN_BASE}/cover/file/{file_id}"
 
 
 def determine_status(entry: dict) -> str:
@@ -292,7 +292,7 @@ def map_inspection(insp_data: dict) -> AutohubInspectionReport:
     )
 
 
-def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
+def map_diagram(diagram_data: dict, legend_data: dict, perf_frame_data: dict = None) -> AutohubCarDiagram:
     """Map diagram and legend API responses."""
     data = diagram_data.get("data", diagram_data)
 
@@ -304,10 +304,27 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
         if draw_file_url:
             frame_draw_url = build_image_url(draw_file_url) if not draw_file_url.startswith("http") else draw_file_url
 
+    # Build damage lookup from perf_frame data
+    damage_lookup: Dict[str, tuple] = {}
+    if perf_frame_data:
+        pf_data = perf_frame_data.get("data", [])
+        if isinstance(pf_data, list):
+            for item in pf_data:
+                frame_id = item.get("carFrameId")
+                criterias = item.get("criterias", [])
+                if frame_id and criterias:
+                    first = criterias[0]
+                    damage_lookup[frame_id] = (
+                        first.get("perfFrameCriteria"),
+                        first.get("frameEvalType"),  # "P"=past, "C"=current
+                    )
+
     # Map parts from criteriaList
     parts = []
     for part in data.get("criteriaList", []):
         img_url = part.get("carFrameImgUrl")
+        frame_id = part.get("carFrameId")
+        damage_code, damage_type = damage_lookup.get(frame_id, (None, None))
         parts.append(AutohubCarDiagramPart(
             name_ko=part.get("carFrameNmKo") or part.get("carFrameNm"),
             name_en=part.get("carFrameNmEn"),
@@ -318,6 +335,8 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
             y=part.get("yPoint"),
             width=part.get("width"),
             height=part.get("height"),
+            damage_code=damage_code,
+            damage_type=damage_type,
         ))
 
     # Map legend

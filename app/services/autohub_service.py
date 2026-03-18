@@ -336,6 +336,7 @@ class AutohubService:
             inspection_data = {}
             diagram_data = {}
             legend_data = {}
+            perf_frame_data = {}
 
             def fetch_detail():
                 return self._api_get(f"/cardata/external/rest/api/v1/data/info/{car_id}")
@@ -360,12 +361,21 @@ class AutohubService:
                 self._save_to_cache(cache_legend_key, result)
                 return result
 
-            with ThreadPoolExecutor(max_workers=4) as executor:
+            def fetch_perf_frame():
+                if not perf_id:
+                    return {}
+                return self._api_get(
+                    "/inspection/external/rest/api/v1/perf/frame/info",
+                    params={"perfId": perf_id},
+                )
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
                 futures = {
                     executor.submit(fetch_detail): "detail",
                     executor.submit(fetch_inspection): "inspection",
                     executor.submit(fetch_diagram): "diagram",
                     executor.submit(fetch_legend): "legend",
+                    executor.submit(fetch_perf_frame): "perf_frame",
                 }
 
                 for future in as_completed(futures):
@@ -380,6 +390,8 @@ class AutohubService:
                             diagram_data = result
                         elif name == "legend":
                             legend_data = result
+                        elif name == "perf_frame":
+                            perf_frame_data = result
                     except Exception as e:
                         logger.warning(f"Failed to fetch {name} for car {car_id}: {e}")
 
@@ -392,7 +404,7 @@ class AutohubService:
 
             # Map diagram if available
             if diagram_data:
-                car_detail.diagram = map_diagram(diagram_data, legend_data)
+                car_detail.diagram = map_diagram(diagram_data, legend_data, perf_frame_data)
 
             result = AutohubCarDetailResponse(success=True, data=car_detail)
             self._save_to_cache(cache_key, result)
