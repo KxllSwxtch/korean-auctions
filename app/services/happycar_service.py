@@ -32,6 +32,7 @@ class HappyCarService:
 
     BASE_URL = "https://www.happycarservice.com"
     LOGIN_URL = f"{BASE_URL}/member/login.ajax.html"
+    LIST_PAGE_URL = f"{BASE_URL}/content/auction_ins.html"
     LIST_AJAX_URL = f"{BASE_URL}/content/auction_ins.ajax.html"
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
     LOGOUT_URL = f"{BASE_URL}/member/logout.ajax.html"
@@ -218,12 +219,38 @@ class HappyCarService:
     # ─── Authentication ───────────────────────────────────────────────
 
     def _warm_up_list_context(self) -> None:
-        """POST to list AJAX endpoint to establish server-side navigation state.
+        """Establish server-side navigation state required by the detail page.
 
-        Korean auction sites track navigation in $_SESSION. The detail page
-        checks that the session previously accessed the list endpoint. Without
-        this warm-up, the server sees a deep-link and redirects to login.
+        The HappyCar server tracks navigation in $_SESSION. The detail page
+        (ins_view.html) checks that the session previously performed an
+        authenticated full-page GET of the list page (auction_ins.html).
+        Without this, the server sees a deep-link and redirects to login.
+
+        Step 1: Full-page GET of the list page (sets $_SESSION navigation flag)
+        Step 2: AJAX POST to the list endpoint (secondary warm-up)
         """
+        # Step 1: Full-page GET — this is the critical step
+        try:
+            resp = self.session.get(
+                self.LIST_PAGE_URL,
+                headers=self.BROWSER_HEADERS,
+                timeout=15,
+            )
+            logger.info(f"[HappyCar] List page visit: status={resp.status_code}, length={len(resp.text)}")
+            self._log_cookies("after list page visit")
+
+            # Parse model categories from the authenticated full page
+            if 'login.html' in resp.text and 'location.href' in resp.text:
+                logger.warning("[HappyCar] List page visit returned login redirect — session may not be fully established")
+            else:
+                _, _, model_cats = self.parser.parse_car_list(resp.text)
+                if model_cats:
+                    self._model_categories = model_cats
+                    logger.info(f"[HappyCar] Parsed {len(model_cats)} model categories from authenticated list page")
+        except Exception as e:
+            logger.warning(f"[HappyCar] List page visit failed (non-critical): {e}")
+
+        # Step 2: AJAX POST — secondary warm-up
         try:
             data = {
                 "code": "", "mode": "list", "page": "1", "pageSize0": "",
@@ -237,30 +264,27 @@ class HappyCarService:
                 self.LIST_AJAX_URL, data=data,
                 headers=self.AJAX_HEADERS, timeout=15,
             )
-            logger.info(f"[HappyCar] List warm-up: status={resp.status_code}, length={len(resp.text)}")
-            self._log_cookies("after list warm-up")
+            logger.info(f"[HappyCar] List AJAX warm-up: status={resp.status_code}, length={len(resp.text)}")
+            self._log_cookies("after list AJAX warm-up")
         except Exception as e:
-            logger.warning(f"[HappyCar] List warm-up failed (non-critical): {e}")
+            logger.warning(f"[HappyCar] List AJAX warm-up failed (non-critical): {e}")
 
     def _authenticate(self) -> bool:
         """Login to HappyCar to get a valid PHPSESSID."""
         try:
             logger.info("Authenticating with HappyCar...")
 
-            # Step 1: GET the main page to pick up initial cookies
+            # Step 1: GET the main page to pick up initial cookies (PHPSESSID)
+            # NOTE: This returns a login redirect page (unauthenticated).
+            # Model categories are parsed later from the authenticated list page
+            # in _warm_up_list_context().
             main_resp = self.session.get(
-                f"{self.BASE_URL}/content/auction_ins.html",
+                self.LIST_PAGE_URL,
                 headers=self.BROWSER_HEADERS,
                 timeout=15,
             )
             main_resp.raise_for_status()
-            logger.info(f"Got main page, status={main_resp.status_code}")
-
-            # Parse model categories from the full page (not available in AJAX responses)
-            _, _, model_cats = self.parser.parse_car_list(main_resp.text)
-            if model_cats:
-                self._model_categories = model_cats
-                logger.info(f"Parsed {len(model_cats)} model categories from full page")
+            logger.info(f"Got main page (pre-login), status={main_resp.status_code}")
 
             # Step 2: POST login credentials
             login_data = {
@@ -296,14 +320,11 @@ class HappyCarService:
                     logger.warning("HappyCar rst_code=-6: IP collision. Rotating proxy...")
                     self._rotate_to_new_ip()
 
-                    # Re-GET main page on new IP
+                    # Re-GET main page on new IP to pick up PHPSESSID cookie
                     main_resp = self.session.get(
-                        f"{self.BASE_URL}/content/auction_ins.html",
+                        self.LIST_PAGE_URL,
                         headers=self.BROWSER_HEADERS, timeout=15,
                     )
-                    _, _, model_cats = self.parser.parse_car_list(main_resp.text)
-                    if model_cats:
-                        self._model_categories = model_cats
 
                     # Retry login on new IP
                     retry_resp = self.session.post(
@@ -337,11 +358,15 @@ class HappyCarService:
                 response_text = raw.lower()
                 if '"result":"y"' in response_text or '"result": "y"' in response_text or "success" in response_text:
                     self._authenticated = True
+                    self._auth_timestamp = time.time()
                     logger.info("HappyCar authentication successful (text fallback)")
+                    self._warm_up_list_context()
                     return True
                 elif "logout" in response_text:
                     self._authenticated = True
+                    self._auth_timestamp = time.time()
                     logger.info("HappyCar already authenticated (logout link found)")
+                    self._warm_up_list_context()
                     return True
                 else:
                     self._authenticated = False
