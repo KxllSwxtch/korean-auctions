@@ -172,6 +172,20 @@ class HappyCarService:
         self.session = self._create_session()
         logger.info(f"[HappyCar proxy] Reset proxy session: session-{new_id}")
 
+    def _logout(self) -> None:
+        """Terminate the current server-side session via LOGOUT_URL.
+
+        Called BEFORE creating a new session so the server releases the
+        IP-bound login slot. Uses the current session's PHPSESSID cookie.
+        """
+        try:
+            resp = self.session.get(self.LOGOUT_URL, headers=self.AJAX_HEADERS, timeout=10)
+            logger.info(f"[HappyCar] Logout: status={resp.status_code}")
+        except Exception as e:
+            logger.warning(f"[HappyCar] Logout failed (non-critical): {e}")
+        finally:
+            self._authenticated = False
+
     # ─── Authentication ───────────────────────────────────────────────
 
     def _warm_up_list_context(self) -> None:
@@ -248,14 +262,39 @@ class HappyCarService:
                     self._log_proxy_ip("after auth")
                     return True
                 elif rst_code == -6:
-                    # Already logged in — session is still valid
-                    self._authenticated = True
-                    self._auth_timestamp = time.time()
-                    logger.info("HappyCar already authenticated (rst_code=-6)")
-                    self._log_cookies("after login")
-                    self._warm_up_list_context()
-                    self._log_proxy_ip("after auth (rst_code=-6)")
-                    return True
+                    # IP already has an active login with a DIFFERENT PHPSESSID.
+                    # Current PHPSESSID is NOT authenticated. Logout + retry.
+                    logger.warning("HappyCar rst_code=-6: IP already logged in. Logging out + retrying...")
+                    self._logout()
+                    time.sleep(0.5)
+
+                    # Re-GET main page for fresh PHPSESSID
+                    self.session.get(
+                        f"{self.BASE_URL}/content/auction_ins.html",
+                        headers=self.BROWSER_HEADERS, timeout=15,
+                    )
+
+                    # Retry login
+                    retry_resp = self.session.post(
+                        self.LOGIN_URL, data=login_data,
+                        headers=self.AJAX_HEADERS, timeout=15, allow_redirects=True,
+                    )
+                    retry_resp.raise_for_status()
+                    retry_json = json.loads(retry_resp.text.strip())
+                    retry_code = retry_json.get("rst_code")
+
+                    if retry_code == 1:
+                        self._authenticated = True
+                        self._auth_timestamp = time.time()
+                        logger.info("HappyCar auth successful after logout+retry")
+                        self._log_cookies("after login (retry)")
+                        self._warm_up_list_context()
+                        self._log_proxy_ip("after auth (retry)")
+                        return True
+                    else:
+                        self._authenticated = False
+                        logger.error(f"HappyCar login failed after retry: rst_code={retry_code}")
+                        return False
                 else:
                     rst_msg = resp_json.get("rst_msg", "")
                     self._authenticated = False
@@ -292,6 +331,7 @@ class HappyCarService:
         # Check 1: Is proxy session about to expire? Reset proxy + full re-auth
         if self._is_proxy_session_expiring():
             with self._auth_lock:
+                self._logout()
                 self._reset_proxy_session()
                 self._authenticate()
             return
@@ -306,6 +346,7 @@ class HappyCarService:
 
         with self._auth_lock:
             if not self._authenticated:
+                self._logout()
                 self.session = self._create_session()
                 self._authenticate()
 
@@ -493,10 +534,12 @@ class HappyCarService:
 
                 if self._is_proxy_session_expiring():
                     with self._auth_lock:
+                        self._logout()
                         self._reset_proxy_session()
                         self._authenticate()
                 else:
                     with self._auth_lock:
+                        self._logout()
                         self._authenticated = False
                         self.session = self._create_session()
                         self._authenticate()
