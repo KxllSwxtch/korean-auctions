@@ -27,7 +27,7 @@ from app.models.autohub_filters import (
 
 logger = logging.getLogger(__name__)
 
-IMAGE_CDN_BASE = "https://api.ahsellcar.co.kr"
+IMAGE_CDN_BASE = "https://file.ahsellcar.co.kr/S4XEZ2O5NLF8"
 
 # Legend color mapping by perfFrameCriteria code
 LEGEND_COLORS: Dict[str, str] = {
@@ -115,13 +115,13 @@ def _translate_perf_value(value_ko: Optional[str]) -> Optional[str]:
     return None
 
 
-def build_image_url(file_id: str, proxy_base: str = "/api/v1/autohub/image") -> str:
-    """Construct image URL from file ID. Returns proxy URL for Autohub file IDs."""
+def build_image_url(file_id: str) -> str:
+    """Construct full CDN image URL from file ID."""
     if not file_id:
         return ""
     if file_id.startswith("http"):
         return file_id
-    return f"{proxy_base}/{file_id}"
+    return f"{IMAGE_CDN_BASE}/cover/file/{file_id}"
 
 
 def determine_status(entry: dict) -> str:
@@ -318,6 +318,7 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
             y=part.get("yPoint"),
             width=part.get("width"),
             height=part.get("height"),
+            damage_code=part.get("perfFrameCriteria"),
         ))
 
     # Map legend

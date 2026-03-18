@@ -119,6 +119,7 @@ class AutohubApiDiagramPart(BaseModel):
     yPoint: Optional[float] = None
     width: Optional[float] = None
     height: Optional[float] = None
+    perfFrameCriteria: Optional[str] = None
 
 
 class AutohubApiDiagram(BaseModel):
@@ -179,6 +180,7 @@ class AutohubCarDiagramPart(BaseModel):
     y: Optional[float] = None
     width: Optional[float] = None
     height: Optional[float] = None
+    damage_code: Optional[str] = None
 
 
 class AutohubCarDiagramLegendItem(BaseModel):
