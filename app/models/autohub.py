@@ -69,35 +69,34 @@ class AutohubApiCarDetail(BaseModel):
 
 
 class AutohubApiInspectionOption(BaseModel):
-    """Single option from inspection"""
-    optionNm: Optional[str] = None
-    optionNmEn: Optional[str] = None
-    optionYn: Optional[str] = None
+    """Single option from inspection (actual API fields)"""
+    ctDtlId: Optional[str] = None
+    ctDtlNm: Optional[str] = None
+    ctCriteria: Optional[str] = None
+    url: Optional[str] = None
 
 
 class AutohubApiPerformanceCriteria(BaseModel):
-    """Single criteria within a performance detail"""
-    criteriaNm: Optional[str] = None
-    criteriaNmEn: Optional[str] = None
-    criteriaVal: Optional[str] = None
-    criteriaValNm: Optional[str] = None
-    criteriaValNmEn: Optional[str] = None
+    """Single criteria within a performance detail (actual API fields)"""
+    ctDtlId: Optional[str] = None
+    ctDtlNmKo: Optional[str] = None
+    orderNo: Optional[int] = None
+    criteriaTypeKoNm: Optional[str] = None
 
 
 class AutohubApiPerformanceDetail(BaseModel):
-    """Performance detail item"""
-    categoryNm: Optional[str] = None
-    categoryNmEn: Optional[str] = None
+    """Performance detail item (actual API fields)"""
+    ctId: Optional[str] = None
+    ctNmKo: Optional[str] = None
+    orderNo: Optional[int] = None
     criteriaList: List[AutohubApiPerformanceCriteria] = Field(default_factory=list)
 
 
 class AutohubApiElectricPart(BaseModel):
-    """Electric part evaluation"""
-    partNm: Optional[str] = None
-    partNmEn: Optional[str] = None
-    partVal: Optional[str] = None
-    partValNm: Optional[str] = None
-    partValNmEn: Optional[str] = None
+    """Electric part evaluation (actual API fields)"""
+    ctDtlId: Optional[str] = None
+    ctDtlNmKo: Optional[str] = None
+    ctCriteriaTypeNmKo: Optional[str] = None
 
 
 class AutohubApiInspection(BaseModel):
@@ -110,8 +109,8 @@ class AutohubApiInspection(BaseModel):
 
 
 class AutohubApiDiagramPart(BaseModel):
-    """Single part in the car diagram"""
-    carFrameNm: Optional[str] = None
+    """Single part in the car diagram (actual API fields)"""
+    carFrameNmKo: Optional[str] = None
     carFrameNmEn: Optional[str] = None
     carFrameCls: Optional[str] = None
     carFrameImgUrl: Optional[str] = None
@@ -129,11 +128,11 @@ class AutohubApiDiagram(BaseModel):
 
 
 class AutohubApiFrameLegendItem(BaseModel):
-    """Single legend item"""
-    legendNm: Optional[str] = None
-    legendNmEn: Optional[str] = None
-    legendColor: Optional[str] = None
-    legendCls: Optional[str] = None
+    """Single legend item (actual API fields)"""
+    perfFrameCriteria: Optional[str] = None
+    frameEvalNmKo: Optional[str] = None
+    frameEvalNmEn: Optional[str] = None
+    orderNo: Optional[int] = None
 
 
 class AutohubApiFrameLegend(BaseModel):

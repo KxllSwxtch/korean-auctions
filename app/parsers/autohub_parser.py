@@ -29,6 +29,72 @@ logger = logging.getLogger(__name__)
 
 IMAGE_CDN_BASE = "https://api.ahsellcar.co.kr"
 
+# Legend color mapping by perfFrameCriteria code
+LEGEND_COLORS: Dict[str, str] = {
+    # Past damage codes
+    "XX": "#FF6B6B",  # Red - Exchange
+    "W":  "#FFA94D",  # Orange - Welding/Bending
+    "P":  "#FFD3D3",  # Pink - Painting
+    # Current damage codes
+    "R":  "#FF6B6B",  # Red - Repair Required
+    "M":  "#4DABF7",  # Blue - Mediate/Adjust
+    "X":  "#FF4444",  # Dark Red - Exchange Required
+}
+
+# Common option translations Korean → English
+OPTION_TRANSLATIONS: Dict[str, str] = {
+    "내비게이션": "Navigation",
+    "선루프": "Sunroof",
+    "전동트렁크": "Power Trunk",
+    "스마트키": "Smart Key",
+    "메모리시트": "Memory Seat",
+    "HUD": "HUD",
+    "후방카메라": "Rear Camera",
+    "열선시트": "Heated Seats",
+    "통풍시트": "Ventilated Seats",
+    "크루즈컨트롤": "Cruise Control",
+    "후방센서": "Rear Sensor",
+    "전방센서": "Front Sensor",
+    "블랙박스": "Dashcam",
+    "ECM룸미러": "ECM Rearview Mirror",
+    "오토라이트": "Auto Lights",
+    "레인센서": "Rain Sensor",
+}
+
+# Performance category translations Korean → English
+PERF_CATEGORY_TRANSLATIONS: Dict[str, str] = {
+    "엔진": "Engine",
+    "미션": "Transmission",
+    "동력전달": "Power Delivery",
+    "조향": "Steering",
+    "제동": "Braking",
+    "전기": "Electrical",
+    "공조": "HVAC",
+    "실내": "Interior",
+    "경고등": "Warning Lights",
+    "차체부식": "Body Corrosion",
+}
+
+# Performance criteria translations Korean → English
+PERF_CRITERIA_TRANSLATIONS: Dict[str, str] = {
+    "작동상태": "Operating Condition",
+    "냉각계통": "Cooling System",
+    "구동축": "Drive Shaft",
+    "클러치": "Clutch",
+    "충전장치": "Charging System",
+    "공조기": "Air Conditioner",
+    "시트": "Seats",
+    "실내트림/내장재": "Interior Trim",
+    "경고등": "Warning Lights",
+    "차체부식": "Body Corrosion",
+}
+
+# Performance value translations Korean → English
+PERF_VALUE_TRANSLATIONS: Dict[str, str] = {
+    "보통": "Normal",
+    "양호": "Good",
+}
+
 
 def format_mileage(mileage: Optional[int]) -> str:
     """Format mileage as string with comma separator and km suffix."""
@@ -37,13 +103,25 @@ def format_mileage(mileage: Optional[int]) -> str:
     return f"{mileage:,}km"
 
 
-def build_image_url(file_id: str) -> str:
-    """Construct full image URL from file ID."""
+def _translate_perf_value(value_ko: Optional[str]) -> Optional[str]:
+    """Translate Korean performance value to English, handling '정비요' prefix."""
+    if not value_ko:
+        return None
+    if value_ko in PERF_VALUE_TRANSLATIONS:
+        return PERF_VALUE_TRANSLATIONS[value_ko]
+    if value_ko.startswith("정비요"):
+        detail = value_ko.replace("정비요", "").strip()
+        return f"Needs Repair: {detail}" if detail else "Needs Repair"
+    return None
+
+
+def build_image_url(file_id: str, proxy_base: str = "/api/v1/autohub/image") -> str:
+    """Construct image URL from file ID. Returns proxy URL for Autohub file IDs."""
     if not file_id:
         return ""
     if file_id.startswith("http"):
         return file_id
-    return f"{IMAGE_CDN_BASE}/file/external/rest/api/v1/image/{file_id}"
+    return f"{proxy_base}/{file_id}"
 
 
 def determine_status(entry: dict) -> str:
@@ -156,10 +234,11 @@ def map_inspection(insp_data: dict) -> AutohubInspectionReport:
     car_data = data.get("car", {})
     option_list = car_data.get("options", []) if isinstance(car_data, dict) else []
     for opt in option_list:
+        name_ko = opt.get("ctDtlNm")
         options.append(AutohubInspectionOption(
-            name=opt.get("optionNm"),
-            name_en=opt.get("optionNmEn"),
-            available=opt.get("optionYn") == "Y",
+            name=name_ko,
+            name_en=OPTION_TRANSLATIONS.get(name_ko, "") if name_ko else None,
+            available=True,
         ))
 
     # Extract electric parts
@@ -167,30 +246,35 @@ def map_inspection(insp_data: dict) -> AutohubInspectionReport:
     eval_data = data.get("evaluation", {})
     if isinstance(eval_data, dict):
         for ep in eval_data.get("electricParts", []):
+            name_ko = ep.get("ctDtlNmKo")
+            value_ko = ep.get("ctCriteriaTypeNmKo")
             electric_parts.append(AutohubPerformanceItem(
-                name=ep.get("partNm"),
-                name_en=ep.get("partNmEn"),
-                value=ep.get("partVal"),
-                value_name=ep.get("partValNm"),
-                value_name_en=ep.get("partValNmEn"),
+                name=name_ko,
+                name_en=OPTION_TRANSLATIONS.get(name_ko, "") if name_ko else None,
+                value=None,
+                value_name=value_ko,
+                value_name_en=_translate_perf_value(value_ko),
             ))
 
     # Extract performance details
     performance_details = []
     if isinstance(eval_data, dict):
         for perf in eval_data.get("performanceDtl", []):
+            cat_ko = perf.get("ctNmKo")
             criteria_items = []
             for crit in perf.get("criteriaList", []):
+                crit_ko = crit.get("ctDtlNmKo")
+                val_ko = crit.get("criteriaTypeKoNm")
                 criteria_items.append(AutohubPerformanceItem(
-                    name=crit.get("criteriaNm"),
-                    name_en=crit.get("criteriaNmEn"),
-                    value=crit.get("criteriaVal"),
-                    value_name=crit.get("criteriaValNm"),
-                    value_name_en=crit.get("criteriaValNmEn"),
+                    name=crit_ko,
+                    name_en=PERF_CRITERIA_TRANSLATIONS.get(crit_ko, "") if crit_ko else None,
+                    value=None,
+                    value_name=val_ko,
+                    value_name_en=_translate_perf_value(val_ko),
                 ))
             performance_details.append(AutohubPerformanceCategory(
-                category=perf.get("categoryNm"),
-                category_en=perf.get("categoryNmEn"),
+                category=cat_ko,
+                category_en=PERF_CATEGORY_TRANSLATIONS.get(cat_ko, "") if cat_ko else None,
                 items=criteria_items,
             ))
 
@@ -225,7 +309,7 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
     for part in data.get("criteriaList", []):
         img_url = part.get("carFrameImgUrl")
         parts.append(AutohubCarDiagramPart(
-            name_ko=part.get("carFrameNm"),
+            name_ko=part.get("carFrameNmKo") or part.get("carFrameNm"),
             name_en=part.get("carFrameNmEn"),
             category=part.get("carFrameCls"),
             image_url=build_image_url(img_url) if img_url and not img_url.startswith("http") else img_url,
@@ -241,20 +325,22 @@ def map_diagram(diagram_data: dict, legend_data: dict) -> AutohubCarDiagram:
 
     legend_past = []
     for item in (legend.get("past", []) if isinstance(legend, dict) else []):
+        criteria_code = item.get("perfFrameCriteria", "")
         legend_past.append(AutohubCarDiagramLegendItem(
-            name=item.get("legendNm"),
-            name_en=item.get("legendNmEn"),
-            color=item.get("legendColor"),
-            cls=item.get("legendCls"),
+            name=item.get("frameEvalNmKo"),
+            name_en=item.get("frameEvalNmEn"),
+            color=LEGEND_COLORS.get(criteria_code, "#ccc"),
+            cls=criteria_code,
         ))
 
     legend_current = []
     for item in (legend.get("current", []) if isinstance(legend, dict) else []):
+        criteria_code = item.get("perfFrameCriteria", "")
         legend_current.append(AutohubCarDiagramLegendItem(
-            name=item.get("legendNm"),
-            name_en=item.get("legendNmEn"),
-            color=item.get("legendColor"),
-            cls=item.get("legendCls"),
+            name=item.get("frameEvalNmKo"),
+            name_en=item.get("frameEvalNmEn"),
+            color=LEGEND_COLORS.get(criteria_code, "#ccc"),
+            cls=criteria_code,
         ))
 
     return AutohubCarDiagram(

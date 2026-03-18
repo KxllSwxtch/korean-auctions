@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi.responses import Response
 from typing import Optional
 from pydantic import BaseModel
 
@@ -91,6 +92,31 @@ async def get_car_detail(
     except Exception as e:
         logger.error(f"Car detail error: {e}", exc_info=True)
         return AutohubCarDetailResponse(success=False, error=str(e))
+
+
+# ===== Image Proxy =====
+
+
+@router.get(
+    "/image/{file_id}",
+    summary="Proxy image from Autohub API",
+    responses={200: {"content": {"image/*": {}}}},
+)
+async def get_image(
+    file_id: str,
+    service: AutohubService = Depends(get_autohub_service),
+) -> Response:
+    """Proxy image from Autohub API with authentication."""
+    try:
+        image_bytes, content_type = service.get_image(file_id)
+        return Response(
+            content=image_bytes,
+            media_type=content_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
+    except Exception as e:
+        logger.error(f"Image proxy error for {file_id}: {e}")
+        raise HTTPException(status_code=502, detail="Failed to fetch image")
 
 
 # ===== Brands =====

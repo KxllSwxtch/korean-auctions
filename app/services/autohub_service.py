@@ -433,6 +433,35 @@ class AutohubService:
             price_options=AUTOHUB_PRICE_OPTIONS,
         )
 
+    def get_image(self, file_id: str) -> tuple:
+        """Fetch image from Autohub API, returns (bytes, content_type)."""
+        cache_key = self._make_cache_key("image", {"file_id": file_id})
+        cached = self._get_from_cache(cache_key, ttl=86400)
+        if cached:
+            return cached
+
+        self._ensure_authenticated()
+        url = f"{self.api_base}/file/external/rest/api/v1/image/{file_id}"
+        response = self.session.get(
+            url,
+            headers=self._get_auth_headers(),
+            timeout=self.settings.request_timeout,
+        )
+        if response.status_code == 401:
+            logger.warning("Got 401 on image fetch, re-authenticating...")
+            if self._authenticate():
+                response = self.session.get(
+                    url,
+                    headers=self._get_auth_headers(),
+                    timeout=self.settings.request_timeout,
+                )
+        response.raise_for_status()
+
+        content_type = response.headers.get("content-type", "image/jpeg")
+        result = (response.content, content_type)
+        self._save_to_cache(cache_key, result)
+        return result
+
     def get_auth_status(self) -> Dict[str, Any]:
         """Check JWT token validity and auto-login status."""
         return {
