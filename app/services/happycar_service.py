@@ -172,6 +172,35 @@ class HappyCarService:
         self.session = self._create_session()
         logger.info(f"[HappyCar proxy] Reset proxy session: session-{new_id}")
 
+    def _rotate_to_new_ip(self, max_attempts: int = 5) -> bool:
+        """Rotate proxy until we get a genuinely different IP.
+
+        Calls _reset_proxy_session() up to max_attempts times,
+        checking the outgoing IP via httpbin after each rotation.
+        Must be called inside self._auth_lock.
+
+        Returns True if IP changed, False if exhausted attempts.
+        """
+        old_ip = self._current_proxy_ip
+        for attempt in range(1, max_attempts + 1):
+            self._reset_proxy_session()
+            new_ip = self._log_proxy_ip(f"rotation attempt {attempt}/{max_attempts}")
+
+            if new_ip is None:
+                # httpbin check failed — can't verify, proceed anyway
+                logger.warning(f"[HappyCar proxy] IP check failed on attempt {attempt}, proceeding without verification")
+                return True
+
+            if old_ip is None or new_ip != old_ip:
+                logger.info(f"[HappyCar proxy] IP changed: {old_ip} -> {new_ip}")
+                return True
+
+            logger.warning(f"[HappyCar proxy] Attempt {attempt}: still same IP {new_ip}, retrying...")
+            time.sleep(1)  # Brief pause before next rotation attempt
+
+        logger.error(f"[HappyCar proxy] Failed to get new IP after {max_attempts} attempts (stuck on {old_ip})")
+        return False
+
     def _logout(self) -> None:
         """Terminate the current server-side session via LOGOUT_URL.
 
@@ -265,7 +294,7 @@ class HappyCarService:
                     # Can't logout old session (don't have its PHPSESSID).
                     # Rotate proxy to get a fresh IP with no existing sessions.
                     logger.warning("HappyCar rst_code=-6: IP collision. Rotating proxy...")
-                    self._reset_proxy_session()
+                    self._rotate_to_new_ip()
 
                     # Re-GET main page on new IP
                     main_resp = self.session.get(
@@ -345,7 +374,7 @@ class HappyCarService:
             if self._is_proxy_session_expiring():
                 logger.info("[HappyCar] Proxy session expiring, rotating...")
                 self._logout()
-                self._reset_proxy_session()
+                self._rotate_to_new_ip()
             else:
                 logger.info("[HappyCar] Session expired or not authenticated, refreshing...")
                 self._logout()
@@ -354,7 +383,7 @@ class HappyCarService:
             if not self._authenticate():
                 # Last resort: rotate proxy and try once more
                 logger.warning("Auth failed, attempting proxy rotation as last resort...")
-                self._reset_proxy_session()
+                self._rotate_to_new_ip()
                 self._authenticate()
 
     # ─── Caching ──────────────────────────────────────────────────────
@@ -541,7 +570,7 @@ class HappyCarService:
 
                 with self._auth_lock:
                     self._logout()
-                    self._reset_proxy_session()
+                    self._rotate_to_new_ip()
                     if not self._authenticate():
                         logger.error("HappyCar: re-auth failed after proxy rotation")
                         return HappyCarDetailResponse(
