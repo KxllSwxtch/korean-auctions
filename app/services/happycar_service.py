@@ -1,5 +1,7 @@
 import hashlib
 import json
+import random
+import string
 import threading
 import time
 import urllib3
@@ -34,7 +36,10 @@ class HappyCarService:
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
     LOGOUT_URL = f"{BASE_URL}/member/logout.ajax.html"
 
-    PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR_sessid-happycar1:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
+    PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR_life-60_session-EoitGYdhe:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
+
+    _PROXY_LIFETIME: int = 3600     # 60 min — matches life-60 parameter
+    _PROXY_SAFETY_MARGIN: int = 300 # 5 min buffer before proxy rotation
 
     # Session-level headers — common to ALL requests
     BASE_HEADERS = {
@@ -76,6 +81,10 @@ class HappyCarService:
 
         # Cached model categories (parsed from full page, not available in AJAX)
         self._model_categories = []
+
+        # Proxy session tracking (sticky IP lifetime)
+        self._proxy_session_start: float = time.time()
+        self._current_proxy_ip: Optional[str] = None
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
@@ -127,13 +136,41 @@ class HappyCarService:
             f"PHPSESSID={'YES' if has_phpsessid else 'NO'}, names={cookie_names}"
         )
 
-    def _log_proxy_ip(self) -> None:
+    def _log_proxy_ip(self, label: str = "check") -> Optional[str]:
         """One-shot GET to httpbin.org/ip through proxy to verify outgoing IP."""
         try:
-            resp = self.session.get("https://httpbin.org/ip", timeout=5)
-            logger.info(f"[HappyCar proxy] Outgoing IP: {resp.json().get('origin', 'unknown')}")
+            resp = self.session.get("https://httpbin.org/ip", timeout=10)
+            ip = resp.json().get("origin", "unknown")
+            self._current_proxy_ip = ip
+            logger.info(f"[HappyCar proxy] {label}: Outgoing IP = {ip}")
+            return ip
         except Exception as e:
-            logger.warning(f"[HappyCar proxy] IP check failed: {e}")
+            logger.warning(f"[HappyCar proxy] {label}: IP check failed: {e}")
+            return None
+
+    def _is_proxy_session_expiring(self) -> bool:
+        """Return True when within safety margin of the proxy's sticky-IP lifetime."""
+        elapsed = time.time() - self._proxy_session_start
+        expiring = elapsed >= (self._PROXY_LIFETIME - self._PROXY_SAFETY_MARGIN)
+        if expiring:
+            logger.info(f"[HappyCar proxy] Session expiring: {elapsed:.0f}s elapsed (limit {self._PROXY_LIFETIME}s)")
+        return expiring
+
+    def _reset_proxy_session(self) -> None:
+        """Generate a new proxy session ID to get a fresh sticky IP.
+
+        Must be called inside self._auth_lock.
+        """
+        new_id = "".join(random.choices(string.ascii_letters + string.digits, k=9))
+        self.PROXY_URL = (
+            f"http://bp-bfk2u7wtb3gy_area-KR_life-60_session-{new_id}"
+            f":zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
+        )
+        self._proxy_session_start = time.time()
+        self._current_proxy_ip = None
+        self._authenticated = False
+        self.session = self._create_session()
+        logger.info(f"[HappyCar proxy] Reset proxy session: session-{new_id}")
 
     # ─── Authentication ───────────────────────────────────────────────
 
@@ -208,7 +245,7 @@ class HappyCarService:
                     logger.info(f"HappyCar authentication successful (rst_code={rst_code})")
                     self._log_cookies("after login")
                     self._warm_up_list_context()
-                    self._log_proxy_ip()
+                    self._log_proxy_ip("after auth")
                     return True
                 elif rst_code == -6:
                     # Already logged in — session is still valid
@@ -217,7 +254,7 @@ class HappyCarService:
                     logger.info("HappyCar already authenticated (rst_code=-6)")
                     self._log_cookies("after login")
                     self._warm_up_list_context()
-                    self._log_proxy_ip()
+                    self._log_proxy_ip("after auth (rst_code=-6)")
                     return True
                 else:
                     rst_msg = resp_json.get("rst_msg", "")
@@ -252,6 +289,14 @@ class HappyCarService:
 
     def _ensure_authenticated(self):
         """Ensure we have a valid session, re-authenticate if needed (thread-safe)."""
+        # Check 1: Is proxy session about to expire? Reset proxy + full re-auth
+        if self._is_proxy_session_expiring():
+            with self._auth_lock:
+                self._reset_proxy_session()
+                self._authenticate()
+            return
+
+        # Check 2: Is PHP session expired?
         if self._authenticated:
             elapsed = time.time() - self._auth_timestamp
             if elapsed < self._SESSION_TTL:
@@ -444,11 +489,17 @@ class HappyCarService:
             if 'login.html' in html and 'location.href' in html:
                 logger.warning(f"HappyCar detail page returned login redirect for idx={idx}")
                 self._log_cookies("before re-auth (detail redirect)")
+                self._log_proxy_ip("detail redirect")
 
-                with self._auth_lock:
-                    self._authenticated = False
-                    self.session = self._create_session()
-                    self._authenticate()
+                if self._is_proxy_session_expiring():
+                    with self._auth_lock:
+                        self._reset_proxy_session()
+                        self._authenticate()
+                else:
+                    with self._auth_lock:
+                        self._authenticated = False
+                        self.session = self._create_session()
+                        self._authenticate()
 
                 self._log_cookies("after re-auth")
 
