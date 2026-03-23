@@ -148,16 +148,16 @@ class SSANCARParser:
         fuel = ""
         transmission = ""
         grade = ""
-        
+
         if not detail_elem:
             return year, mileage, mileage_formatted, fuel, transmission, grade
-        
+
         # Find all span elements in details
         spans = detail_elem.find_all('span')
-        
+
         for i, span in enumerate(spans):
             text = span.text.strip()
-            
+
             # Year (4 digits)
             if re.match(r'^\d{4}$', text):
                 year = int(text)
@@ -168,8 +168,8 @@ class SSANCARParser:
                 mileage_num = re.sub(r'[^\d]', '', text)
                 if mileage_num:
                     mileage = int(mileage_num)
-            # Grade (A1-D2 pattern or A/1-D/2 pattern)
-            elif re.match(r'^[A-D][/]?\d$', text):
+            # Grade (letter + optional slash + digit, e.g. A1, A/1, F/1)
+            elif re.match(r'^[A-Z][/]?\d$', text):
                 grade = text.replace('/', '')  # Normalize A/1 to A1
             # Transmission (A/T, M/T)
             elif text.upper() in ['A/T', 'M/T', 'CVT', 'DCT']:
@@ -188,7 +188,16 @@ class SSANCARParser:
                     '수소': 'Hydrogen'
                 }
                 fuel = fuel_map.get(text, text)
-        
+            # Engine volume (contains 'cc') — skip, not extracted in list parser
+            elif 'cc' in text.lower():
+                pass
+            # Bare numeric value (comma-formatted, 1000+) — mileage without "km" suffix
+            elif re.match(r'^\d{1,3}(,\d{3})+$', text):
+                mileage_formatted = f"{text} Km"
+                mileage_num = text.replace(',', '')
+                if mileage_num:
+                    mileage = int(mileage_num)
+
         return year, mileage, mileage_formatted, fuel, transmission, grade
     
     def parse_car_detail(self, html: str) -> Optional[SSANCARCarDetail]:
@@ -227,6 +236,13 @@ class SSANCARParser:
                     full_name = name_span.text.strip()
                     manufacturer, model = self._parse_manufacturer_model(full_name)
             
+            # Known color names for extraction
+            KNOWN_COLORS = {
+                'black', 'white', 'silver', 'gray', 'grey', 'red', 'blue',
+                'green', 'brown', 'beige', 'orange', 'yellow', 'gold', 'navy',
+                'purple', 'pink', 'burgundy', 'champagne', 'bronze', 'ivory'
+            }
+
             # Extract details (year, transmission, fuel, etc.)
             year = 0
             transmission = ""
@@ -235,7 +251,8 @@ class SSANCARParser:
             mileage = None  # Initialize as None (optional int)
             mileage_formatted = ""
             condition_grade = ""
-            
+            color = ""
+
             detail_elem = soup.find('ul', class_='detail')
             if detail_elem:
                 li_elem = detail_elem.find('li')
@@ -243,7 +260,7 @@ class SSANCARParser:
                     spans = li_elem.find_all('span')
                     for span in spans:
                         text = span.text.strip()
-                        
+
                         # Year (4 digits)
                         if re.match(r'^\d{4}$', text):
                             year = int(text)
@@ -263,9 +280,18 @@ class SSANCARParser:
                             mileage_num = re.sub(r'[^\d]', '', text)
                             if mileage_num:
                                 mileage = int(mileage_num)
-                        # Grade (A/1-D/2 pattern)
-                        elif re.match(r'^[A-D][/]?\d$', text):
+                        # Grade (letter + optional slash + digit, e.g. A1, A/1, F/1)
+                        elif re.match(r'^[A-Z][/]?\d$', text):
                             condition_grade = text
+                        # Color (known color names)
+                        elif text.lower() in KNOWN_COLORS:
+                            color = text
+                        # Bare numeric value (comma-formatted) — mileage without "km" suffix
+                        elif re.match(r'^\d{1,3}(,\d{3})*$', text):
+                            mileage_formatted = f"{text} Km"
+                            mileage_num = text.replace(',', '')
+                            if mileage_num:
+                                mileage = int(mileage_num)
             
             # Extract starting price
             starting_price = ""
@@ -343,7 +369,7 @@ class SSANCARParser:
                 transmission=transmission,
                 grade=condition_grade,
                 condition_grade=condition_grade,  # Set both grade and condition_grade
-                color="",  # Color not shown in detail page
+                color=color,
                 engine_size=engine_volume,
                 engine_volume=engine_volume,  # Set both engine_size and engine_volume
                 vin="",  # VIN not shown in public view
