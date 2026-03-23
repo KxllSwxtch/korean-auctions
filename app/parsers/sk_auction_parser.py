@@ -117,14 +117,16 @@ class SKAuctionParser(BaseAuctionParser):
                     logger.info(f"✅ Parsed next auction date (by name): {date_val}")
                     return date_val
 
-            # Fallback: regex on raw HTML
-            match = re.search(
-                r'<input[^>]*(?:id|name)=["\']auctDt["\'][^>]*value=["\'](\d{8})["\']',
+            # Fallback: regex on raw HTML (order-independent for attributes)
+            tag_match = re.search(
+                r'<input\b[^>]*\b(?:id|name)=["\']auctDt["\'][^>]*/?>',
                 html,
             )
-            if match:
-                logger.info(f"✅ Parsed next auction date (by regex): {match.group(1)}")
-                return match.group(1)
+            if tag_match:
+                val_match = re.search(r'\bvalue=["\'](\d{8})["\']', tag_match.group(0))
+                if val_match:
+                    logger.info(f"✅ Parsed next auction date (by regex): {val_match.group(1)}")
+                    return val_match.group(1)
 
             logger.warning("⚠️ Could not find auctDt in page HTML")
             return None

@@ -448,6 +448,9 @@ async def get_next_auction_date():
 
         result = await asyncio.to_thread(sk_auction_service.get_next_auction_date)
 
+        if not result.success:
+            logger.warning(f"⚠️ Next auction date resolved with fallback: {result.message}")
+
         logger.info(f"✅ Next auction date: {result.auction_date}")
         return result
 
