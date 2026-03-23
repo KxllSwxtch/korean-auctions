@@ -20,6 +20,7 @@ from app.models.sk_auction import (
     SKAuctionYearsResponse,
     SKAuctionCountResponse,
     SKAuctionSearchFilters,
+    SKAuctionNextDateResponse,
 )
 from app.services.sk_auction_service import SKAuctionService
 
@@ -425,6 +426,33 @@ async def get_years():
         raise
     except Exception as e:
         logger.error(f"❌ SK Auction years error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "Internal server error", "message": str(e)},
+        )
+
+
+# ==================== Auction Date ====================
+
+
+@router.get("/next-auction-date", response_model=SKAuctionNextDateResponse)
+async def get_next_auction_date():
+    """
+    Get the next auction date from SK Auction.
+
+    Scrapes the exhibition list page to find the server-set auction date.
+    The date is cached for 12 hours to minimize scraping load.
+    """
+    try:
+        logger.info("📅 SK Auction next auction date request")
+
+        result = await asyncio.to_thread(sk_auction_service.get_next_auction_date)
+
+        logger.info(f"✅ Next auction date: {result.auction_date}")
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Next auction date error: {e}")
         raise HTTPException(
             status_code=500,
             detail={"error": "Internal server error", "message": str(e)},

@@ -32,6 +32,7 @@ from app.models.sk_auction import (
     SKAuctionYearsResponse,
     SKAuctionCountResponse,
     SKAuctionSearchFilters,
+    SKAuctionNextDateResponse,
 )
 from app.parsers.sk_auction_parser import SKAuctionParser
 from app.core.config import get_settings
@@ -52,6 +53,7 @@ class SKAuctionService:
         "fuel_types": "/sys/comnCd/selectCodeList.do",
         "years": "/sys/comnCd/selectCodeList.do",
         "login": "/main/actionLogin.do",
+        "exhibition_page": "/pc/auc/auctInfo/selectExhiListView.do",
         "car_detail": "/pc/No",  # HTML page
     }
 
@@ -299,6 +301,112 @@ class SKAuctionService:
             self._create_session()
         return self._authenticated
 
+    # ==================== Auction Date Resolution ====================
+
+    def _get_next_auction_date(self) -> str:
+        """
+        Get the next auction date from SK Auction website.
+
+        The exhibition list page contains a hidden input set server-side:
+        <input id="auctDt" name="auctDt" type="hidden" value="YYYYMMDD"/>
+        This always points to the next auction date.
+
+        Returns:
+            Auction date string in YYYYMMDD format.
+            Falls back to today's date if parsing fails.
+        """
+        cache_key = self._make_cache_key("next_auction_date")
+        cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_auction_date)
+        if cached is not None:
+            logger.debug(f"📦 SK next auction date cache hit: {cached}")
+            return cached
+
+        fallback_date = datetime.now().strftime("%Y%m%d")
+
+        try:
+            self._ensure_authenticated()
+
+            url = f"{self.BASE_URL}{self.ENDPOINTS['exhibition_page']}"
+            logger.info("📥 Fetching SK Auction exhibition page for next auction date")
+
+            response = self.session.get(url, headers=self._html_headers, timeout=30)
+
+            if response.status_code != 200:
+                logger.warning(f"⚠️ Exhibition page HTTP {response.status_code}")
+                return fallback_date
+
+            date_str = self.parser.parse_next_auction_date(response.text)
+
+            if not date_str:
+                logger.warning("⚠️ Parser returned None for auction date, using fallback")
+                return fallback_date
+
+            # Validate date format
+            try:
+                datetime.strptime(date_str, "%Y%m%d")
+            except ValueError:
+                logger.warning(f"⚠️ Invalid date format from parser: {date_str}")
+                return fallback_date
+
+            self._save_to_cache(cache_key, date_str)
+            logger.info(f"✅ Next auction date resolved: {date_str}")
+            return date_str
+
+        except requests.exceptions.Timeout:
+            logger.error("⏰ Timeout fetching exhibition page")
+            return fallback_date
+        except requests.exceptions.RequestException as e:
+            logger.error(f"🌐 Network error fetching exhibition page: {e}")
+            return fallback_date
+        except Exception as e:
+            logger.error(f"❌ Error resolving next auction date: {e}")
+            return fallback_date
+
+    def get_next_auction_date(self) -> SKAuctionNextDateResponse:
+        """
+        Get the next auction date with metadata.
+
+        Returns:
+            SKAuctionNextDateResponse with date info
+        """
+        try:
+            date_str = self._get_next_auction_date()
+
+            parsed = datetime.strptime(date_str, "%Y%m%d").date()
+            today = datetime.now().date()
+
+            formatted = f"{date_str[:4]}.{date_str[4:6]}.{date_str[6:8]}"
+            is_today = parsed == today
+            is_future = parsed > today
+
+            if is_today:
+                message = "Auction is today"
+            elif is_future:
+                days_until = (parsed - today).days
+                message = f"Next auction in {days_until} day{'s' if days_until != 1 else ''}"
+            else:
+                message = "Auction date is in the past"
+
+            return SKAuctionNextDateResponse(
+                success=True,
+                auction_date=date_str,
+                formatted_date=formatted,
+                is_today=is_today,
+                is_future=is_future,
+                message=message,
+            )
+        except Exception as e:
+            logger.error(f"❌ Error building auction date response: {e}")
+            fallback = datetime.now().strftime("%Y%m%d")
+            return SKAuctionNextDateResponse(
+                success=False,
+                auction_date=fallback,
+                formatted_date=f"{fallback[:4]}.{fallback[4:6]}.{fallback[6:8]}",
+                is_today=True,
+                is_future=False,
+                message=f"Error: {str(e)}",
+            )
+
     # ==================== API Methods ====================
 
     def get_cars(
@@ -325,7 +433,7 @@ class SKAuctionService:
         try:
             # Default auction date to today
             if auction_date is None:
-                auction_date = datetime.now().strftime("%Y%m%d")
+                auction_date = self._get_next_auction_date()
 
             # Check cache (3min TTL for car listings)
             cache_params = {
@@ -876,7 +984,7 @@ class SKAuctionService:
         """
         try:
             if auction_date is None:
-                auction_date = datetime.now().strftime("%Y%m%d")
+                auction_date = self._get_next_auction_date()
 
             # Fetch first page with minimal data to get count
             result = self.get_cars(page=1, page_size=1, auction_date=auction_date)

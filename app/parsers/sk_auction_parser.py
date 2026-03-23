@@ -83,6 +83,56 @@ class SKAuctionParser(BaseAuctionParser):
         """Main parse entry point - dispatches to specific parsers"""
         raise NotImplementedError("Use specific parse methods instead")
 
+    # ==================== Auction Date Parsing ====================
+
+    def parse_next_auction_date(self, html: str) -> Optional[str]:
+        """
+        Extract the next auction date from the exhibition list page HTML.
+
+        The page contains a hidden input set server-side:
+        <input id="auctDt" name="auctDt" type="hidden" value="20260324"/>
+
+        Args:
+            html: Raw HTML of selectExhiListView.do page
+
+        Returns:
+            Auction date string in YYYYMMDD format, or None if not found.
+        """
+        try:
+            soup = BeautifulSoup(html, "html.parser")
+
+            # Primary: find by id
+            input_elem = soup.find("input", {"id": "auctDt"})
+            if input_elem and input_elem.get("value"):
+                date_val = input_elem["value"].strip()
+                if re.match(r"^\d{8}$", date_val):
+                    logger.info(f"✅ Parsed next auction date (by id): {date_val}")
+                    return date_val
+
+            # Fallback: find by name
+            input_elem = soup.find("input", {"name": "auctDt"})
+            if input_elem and input_elem.get("value"):
+                date_val = input_elem["value"].strip()
+                if re.match(r"^\d{8}$", date_val):
+                    logger.info(f"✅ Parsed next auction date (by name): {date_val}")
+                    return date_val
+
+            # Fallback: regex on raw HTML
+            match = re.search(
+                r'<input[^>]*(?:id|name)=["\']auctDt["\'][^>]*value=["\'](\d{8})["\']',
+                html,
+            )
+            if match:
+                logger.info(f"✅ Parsed next auction date (by regex): {match.group(1)}")
+                return match.group(1)
+
+            logger.warning("⚠️ Could not find auctDt in page HTML")
+            return None
+
+        except Exception as e:
+            logger.error(f"❌ Error parsing auction date: {e}")
+            return None
+
     # ==================== JSON Parsing Methods ====================
 
     def parse_cars_json(

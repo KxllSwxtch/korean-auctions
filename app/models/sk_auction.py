@@ -409,6 +409,18 @@ class SKAuctionCountResponse(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class SKAuctionNextDateResponse(BaseModel):
+    """Response model for next auction date"""
+
+    success: bool = Field(..., description="Request success status")
+    auction_date: str = Field(..., description="Next auction date in YYYYMMDD format")
+    formatted_date: str = Field(..., description="Formatted date (YYYY.MM.DD)")
+    is_today: bool = Field(default=False, description="Whether the auction date is today")
+    is_future: bool = Field(default=False, description="Whether the auction date is in the future")
+    message: str = Field(default="", description="Status message")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
 class SKAuctionError(BaseModel):
     """Error response model"""
 

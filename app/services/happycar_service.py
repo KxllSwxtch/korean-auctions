@@ -1,6 +1,7 @@
 import hashlib
 import json
 import random
+import re
 import string
 import threading
 import time
@@ -71,6 +72,11 @@ class HappyCarService:
         "Sec-Fetch-Mode": "navigate",
         "Upgrade-Insecure-Requests": "1",
     }
+
+    _LOGIN_REDIRECT_RE = re.compile(
+        r"""location\.href\s*=\s*['"][^'"]*login\.html""",
+        re.IGNORECASE,
+    )
 
     def __init__(self):
         self.parser = HappyCarParser()
@@ -148,6 +154,19 @@ class HappyCarService:
         except Exception as e:
             logger.warning(f"[HappyCar proxy] {label}: IP check failed: {e}")
             return None
+
+    def _is_login_redirect(self, html: str) -> bool:
+        """Detect a genuine JS-based login redirect page.
+
+        Real redirects are tiny script-only pages (<2KB) with a JS assignment
+        like: location.href = '/member/login.html';
+        Valid detail pages are 10KB+ and may incidentally contain both
+        'login.html' and 'location.href', which causes false positives
+        with simple substring checks.
+        """
+        if len(html) > 2000:
+            return False
+        return bool(self._LOGIN_REDIRECT_RE.search(html))
 
     def _is_proxy_session_expiring(self) -> bool:
         """Return True when within safety margin of the proxy's sticky-IP lifetime."""
@@ -240,7 +259,7 @@ class HappyCarService:
             self._log_cookies("after list page visit")
 
             # Parse model categories from the authenticated full page
-            if 'login.html' in resp.text and 'location.href' in resp.text:
+            if self._is_login_redirect(resp.text):
                 logger.warning("[HappyCar] List page visit returned login redirect — session may not be fully established")
             else:
                 _, _, model_cats = self.parser.parse_car_list(resp.text)
@@ -586,9 +605,13 @@ class HappyCarService:
             # Detail page uses EUC-KR encoding
             response.encoding = "euc-kr"
             html = response.text
+            logger.debug(
+                f"[HappyCar] Detail response: idx={idx}, length={len(html)}, "
+                f"head={html[:500]!r}"
+            )
 
             # Detect login redirect — page requires auth but session expired
-            if 'login.html' in html and 'location.href' in html:
+            if self._is_login_redirect(html):
                 logger.warning(f"HappyCar detail page returned login redirect for idx={idx}")
                 self._log_cookies("before re-auth (detail redirect)")
                 self._log_proxy_ip("detail redirect")
@@ -610,8 +633,12 @@ class HappyCarService:
                 response.raise_for_status()
                 response.encoding = "euc-kr"
                 html = response.text
+                logger.debug(
+                    f"[HappyCar] Detail response (retry): idx={idx}, length={len(html)}, "
+                    f"head={html[:500]!r}"
+                )
 
-                if 'login.html' in html and 'location.href' in html:
+                if self._is_login_redirect(html):
                     logger.error(f"HappyCar: still redirected to login after re-auth for idx={idx}")
                     self._log_cookies("STILL FAILING after re-auth")
                     return HappyCarDetailResponse(
