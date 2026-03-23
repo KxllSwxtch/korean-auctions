@@ -286,8 +286,8 @@ class SSANCARParser:
                         # Color (known color names)
                         elif text.lower() in KNOWN_COLORS:
                             color = text
-                        # Bare numeric value (comma-formatted) — mileage without "km" suffix
-                        elif re.match(r'^\d{1,3}(,\d{3})*$', text):
+                        # Bare numeric value (comma-formatted, 1000+) — mileage without "km" suffix
+                        elif re.match(r'^\d{1,3}(,\d{3})+$', text):
                             mileage_formatted = f"{text} Km"
                             mileage_num = text.replace(',', '')
                             if mileage_num:
