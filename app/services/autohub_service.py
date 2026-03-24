@@ -72,6 +72,7 @@ class AutohubService:
 
     def _create_session(self) -> requests.Session:
         s = requests.Session()
+        s.headers.update(self._get_base_headers())
         retry_strategy = Retry(
             total=3,
             backoff_factor=1,
@@ -82,15 +83,30 @@ class AutohubService:
         s.mount("http://", adapter)
         return s
 
-    def _get_auth_headers(self) -> Dict[str, str]:
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json",
-            "origin": "https://www.autohubauction.co.kr",
-            "referer": "https://www.autohubauction.co.kr/",
+    def _get_base_headers(self) -> Dict[str, str]:
+        """Browser-like headers to avoid WAF/CDN blocking."""
+        return {
+            "Accept": "application/json",
+            "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.5,en;q=0.3",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "application/json",
+            "Origin": "https://www.autohubauction.co.kr",
+            "Pragma": "no-cache",
+            "Referer": "https://www.autohubauction.co.kr/",
+            "Sec-Fetch-Dest": "empty",
+            "Sec-Fetch-Mode": "cors",
+            "Sec-Fetch-Site": "cross-site",
+            "User-Agent": self.settings.user_agent,
+            "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
         }
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        headers = self._get_base_headers()
         if self._jwt_token:
-            headers["authorization"] = f"Bearer {self._jwt_token}"
+            headers["Authorization"] = f"Bearer {self._jwt_token}"
         return headers
 
     def _is_token_valid(self) -> bool:
@@ -125,12 +141,7 @@ class AutohubService:
                     "pw": self.settings.autohub_password,
                     "productId": self.settings.autohub_product_id,
                 },
-                headers={
-                    "accept": "application/json",
-                    "content-type": "application/json",
-                    "origin": "https://www.autohubauction.co.kr",
-                    "referer": "https://www.autohubauction.co.kr/",
-                },
+                headers=self._get_base_headers(),
                 timeout=self.settings.request_timeout,
             )
             response.raise_for_status()
@@ -202,7 +213,7 @@ class AutohubService:
     # ===== API Methods =====
 
     def _api_get(self, path: str, params: Optional[Dict] = None) -> Dict[str, Any]:
-        """Make authenticated GET request to Autohub API with auto-auth and 401 retry."""
+        """Make authenticated GET request to Autohub API with auto-auth and 401/403 retry."""
         self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"GET {url}")
@@ -212,8 +223,9 @@ class AutohubService:
             params=params,
             timeout=self.settings.request_timeout,
         )
-        if response.status_code == 401:
-            logger.warning("Got 401 on GET, re-authenticating...")
+        if response.status_code in (401, 403):
+            logger.warning(f"Got {response.status_code} on GET, re-authenticating...")
+            logger.debug(f"Response body: {response.text[:500]}")
             if self._authenticate():
                 response = self.session.get(
                     url,
@@ -225,7 +237,7 @@ class AutohubService:
         return response.json()
 
     def _api_post(self, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
-        """Make authenticated POST request to Autohub API with auto-auth and 401 retry."""
+        """Make authenticated POST request to Autohub API with auto-auth and 401/403 retry."""
         self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"POST {url}")
@@ -235,8 +247,9 @@ class AutohubService:
             json=body,
             timeout=self.settings.request_timeout,
         )
-        if response.status_code == 401:
-            logger.warning("Got 401 on POST, re-authenticating...")
+        if response.status_code in (401, 403):
+            logger.warning(f"Got {response.status_code} on POST, re-authenticating...")
+            logger.debug(f"Response body: {response.text[:500]}")
             if self._authenticate():
                 response = self.session.post(
                     url,
