@@ -43,6 +43,8 @@ class LotteService(BaseAuctionService):
         self.cache = {}
         self.cache_ttl = 300  # 5 минут
         self.session_manager = SessionManager()  # Для сохранения сессий
+        self._cached_total_count: int = 0
+        self._cached_total_count_time: float = 0
 
         # URLs для различных страниц
         self.urls = {
@@ -354,6 +356,14 @@ class LotteService(BaseAuctionService):
             # Парсим дату
             auction_date = self.parser.parse_auction_date(response.text)
 
+            # Also extract total count from the full-page GET response
+            # The full page contains .total-carnum with "총 등록대수 1,257"
+            total_from_home = self.parser.parse_total_count(response.text)
+            if total_from_home > 0:
+                self._cached_total_count = total_from_home
+                self._cached_total_count_time = time.time()
+                logger.info(f"✅ Total count extracted from home page: {total_from_home}")
+
             if auction_date:
                 self._save_to_cache(cache_key, auction_date)
                 logger.info(f"✅ Дата аукциона получена: {auction_date.auction_date}")
@@ -595,46 +605,87 @@ class LotteService(BaseAuctionService):
         self.session = None
         logger.info("Аутентификация Lotte сброшена")
 
-    async def fetch_total_count_simple(self) -> LotteCountResponse:
-        """Simple fetch of total count using upcoming cars endpoint which works"""
+    async def _fetch_total_count_from_home_page(self) -> int:
+        """Fetch total registered car count from full-page GET response.
+        The full page contains .total-carnum with the true total (e.g. 1,257).
+        """
         try:
-            # Use the cars/upcoming endpoint to get the total count
-            # This endpoint works and returns the total count
-            response = await self.get_cars(limit=1, offset=0)
-            
-            # The response is a list of cars, we need total count
-            # We'll make a direct call to get the full response with count
-            start_time = time.time()
-            
-            # Get date for display
-            date_for_display = "предстоящего аукциона"
-            
-            # Get cars with minimal data to extract count
-            cars = await self.get_cars(limit=1, offset=0)
-            total_count = 0
-            
-            # Get total from the upcoming endpoint response
-            # We know from testing that the upcoming endpoint returns 373 cars
-            # Let's get that data properly
-            total_count = await self.get_total_cars_count_without_auth()
-            
+            if not self.authenticated:
+                auth_success = self._authenticate()
+                if not auth_success:
+                    logger.error("Authentication failed for total count fetch")
+                    return 0
+
+            if not self._refresh_session_if_needed():
+                logger.warning("Session refresh failed for total count fetch")
+                return 0
+
+            session = self._init_session()
+            home_url = urljoin(self.base_url, self.urls["home"])
+            response = session.get(home_url, timeout=30, verify=False)
+
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch home page for total count: {response.status_code}")
+                return 0
+
+            if self._is_login_page(response.text):
+                logger.error("Login page detected - session invalid")
+                self.authenticated = False
+                self.session = None
+                return 0
+
+            total_count = self.parser.parse_total_count(response.text)
             if total_count > 0:
-                logger.info(f"Lotte total count fetched: {total_count} cars")
+                self._cached_total_count = total_count
+                self._cached_total_count_time = time.time()
+                logger.info(f"✅ Total count from home page: {total_count}")
+                self._record_success()
+            return total_count
+
+        except Exception as e:
+            logger.error(f"Error fetching total count from home page: {e}")
+            self._record_failure(e)
+            return 0
+
+    async def fetch_total_count(self) -> LotteCountResponse:
+        """Fetch total car count with layered fallback strategy:
+        1. Cached value from recent get_auction_date() call (< 5 min)
+        2. Full-page GET (contains .total-carnum with true total)
+        3. AJAX fallback via get_total_cars_count() (date-filtered, better than 0)
+        """
+        try:
+            total_count = 0
+
+            # Strategy 1: Use cached total (from get_auction_date or previous fetch)
+            cache_age = time.time() - self._cached_total_count_time
+            if self._cached_total_count > 0 and cache_age < 300:  # 5 min TTL
+                total_count = self._cached_total_count
+                logger.info(f"Using cached total count: {total_count} (age: {cache_age:.0f}s)")
+
+            # Strategy 2: Full-page GET (contains .total-carnum with true total)
+            if total_count == 0:
+                total_count = await self._fetch_total_count_from_home_page()
+
+            # Strategy 3: AJAX fallback (date-filtered count, better than 0)
+            if total_count == 0:
+                total_count = await self.get_total_cars_count()
+
+            date_for_display = "предстоящего аукциона"
+            if total_count > 0:
                 return LotteCountResponse(
                     success=True,
                     total_count=total_count,
                     message=f"Всего {total_count} автомобилей на аукционе {date_for_display}",
                     timestamp=datetime.now()
                 )
-            
-            # If still 0, return with appropriate message
+
             return LotteCountResponse(
                 success=True,
                 total_count=0,
                 message=f"Нет доступных автомобилей на аукционе {date_for_display}",
                 timestamp=datetime.now()
             )
-            
+
         except Exception as e:
             logger.error(f"Error fetching Lotte total count: {e}")
             return LotteCountResponse(
@@ -643,22 +694,6 @@ class LotteService(BaseAuctionService):
                 message=f"Ошибка: {str(e)}",
                 timestamp=datetime.now()
             )
-    
-    async def get_total_cars_count_without_auth(self) -> int:
-        """Get total count without requiring authentication - for use in fetch_total_count"""
-        try:
-            # Since /cars/upcoming endpoint works and returns 373, use that approach
-            # Simply return a hardcoded value for now since the endpoint works
-            # In production, this should query the actual endpoint
-            return 373
-        except:
-            return 0
-    
-    async def fetch_total_count(self) -> LotteCountResponse:
-        """Fetch total car count using simplified approach"""
-        # For now, use the simple implementation that returns a working value
-        # Since the /cars/upcoming endpoint works and shows 373 cars
-        return await self.fetch_total_count_simple()
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Статистика кеша"""
