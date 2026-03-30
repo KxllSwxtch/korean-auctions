@@ -46,6 +46,11 @@ class LotteService(BaseAuctionService):
         self._cached_total_count: int = 0
         self._cached_total_count_time: float = 0
 
+        # Auth rate limiting & lockout protection
+        self._auth_locked_until: float = 0  # Cooldown after errOverPassCnt
+        self._last_auth_attempt: float = 0  # Rate limiter timestamp
+        self._auth_min_interval: float = 30  # Min seconds between auth attempts
+
         # URLs для различных страниц
         self.urls = {
             "home": "/hp/auct/myp/entry/selectMypEntryList.do",  # Страница с датой аукциона
@@ -104,6 +109,24 @@ class LotteService(BaseAuctionService):
     def _authenticate(self) -> bool:
         """Аутентификация в системе Lotte (двухэтапный процесс)"""
         try:
+            # Guard 1: If already authenticated and session is valid, skip re-auth
+            if self.authenticated and self.session and self._validate_session():
+                logger.info("✅ Session already valid, skipping re-authentication")
+                return True
+
+            # Guard 2: Respect cooldown after account lockout (errOverPassCnt)
+            if time.time() < self._auth_locked_until:
+                remaining = int(self._auth_locked_until - time.time())
+                logger.warning(f"⏳ Auth cooldown active ({remaining}s remaining), skipping login attempt")
+                return False
+
+            # Guard 3: Rate limit auth attempts (max 1 per _auth_min_interval seconds)
+            now = time.time()
+            if now - self._last_auth_attempt < self._auth_min_interval:
+                logger.warning(f"⏳ Auth rate limit: last attempt was {now - self._last_auth_attempt:.0f}s ago, minimum interval is {self._auth_min_interval}s")
+                return False
+            self._last_auth_attempt = now
+
             # Force fresh session for clean headers/cookies on each auth attempt
             self.session = None
             session = self._init_session()
@@ -236,7 +259,8 @@ class LotteService(BaseAuctionService):
                     if error_code == "errUserAuth":
                         logger.error("Неверные логин или пароль")
                     elif error_code == "errOverPassCnt":
-                        logger.error("Превышено количество попыток входа")
+                        logger.error("Превышено количество попыток входа — активируем 15-мин cooldown")
+                        self._auth_locked_until = time.time() + 900  # 15-min cooldown
                     elif error_code == "feeInactive":
                         logger.error("Проблемы с оплатой аккаунта")
                     else:

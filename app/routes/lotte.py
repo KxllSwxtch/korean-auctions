@@ -79,6 +79,10 @@ async def get_cars(
     try:
         logger.info(f"Запрос автомобилей Lotte: limit={limit}, offset={offset}")
 
+        # Pre-authenticate once to avoid multiple auth cascades
+        if not service.authenticated:
+            service._authenticate()
+
         response = await service.get_cars_response_with_date_check(
             limit=limit, offset=offset
         )
@@ -253,6 +257,11 @@ async def get_upcoming_cars(
         logger.info(
             f"Запрос автомобилей предстоящего аукциона Lotte: limit={limit}, offset={offset}"
         )
+
+        # Pre-authenticate once for the entire request to avoid
+        # multiple independent auth cascades (prevents account lockout)
+        if not service.authenticated:
+            service._authenticate()
 
         # Получаем дату аукциона для информации
         auction_date = await service.get_auction_date()
