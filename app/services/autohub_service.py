@@ -275,9 +275,11 @@ class AutohubService:
                 "/auction/external/rest/api/v1/entry/list/paging",
                 api_body,
             )
-            cars, total_count = map_car_list(response_data)
+            cars, total_count, total_pages = map_car_list(response_data)
 
-            total_pages = (total_count + params.page_size - 1) // params.page_size if params.page_size > 0 else 0
+            # Fallback: if API didn't provide total_pages, compute it
+            if total_pages == 0 and total_count > 0 and params.page_size > 0:
+                total_pages = (total_count + params.page_size - 1) // params.page_size
 
             result = AutohubResponse(
                 success=True,

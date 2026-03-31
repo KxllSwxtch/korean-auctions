@@ -169,11 +169,55 @@ def map_car_entry(entry: dict) -> AutohubCar:
     )
 
 
-def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int]:
-    """Map listing API response to list of cars + total count."""
+def _extract_total_count(data: dict, fallback_count: int) -> int:
+    """Extract total count trying multiple field names for resilience."""
+    for field in ("totalRows", "totalCount", "total", "totalCnt"):
+        value = data.get(field)
+        if value is not None:
+            try:
+                count = int(value)
+                if count >= 0:
+                    return count
+            except (ValueError, TypeError):
+                logger.warning(f"Field '{field}' has non-integer value: {value!r}")
+
+    logger.warning(
+        f"No total count field found in API response. "
+        f"Available keys: {list(data.keys())}. "
+        f"Falling back to parsed car count: {fallback_count}"
+    )
+    return fallback_count
+
+
+def _extract_total_pages(data: dict, total_count: int, page_size: int) -> int:
+    """Extract total pages from API response, with computed fallback."""
+    for field in ("totalPages", "totalPage", "pageCount"):
+        value = data.get(field)
+        if value is not None:
+            try:
+                pages = int(value)
+                if pages >= 0:
+                    return pages
+            except (ValueError, TypeError):
+                pass
+
+    if page_size > 0 and total_count > 0:
+        return (total_count + page_size - 1) // page_size
+    return 0
+
+
+def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int, int]:
+    """Map listing API response to list of cars + total count + total pages."""
     data = api_data.get("data", {})
+
+    if not isinstance(data, dict):
+        logger.warning(f"API response 'data' is not a dict: {type(data)}")
+        data = {}
+
+    logger.debug(f"API response data keys: {list(data.keys())}")
+
     entries = data.get("list", [])
-    total_count = data.get("totalCount", 0)
+    page_size = data.get("pageSize", 20)
 
     cars = []
     for entry in entries:
@@ -183,7 +227,12 @@ def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int]:
         except Exception as e:
             logger.warning(f"Failed to map car entry: {e}", exc_info=True)
 
-    return cars, total_count
+    total_count = _extract_total_count(data, fallback_count=len(cars))
+    total_pages = _extract_total_pages(data, total_count, page_size)
+
+    logger.info(f"Mapped {len(cars)} cars (total_count={total_count}, total_pages={total_pages})")
+
+    return cars, total_count, total_pages
 
 
 def map_car_detail(detail_data: dict) -> AutohubCarDetail:
