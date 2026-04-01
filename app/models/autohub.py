@@ -239,6 +239,8 @@ class AutohubCarDetail(BaseModel):
     title: Optional[str] = None
     vin: Optional[str] = None
     car_number: Optional[str] = None
+    starting_price: Optional[int] = Field(None, description="Start price in manwon (startAmt)")
+    hope_price: Optional[int] = Field(None, description="Hope price in manwon (hopeAmt)")
     year: Optional[int] = None
     mileage: Optional[int] = None
     displacement: Optional[int] = None

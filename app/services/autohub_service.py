@@ -24,6 +24,7 @@ from app.models.autohub_filters import (
     AutohubBrandsResponse,
     AutohubBrandsGroup,
     AutohubFilterInfo,
+    AutohubSortOrder,
     AutohubFuelType,
     AutohubAuctionResult,
     AutohubLane,
@@ -36,6 +37,7 @@ from app.parsers.autohub_parser import (
     map_inspection,
     map_diagram,
     map_brands,
+    extract_entry_prices,
 )
 from app.core.config import get_settings
 from app.core.logging import get_logger
@@ -263,7 +265,13 @@ class AutohubService:
     # ===== Core Methods =====
 
     def get_car_list(self, params: AutohubSearchRequest) -> AutohubResponse:
-        """Fetch car listing from API."""
+        """Fetch car listing from API. Dispatches to entry search when needed."""
+        if params.entry_number:
+            return self._search_by_entry_number(params)
+        return self._fetch_car_page(params)
+
+    def _fetch_car_page(self, params: AutohubSearchRequest) -> AutohubResponse:
+        """Fetch a single page of car listings from the external API."""
         api_body = params.to_api_body()
         cache_key = self._make_cache_key("car_list", api_body)
         cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
@@ -318,6 +326,92 @@ class AutohubService:
                 page_size=params.page_size,
             )
 
+    def _search_by_entry_number(self, params: AutohubSearchRequest) -> AutohubResponse:
+        """Search for a specific car by entry number using server-side filtering.
+
+        The external API does not support entryNo as a request filter,
+        so we fetch pages sorted by entry number and scan for the match.
+        Early termination: stop once we pass the target in sorted order.
+        """
+        target = params.entry_number
+        try:
+            target_int = int(target)
+        except (ValueError, TypeError):
+            return AutohubResponse(
+                success=True, data=[], total_count=0,
+                total_pages=0, current_page=1, page_size=params.page_size,
+            )
+
+        # Check cache (keyed by normalized entry number + active filters)
+        cache_key = self._make_cache_key("entry_search", {
+            "entry": target_int,
+            "brands": params.car_brands,
+            "models": params.car_models,
+            "details": params.car_model_details,
+            "fuel": params.fuel_type.value if params.fuel_type else None,
+            "lane": params.lane.value if params.lane else None,
+            "year_from": params.year_from,
+            "year_to": params.year_to,
+            "mileage_from": params.mileage_from,
+            "mileage_to": params.mileage_to,
+            "price_from": params.price_from,
+            "price_to": params.price_to,
+            "auction_result": params.auction_result.value if params.auction_result else None,
+            "condition_grade": params.condition_grade,
+        })
+        cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
+        if cached:
+            return cached
+
+        # Build scan params: no entry_number, large page, sorted by entry asc
+        scan_params = params.model_copy()
+        scan_params.entry_number = None
+        scan_params.page_size = 100
+        scan_params.sort_order = AutohubSortOrder.ENTRY
+        scan_params.sort_direction = "asc"
+        scan_params.page = 1
+
+        max_pages = 30  # safety limit (~3000 cars)
+
+        for page_num in range(1, max_pages + 1):
+            scan_params.page = page_num
+            result = self._fetch_car_page(scan_params)
+
+            if not result.success or not result.data:
+                break
+
+            for car in result.data:
+                try:
+                    car_entry_int = int(car.auction_number)
+                except (ValueError, TypeError):
+                    continue
+
+                if car_entry_int == target_int:
+                    found = AutohubResponse(
+                        success=True, data=[car],
+                        total_count=1, total_pages=1,
+                        current_page=1, page_size=params.page_size,
+                    )
+                    self._save_to_cache(cache_key, found)
+                    return found
+
+                if car_entry_int > target_int:
+                    # Passed target in sorted order — not found
+                    break
+            else:
+                # Inner loop completed without break; check if more pages exist
+                if page_num >= result.total_pages:
+                    break
+                continue
+            break  # Inner loop broke (early termination)
+
+        not_found = AutohubResponse(
+            success=True, data=[], total_count=0,
+            total_pages=0, current_page=1, page_size=params.page_size,
+        )
+        self._save_to_cache(cache_key, not_found)
+        return not_found
+
     def get_brands(self) -> AutohubBrandsResponse:
         """Fetch hierarchical brands from API (cached 24h)."""
         cache_key = self._make_cache_key("brands")
@@ -352,6 +446,7 @@ class AutohubService:
             diagram_data = {}
             legend_data = {}
             perf_frame_data = {}
+            entry_listing_data = {}
 
             def fetch_detail():
                 return self._api_get(f"/cardata/external/rest/api/v1/data/info/{car_id}")
@@ -384,13 +479,21 @@ class AutohubService:
                     params={"perfId": perf_id},
                 )
 
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            def fetch_entry_listing():
+                """Fetch listing entry for this car to get pricing data."""
+                return self._api_post(
+                    "/auction/external/rest/api/v1/entry/list/paging",
+                    {"tenant": "1", "carId": car_id, "pageSize": 5, "pageIndex": 1},
+                )
+
+            with ThreadPoolExecutor(max_workers=6) as executor:
                 futures = {
                     executor.submit(fetch_detail): "detail",
                     executor.submit(fetch_inspection): "inspection",
                     executor.submit(fetch_diagram): "diagram",
                     executor.submit(fetch_legend): "legend",
                     executor.submit(fetch_perf_frame): "perf_frame",
+                    executor.submit(fetch_entry_listing): "entry_listing",
                 }
 
                 for future in as_completed(futures):
@@ -407,11 +510,19 @@ class AutohubService:
                             legend_data = result
                         elif name == "perf_frame":
                             perf_frame_data = result
+                        elif name == "entry_listing":
+                            entry_listing_data = result
                     except Exception as e:
                         logger.warning(f"Failed to fetch {name} for car {car_id}: {e}")
 
             # Map detail
             car_detail = map_car_detail(detail_data)
+
+            # Extract prices from listing entry if available
+            if entry_listing_data:
+                starting_price, hope_price = extract_entry_prices(entry_listing_data, car_id)
+                car_detail.starting_price = starting_price
+                car_detail.hope_price = hope_price
 
             # Map inspection if available
             if inspection_data:

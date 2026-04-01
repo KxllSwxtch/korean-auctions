@@ -151,8 +151,9 @@ class AutohubSearchRequest(BaseModel):
             body["aucLaneCode"] = self.lane.value
         if self.condition_grade:
             body["inspGrade"] = self.condition_grade
-        if self.entry_number:
-            body["entryNo"] = self.entry_number
+        # NOTE: entryNo is NOT a supported filter on the external API's paging
+        # endpoint — it is silently ignored. Entry number search is handled
+        # by server-side post-filtering in AutohubService._search_by_entry_number().
 
         return body
 

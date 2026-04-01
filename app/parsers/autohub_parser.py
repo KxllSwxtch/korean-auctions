@@ -235,6 +235,18 @@ def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int, int]:
     return cars, total_count, total_pages
 
 
+def extract_entry_prices(listing_data: dict, car_id: str) -> tuple:
+    """Extract starting_price and hope_price from listing API response for a given car_id.
+    Returns (starting_price, hope_price) in manwon units, or (None, None) if not found.
+    """
+    data = listing_data.get("data", {})
+    entries = data.get("list", []) if isinstance(data, dict) else []
+    for entry in entries:
+        if entry.get("carId") == car_id:
+            return entry.get("startAmt"), entry.get("hopeAmt")
+    return None, None
+
+
 def map_car_detail(detail_data: dict) -> AutohubCarDetail:
     """Map car detail API response."""
     data = detail_data.get("data", detail_data)
