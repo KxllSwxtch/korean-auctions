@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+import threading
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -32,6 +35,47 @@ setup_logging()
 # Настройки приложения
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: start/stop the HeyDealer background sync scheduler."""
+    scheduler = None
+    try:
+        if settings.heydealer_sync_enabled:
+            from apscheduler.schedulers.background import BackgroundScheduler
+            from app.services.heydealer_sync_service import HeyDealerSyncService
+
+            sync_service = HeyDealerSyncService()
+            scheduler = BackgroundScheduler()
+            scheduler.add_job(
+                sync_service.run_sync,
+                "interval",
+                minutes=settings.heydealer_sync_interval_minutes,
+                id="heydealer_sync",
+                max_instances=1,
+                replace_existing=True,
+            )
+            scheduler.start()
+
+            app.state.heydealer_sync_service = sync_service
+            app.state.heydealer_scheduler = scheduler
+
+            # Trigger immediate sync if data is stale or missing (in a background thread)
+            thread = threading.Thread(
+                target=sync_service.run_sync_if_stale, daemon=True
+            )
+            thread.start()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to start HeyDealer sync: {e}")
+
+    yield
+
+    # Shutdown
+    if scheduler:
+        scheduler.shutdown(wait=False)
+
+
 # Создание FastAPI приложения
 app = FastAPI(
     title="AutoBaza Parser API",
@@ -40,6 +84,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     default_response_class=ORJSONResponse,
+    lifespan=lifespan,
 )
 
 # GZip compression (before CORS to compress all responses)

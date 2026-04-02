@@ -29,5 +29,8 @@ Faker==34.0.0
 cryptography
 cloudscraper==1.2.71
 
+# Scheduling
+apscheduler==3.10.4
+
 # Dependencies (auto-resolved by pip)
 # Core dependencies will be installed automatically

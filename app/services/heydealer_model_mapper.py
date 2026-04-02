@@ -1,70 +1,47 @@
 """
-Service to map model_group to generation IDs for HeyDealer filtering
+Service to map model_group to generation IDs for HeyDealer filtering.
+Reads from local data store instead of live API to avoid session conflicts.
 """
 
 import logging
-import requests
 from typing import List, Optional
-from app.services.heydealer_auth_service import heydealer_auth
 
 logger = logging.getLogger(__name__)
 
 
 class HeyDealerModelMapper:
     """Maps model groups to generation IDs for proper filtering"""
-    
+
     @staticmethod
     def get_generation_ids_for_model_group(model_group_hash_id: str) -> List[str]:
         """
-        Get all generation (model) IDs for a given model group
-        
+        Get all generation (model) IDs for a given model group.
+        Reads from local data store (populated by background sync).
+
         Args:
             model_group_hash_id: The model group hash ID (e.g., "lMgGzM" for Mohave)
-            
+
         Returns:
             List of generation hash IDs that belong to this model group
         """
         try:
-            # Get session
-            cookies, headers = heydealer_auth.get_valid_session()
-            
-            if not cookies or not headers:
-                logger.error("Failed to get HeyDealer session for model mapping")
+            from app.core.heydealer_data_store import heydealer_data_store
+
+            data = heydealer_data_store.get_model_generations(model_group_hash_id)
+
+            if not data:
+                logger.warning(f"No data found for model group {model_group_hash_id} in data store")
                 return []
-            
-            # Fetch model group details
-            params = {
-                "type": "auction",
-                "is_subscribed": "false",
-                "is_retried": "false", 
-                "is_previously_bid": "false",
-                "model_group": model_group_hash_id,
-            }
-            
-            response = requests.get(
-                f"https://api.heydealer.com/v2/dealers/web/car_meta/model_groups/{model_group_hash_id}/",
-                params=params,
-                headers=headers,
-                cookies=cookies,
-                timeout=10,
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Failed to fetch model group details: {response.status_code}, response: {response.text}")
-                return []
-            
-            data = response.json()
+
             models = data.get("models", [])
-            
+
             if not models:
                 logger.warning(f"No models found in model group {model_group_hash_id}")
                 return []
-            
-            # Extract generation IDs
+
             generation_ids = [model.get("hash_id") for model in models if model.get("hash_id")]
-            
-            logger.info(f"Model group {model_group_hash_id} расширен в {len(generation_ids)} поколений: {generation_ids}")
-            logger.debug(f"Model group details: {data}")
+
+            logger.info(f"Model group {model_group_hash_id} expanded to {len(generation_ids)} generations: {generation_ids}")
             return generation_ids
             
         except Exception as e:

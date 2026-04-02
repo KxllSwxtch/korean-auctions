@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     cache_ttl_filters: int = 3600        # 1h - filter metadata
     cache_ttl_exchange_rate: int = 1800  # 30min - exchange rates
 
+    # HeyDealer background sync settings
+    heydealer_sync_interval_minutes: int = 60
+    heydealer_sync_concurrency: int = 3
+    heydealer_sync_request_delay_ms: int = 500
+    heydealer_sync_enabled: bool = True
+    heydealer_data_dir: str = "cache/heydealer"
+    heydealer_sync_on_startup: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

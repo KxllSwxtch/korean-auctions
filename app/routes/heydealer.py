@@ -25,8 +25,26 @@ from app.services.heydealer_service import HeyDealerService
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
 from app.services.heydealer_client_filter import client_filter
+from app.core.heydealer_data_store import heydealer_data_store
 
 logger = logging.getLogger(__name__)
+
+
+def _sync_unavailable_response(page: int = 1):
+    """Standard response when data store has no data yet."""
+    return {
+        "success": False,
+        "data": {"cars": [], "total_count": 0, "page": page},
+        "message": "Data sync in progress, please retry in a few minutes",
+        "total_count": 0,
+        "current_page": page,
+        "pagination": {
+            "current_page": page,
+            "total_count": 0,
+            "page_size": 20,
+            "has_next": False,
+        },
+    }
 
 
 def is_valid_hash_id(value: str) -> bool:
@@ -88,236 +106,74 @@ async def get_heydealer_cars(
     """
     try:
         logger.info(
-            f"Получение автомобилей HeyDealer: страница {page}, тип {auction_type}"
-        )
-        logger.info(
-            f"Параметры фильтров: brand={brand}, model_group={model_group}, model={model}, grade={grade}"
+            f"Получение автомобилей HeyDealer: страница {page}, brand={brand}, model_group={model_group}, model={model}, grade={grade}"
         )
 
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
+        if not heydealer_data_store.is_data_available():
+            return _sync_unavailable_response(page)
 
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return HeyDealerResponse(
-                success=False,
-                data=None,
-                message="Ошибка авторизации HeyDealer",
-                total_count=0,
-                current_page=page,
-            )
+        # Get raw cars from data store and filter in-memory
+        cars_data = heydealer_data_store.get_cars_raw()
 
-        # Подготавливаем параметры
-        params = {
-            "page": page,
-            "type": auction_type,
-            "is_subscribed": str(is_subscribed).lower(),
-            "is_retried": str(is_retried).lower(),
-            "is_previously_bid": str(is_previously_bid).lower(),
-            "order": order,
-        }
+        # Apply brand filter
+        if brand and brand.strip() and is_valid_hash_id(brand):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("brand", {}).get("hash_id") == brand
+            ]
 
-        # Добавляем параметры фильтрации если они указаны (и не пустые)
-        if brand and brand.strip():
-            # Проверяем, является ли brand валидным hash_id
-            if is_valid_hash_id(brand):
-                # Это hash_id, используем как есть
-                params["brand"] = brand
-                logger.info(f"Используем brand hash_id: {brand}")
-            else:
-                # Для обратной совместимости пытаемся найти hash_id по названию
-                brand_hash_id = await find_brand_by_name(brand)
-                if brand_hash_id:
-                    params["brand"] = brand_hash_id
-                    logger.info(f"Найден hash_id для бренда {brand}: {brand_hash_id}")
-                else:
-                    logger.warning(
-                        f"Бренд {brand} не найден. Ожидается валидный hash_id (2-6 символов)"
-                    )
-
-        # Обработка model_group - расширяем до generation IDs
-        needs_model_group_expansion = False
-        if model_group and model_group.strip() and not model:
-            # Принимаем только hash_id (как в оригинальном API HeyDealer)
-            if is_valid_hash_id(model_group):
-                # HeyDealer API не поддерживает model_group напрямую
-                needs_model_group_expansion = True
-                logger.info(f"🔧 model_group ({model_group}) будет расширен до generation IDs")
-            else:
-                logger.warning(
-                    f"Неверный формат model_group: {model_group}. Ожидается валидный hash_id (2-6 символов)"
-                )
-        if model and model.strip():
-            # Принимаем только hash_id для model (поколение)
-            if is_valid_hash_id(model):
-                params["model"] = model
-                logger.info(f"Используем model hash_id: {model}")
-            else:
-                logger.warning(
-                    f"Неверный формат model: {model}. Ожидается валидный hash_id (2-6 символов)"
-                )
-
-        if grade and grade.strip():
-            # Принимаем только hash_id для grade (конфигурация)
-            if is_valid_hash_id(grade):
-                params["grade"] = grade
-                logger.info(f"✅ Используем grade hash_id: {grade} для фильтрации")
-            else:
-                logger.warning(
-                    f"⚠️ Неверный формат grade: {grade}. Ожидается валидный hash_id (2-6 символов)"
-                )
-
-        # Если нужно расширение model_group
-        if needs_model_group_expansion:
+        # Apply model_group expansion
+        if model_group and model_group.strip() and is_valid_hash_id(model_group) and not model:
             from app.services.heydealer_model_mapper import HeyDealerModelMapper
-            
             generation_ids = HeyDealerModelMapper.get_generation_ids_for_model_group(model_group)
-            
-            if not generation_ids:
-                logger.warning(f"Не найдены generation IDs для model_group {model_group}")
-                return HeyDealerResponse(
-                    success=True,
-                    data=HeyDealerCarList(cars=[], total_count=0, page=page),
-                    message=f"Не найдены поколения для модели {model_group}",
-                    total_count=0,
-                    current_page=page,
-                )
-            
-            # Делаем запросы для каждого generation
-            all_cars = []
-            for gen_id in generation_ids:
-                gen_params = params.copy()
-                gen_params["model"] = gen_id
-                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
-                gen_params.pop("brand", None)
-                
-                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = requests.get(
-                    "https://api.heydealer.com/v2/dealers/web/cars/",
-                    params=gen_params,
-                    headers=headers,
-                    cookies=cookies,
-                    timeout=30,
-                )
-                
-                if gen_response.status_code == 200:
-                    gen_cars = gen_response.json()
-                    all_cars.extend(gen_cars)
-                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
-            
-            cars_data = all_cars
-            total_count = len(cars_data)
-            
-            # Применяем пагинацию к объединенным результатам
-            page_size = 20
-            start_index = (page - 1) * page_size
-            end_index = start_index + page_size
-            cars_data = cars_data[start_index:end_index]
-            
-            logger.info(f"Всего получено {total_count} автомобилей для model_group {model_group}")
-        else:
-            # Обычный запрос
-            logger.info(f"📡 Отправка запроса к HeyDealer API с параметрами: {params}")
-            
-            # Создаем полный URL для логирования
-            from urllib.parse import urlencode
-            full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
-            logger.info(f"🔍 Полный URL запроса: {full_url}")
-            
-            response = requests.get(
-                "https://api.heydealer.com/v2/dealers/web/cars/",
-                params=params,
-                headers=headers,
-                cookies=cookies,
-                timeout=30,
-            )
-        
-        # Обрабатываем результаты
-        if not needs_model_group_expansion:
-            # Логируем статус и первые несколько машин для отладки
-            logger.info(f"📊 Статус ответа: {response.status_code}")
-            logger.info(f"📊 Заголовки пагинации: Count={response.headers.get('X-Pagination-Count', 'N/A')}, PageSize={response.headers.get('X-Pagination-Page-Size', 'N/A')}")
-
-            if response.status_code == 200:
-                cars_data = response.json()
-                
-                # Извлекаем информацию о пагинации из заголовков
-                total_count = int(response.headers.get("X-Pagination-Count", 0))
-                page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
-
-                # Если total_count = 0, это означает бесконечную прокрутку
-                if total_count == 0:
-                    link_header = response.headers.get("Link", "")
-                    has_next_page = 'rel="next"' in link_header
-
-                    if has_next_page:
-                        estimated_total = len(cars_data) + (page * page_size)
-                    else:
-                        estimated_total = len(cars_data) + ((page - 1) * page_size)
-
-                    total_count = estimated_total
+            if generation_ids:
+                generation_id_set = set(generation_ids)
+                cars_data = [
+                    c for c in cars_data
+                    if c.get("detail", {}).get("model", {}).get("hash_id") in generation_id_set
+                ]
             else:
-                logger.error(
-                    f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
-                )
-                return HeyDealerResponse(
-                    success=False,
-                    data=None,
-                    message=f"Ошибка получения данных: {response.status_code}",
-                    total_count=0,
-                    current_page=page,
-                )
-            
-            # Логируем количество и примеры машин для отладки
-            logger.info(f"📊 Получено автомобилей: {len(cars_data)}")
-            if cars_data and len(cars_data) > 0:
-                first_car = cars_data[0]
-                car_detail = first_car.get('detail', {})
-                logger.info(f"🚗 Пример первого автомобиля: full_name={car_detail.get('full_name', 'N/A')}, model_part={car_detail.get('model_part_name', 'N/A')}")
-                
-                # Проверяем, применились ли фильтры
-                if model_group:
-                    # Проверяем первые несколько машин
-                    logger.info(f"🔍 Проверка применения фильтра model_group={model_group}:")
-                    for i, car in enumerate(cars_data[:5]):
-                        car_model = car.get('detail', {}).get('model_part_name', '')
-                        logger.info(f"  Авто {i+1}: {car_model}")
+                cars_data = []
 
-        # Парсим данные через парсер (для обоих случаев)
+        # Apply model filter
+        if model and model.strip() and is_valid_hash_id(model):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("model", {}).get("hash_id") == model
+            ]
+
+        # Apply grade filter
+        if grade and grade.strip() and is_valid_hash_id(grade):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("grade", {}).get("hash_id") == grade
+            ]
+
+        total_count = len(cars_data)
+        page_size = 20
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size
+        page_cars = cars_data[start_index:end_index]
+
+        # Parse through existing parser
         parser = HeyDealerParser()
         car_list = parser.parse_car_list_with_pagination(
-            cars_data, total_count, page, page_size
+            page_cars, total_count, page, page_size
         )
 
         if not car_list:
-            logger.error("Не удалось распарсить данные автомобилей")
-            return HeyDealerResponse(
-                success=False,
-                data=None,
-                message="Ошибка парсинга данных",
-                total_count=0,
-                current_page=page,
-            )
+            return {
+                "success": True,
+                "data": {"cars": [], "total_count": 0, "page": page},
+                "message": "Нет автомобилей",
+                "total_count": 0,
+                "current_page": page,
+            }
 
-        # Нормализуем данные через парсер для правильного отображения
         normalized_data = parser.format_response_data(
-            cars=car_list.cars, total_count=car_list.total_count, page=page
+            cars=car_list.cars, total_count=total_count, page=page
         )
 
-        # Формируем успешный ответ в формате HeyDealerResponse
-        response_obj = HeyDealerResponse(
-            success=True,
-            data=car_list,  # Оставляем для совместимости с моделью
-            message=f"Успешно получено {len(car_list.cars)} автомобилей",
-            total_count=car_list.total_count,
-            current_page=page,
-        )
-
-        logger.info(f"✅ Успешно получено {len(car_list.cars)} автомобилей HeyDealer")
-        if grade:
-            logger.info(f"🔍 Фильтрация по grade={grade} применена на стороне API")
-
-        # Возвращаем нормализованные данные вместо Pydantic объектов
         return {
             "success": True,
             "data": {
@@ -357,81 +213,39 @@ async def get_normalized_heydealer_cars(
     Возвращает данные в общем формате для всех аукционов.
     """
     try:
-        logger.info(
-            f"Получение нормализованных автомобилей HeyDealer: страница {page}, тип {auction_type}"
-        )
-
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
-
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
+        if not heydealer_data_store.is_data_available():
             return {
                 "success": False,
-                "message": "Ошибка авторизации HeyDealer",
+                "message": "Data sync in progress",
                 "cars": [],
                 "total_count": 0,
                 "current_page": page,
                 "auction_name": "HeyDealer",
             }
 
-        # Подготавливаем параметры
-        params = {
-            "page": page,
-            "type": auction_type,
-            "is_subscribed": str(is_subscribed).lower(),
-            "is_retried": str(is_retried).lower(),
-            "is_previously_bid": str(is_previously_bid).lower(),
-            "order": order,
-        }
+        cars_data = heydealer_data_store.get_cars_raw()
+        page_size = 20
+        total_count = len(cars_data)
+        start = (page - 1) * page_size
+        page_cars = cars_data[start : start + page_size]
 
-        # Выполняем запрос
-        response = requests.get(
-            "https://api.heydealer.com/v2/dealers/web/cars/",
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            timeout=30,
-        )
+        parser = HeyDealerParser()
+        car_list = parser.parse_car_list(page_cars)
 
-        if response.status_code == 200:
-            cars_data = response.json()
-
-            # Парсим данные через парсер
-            parser = HeyDealerParser()
-            car_list = parser.parse_car_list(cars_data)
-
-            if not car_list:
-                return {
-                    "success": False,
-                    "message": "Ошибка парсинга данных",
-                    "cars": [],
-                    "total_count": 0,
-                    "current_page": page,
-                    "auction_name": "HeyDealer",
-                }
-
-            # Нормализуем данные через парсер
-            normalized_data = parser.format_response_data(
-                cars=car_list.cars, total_count=car_list.total_count, page=page
-            )
-
-            logger.info(
-                f"Успешно получено {len(car_list.cars)} автомобилей HeyDealer (normalized)"
-            )
-            return normalized_data
-        else:
-            logger.error(
-                f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
-            )
+        if not car_list:
             return {
                 "success": False,
-                "message": f"Ошибка получения данных: {response.status_code}",
+                "message": "Ошибка парсинга данных",
                 "cars": [],
                 "total_count": 0,
                 "current_page": page,
                 "auction_name": "HeyDealer",
             }
+
+        normalized_data = parser.format_response_data(
+            cars=car_list.cars, total_count=total_count, page=page
+        )
+        return normalized_data
 
     except Exception as e:
         logger.error(f"Ошибка при получении нормализованных автомобилей HeyDealer: {e}")
@@ -446,52 +260,39 @@ async def get_heydealer_status(
     service: HeyDealerService = Depends(get_heydealer_service),
 ):
     """
-    Проверяет статус подключения к HeyDealer API
+    Проверяет статус подключения к HeyDealer API.
+    Returns sync metadata and data availability.
     """
     try:
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
+        meta = heydealer_data_store.get_sync_metadata()
+        has_data = heydealer_data_store.is_data_available()
+        age = heydealer_data_store.get_data_age_seconds()
 
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "status": "error",
-                "message": "Ошибка авторизации HeyDealer",
-                "auction_name": "HeyDealer",
-                "authenticated": False,
-            }
-
-        # Проверяем доступность API
-        response = requests.get(
-            "https://api.heydealer.com/v2/dealers/web/cars/",
-            params={"page": 1, "type": "auction", "is_subscribed": "false"},
-            headers=headers,
-            cookies=cookies,
-            timeout=10,
-        )
-
-        if response.status_code == 200:
-            data = response.json()
+        if has_data:
             return {
                 "status": "success",
-                "message": f"Подключение к HeyDealer API работает. Получено {len(data)} автомобилей.",
+                "message": f"HeyDealer data available. {meta.get('total_cars', 0)} cars cached. Last sync: {meta.get('last_sync_at', 'N/A')}",
                 "auction_name": "HeyDealer",
                 "authenticated": True,
-                "cars_count": len(data),
+                "cars_count": meta.get("total_cars", 0),
+                "sync": meta,
+                "data_age_seconds": age,
             }
         else:
             return {
                 "status": "error",
-                "message": f"Ошибка подключения к HeyDealer API: {response.status_code}",
+                "message": f"Data sync pending or failed. Status: {meta.get('status', 'unknown')}",
                 "auction_name": "HeyDealer",
                 "authenticated": False,
+                "sync": meta,
+                "data_age_seconds": age,
             }
 
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса HeyDealer: {e}")
         return {
             "status": "error",
-            "message": f"Ошибка подключения к HeyDealer API: {str(e)}",
+            "message": f"Ошибка: {str(e)}",
             "auction_name": "HeyDealer",
             "authenticated": False,
         }
@@ -516,127 +317,24 @@ async def get_filtered_cars(
     wheel_drive: Optional[str] = Query(None, description="Тип привода (например: 2WD,4WD)"),
     location: Optional[str] = Query(None, description="Местоположение"),
 ):
-    """Получение отфильтрованного списка автомобилей"""
+    """Получение отфильтрованного списка автомобилей (from local data store)"""
     try:
-        logger.info(f"Получение отфильтрованных автомобилей HeyDealer: страница {page}")
+        if not heydealer_data_store.is_data_available():
+            return _sync_unavailable_response(page)
 
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
+        cars_data = heydealer_data_store.get_cars_raw()
 
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "data": {"cars": [], "total_count": 0, "page": page},
-                "message": "Ошибка авторизации HeyDealer",
-                "total_count": 0,
-                "current_page": page,
-            }
+        # Apply hash_id-based filters
+        if brand and brand.strip() and is_valid_hash_id(brand):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("brand", {}).get("hash_id") == brand
+            ]
 
-        # Подготавливаем параметры
-        params = {
-            "page": page,
-            "type": "auction",
-            "is_subscribed": "false",
-            "is_retried": "false",
-            "is_previously_bid": "false",
-            "order": order,
-        }
-
-        # Добавляем фильтры (только если они не пустые и валидные)
-        if brand and brand.strip():
-            # Проверяем формат hash_id для brand
-            if is_valid_hash_id(brand):
-                params["brand"] = brand
-                logger.info(f"Используем brand hash_id: {brand}")
-            else:
-                logger.warning(
-                    f"Неверный формат brand: {brand}. Ожидается валидный hash_id (2-6 символов)"
-                )
-
-        # Обработка model_group - НЕ добавляем в params, так как API не поддерживает
-        needs_model_group_expansion = False
-        if model_group and model_group.strip() and not model:
-            # Проверяем формат hash_id для model_group
-            if is_valid_hash_id(model_group):
-                # HeyDealer API не поддерживает model_group напрямую
-                # Нужно будет сделать отдельные запросы для каждого generation
-                needs_model_group_expansion = True
-                logger.info(f"Model_group {model_group} будет расширен до generation IDs")
-            else:
-                logger.warning(
-                    f"Неверный формат model_group: {model_group}. Ожидается валидный hash_id (2-6 символов)"
-                )
-
-        if model and model.strip():
-            # Проверяем формат hash_id для model
-            if is_valid_hash_id(model):
-                params["model"] = model
-                logger.info(f"Используем model hash_id: {model}")
-                # Если указана конкретная модель (generation), удаляем brand для точной фильтрации
-                if "brand" in params:
-                    params.pop("brand")
-                    logger.info(f"Удален параметр brand, так как указана конкретная модель {model}")
-            else:
-                logger.warning(
-                    f"Неверный формат model: {model}. Ожидается валидный hash_id (2-6 символов)"
-                )
-
-        if grade and grade.strip():
-            # Проверяем формат hash_id для grade
-            if is_valid_hash_id(grade):
-                params["grade"] = grade
-                logger.info(f"Используем grade hash_id: {grade}")
-                # Если указана конкретная конфигурация (grade), удаляем более широкие фильтры
-                if "brand" in params:
-                    params.pop("brand")
-                    logger.info(f"Удален параметр brand, так как указана конкретная конфигурация {grade}")
-                if "model" in params:
-                    params.pop("model")
-                    logger.info(f"Удален параметр model, так как указана конкретная конфигурация {grade}")
-            else:
-                logger.warning(
-                    f"Неверный формат grade: {grade}. Ожидается валидный hash_id (2-6 символов)"
-                )
-        if min_year:
-            params["min_year"] = min_year
-        if max_year:
-            params["max_year"] = max_year
-        if min_price:
-            params["min_price"] = min_price
-        if max_price:
-            params["max_price"] = max_price
-        if min_mileage:
-            params["min_mileage"] = min_mileage
-        if max_mileage:
-            params["max_mileage"] = max_mileage
-        if fuel and fuel.strip():
-            # Fuel should be sent as a list to HeyDealer API
-            fuel_values = [v.strip() for v in fuel.split(',') if v.strip()]
-            if fuel_values:
-                params["fuel"] = fuel_values
-                logger.info(f"Используем fuel: {fuel_values}")
-        if transmission and transmission.strip():
-            params["transmission"] = transmission
-        if wheel_drive and wheel_drive.strip():
-            # Wheel drive should be sent as a list
-            wheel_drive_values = [v.strip() for v in wheel_drive.split(',') if v.strip()]
-            if wheel_drive_values:
-                params["wheel_drive"] = wheel_drive_values
-                logger.info(f"Используем wheel_drive: {wheel_drive_values}")
-        if location and location.strip():
-            params["location"] = location
-
-        logger.info(f"Параметры фильтрации: {params}")
-        
-        # Если нужно расширение model_group
-        if needs_model_group_expansion:
+        if model_group and model_group.strip() and is_valid_hash_id(model_group) and not model:
             from app.services.heydealer_model_mapper import HeyDealerModelMapper
-            
             generation_ids = HeyDealerModelMapper.get_generation_ids_for_model_group(model_group)
-            
             if not generation_ids:
-                logger.warning(f"Не найдены generation IDs для model_group {model_group}")
                 return {
                     "success": True,
                     "data": {"cars": [], "total_count": 0, "page": page},
@@ -644,185 +342,112 @@ async def get_filtered_cars(
                     "total_count": 0,
                     "current_page": page,
                 }
-            
-            # Делаем запросы для каждого generation
-            all_cars = []
-            for gen_id in generation_ids:
-                gen_params = params.copy()
-                gen_params["model"] = gen_id
-                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
-                gen_params.pop("brand", None)
-                
-                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = requests.get(
-                    "https://api.heydealer.com/v2/dealers/web/cars/",
-                    params=gen_params,
-                    headers=headers,
-                    cookies=cookies,
-                    timeout=30,
-                )
-                
-                if gen_response.status_code == 200:
-                    gen_cars = gen_response.json()
-                    all_cars.extend(gen_cars)
-                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
-            
-            cars_data = all_cars
-            logger.info(f"Model group expansion для {model_group}: получено {len(cars_data)} автомобилей из {len(generation_ids)} поколений")
-        else:
-            # Обычный запрос
-            response = requests.get(
-                "https://api.heydealer.com/v2/dealers/web/cars/",
-                params=params,
-                headers=headers,
-                cookies=cookies,
-                timeout=30,
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"Ошибка API: {response.status_code}")
-                return {
-                    "success": False,
-                    "data": {"cars": [], "total_count": 0, "page": page},
-                    "message": f"Ошибка получения данных: {response.status_code}",
-                    "total_count": 0,
-                    "current_page": page,
-                }
-                
-            cars_data = response.json()
-        
-        # Теперь обрабатываем полученные данные
-        logger.info(f"Получено {len(cars_data)} автомобилей с фильтрами")
+            generation_id_set = set(generation_ids)
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("model", {}).get("hash_id") in generation_id_set
+            ]
 
-        # Парсим данные через парсер для нормализации
-        from app.parsers.heydealer_parser import HeyDealerParser
+        if model and model.strip() and is_valid_hash_id(model):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("model", {}).get("hash_id") == model
+            ]
 
+        if grade and grade.strip() and is_valid_hash_id(grade):
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("grade", {}).get("hash_id") == grade
+            ]
+
+        # Normalize cars and apply additional filters
         parser = HeyDealerParser()
-
-        # Создаем Pydantic объекты и нормализуем данные
         normalized_cars = []
-        for car_data in cars_data:
+        for car_raw in cars_data:
             try:
-                # Создаем Pydantic объект
-                pydantic_car = HeyDealerCar(**car_data)
-
-                # Нормализуем данные через парсер
+                pydantic_car = HeyDealerCar(**car_raw)
                 normalized_car = parser.normalize_car_data(pydantic_car)
+                detail_data = car_raw.get("detail", {})
 
-                # Дополняем данными из сырого API ответа (для полей, которых нет в Pydantic)
-                detail_data = car_data.get("detail", {})
-
-                # Извлекаем данные о топливе и трансмиссии из названия и других полей
                 title = normalized_car.get("title", "")
                 grade_part_name = normalized_car.get("grade_part_name", "")
 
-                # Определяем тип топлива из названия
                 fuel_type = None
                 fuel_display = None
                 if "가솔린" in title or "가솔린" in grade_part_name:
-                    fuel_type = "gasoline"
-                    fuel_display = "Бензин"
+                    fuel_type, fuel_display = "gasoline", "Бензин"
                 elif "디젤" in title or "디젤" in grade_part_name:
-                    fuel_type = "diesel"
-                    fuel_display = "Дизель"
+                    fuel_type, fuel_display = "diesel", "Дизель"
                 elif "하이브리드" in title or "하이브리드" in grade_part_name:
-                    fuel_type = "hybrid"
-                    fuel_display = "Гибрид"
+                    fuel_type, fuel_display = "hybrid", "Гибрид"
                 elif "전기" in title or "전기" in grade_part_name or "EV" in title:
-                    fuel_type = "electric"
-                    fuel_display = "Электро"
+                    fuel_type, fuel_display = "electric", "Электро"
                 elif "LPG" in title or "LPI" in title:
-                    fuel_type = "lpg"
-                    fuel_display = "ГБО"
+                    fuel_type, fuel_display = "lpg", "ГБО"
 
-                # Определяем тип трансмиссии из названия
                 transmission_type = None
                 transmission_display = None
-                if (
-                    "AWD" in title
-                    or "AWD" in grade_part_name
-                    or "4WD" in title
-                    or "4WD" in grade_part_name
-                ):
-                    transmission_type = "awd"
-                    transmission_display = "Полный привод"
-                elif (
-                    "2WD" in title
-                    or "2WD" in grade_part_name
-                    or "FWD" in title
-                    or "FWD" in grade_part_name
-                ):
-                    transmission_type = "fwd"
-                    transmission_display = "Передний привод"
+                if "AWD" in title or "AWD" in grade_part_name or "4WD" in title or "4WD" in grade_part_name:
+                    transmission_type, transmission_display = "awd", "Полный привод"
+                elif "2WD" in title or "2WD" in grade_part_name or "FWD" in title or "FWD" in grade_part_name:
+                    transmission_type, transmission_display = "fwd", "Передний привод"
                 elif "RWD" in title or "RWD" in grade_part_name:
-                    transmission_type = "rwd"
-                    transmission_display = "Задний привод"
+                    transmission_type, transmission_display = "rwd", "Задний привод"
 
-                # Пытаемся определить коробку передач (это сложнее, так как в названии не всегда указано)
-                gear_type = None
-                gear_display = None
-                if "수동" in title:  # Ручная
-                    gear_type = "manual"
-                    gear_display = "Механика"
-                elif "자동" in title:  # Автоматическая
-                    gear_type = "automatic"
-                    gear_display = "Автомат"
+                gear_type, gear_display = "automatic", "Автомат"
+                if "수동" in title:
+                    gear_type, gear_display = "manual", "Механика"
                 elif "CVT" in title:
-                    gear_type = "cvt"
-                    gear_display = "Вариатор"
-                else:
-                    # По умолчанию считаем автоматической для современных автомобилей
-                    gear_type = "automatic"
-                    gear_display = "Автомат"
+                    gear_type, gear_display = "cvt", "Вариатор"
 
-                normalized_car.update(
-                    {
-                        "fuel": fuel_type,
-                        "fuel_display": fuel_display,
-                        "fuel_type": fuel_type,
-                        "transmission": transmission_type,
-                        "transmission_display": transmission_display,
-                        "gear": gear_type,
-                        "gear_display": gear_display,
-                        "payment": detail_data.get("payment"),
-                        "payment_display": detail_data.get("payment_display"),
-                        "color": detail_data.get("color"),
-                        "accident": detail_data.get("accident"),
-                        "accident_display": detail_data.get("accident_display"),
-                    }
-                )
-
+                normalized_car.update({
+                    "fuel": fuel_type, "fuel_display": fuel_display, "fuel_type": fuel_type,
+                    "transmission": transmission_type, "transmission_display": transmission_display,
+                    "gear": gear_type, "gear_display": gear_display,
+                    "payment": detail_data.get("payment"), "payment_display": detail_data.get("payment_display"),
+                    "color": detail_data.get("color"),
+                    "accident": detail_data.get("accident"), "accident_display": detail_data.get("accident_display"),
+                })
                 normalized_cars.append(normalized_car)
             except Exception as e:
                 logger.error(f"Ошибка обработки автомобиля: {e}")
                 continue
 
-        # Применяем пагинацию если нужно
+        # Apply client-side value filters
+        if min_year:
+            normalized_cars = [c for c in normalized_cars if (c.get("year") or 0) >= min_year]
+        if max_year:
+            normalized_cars = [c for c in normalized_cars if (c.get("year") or 9999) <= max_year]
+        if min_price:
+            normalized_cars = [c for c in normalized_cars if (c.get("price") or c.get("desired_price") or 0) >= min_price]
+        if max_price:
+            normalized_cars = [c for c in normalized_cars if (c.get("price") or c.get("desired_price") or 999999999) <= max_price]
+        if min_mileage:
+            normalized_cars = [c for c in normalized_cars if (c.get("mileage") or 0) >= min_mileage]
+        if max_mileage:
+            normalized_cars = [c for c in normalized_cars if (c.get("mileage") or 999999) <= max_mileage]
+        if fuel and fuel.strip():
+            fuel_values = [v.strip().lower() for v in fuel.split(",") if v.strip()]
+            if fuel_values:
+                normalized_cars = [c for c in normalized_cars if c.get("fuel") in fuel_values]
+
         total_count = len(normalized_cars)
         page_size = 20
-        
-        # Если это расширение model_group, применяем пагинацию к объединенным результатам
-        if needs_model_group_expansion:
-            start_index = (page - 1) * page_size
-            end_index = start_index + page_size
-            normalized_cars = normalized_cars[start_index:end_index]
+        start_index = (page - 1) * page_size
+        end_index = start_index + page_size
+        page_cars = normalized_cars[start_index:end_index]
 
-        # Возвращаем структуру, совместимую с /cars endpoint
         return {
             "success": True,
-            "data": {
-                "cars": normalized_cars,
-                "total_count": total_count,
-                "page": page,
-            },
-            "message": f"Получено {len(normalized_cars)} автомобилей с фильтрами",
+            "data": {"cars": page_cars, "total_count": total_count, "page": page},
+            "message": f"Получено {len(page_cars)} автомобилей с фильтрами",
             "total_count": total_count,
             "current_page": page,
             "pagination": {
                 "current_page": page,
                 "total_count": total_count,
                 "page_size": page_size,
-                "has_next": len(normalized_cars) == page_size,
+                "has_next": end_index < total_count,
             },
         }
 
@@ -858,68 +483,24 @@ async def get_heydealer_car_detail_with_tech_sheet(
             f"Получение детальной информации об автомобиле с техническим листом: {car_hash_id}"
         )
 
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
+        # Read from data store instead of live API
+        car_data = heydealer_data_store.get_car_detail(car_hash_id)
+        repairs_data = heydealer_data_store.get_accident_repairs(car_hash_id)
 
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
+        car_request_success = car_data is not None
+        repairs_request_success = repairs_data is not None
+
+        # Проверяем успешность основного запроса
+        if not car_data:
+            logger.error(f"Car detail not found in data store: {car_hash_id}")
             return HeyDealerCarWithTechSheetResponse(
                 success=False,
                 data=None,
-                message="Ошибка авторизации HeyDealer",
+                message=f"Автомобиль {car_hash_id} не найден в кэше данных",
                 timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
                 total_requests=0,
                 car_request_success=False,
                 accident_repairs_request_success=False,
-            )
-
-        # Выполняем два запроса параллельно
-        detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        accident_repairs_url = f"https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/{car_hash_id}/"
-
-        # Параллельные запросы для лучшей производительности
-        import asyncio
-        import aiohttp
-
-        async def fetch_car_details():
-            try:
-                response = requests.get(
-                    detail_url, headers=headers, cookies=cookies, timeout=30
-                )
-                return response.status_code, (
-                    response.json() if response.status_code == 200 else None
-                )
-            except Exception as e:
-                logger.error(f"Ошибка получения данных автомобиля: {e}")
-                return 500, None
-
-        async def fetch_accident_repairs():
-            try:
-                response = requests.get(
-                    accident_repairs_url, headers=headers, cookies=cookies, timeout=30
-                )
-                return response.status_code, (
-                    response.json() if response.status_code == 200 else None
-                )
-            except Exception as e:
-                logger.error(f"Ошибка получения технического листа: {e}")
-                return 500, None
-
-        # Выполняем запросы параллельно
-        car_status, car_data = await fetch_car_details()
-        repairs_status, repairs_data = await fetch_accident_repairs()
-
-        # Проверяем успешность основного запроса
-        if car_status != 200 or not car_data:
-            logger.error(f"Ошибка получения детальной информации: {car_status}")
-            return HeyDealerCarWithTechSheetResponse(
-                success=False,
-                data=None,
-                message=f"Ошибка получения данных автомобиля: {car_status}",
-                timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                total_requests=2,
-                car_request_success=False,
-                accident_repairs_request_success=repairs_status == 200,
             )
 
         # Извлекаем данные автомобиля
@@ -932,7 +513,7 @@ async def get_heydealer_car_detail_with_tech_sheet(
         accident_repairs_available = False
         accident_repairs_error = None
 
-        if repairs_status == 200 and repairs_data:
+        if repairs_data:
             try:
                 # Парсим данные технического листа через наш парсер
                 from app.parsers.heydealer_parser import HeyDealerParser
@@ -945,11 +526,9 @@ async def get_heydealer_car_detail_with_tech_sheet(
                 logger.error(f"Ошибка парсинга технического листа: {e}")
                 accident_repairs_error = f"Ошибка парсинга технического листа: {str(e)}"
         else:
-            accident_repairs_error = (
-                f"Ошибка получения технического листа: {repairs_status}"
-            )
+            accident_repairs_error = "Технический лист не найден в кэше данных"
             logger.warning(
-                f"Не удалось получить технический лист для {car_hash_id}: {repairs_status}"
+                f"Не удалось получить технический лист для {car_hash_id} из кэша"
             )
 
         # Создаем объединенный объект данных
@@ -1042,8 +621,8 @@ async def get_heydealer_car_detail_with_tech_sheet(
                 else f" (технический лист недоступен)"
             ),
             timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-            total_requests=2,
-            car_request_success=True,
+            total_requests=0,
+            car_request_success=car_request_success,
             accident_repairs_request_success=accident_repairs_available,
         )
 
@@ -1079,23 +658,9 @@ async def get_heydealer_car_detail_basic(
             f"Получение базовой детальной информации об автомобиле: {car_hash_id}"
         )
 
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
+        detail_data = heydealer_data_store.get_car_detail(car_hash_id)
 
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "error": "Ошибка авторизации HeyDealer",
-                "detail": "Не удалось получить валидную сессию HeyDealer",
-            }
-
-        # Получаем детальную информацию
-        detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
-
-        if detail_response.status_code == 200:
-            detail_data = detail_response.json()
+        if detail_data:
 
             # Извлекаем данные напрямую
             detail_section = detail_data.get("detail", {})
@@ -1188,18 +753,18 @@ async def get_heydealer_car_detail_basic(
                     ),
                 },
                 "message": "Базовая детальная информация успешно получена",
-                "timestamp": detail_response.headers.get("Date", ""),
+                "timestamp": datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
             }
 
             return result
         else:
             logger.error(
-                f"Ошибка получения детальной информации: {detail_response.status_code} - {detail_response.text}"
+                f"Автомобиль {car_hash_id} не найден в кэше данных"
             )
             return {
                 "success": False,
-                "error": f"Ошибка получения данных: {detail_response.status_code}",
-                "detail": detail_response.text,
+                "error": f"Автомобиль {car_hash_id} не найден",
+                "detail": "Данные отсутствуют в кэше. Дождитесь следующей синхронизации.",
             }
 
     except Exception as e:
@@ -1447,66 +1012,6 @@ async def get_heydealer_car_simple(
         )
 
 
-@router.get("/cars/{car_hash_id}/debug")
-async def debug_heydealer_car(
-    car_hash_id: str = Path(..., description="Hash ID автомобиля"),
-):
-    """
-    Отладочный endpoint для проверки данных
-
-    - **car_hash_id**: Уникальный идентификатор автомобиля (hash_id)
-    """
-    try:
-        # Используем автоматический сервис авторизации
-        cookies, headers = heydealer_auth.get_valid_session()
-
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "status_code": 500,
-                "error": "Ошибка авторизации HeyDealer",
-            }
-
-        # Прямой запрос к API
-        response = requests.get(
-            f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/",
-            headers=headers,
-            cookies=cookies,
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            detail_section = data.get("detail", {})
-            auction_section = data.get("auction", {})
-
-            return {
-                "success": True,
-                "hash_id": data.get("hash_id"),
-                "status_display": data.get("status_display"),
-                "detail_full_name": detail_section.get("full_name"),
-                "detail_year": detail_section.get("year"),
-                "detail_mileage": detail_section.get("mileage"),
-                "auction_desired_price": auction_section.get("desired_price"),
-                "auction_bids_count": auction_section.get("bids_count"),
-                "detail_keys_count": (
-                    len(detail_section.keys()) if detail_section else 0
-                ),
-                "auction_keys_count": (
-                    len(auction_section.keys()) if auction_section else 0
-                ),
-            }
-        else:
-            return {
-                "success": False,
-                "status_code": response.status_code,
-                "error": response.text[:500],
-            }
-
-    except Exception as e:
-        return {"success": False, "error": f"Exception: {str(e)}"}
-
-
 @router.get("/cars/{car_hash_id}/direct-json")
 async def get_heydealer_car_detail_direct_json(
     car_hash_id: str = Path(..., description="Hash ID автомобиля"),
@@ -1640,20 +1145,18 @@ async def get_heydealer_car_debug_json(
 
 @router.get("/brands", response_model=HeyDealerBrandsResponse)
 async def get_brands():
-    """Получение списка марок автомобилей"""
+    """Получение списка марок автомобилей (from data store)"""
     try:
-        service = get_heydealer_service()
-        brands_data = await service.get_brands()
+        brands_data = heydealer_data_store.get_brands()
 
         if brands_data:
-            # Парсим данные в модели Pydantic
-            brands = [HeyDealerBrand(**brand) for brand in brands_data]
+            brands = [HeyDealerBrand(**brand) for brand in brands_data] if isinstance(brands_data, list) else []
             return HeyDealerBrandsResponse(
                 success=True, data=brands, message=f"Получено {len(brands)} марок"
             )
         else:
             return HeyDealerBrandsResponse(
-                success=False, data=[], message="Не удалось получить список марок"
+                success=False, data=[], message="Данные марок ещё не загружены"
             )
 
     except Exception as e:
@@ -1663,12 +1166,29 @@ async def get_brands():
         )
 
 
+@router.get("/brands/raw", response_model=Dict[str, Any])
+async def get_brands_raw():
+    """Получение сырых данных марок для отладки (from data store)"""
+    try:
+        brands_data = heydealer_data_store.get_brands()
+
+        return {
+            "success": True,
+            "data": brands_data,
+            "count": len(brands_data) if brands_data else 0,
+            "message": "Сырые данные марок (из кэша)",
+        }
+
+    except Exception as e:
+        logger.error(f"Ошибка в эндпоинте сырых данных марок: {str(e)}")
+        return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
+
+
 @router.get("/brands/{brand_hash_id}", response_model=HeyDealerBrandDetailResponse)
 async def get_brand_models(brand_hash_id: str):
-    """Получение списка моделей для выбранной марки"""
+    """Получение списка моделей для выбранной марки (from data store)"""
     try:
-        service = get_heydealer_service()
-        brand_data = await service.get_brand_models(brand_hash_id)
+        brand_data = heydealer_data_store.get_brand_models(brand_hash_id)
 
         if brand_data:
             return HeyDealerBrandDetailResponse(
@@ -1678,7 +1198,7 @@ async def get_brand_models(brand_hash_id: str):
             )
         else:
             return HeyDealerBrandDetailResponse(
-                success=False, data={}, message="Не удалось получить список моделей"
+                success=False, data={}, message="Модели для этой марки ещё не загружены"
             )
 
     except Exception as e:
@@ -1692,21 +1212,17 @@ async def get_brand_models(brand_hash_id: str):
     "/model-groups/{model_group_hash_id}", response_model=HeyDealerModelDetailResponse
 )
 async def get_model_generations(model_group_hash_id: str):
-    """Получение списка поколений для выбранной модели"""
+    """Получение списка поколений для выбранной модели (from data store)"""
     try:
-        service = get_heydealer_service()
-        model_data = await service.get_model_generations(model_group_hash_id)
+        model_data = heydealer_data_store.get_model_generations(model_group_hash_id)
 
         if model_data:
-            # Парсим данные через парсер
-            from app.parsers.heydealer_parser import HeyDealerParser
-
             parser = HeyDealerParser()
             parsed_response = parser.parse_model_detail(model_data)
             return parsed_response
         else:
             return HeyDealerModelDetailResponse(
-                success=False, data={}, message="Не удалось получить список поколений"
+                success=False, data={}, message="Поколения для этой модели ещё не загружены"
             )
 
     except Exception as e:
@@ -1718,15 +1234,11 @@ async def get_model_generations(model_group_hash_id: str):
 
 @router.get("/models/{model_hash_id}", response_model=HeyDealerGradeDetailResponse)
 async def get_model_configurations(model_hash_id: str):
-    """Получение списка конфигураций для выбранного поколения"""
+    """Получение списка конфигураций для выбранного поколения (from data store)"""
     try:
-        service = get_heydealer_service()
-        config_data = await service.get_model_configurations(model_hash_id)
+        config_data = heydealer_data_store.get_model_configurations(model_hash_id)
 
         if config_data:
-            # Парсим данные через парсер
-            from app.parsers.heydealer_parser import HeyDealerParser
-
             parser = HeyDealerParser()
             parsed_response = parser.parse_grade_detail(config_data)
             return parsed_response
@@ -1734,7 +1246,7 @@ async def get_model_configurations(model_hash_id: str):
             return HeyDealerGradeDetailResponse(
                 success=False,
                 data={},
-                message="Не удалось получить список конфигураций",
+                message="Конфигурации для этой модели ещё не загружены",
             )
 
     except Exception as e:
@@ -1744,44 +1256,25 @@ async def get_model_configurations(model_hash_id: str):
         )
 
 
-@router.get("/brands/raw", response_model=Dict[str, Any])
-async def get_brands_raw():
-    """Получение сырых данных марок для отладки"""
-    try:
-        service = get_heydealer_service()
-        brands_data = await service.get_brands()
-
-        return {
-            "success": True,
-            "data": brands_data,
-            "count": len(brands_data) if brands_data else 0,
-            "message": "Сырые данные марок",
-        }
-
-    except Exception as e:
-        logger.error(f"Ошибка в эндпоинте сырых данных марок: {str(e)}")
-        return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
-
-
 @router.get("/cars/filtered/raw", response_model=Dict[str, Any])
 async def get_filtered_cars_raw(
     page: int = Query(1, description="Номер страницы"),
     grade: Optional[str] = Query(None, description="ID конфигурации"),
-    service: HeyDealerService = Depends(get_heydealer_service),
 ):
-    """Получение сырых данных отфильтрованных автомобилей для отладки"""
+    """Получение сырых данных отфильтрованных автомобилей (from data store)"""
     try:
-        filters = {"page": page}
+        cars_data = heydealer_data_store.get_cars_raw()
         if grade:
-            filters["grade"] = grade
-
-        cars_data = await service.get_filtered_cars(filters)
+            cars_data = [
+                c for c in cars_data
+                if c.get("detail", {}).get("grade", {}).get("hash_id") == grade
+            ]
 
         return {
             "success": True,
             "data": cars_data,
             "count": len(cars_data) if cars_data else 0,
-            "message": "Сырые данные отфильтрованных автомобилей",
+            "message": "Сырые данные отфильтрованных автомобилей (из кэша)",
         }
 
     except Exception as e:
@@ -1792,9 +1285,9 @@ async def get_filtered_cars_raw(
 # === ПРЯМЫЕ ЭНДПОИНТЫ ДЛЯ ТЕСТИРОВАНИЯ ===
 
 
-@router.get("/brands/direct", response_model=Dict[str, Any])
+@router.get("/brands-direct", response_model=Dict[str, Any])
 async def get_brands_direct():
-    """Прямое получение списка марок без сервиса"""
+    """Прямое получение списка марок без сервиса (debug — uses live API)"""
     try:
         # Данные из файла brands.py
         cookies = {
@@ -2026,8 +1519,7 @@ async def get_filtered_cars_direct(
 async def find_brand_by_name(brand_name: str) -> Optional[str]:
     """Поиск hash_id бренда по названию (на английском или корейском)"""
     try:
-        service = get_heydealer_service()
-        brands_data = await service.get_brands()
+        brands_data = heydealer_data_store.get_brands()
 
         if not brands_data:
             return None
@@ -2107,12 +1599,9 @@ async def get_brand_models_by_name(brand_name: str):
 
 @router.get("/filters", response_model=Dict[str, Any])
 async def get_filters():
-    """Получение всех доступных фильтров для frontend"""
+    """Получение всех доступных фильтров для frontend (from data store)"""
     try:
-        service = get_heydealer_service()
-
-        # Получаем список брендов
-        brands_data = await service.get_brands()
+        brands_data = heydealer_data_store.get_brands()
 
         if not brands_data:
             return {
@@ -2191,8 +1680,7 @@ async def find_model_group_by_name(model_group_name: str) -> Optional[str]:
 
         # Поскольку у нас нет полного списка всех model_groups,
         # попробуем найти через бренды
-        service = get_heydealer_service()
-        brands_data = await service.get_brands()
+        brands_data = heydealer_data_store.get_brands()
 
         if not brands_data:
             return None
@@ -2203,7 +1691,7 @@ async def find_model_group_by_name(model_group_name: str) -> Optional[str]:
         # Ищем во всех брендах
         for brand in brands_data:
             try:
-                brand_models = await service.get_brand_models(brand.get("hash_id"))
+                brand_models = heydealer_data_store.get_brand_models(brand.get("hash_id"))
                 if brand_models and "model_groups" in brand_models:
                     for model_group in brand_models["model_groups"]:
                         model_name = model_group.get("name", "")
@@ -2254,25 +1742,22 @@ async def get_model_generations_by_name(model_group_name: str):
 
 @router.get("/cars/{car_hash_id}/debug")
 async def get_car_debug(car_hash_id: str):
-    """Отладочная информация об автомобиле"""
+    """Отладочная информация об автомобиле (from data store)"""
     try:
-        service = get_heydealer_service()
+        car_data = heydealer_data_store.get_car_detail(car_hash_id)
+        if not car_data:
+            raise HTTPException(status_code=404, detail="Автомобиль не найден в кэше")
 
-        # Получаем детальные данные
-        car_detail = await service.get_car_detail(car_hash_id)
-        if not car_detail:
-            raise HTTPException(status_code=404, detail="Автомобиль не найден")
-
-        # Формируем отладочную информацию
         debug_info = {
             "hash_id": car_hash_id,
-            "status": car_detail.status,
-            "detail_keys": list(car_detail.detail.__dict__.keys()),
-            "auction_keys": list(car_detail.auction.__dict__.keys()),
-            "etc_keys": list(car_detail.etc.__dict__.keys()),
-            "has_detail": bool(car_detail.detail),
-            "has_auction": bool(car_detail.auction),
-            "has_etc": bool(car_detail.etc),
+            "status": car_data.get("status"),
+            "detail_keys": list(car_data.get("detail", {}).keys()),
+            "auction_keys": list(car_data.get("auction", {}).keys()),
+            "etc_keys": list(car_data.get("etc", {}).keys()),
+            "has_detail": bool(car_data.get("detail")),
+            "has_auction": bool(car_data.get("auction")),
+            "has_etc": bool(car_data.get("etc")),
+            "source": "data_store",
         }
 
         return {
@@ -2295,7 +1780,7 @@ async def get_car_debug(car_hash_id: str):
 @router.get("/cars/{car_hash_id}/accident-repairs")
 async def get_car_accident_repairs(car_hash_id: str):
     """
-    Получает технический лист (accident repairs) для автомобиля
+    Получает технический лист (accident repairs) для автомобиля (from data store)
 
     Args:
         car_hash_id: Уникальный ID автомобиля
@@ -2304,10 +1789,7 @@ async def get_car_accident_repairs(car_hash_id: str):
         Технический лист с информацией о состоянии всех частей автомобиля
     """
     try:
-        service = get_heydealer_service()
-
-        # Получаем технический лист
-        accident_repairs = await service.get_accident_repairs(car_hash_id)
+        accident_repairs = heydealer_data_store.get_accident_repairs(car_hash_id)
         if not accident_repairs:
             raise HTTPException(
                 status_code=404, detail="Технический лист для автомобиля не найден"
@@ -2337,7 +1819,7 @@ async def get_car_accident_repairs(car_hash_id: str):
 @router.get("/cars/{car_hash_id}/with-accident-repairs")
 async def get_car_with_accident_repairs(car_hash_id: str):
     """
-    Получает детальную информацию об автомобиле вместе с техническим листом
+    Получает детальную информацию об автомобиле вместе с техническим листом (from data store)
 
     Args:
         car_hash_id: Уникальный ID автомобиля
@@ -2346,10 +1828,11 @@ async def get_car_with_accident_repairs(car_hash_id: str):
         Полная информация об автомобиле включая технический лист
     """
     try:
-        service = get_heydealer_service()
-
-        # Получаем комбинированные данные
-        combined_data = await service.get_car_with_accident_repairs(car_hash_id)
+        car_detail = heydealer_data_store.get_car_detail(car_hash_id)
+        accident_data = heydealer_data_store.get_accident_repairs(car_hash_id)
+        combined_data = car_detail
+        if combined_data and accident_data:
+            combined_data["accident_repairs"] = accident_data
         if not combined_data:
             raise HTTPException(
                 status_code=404, detail="Автомобиль или его технический лист не найден"
@@ -2384,19 +1867,16 @@ async def get_car_with_accident_repairs(car_hash_id: str):
 @router.get("/cars/{car_hash_id}/accident-repairs/raw")
 async def get_car_accident_repairs_raw(car_hash_id: str):
     """
-    Получает сырые данные технического листа (для отладки)
+    Получает сырые данные технического листа (from data store)
 
     Args:
         car_hash_id: Уникальный ID автомобиля
 
     Returns:
-        Необработанные данные технического листа от API
+        Необработанные данные технического листа
     """
     try:
-        service = get_heydealer_service()
-
-        # Получаем сырые данные
-        raw_data = await service.get_accident_repairs(car_hash_id)
+        raw_data = heydealer_data_store.get_accident_repairs(car_hash_id)
         if not raw_data:
             raise HTTPException(
                 status_code=404, detail="Технический лист для автомобиля не найден"
@@ -2430,10 +1910,7 @@ async def get_car_accident_repairs_summary(car_hash_id: str):
         Краткая сводка о состоянии автомобиля
     """
     try:
-        service = get_heydealer_service()
-
-        # Получаем технический лист
-        accident_repairs = await service.get_accident_repairs(car_hash_id)
+        accident_repairs = heydealer_data_store.get_accident_repairs(car_hash_id)
         if not accident_repairs:
             raise HTTPException(
                 status_code=404, detail="Технический лист для автомобиля не найден"
@@ -2634,94 +2111,39 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
             except Exception as e:
                 logger.warning(f"Playwright scraper failed, falling back to API: {e}")
         
-        # Fallback to API method
-        # Получаем валидную сессию
-        cookies, headers = heydealer_auth.get_valid_session()
-        
-        if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
+        # Fallback: read from data store
+        diagram_data = heydealer_data_store.get_accident_repairs(car_hash_id)
+
+        if not diagram_data:
             raise HTTPException(
-                status_code=401, 
-                detail="Ошибка авторизации HeyDealer"
+                status_code=404,
+                detail=f"Диаграмма повреждений для {car_hash_id} не найдена в кэше"
             )
-        
-        # Формируем URL для получения диаграммы
-        diagram_url = f"https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/"
-        
-        # Параметры запроса
-        params = {
-            "car": car_hash_id
-        }
-        
-        # Выполняем запрос
-        response = requests.get(
-            diagram_url,
-            params=params,
-            headers=headers,
-            cookies=cookies,
-            timeout=30
-        )
-        
-        if response.status_code != 200:
-            logger.error(f"Ошибка получения диаграммы: {response.status_code} - {response.text}")
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Ошибка получения диаграммы повреждений: {response.status_code}"
-            )
-        
-        # Получаем данные
-        diagram_data = response.json()
-        
-        # Логируем полученные данные для отладки
-        logger.info(f"Получены данные диаграммы: {json.dumps(diagram_data, ensure_ascii=False, indent=2)[:1000]}")
-        
-        # Get actual damage data from car details API
-        try:
-            logger.info(f"Fetching car details for actual damage data")
-            detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-            detail_response = requests.get(detail_url, headers=headers, cookies=cookies, timeout=30)
-            
-            if detail_response.status_code == 200:
-                car_details = detail_response.json()
-                detail_section = car_details.get('detail', {})
-                
-                # Get actual accident repairs from car details
-                actual_repairs = detail_section.get('accident_repairs', [])
-                logger.info(f"Found {len(actual_repairs)} actual repairs: {actual_repairs}")
-                
-                # Merge actual repairs with diagram template
-                if actual_repairs:
-                    # Create a map of part names to repair types
-                    repair_map = {}
-                    for repair in actual_repairs:
-                        part = repair.get('part', '')
-                        repair_type = repair.get('repair', 'none')
-                        if part and repair_type != 'none':
-                            repair_map[part] = repair_type
-                    
-                    # Update the accident_repairs array with actual damage data
-                    for diagram_repair in diagram_data.get('accident_repairs', []):
-                        part_name = diagram_repair.get('part', '')
-                        
-                        # Check if this part has actual damage
-                        if part_name in repair_map:
-                            diagram_repair['repair'] = repair_map[part_name]
-                            # Update repair display
-                            repair_displays = {
-                                'weld': '용접 (Welded)',
-                                'painted': '도색 (Painted)', 
-                                'exchange': '교환 (Exchanged)',
-                                'none': '없음 (None)'
-                            }
-                            diagram_repair['repair_display'] = repair_displays.get(repair_map[part_name], repair_map[part_name])
-                            logger.info(f"Updated {part_name} to {repair_map[part_name]}")
-                    
-                    logger.info(f"Successfully merged actual damage data")
-            else:
-                logger.warning(f"Could not fetch car details: {detail_response.status_code}")
-                
-        except Exception as e:
-            logger.warning(f"Could not get actual damage data from car details: {e}")
+
+        # Merge actual damage data from car details
+        car_details = heydealer_data_store.get_car_detail(car_hash_id)
+        if car_details:
+            detail_section = car_details.get('detail', {})
+            actual_repairs = detail_section.get('accident_repairs', [])
+            if actual_repairs:
+                repair_map = {}
+                for repair in actual_repairs:
+                    part = repair.get('part', '')
+                    repair_type = repair.get('repair', 'none')
+                    if part and repair_type != 'none':
+                        repair_map[part] = repair_type
+
+                for diagram_repair in diagram_data.get('accident_repairs', []):
+                    part_name = diagram_repair.get('part', '')
+                    if part_name in repair_map:
+                        diagram_repair['repair'] = repair_map[part_name]
+                        repair_displays = {
+                            'weld': '용접 (Welded)',
+                            'painted': '도색 (Painted)',
+                            'exchange': '교환 (Exchanged)',
+                            'none': '없음 (None)'
+                        }
+                        diagram_repair['repair_display'] = repair_displays.get(repair_map[part_name], repair_map[part_name])
         
         # Обрабатываем данные о повреждениях
         accident_repairs = []
@@ -2804,3 +2226,35 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
     except Exception as e:
         logger.error(f"Ошибка получения диаграммы повреждений для {car_hash_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# === SYNC CONTROL ENDPOINTS ===
+
+
+@router.get("/sync/status")
+async def get_sync_status():
+    """Get current HeyDealer data sync status and freshness"""
+    meta = heydealer_data_store.get_sync_metadata()
+    return {
+        "success": True,
+        "sync": meta,
+        "data_available": heydealer_data_store.is_data_available(),
+        "data_age_seconds": heydealer_data_store.get_data_age_seconds(),
+    }
+
+
+@router.post("/sync/trigger")
+async def trigger_sync():
+    """Manually trigger a HeyDealer data sync"""
+    import threading
+    from app.services.heydealer_sync_service import HeyDealerSyncService
+
+    sync_service = HeyDealerSyncService()
+    thread = threading.Thread(target=sync_service.run_sync, daemon=True)
+    thread.start()
+
+    return {
+        "success": True,
+        "message": "Sync triggered in background",
+        "current_status": heydealer_data_store.get_sync_metadata(),
+    }
