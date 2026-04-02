@@ -62,12 +62,11 @@ class HeyDealerService(BaseAuctionService):
             True if authentication successful, False otherwise
         """
         try:
-            # Use the heydealer_auth service which handles async authentication
-            valid_session = heydealer_auth.get_valid_session()
-            if valid_session:
-                self._cookies = valid_session.get("cookies", {})
-                self._session_id = valid_session.get("session_id")
-                self._csrf_token = valid_session.get("csrf_token")
+            # get_valid_session() returns a tuple (cookies, headers)
+            cookies, headers = heydealer_auth.get_valid_session()
+            if cookies and headers:
+                self._cookies = cookies
+                self._headers = headers
                 self.authenticated = True
                 base_logger.info(f"✅ {self.name}: Authentication successful")
                 return True

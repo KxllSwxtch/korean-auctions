@@ -5,11 +5,9 @@
 import requests
 import json
 import os
-import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
-
-logger = logging.getLogger(__name__)
+from loguru import logger
 
 
 class HeyDealerAuthService:
@@ -110,26 +108,31 @@ class HeyDealerAuthService:
             # Шаг 1: Получаем CSRF через сессию
             csrf_token = None
 
-            # Пробуем получить CSRF через главную страницу в этой же сессии
+            # Попытка 1: CSRF через главную страницу
             try:
-                session.get("https://dealer.heydealer.com/", timeout=30)
+                resp = session.get("https://dealer.heydealer.com/", timeout=30)
                 csrf_token = session.cookies.get("csrftoken")
+                logger.info(f"[CSRF] Главная страница: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
             except Exception as e:
-                logger.warning(f"Не удалось получить CSRF через сессию: {e}")
+                logger.warning(f"[CSRF] Ошибка главной страницы: {e}")
 
+            # Попытка 2: CSRF через API
             if not csrf_token:
                 try:
-                    session.get("https://api.heydealer.com/v2/dealers/web/", timeout=30)
+                    resp = session.get("https://api.heydealer.com/v2/dealers/web/", timeout=30)
                     csrf_token = session.cookies.get("csrftoken")
+                    logger.info(f"[CSRF] API endpoint: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
                 except Exception as e:
-                    logger.warning(f"Не удалось получить CSRF через API в сессии: {e}")
+                    logger.warning(f"[CSRF] Ошибка API endpoint: {e}")
 
+            # Попытка 3: CSRF через login URL
             if not csrf_token:
                 try:
-                    session.get(self.login_url, timeout=30)
+                    resp = session.get(self.login_url, timeout=30)
                     csrf_token = session.cookies.get("csrftoken")
+                    logger.info(f"[CSRF] Login endpoint: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
                 except Exception as e:
-                    logger.warning(f"Не удалось получить CSRF через login endpoint: {e}")
+                    logger.warning(f"[CSRF] Ошибка login endpoint: {e}")
 
             if not csrf_token:
                 logger.error("Не удалось получить CSRF токен ни одним методом — авторизация невозможна")
