@@ -5,6 +5,8 @@
 import requests
 import json
 import os
+import secrets
+import string
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from loguru import logger
@@ -108,35 +110,27 @@ class HeyDealerAuthService:
             # Шаг 1: Получаем CSRF через сессию
             csrf_token = None
 
-            # Попытка 1: CSRF через главную страницу
-            try:
-                resp = session.get("https://dealer.heydealer.com/", timeout=30)
-                csrf_token = session.cookies.get("csrftoken")
-                logger.info(f"[CSRF] Главная страница: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
-            except Exception as e:
-                logger.warning(f"[CSRF] Ошибка главной страницы: {e}")
-
-            # Попытка 2: CSRF через API
-            if not csrf_token:
+            # Попытка 1: Пробуем GET к API endpoints чтобы получить CSRF cookie от Django
+            csrf_urls = [
+                "https://dealer.heydealer.com/",
+                "https://api.heydealer.com/v2/dealers/web/cars/",
+                "https://api.heydealer.com/v2/dealers/web/",
+                self.login_url,
+            ]
+            for url in csrf_urls:
+                if csrf_token:
+                    break
                 try:
-                    resp = session.get("https://api.heydealer.com/v2/dealers/web/", timeout=30)
+                    resp = session.get(url, timeout=15)
                     csrf_token = session.cookies.get("csrftoken")
-                    logger.info(f"[CSRF] API endpoint: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
+                    logger.info(f"[CSRF] GET {url}: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
                 except Exception as e:
-                    logger.warning(f"[CSRF] Ошибка API endpoint: {e}")
+                    logger.warning(f"[CSRF] GET {url} failed: {e}")
 
-            # Попытка 3: CSRF через login URL
+            # Попытка 2: Если CSRF не получен, генерируем свой токен (Django double-submit pattern)
             if not csrf_token:
-                try:
-                    resp = session.get(self.login_url, timeout=30)
-                    csrf_token = session.cookies.get("csrftoken")
-                    logger.info(f"[CSRF] Login endpoint: status={resp.status_code}, cookies={list(session.cookies.keys())}, csrf={'OK' if csrf_token else 'НЕТ'}")
-                except Exception as e:
-                    logger.warning(f"[CSRF] Ошибка login endpoint: {e}")
-
-            if not csrf_token:
-                logger.error("Не удалось получить CSRF токен ни одним методом — авторизация невозможна")
-                return None
+                csrf_token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(32))
+                logger.warning(f"[CSRF] Сервер не вернул csrftoken, используем сгенерированный: {csrf_token[:8]}...")
 
             logger.info(f"CSRF токен для логина: {csrf_token[:8]}...")
 
