@@ -160,8 +160,10 @@ class HeyDealerAuthService:
 
                 logger.info(f"✅ Авторизация успешна! User hash_id: {user_hash_id}")
 
-                # Собираем все cookies из сессии
-                session_cookies = dict(session.cookies)
+                # Собираем все cookies из сессии (последний побеждает при дубликатах)
+                session_cookies = {}
+                for cookie in session.cookies:
+                    session_cookies[cookie.name] = cookie.value
 
                 # Собираем headers для дальнейших запросов
                 session_headers = dict(self.base_headers)

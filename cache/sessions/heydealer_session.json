@@ -1,0 +1,23 @@
+{
+  "user_hash_id": "jQdE8874",
+  "cookies": {
+    "ga_dsi": "717cb7ab49f84c23bc080f10d2073102",
+    "sessionid": "d573gff2rogz1uml0eclozxn8vfbcpbd",
+    "csrftoken": "3Irq6KJu0BtKQ6qiwfLlFzW0JSP9rSJq"
+  },
+  "headers": {
+    "Accept": "*/*",
+    "Accept-Language": "en,ru;q=0.9,ko;q=0.8",
+    "App-Os": "pc",
+    "App-Type": "dealer",
+    "App-Version": "1.9.0",
+    "Connection": "keep-alive",
+    "Origin": "https://dealer.heydealer.com",
+    "Referer": "https://dealer.heydealer.com/",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    "Content-Type": "application/json",
+    "X-CSRFToken": "kJsk4KPFlGSukEuiN7Bgy3ybzD41qWwG"
+  },
+  "created_at": "2026-04-02T17:18:17.892428",
+  "expires_at": "2026-04-03T05:18:17.892432"
+}
