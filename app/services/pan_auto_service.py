@@ -3,10 +3,10 @@ Service for fetching car data from Pan-Auto.ru API
 Provides HP (horsepower) and Russian customs costs data
 """
 
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
 import logging
 import re
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
 
 from app.core.http_client import AsyncHttpClient
 from app.models.pan_auto import (
@@ -100,7 +100,7 @@ class PanAutoService:
                     return cached_response
 
             # Build URL
-            url = f"{self.BASE_URL}/cars/{car_id}/"
+            url = f"{self.BASE_URL}/korea/{car_id}/"
 
             logger.info(f"Fetching Pan-Auto data for car: {car_id}")
 
@@ -111,9 +111,7 @@ class PanAutoService:
                 error_msg = f"Pan-Auto API returned status {response.status_code if response else 'None'} for car {car_id}"
                 logger.warning(error_msg)
                 return PanAutoCarDetailResponse(
-                    success=False,
-                    data=None,
-                    message=error_msg
+                    success=False, data=None, message=error_msg
                 )
 
             # Parse JSON response
@@ -124,7 +122,7 @@ class PanAutoService:
                 return PanAutoCarDetailResponse(
                     success=False,
                     data=None,
-                    message="Failed to parse Pan-Auto response"
+                    message="Failed to parse Pan-Auto response",
                 )
 
             # Extract data with proper error handling
@@ -132,26 +130,22 @@ class PanAutoService:
 
             # Create response
             result = PanAutoCarDetailResponse(
-                success=True,
-                data=car_detail,
-                message=None
+                success=True, data=car_detail, message=None
             )
 
             # Cache the response
             if use_cache:
                 self.cache.set(cache_key, result)
 
-            logger.info(f"Successfully fetched Pan-Auto data for car {car_id}: HP={car_detail.hp}")
+            logger.info(
+                f"Successfully fetched Pan-Auto data for car {car_id}: HP={car_detail.hp}"
+            )
             return result
 
         except Exception as e:
             error_msg = f"Error fetching Pan-Auto data for car {car_id}: {str(e)}"
             logger.error(error_msg)
-            return PanAutoCarDetailResponse(
-                success=False,
-                data=None,
-                message=error_msg
-            )
+            return PanAutoCarDetailResponse(success=False, data=None, message=error_msg)
 
     def _parse_car_detail(self, data: Dict[str, Any], car_id: str) -> PanAutoCarDetail:
         """
@@ -214,7 +208,7 @@ class PanAutoService:
                 year = int(year_raw)
             except (ValueError, TypeError):
                 # Extract 4-digit year from Russian date string
-                year_match = re.search(r'\b(19|20)\d{2}\b', str(year_raw))
+                year_match = re.search(r"\b(19|20)\d{2}\b", str(year_raw))
                 if year_match:
                     year = int(year_match.group())
 
