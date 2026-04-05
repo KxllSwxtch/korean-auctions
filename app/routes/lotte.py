@@ -79,10 +79,6 @@ async def get_cars(
     try:
         logger.info(f"Запрос автомобилей Lotte: limit={limit}, offset={offset}")
 
-        # Pre-authenticate once to avoid multiple auth cascades
-        if not service.authenticated:
-            service._authenticate()
-
         response = await service.get_cars_response_with_date_check(
             limit=limit, offset=offset
         )
@@ -97,6 +93,22 @@ async def get_cars(
         return response
 
     except Exception as e:
+        error_msg = str(e)
+        is_auth_error = "аутентифицироваться" in error_msg or "Authentication" in error_msg or "Session" in error_msg
+
+        if is_auth_error:
+            logger.warning(f"Lotte auth unavailable: {e}")
+            error_response = LotteError(
+                error_code="AUTH_UNAVAILABLE",
+                message="Lotte auction service temporarily unavailable, please retry",
+                timestamp=datetime.now().isoformat(),
+            )
+            return JSONResponse(
+                status_code=503,
+                content=error_response.model_dump(),
+                headers={"Retry-After": "60"},
+            )
+
         logger.error(f"Ошибка при получении автомобилей Lotte: {e}")
         error_response = LotteError(
             error_code="INTERNAL_ERROR",
@@ -258,10 +270,8 @@ async def get_upcoming_cars(
             f"Запрос автомобилей предстоящего аукциона Lotte: limit={limit}, offset={offset}"
         )
 
-        # Pre-authenticate once for the entire request to avoid
-        # multiple independent auth cascades (prevents account lockout)
-        if not service.authenticated:
-            service._authenticate()
+        # Service methods handle auth internally via _ensure_session()
+        # No pre-auth needed — the coordinator prevents race conditions
 
         # Получаем дату аукциона для информации
         auction_date = await service.get_auction_date()
@@ -289,6 +299,22 @@ async def get_upcoming_cars(
         return response
 
     except Exception as e:
+        error_msg = str(e)
+        is_auth_error = "аутентифицироваться" in error_msg or "Authentication" in error_msg or "Session" in error_msg
+
+        if is_auth_error:
+            logger.warning(f"Lotte auth unavailable: {e}")
+            error_response = LotteError(
+                error_code="AUTH_UNAVAILABLE",
+                message="Lotte auction service temporarily unavailable, please retry",
+                timestamp=datetime.now().isoformat(),
+            )
+            return JSONResponse(
+                status_code=503,
+                content=error_response.model_dump(),
+                headers={"Retry-After": "60"},
+            )
+
         logger.error(
             f"Ошибка при получении автомобилей предстоящего аукциона Lotte: {e}"
         )

@@ -46,11 +46,6 @@ class LotteService(BaseAuctionService):
         self._cached_total_count: int = 0
         self._cached_total_count_time: float = 0
 
-        # Auth rate limiting & lockout protection
-        self._auth_locked_until: float = 0  # Cooldown after errOverPassCnt
-        self._last_auth_attempt: float = 0  # Rate limiter timestamp
-        self._auth_min_interval: float = 30  # Min seconds between auth attempts
-
         # URLs для различных страниц
         self.urls = {
             "home": "/hp/auct/myp/entry/selectMypEntryList.do",  # Страница с датой аукциона
@@ -103,181 +98,197 @@ class LotteService(BaseAuctionService):
 
         return self.session
 
-    @retry(
-        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10)
-    )
     def _authenticate(self) -> bool:
-        """Аутентификация в системе Lotte (двухэтапный процесс)"""
+        """Authenticate using cross-worker coordinator to prevent race conditions."""
+        from app.core.auth_coordinator import ensure_authenticated
+        return ensure_authenticated(self)
+
+    def _ensure_session(self) -> bool:
+        """Single entry point for ensuring we have a valid authenticated session.
+        Replaces scattered _authenticate() + _refresh_session_if_needed() calls.
+        """
+        if self.authenticated and not self._is_session_expired():
+            return True
+        return self._authenticate()
+
+    def _do_authenticate(self) -> bool:
+        """Core 3-step Lotte login flow. Called by auth_coordinator under file lock.
+
+        Returns True on success, False on non-retriable failure.
+        Raises exceptions on retriable failures (network errors, unexpected responses).
+        """
+        # Force fresh session for clean headers/cookies
+        self.session = None
+        session = self._init_session()
+
+        login = settings.lotte_username
+        password = settings.lotte_password
+
+        logger.info(f"Начинаем аутентификацию в Lotte для пользователя: {login}")
+
+        # Step 1: Get login page for cookies/session
+        login_page_url = urljoin(self.base_url, self.urls["login"])
+        response = session.get(login_page_url, timeout=30, verify=False)
+
+        if response.status_code != 200:
+            logger.error(f"Не удалось получить страницу логина: {response.status_code}")
+            raise Exception(f"Login page fetch failed: HTTP {response.status_code}")
+
+        logger.info(f"Страница логина получена (статус: {response.status_code})")
+        logger.debug(f"Cookies после получения страницы логина: {session.cookies.get_dict()}")
+
+        # Step 2: Validate credentials via AJAX
+        login_check_url = urljoin(self.base_url, self.urls["login_check"])
+        login_check_data = {
+            "userId": login,
+            "userPwd": password,
+            "resultCd": "",
+        }
+
+        session.headers.update(
+            {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                "X-Requested-With": "XMLHttpRequest",
+                "Referer": login_page_url,
+                "Accept": "application/json, text/javascript, */*; q=0.01",
+            }
+        )
+
+        check_response = session.post(
+            login_check_url, data=login_check_data, timeout=30, verify=False
+        )
+
+        if check_response.status_code != 200:
+            logger.error(f"Ошибка при проверке логина: HTTP {check_response.status_code}")
+            raise Exception(f"Login check failed: HTTP {check_response.status_code}")
+
         try:
-            # Guard 1: If already authenticated and session is valid, skip re-auth
-            if self.authenticated and self.session and self._validate_session():
-                logger.info("✅ Session already valid, skipping re-authentication")
+            result = check_response.json()
+        except Exception as json_err:
+            logger.error(f"Ошибка при разборе JSON ответа проверки логина: {json_err}")
+            logger.error(f"Текст ответа: {check_response.text[:500]}")
+            raise Exception(f"Login check returned non-JSON response: {json_err}")
+
+        logger.info(f"Ответ проверки логина: {result}")
+
+        # Check for login errors
+        error_code = result.get("resultCd")
+        if error_code is not None and error_code != "":
+            logger.error(f"Ошибка логина: {error_code}")
+            if error_code == "errUserAuth":
+                logger.error("Неверные логин или пароль")
+                return False
+            elif error_code == "errOverPassCnt":
+                logger.error("Превышено количество попыток входа — активируем 15-мин cooldown")
+                from app.core.auth_coordinator import set_lockout
+                set_lockout(900)
+                return False
+            elif error_code == "feeInactive":
+                logger.error("Проблемы с оплатой аккаунта")
+                return False
+            else:
+                logger.error(f"Неизвестная ошибка логина: {error_code}")
+                return False
+
+        logger.info("Проверка логина прошла успешно")
+
+        # Step 3: Final login POST with allow_redirects=False to detect failures
+        login_action_url = urljoin(self.base_url, self.urls["login_action"])
+        final_login_data = {
+            "userId": login,
+            "userPwd": password,
+            "resultCd": "",
+        }
+
+        session.headers.update(
+            {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": login_page_url,
+            }
+        )
+        if "X-Requested-With" in session.headers:
+            del session.headers["X-Requested-With"]
+
+        final_response = session.post(
+            login_action_url,
+            data=final_login_data,
+            timeout=30,
+            verify=False,
+            allow_redirects=False,
+        )
+
+        # Restore browser-like headers after login flow
+        session.headers.update({
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Upgrade-Insecure-Requests": "1",
+        })
+        session.headers.pop("Content-Type", None)
+
+        logger.info(f"Финальный логин статус: {final_response.status_code}")
+
+        if final_response.status_code in [302, 303]:
+            # Inspect redirect target to detect failed login
+            location = final_response.headers.get("Location", "")
+            logger.info(f"Login redirect location: {location}")
+
+            if "viewLoginUsr" in location or "login" in location.lower():
+                logger.error(f"Login redirected back to login page: {location}")
+                raise Exception("Login redirected back to login page — session not established")
+
+            # Follow redirect manually to capture cookies properly
+            redirect_url = urljoin(self.base_url, location)
+            session.get(redirect_url, timeout=15, verify=False)
+
+        elif final_response.status_code == 200:
+            # Direct 200 — check if it's actually the login page
+            if self._is_login_page(final_response.text):
+                logger.error("Login POST returned 200 but response is login page")
+                raise Exception("Login POST returned login page — auth not established")
+        else:
+            logger.error(f"Ошибка финального логина: HTTP {final_response.status_code}")
+            raise Exception(f"Final login failed: HTTP {final_response.status_code}")
+
+        # Validate session by hitting a protected page
+        if self._validate_session():
+            logger.info("✅ Аутентификация в Lotte успешна и проверена!")
+            return True
+        else:
+            logger.error("Login POST succeeded but session validation failed")
+            raise Exception("Session validation failed after successful login POST")
+
+    def _load_shared_session(self) -> bool:
+        """Load session cookies from shared file written by another worker."""
+        try:
+            session_data = self.session_manager.load_session('lotte')
+            if not session_data:
+                return False
+
+            age = self.session_manager.get_session_age('lotte')
+            if age and age > timedelta(minutes=self.session_max_age_minutes):
+                logger.debug(f"Shared session too old ({age.total_seconds()/60:.1f} min)")
+                return False
+
+            self.session = None
+            self.session = self._init_session()
+
+            cookies = session_data if isinstance(session_data, dict) else {}
+            if 'cookies' in cookies and isinstance(cookies.get('cookies'), dict):
+                cookies = cookies['cookies']
+            for name, value in cookies.items():
+                if isinstance(value, str):
+                    self.session.cookies.set(name, value)
+
+            if self._validate_session():
+                self.authenticated = True
+                self.session_created_at = datetime.now()
+                logger.info("✅ Shared session loaded and validated")
                 return True
 
-            # Guard 2: Respect cooldown after account lockout (errOverPassCnt)
-            if time.time() < self._auth_locked_until:
-                remaining = int(self._auth_locked_until - time.time())
-                logger.warning(f"⏳ Auth cooldown active ({remaining}s remaining), skipping login attempt")
-                return False
-
-            # Guard 3: Rate limit auth attempts (max 1 per _auth_min_interval seconds)
-            now = time.time()
-            if now - self._last_auth_attempt < self._auth_min_interval:
-                logger.warning(f"⏳ Auth rate limit: last attempt was {now - self._last_auth_attempt:.0f}s ago, minimum interval is {self._auth_min_interval}s")
-                return False
-            self._last_auth_attempt = now
-
-            # Force fresh session for clean headers/cookies on each auth attempt
+            logger.debug("Shared session failed validation")
             self.session = None
-            session = self._init_session()
-
-            # Логин и пароль из конфига
-            login = settings.lotte_username
-            password = settings.lotte_password
-
-            logger.info(f"Начинаем аутентификацию в Lotte для пользователя: {login}")
-
-            # Шаг 1: Получаем страницу логина для получения cookies и сессии
-            login_page_url = urljoin(self.base_url, self.urls["login"])
-            response = session.get(login_page_url, timeout=30, verify=False)
-
-            if response.status_code != 200:
-                logger.error(
-                    f"Не удалось получить страницу логина: {response.status_code}"
-                )
-                logger.error(f"Response headers: {response.headers}")
-                return False
-
-            logger.info(f"Страница логина получена (статус: {response.status_code})")
-            logger.debug(f"Cookies после получения страницы логина: {session.cookies.get_dict()}")
-
-            # Шаг 2: Проверяем логин данные через AJAX
-            login_check_url = urljoin(self.base_url, self.urls["login_check"])
-
-            # Подготавливаем данные для проверки логина (как в форме HTML)
-            login_check_data = {
-                "userId": login,
-                "userPwd": password,
-                "resultCd": "",
-            }
-
-            # Устанавливаем правильные заголовки для AJAX запроса
-            session.headers.update(
-                {
-                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Referer": login_page_url,
-                    "Accept": "application/json, text/javascript, */*; q=0.01",
-                }
-            )
-
-            # Отправляем AJAX запрос для проверки логина
-            check_response = session.post(
-                login_check_url, data=login_check_data, timeout=30, verify=False
-            )
-
-            logger.debug(f"Отправка проверки логина на: {login_check_url}")
-            logger.debug(f"Данные для проверки: {login_check_data}")
-            
-            if check_response.status_code != 200:
-                logger.error(
-                    f"Ошибка при проверке логина: HTTP {check_response.status_code}"
-                )
-                logger.error(f"Response text: {check_response.text[:500]}")
-                return False
-
-            # Анализируем ответ проверки логина
-            try:
-                result = check_response.json()
-                logger.info(f"Ответ проверки логина: {result}")
-
-                # Проверяем результат (если resultCd пустой или null, то логин успешен)
-                if result.get("resultCd") is None or result.get("resultCd") == "":
-                    logger.info("Проверка логина прошла успешно")
-
-                    # Шаг 3: Финальный логин
-                    login_action_url = urljoin(self.base_url, self.urls["login_action"])
-
-                    # Данные для финального логина
-                    final_login_data = {
-                        "userId": login,
-                        "userPwd": password,
-                        "resultCd": "",
-                    }
-
-                    # Убираем AJAX заголовки для обычного POST запроса
-                    session.headers.update(
-                        {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Referer": login_page_url,
-                        }
-                    )
-                    # Удаляем AJAX заголовок
-                    if "X-Requested-With" in session.headers:
-                        del session.headers["X-Requested-With"]
-
-                    final_response = session.post(
-                        login_action_url,
-                        data=final_login_data,
-                        timeout=30,
-                        verify=False,
-                    )
-
-                    # Restore browser-like headers after login flow
-                    session.headers.update({
-                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-                        "Upgrade-Insecure-Requests": "1",
-                    })
-                    session.headers.pop("Content-Type", None)
-
-                    # Проверяем финальный ответ (должен быть редирект или успешная страница)
-                    logger.debug(f"Финальный логин статус: {final_response.status_code}")
-                    logger.debug(f"Финальный логин headers: {final_response.headers}")
-                    
-                    if final_response.status_code in [200, 302, 303]:
-                        # Verify the session actually works by hitting a protected page
-                        if self._validate_session():
-                            self.authenticated = True
-                            logger.info("✅ Аутентификация в Lotte успешна и проверена!")
-                            self._save_session()
-                            return True
-                        else:
-                            logger.error("Login POST succeeded but session validation failed")
-                            return False
-                    else:
-                        logger.error(
-                            f"Ошибка финального логина: HTTP {final_response.status_code}"
-                        )
-                        logger.error(f"Response text: {final_response.text[:500]}")
-                        return False
-
-                else:
-                    # Есть ошибка в логине
-                    error_code = result.get("resultCd")
-                    logger.error(f"Ошибка логина: {error_code}")
-
-                    if error_code == "errUserAuth":
-                        logger.error("Неверные логин или пароль")
-                    elif error_code == "errOverPassCnt":
-                        logger.error("Превышено количество попыток входа — активируем 15-мин cooldown")
-                        self._auth_locked_until = time.time() + 900  # 15-min cooldown
-                    elif error_code == "feeInactive":
-                        logger.error("Проблемы с оплатой аккаунта")
-                    else:
-                        logger.error(f"Неизвестная ошибка логина: {error_code}")
-
-                    return False
-
-            except Exception as json_error:
-                logger.error(f"Ошибка при разборе ответа: {json_error}")
-                logger.error(f"Текст ответа: {check_response.text[:500]}")
-                # Не возвращаем False если аутентификация прошла успешно
-                if self.authenticated:
-                    return True
-                return False
-
+            return False
         except Exception as e:
-            logger.error(f"Ошибка при аутентификации в Lotte: {e}")
+            logger.debug(f"Error loading shared session: {e}")
             return False
 
     def _validate_session(self) -> bool:
@@ -338,18 +349,9 @@ class LotteService(BaseAuctionService):
             return cached_data
 
         try:
-            # Аутентификация если нужно
-            if not self.authenticated:
-                auth_success = self._authenticate()
-                if not auth_success:
-                    logger.error("Не удалось аутентифицироваться")
-                    self._record_failure(Exception("Authentication failed"))
-                    return None
-
-            # Check and refresh session if needed
-            if not self._refresh_session_if_needed():
-                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for auction date")
-                self._record_failure(Exception("Session refresh failed"))
+            if not self._ensure_session():
+                logger.error("Не удалось аутентифицироваться")
+                self._record_failure(Exception("Authentication failed"))
                 return None
 
             session = self._init_session()
@@ -416,16 +418,10 @@ class LotteService(BaseAuctionService):
         )
 
         try:
-            # Аутентификация если нужно
-            if not self.authenticated:
-                logger.info("Требуется аутентификация для получения списка автомобилей")
-                auth_success = self._authenticate()
-                if not auth_success:
-                    logger.error("Не удалось аутентифицироваться для получения автомобилей")
-                    raise Exception("Не удалось аутентифицироваться")
+            if not self._ensure_session():
+                raise Exception("Не удалось аутентифицироваться")
 
             # Получаем страницу с автомобилями с пагинацией
-            # _fetch_cars_page already handles session refresh and retries
             cars_response = await self._fetch_cars_page(limit, offset)
 
             if not cars_response:
@@ -453,12 +449,6 @@ class LotteService(BaseAuctionService):
     ) -> Optional[LotteCar]:
         """Получение детальной информации об автомобиле"""
         try:
-            # Check and refresh session if needed
-            if not self._refresh_session_if_needed():
-                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car details")
-                self._record_failure(Exception("Session refresh failed"))
-                return None
-
             session = self._init_session()
 
             # Формируем URL для получения деталей
@@ -513,12 +503,9 @@ class LotteService(BaseAuctionService):
             return cached_data
 
         try:
-            # Аутентификация если нужно
-            if not self.authenticated:
-                auth_success = self._authenticate()
-                if not auth_success:
-                    logger.error("Не удалось аутентифицироваться")
-                    return []
+            if not self._ensure_session():
+                logger.error("Не удалось аутентифицироваться")
+                return []
 
             session = self._init_session()
 
@@ -634,14 +621,8 @@ class LotteService(BaseAuctionService):
         The full page contains .total-carnum with the true total (e.g. 1,257).
         """
         try:
-            if not self.authenticated:
-                auth_success = self._authenticate()
-                if not auth_success:
-                    logger.error("Authentication failed for total count fetch")
-                    return 0
-
-            if not self._refresh_session_if_needed():
-                logger.warning("Session refresh failed for total count fetch")
+            if not self._ensure_session():
+                logger.error("Authentication failed for total count fetch")
                 return 0
 
             session = self._init_session()
@@ -734,12 +715,6 @@ class LotteService(BaseAuctionService):
     async def _fetch_cars_page(self, limit: int = 20, offset: int = 0):
         """Получение страницы с автомобилями с пагинацией"""
         try:
-            # Check and refresh session if needed
-            if not self._refresh_session_if_needed():
-                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for cars page")
-                self._record_failure(Exception("Session refresh failed"))
-                return None
-
             session = self._init_session()
             cars_url = urljoin(self.base_url, self.urls["cars_list"])
 
@@ -882,7 +857,10 @@ class LotteService(BaseAuctionService):
     async def get_total_cars_count(self) -> int:
         """Получение общего количества автомобилей на аукционе"""
         try:
-            # Получаем первую страницу с минимальным количеством элементов
+            if not self._ensure_session():
+                logger.error("Authentication failed for total cars count")
+                return 0
+
             cars_response = await self._fetch_cars_page(limit=1, offset=0)
 
             if not cars_response:
@@ -920,17 +898,14 @@ class LotteService(BaseAuctionService):
             LotteCarResponse: Ответ с детальной информацией об автомобиле
         """
         try:
-            # Check and refresh session if needed
-            if not self._refresh_session_if_needed():
-                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car detail")
-                self._record_failure(Exception("Session refresh failed"))
+            if not self._ensure_session():
                 return LotteCarResponse(
                     success=False,
-                    message="Session refresh failed",
-                    error="Session expired"
+                    message="Authentication failed",
+                    error="Could not authenticate"
                 )
 
-            # Параметры запроса для детальной страницы
+            # Парам��тры запроса для детальной страницы
             params = {
                 "searchMngDivCd": search_mng_div_cd,
                 "searchMngNo": search_mng_no,
@@ -1064,28 +1039,14 @@ class LotteService(BaseAuctionService):
             LotteCarHistoryResponse: История автомобиля
         """
         try:
-            # Аутентификация если нужно
-            if not self.authenticated:
-                logger.info("Требуется аутентификация для получения истории автомобиля")
-                auth_success = self._authenticate()
-                if not auth_success:
-                    self._record_failure(Exception("Authentication failed"))
-                    return LotteCarHistoryResponse(
-                        success=False,
-                        message="Не удалось аутентифицироваться",
-                        error="Authentication failed"
-                    )
-
-            # Check and refresh session if needed
-            if not self._refresh_session_if_needed():
-                base_logger.warning(f"⚠️ {self.name}: Session refresh failed for car history")
-                self._record_failure(Exception("Session refresh failed"))
+            if not self._ensure_session():
+                self._record_failure(Exception("Authentication failed"))
                 return LotteCarHistoryResponse(
                     success=False,
-                    message="Session refresh failed",
-                    error="Session expired"
+                    message="Не удалось аутентифицироваться",
+                    error="Authentication failed"
                 )
-            
+
             session = self._init_session()
             
             # URL для истории автомобиля
