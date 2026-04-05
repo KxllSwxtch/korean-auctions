@@ -449,6 +449,11 @@ class LotteService(BaseAuctionService):
     ) -> Optional[LotteCar]:
         """Получение детальной информации об автомобиле"""
         try:
+            # Re-check auth on each retry attempt (session may have been invalidated)
+            if not self._ensure_session():
+                self._record_failure(Exception("Authentication failed"))
+                return None
+
             session = self._init_session()
 
             # Формируем URL для получения деталей
@@ -715,6 +720,11 @@ class LotteService(BaseAuctionService):
     async def _fetch_cars_page(self, limit: int = 20, offset: int = 0):
         """Получение страницы с автомобилями с пагинацией"""
         try:
+            # Re-check auth on each retry attempt (session may have been invalidated)
+            if not self._ensure_session():
+                self._record_failure(Exception("Authentication failed"))
+                return None
+
             session = self._init_session()
             cars_url = urljoin(self.base_url, self.urls["cars_list"])
 
