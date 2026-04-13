@@ -17,7 +17,7 @@ from app.models.ssancar import (
 )
 from app.parsers.ssancar_parser import SSANCARParser
 from app.core.session_manager import SessionManager
-from app.core.proxy_config import get_proxy_config
+from app.core.proxy_config import get_proxy_pool
 
 
 class SSANCARService:
@@ -102,6 +102,12 @@ class SSANCARService:
 
         self.session_manager = SessionManager()
         self.parser = SSANCARParser()
+        # Per-instance pool: pre-seeded by ProxyPool.__post_init__.
+        self._proxy_pool = get_proxy_pool()
+        logger.info(
+            f"🔐 SSANCAR proxy pool: {self._proxy_pool.names}, "
+            f"starting on '{self._proxy_pool.current()[0].name}'"
+        )
         self.session = self._create_session()
         self._load_or_set_cookies()
 
@@ -146,23 +152,15 @@ class SSANCARService:
         }
     
     def _create_session(self) -> requests.Session:
-        """Create a requests session with retry logic and proxy support"""
+        """Create a requests session with retry logic and pooled proxy."""
         session = requests.Session()
-        
-        # Try to get proxy configuration from environment first
-        proxy_config = get_proxy_config()
-        if not proxy_config:
-            # Fallback to hardcoded Oxylabs proxy for SSANCAR (US targeting - KR IPs blocked)
-            proxy_config = {
-                "http": "http://customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2@pr.oxylabs.io:7777",
-                "https": "http://customer-arman_zVdZn-cc-US:~eEYPgwRzO+I2@pr.oxylabs.io:7777"
-            }
-            logger.info(f"🔐 Using default Oxylabs proxy configuration for SSANCAR")
-        else:
-            logger.info(f"🔐 Using environment proxy configuration for SSANCAR")
-        
-        session.proxies = proxy_config
-        
+
+        # Pull current proxy from the per-instance pool. _rotate_proxy() will
+        # advance and recreate the session when a provider stops working.
+        entry, _ = self._proxy_pool.current()
+        session.proxies = self._proxy_pool.current_dict()
+        logger.info(f"🔐 SSANCAR session using proxy '{entry.name}'")
+
         # Setup retry strategy
         retry_strategy = Retry(
             total=3,
@@ -170,15 +168,28 @@ class SSANCARService:
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
         )
-        
+
         adapter = HTTPAdapter(max_retries=retry_strategy)
         session.mount("http://", adapter)
         session.mount("https://", adapter)
-        
+
         # Set default headers
         session.headers.update(self.DEFAULT_HEADERS)
-        
+
         return session
+
+    def _rotate_proxy(self) -> None:
+        """Advance to the next pool entry and rebuild the session.
+
+        Call this when the current proxy starts returning failures the retry
+        adapter cannot handle (e.g. exhausted quota, persistent 407/403).
+        """
+        entry, _ = self._proxy_pool.advance()
+        logger.info(f"🔁 SSANCAR rotating proxy to '{entry.name}'")
+        # Preserve cookies across rotation — server-side session is tied to PHPSESSID.
+        old_cookies = dict(self.session.cookies)
+        self.session = self._create_session()
+        self.session.cookies.update(old_cookies)
     
     def _load_or_set_cookies(self):
         """Load saved cookies or use default ones"""

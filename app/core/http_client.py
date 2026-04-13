@@ -3,12 +3,13 @@
 """
 
 import asyncio
+import os
 import aiohttp
 from typing import Optional, Dict, Any, Union
 from urllib.parse import urljoin
 
 from app.core.logging import get_logger
-from app.core.proxy_config import get_proxy_config
+from app.core.proxy_config import ProxyPool, get_proxy_pool
 
 logger = get_logger("async_http_client")
 
@@ -44,13 +45,16 @@ class AsyncHttpClient:
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: Optional[aiohttp.ClientSession] = None
         self.use_proxy = use_proxy
-        self._proxy_url: Optional[str] = None
+        self._pool: Optional[ProxyPool] = None
 
-        if use_proxy:
-            proxy_config = get_proxy_config()
-            if proxy_config:
-                self._proxy_url = proxy_config.get("http")
-                logger.info(f"🔐 AsyncHttpClient using proxy: {self._proxy_url.split('@')[-1] if self._proxy_url else 'None'}")
+        # Preserve the legacy USE_PROXY env gate: callers pass use_proxy=True,
+        # but the pool is only built if USE_PROXY=true is also set.
+        if use_proxy and os.getenv("USE_PROXY", "false").lower() == "true":
+            self._pool = get_proxy_pool()
+            logger.info(
+                f"🔐 AsyncHttpClient pool: {self._pool.names} "
+                f"(round-robin per request)"
+            )
 
     @property
     async def session(self) -> aiohttp.ClientSession:
@@ -64,10 +68,20 @@ class AsyncHttpClient:
             )
         return self._session
 
+    def _pick_proxy(self) -> Optional[str]:
+        """Pick the next proxy URL for a single request via round-robin pool."""
+        if not self.use_proxy or self._pool is None:
+            return None
+        entry, url = self._pool.advance()
+        logger.debug(f"🔁 Proxy rotated to {entry.name}")
+        return url
+
     @property
     def proxy(self) -> Optional[str]:
-        """Получить URL прокси для запросов"""
-        return self._proxy_url if self.use_proxy else None
+        """Backwards-compatible read-only accessor (does not advance the pool)."""
+        if not self.use_proxy or self._pool is None:
+            return None
+        return self._pool.current()[1]
 
     async def get(
         self,
@@ -98,7 +112,8 @@ class AsyncHttpClient:
         )
 
         try:
-            proxy_info = f" via proxy" if self.proxy else ""
+            proxy_url = self._pick_proxy()
+            proxy_info = f" via proxy" if proxy_url else ""
             logger.debug(f"🌐 GET запрос к {url}{proxy_info}")
 
             async with session.get(
@@ -107,7 +122,7 @@ class AsyncHttpClient:
                 cookies=cookies,
                 params=params,
                 timeout=request_timeout,
-                proxy=self.proxy,
+                proxy=proxy_url,
             ) as response:
                 text = await response.text()
 
@@ -159,7 +174,8 @@ class AsyncHttpClient:
         )
 
         try:
-            proxy_info = f" via proxy" if self.proxy else ""
+            proxy_url = self._pick_proxy()
+            proxy_info = f" via proxy" if proxy_url else ""
             logger.debug(f"🌐 POST запрос к {url}{proxy_info}")
 
             async with session.post(
@@ -169,7 +185,7 @@ class AsyncHttpClient:
                 headers=headers,
                 cookies=cookies,
                 timeout=request_timeout,
-                proxy=self.proxy,
+                proxy=proxy_url,
             ) as response:
                 text = await response.text()
 

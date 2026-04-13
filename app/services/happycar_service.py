@@ -1,8 +1,6 @@
 import hashlib
 import json
-import random
 import re
-import string
 import threading
 import time
 import urllib3
@@ -18,6 +16,7 @@ from app.models.happycar import (
 )
 from app.parsers.happycar_parser import HappyCarParser
 from app.core.config import get_settings
+from app.core.proxy_config import get_proxy_pool
 
 # Suppress InsecureRequestWarning for verify=False
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -38,8 +37,8 @@ class HappyCarService:
     DETAIL_URL = f"{BASE_URL}/content/ins_view.html"
     LOGOUT_URL = f"{BASE_URL}/member/logout.ajax.html"
 
-    PROXY_URL = "http://bp-bfk2u7wtb3gy_area-KR_life-60_session-EoitGYdhe:zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
-
+    # Sticky-IP lifetime tied to the BestProxy `life-60` username modifier.
+    # Oxylabs entries don't honor it but rotating earlier doesn't hurt.
     _PROXY_LIFETIME: int = 3600     # 60 min — matches life-60 parameter
     _PROXY_SAFETY_MARGIN: int = 300 # 5 min buffer before proxy rotation
 
@@ -80,6 +79,12 @@ class HappyCarService:
 
     def __init__(self):
         self.parser = HappyCarParser()
+        # Per-instance pool: pre-seeded to the first entry by ProxyPool.__post_init__.
+        self._proxy_pool = get_proxy_pool()
+        logger.info(
+            f"[HappyCar proxy] Pool initialized: {self._proxy_pool.names}, "
+            f"starting on '{self._proxy_pool.current()[0].name}'"
+        )
         self.session = self._create_session()
         self._authenticated = False
         self._auth_lock = threading.Lock()
@@ -120,11 +125,9 @@ class HappyCarService:
         # Default headers
         session.headers.update(self.BASE_HEADERS)
 
-        # Proxy
-        session.proxies = {
-            "http": self.PROXY_URL,
-            "https": self.PROXY_URL,
-        }
+        # Proxy — pulled from the per-instance ProxyPool so the same session
+        # uses one consistent provider until _reset_proxy_session() advances it.
+        session.proxies = self._proxy_pool.current_dict()
 
         # SSL verification disabled (required for some Korean sites behind proxies)
         session.verify = False
@@ -177,20 +180,20 @@ class HappyCarService:
         return expiring
 
     def _reset_proxy_session(self) -> None:
-        """Generate a new proxy session ID to get a fresh sticky IP.
+        """Advance to the next provider in the pool and rebuild the session.
 
-        Must be called inside self._auth_lock.
+        Round-robins across all configured providers (Oxylabs + BestProxy
+        accounts), generating a fresh sticky session id for providers that
+        support one. Must be called inside self._auth_lock.
         """
-        new_id = "".join(random.choices(string.ascii_letters + string.digits, k=9))
-        self.PROXY_URL = (
-            f"http://bp-bfk2u7wtb3gy_area-KR_life-60_session-{new_id}"
-            f":zwj1SkzW69P1nhUs@proxy.bestproxy.com:2312"
-        )
+        entry, _ = self._proxy_pool.advance()
         self._proxy_session_start = time.time()
         self._current_proxy_ip = None
         self._authenticated = False
         self.session = self._create_session()
-        logger.info(f"[HappyCar proxy] Reset proxy session: session-{new_id}")
+        sid = self._proxy_pool.current_session_id()
+        sid_label = f"session-{sid}" if sid else "no-sticky"
+        logger.info(f"[HappyCar proxy] Reset proxy session: {entry.name} ({sid_label})")
 
     def _rotate_to_new_ip(self, max_attempts: int = 5) -> bool:
         """Rotate proxy until we get a genuinely different IP.
