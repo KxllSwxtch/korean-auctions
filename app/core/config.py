@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # HappyCar credentials
     happycar_username: str = "uztrade"
-    happycar_password: str = "112358"
+    happycar_password: str = "u112358@"
 
     # User Agent для запросов
     user_agent: str = (
