@@ -18,6 +18,7 @@ from app.routes import (
     ssancar,
     bikemart,
     encar,
+    encar_proxy,
     encar_truck,
     sk_auction,
     pan_auto,
@@ -102,6 +103,10 @@ app.include_router(bikemart.router, prefix="/api/v1/bikemart", tags=["Bikemart"]
 
 # Encar routes - Encar catalog
 app.include_router(encar.router, prefix="/api/v1/encar", tags=["Encar"])
+
+# Encar transparent proxy — used by the Next.js frontend to fetch catalog/nav
+# data from api.encar.com through the backend's proxy pool.
+app.include_router(encar_proxy.router, tags=["Encar Proxy"])
 
 # Encar Truck routes - Trucks and special equipment
 app.include_router(encar_truck.router, prefix="/api/v1/encar", tags=["Encar Trucks"])
