@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -25,12 +27,31 @@ from app.routes import (
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.scheduler import start_scheduler, stop_scheduler
 
 # Настройка логирования
 setup_logging()
 
 # Настройки приложения
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: eagerly init services, start background warming."""
+    # Eagerly initialise service singletons so the first user request
+    # doesn't pay the initialisation cost.
+    from app.routes.lotte import get_lotte_service
+    get_lotte_service()
+
+    # Start background cache warming scheduler
+    await start_scheduler()
+
+    yield
+
+    # Shutdown
+    await stop_scheduler()
+
 
 # Создание FastAPI приложения
 app = FastAPI(
@@ -40,6 +61,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     default_response_class=ORJSONResponse,
+    lifespan=lifespan,
 )
 
 # GZip compression (before CORS to compress all responses)

@@ -12,9 +12,10 @@ exec gunicorn main:app \
     --workers 2 \
     --worker-class uvicorn.workers.UvicornWorker \
     --timeout 120 \
-    --keep-alive 2 \
+    --keep-alive 5 \
     --max-requests 1000 \
     --max-requests-jitter 50 \
+    --preload \
     --log-level info \
     --access-logfile - \
     --error-logfile - 

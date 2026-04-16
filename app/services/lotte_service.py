@@ -344,7 +344,7 @@ class LotteService(BaseAuctionService):
         cache_key = "lotte_auction_date"
 
         # Проверяем кеш (auction date: 12h TTL)
-        cached_data = self._get_from_cache(cache_key, ttl=43200)
+        cached_data = self._get_from_cache(cache_key, ttl=settings.cache_ttl_auction_date)
         if cached_data:
             return cached_data
 
@@ -503,7 +503,7 @@ class LotteService(BaseAuctionService):
         cache_key = f"lotte_cars_{limit}_{offset}"
 
         # Проверяем кеш (car list: 3min TTL)
-        cached_data = self._get_from_cache(cache_key, ttl=180)
+        cached_data = self._get_from_cache(cache_key, ttl=settings.cache_ttl_car_list)
         if cached_data:
             return cached_data
 

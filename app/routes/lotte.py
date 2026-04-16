@@ -15,8 +15,10 @@ from app.models.lotte import (
 )
 from app.services.lotte_service import LotteService
 from app.core.logging import logger
+from app.core.single_flight import SingleFlight
 
 router = APIRouter(prefix="/api/v1/lotte", tags=["Lotte Auction"])
+_lotte_flight = SingleFlight()
 
 # Глобальный экземпляр сервиса
 _lotte_service = None
@@ -79,8 +81,11 @@ async def get_cars(
     try:
         logger.info(f"Запрос автомобилей Lotte: limit={limit}, offset={offset}")
 
-        response = await service.get_cars_response_with_date_check(
-            limit=limit, offset=offset
+        # Deduplicate concurrent identical requests via SingleFlight
+        flight_key = f"lotte:cars:{limit}:{offset}"
+        response = await _lotte_flight.do(
+            flight_key,
+            lambda: service.get_cars_response_with_date_check(limit=limit, offset=offset),
         )
 
         if not response.success:

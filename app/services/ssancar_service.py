@@ -16,6 +16,7 @@ from app.models.ssancar import (
     SSANCARManufacturersResponse, SSANCARModelsResponse
 )
 from app.parsers.ssancar_parser import SSANCARParser
+from app.core.config import get_settings
 from app.core.session_manager import SessionManager
 from app.core.proxy_config import get_proxy_pool
 
@@ -266,7 +267,7 @@ class SSANCARService:
             # Check cache (3min TTL for car listings)
             cache_params = filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters)
             cache_key = self._make_cache_key("cars", cache_params)
-            cached = self._get_from_cache(cache_key, ttl=180)
+            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl_car_list)
             if cached is not None:
                 logger.debug(f"📦 SSANCAR cars cache hit")
                 return cached
@@ -426,7 +427,7 @@ class SSANCARService:
         try:
             # Check cache (30min TTL for car details)
             cache_key = self._make_cache_key("detail", {"car_no": car_no})
-            cached = self._get_from_cache(cache_key, ttl=1800)
+            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl_car_detail)
             if cached is not None:
                 logger.debug(f"📦 SSANCAR car detail cache hit: {car_no}")
                 return cached
@@ -498,7 +499,7 @@ class SSANCARService:
         try:
             # Check cache (1h TTL for filter metadata)
             cache_key = self._make_cache_key("filter_options")
-            cached = self._get_from_cache(cache_key, ttl=3600)
+            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl_filters)
             if cached is not None:
                 logger.debug("📦 SSANCAR filter options cache hit")
                 return cached
@@ -631,7 +632,7 @@ class SSANCARService:
             if filters:
                 cache_params.update(filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters))
             cache_key = self._make_cache_key("total_count", cache_params)
-            cached = self._get_from_cache(cache_key, ttl=300)
+            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl)
             if cached is not None:
                 logger.debug("📦 SSANCAR total count cache hit")
                 return cached

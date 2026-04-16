@@ -9,8 +9,12 @@ from app.models.encar import (
 )
 from app.services.encar_service import encar_service, EncarService
 from app.core.logging import get_logger
+from app.core.single_flight import SingleFlight
 
 logger = get_logger("encar_routes")
+
+_catalog_flight = SingleFlight()
+_filters_flight = SingleFlight()
 
 router = APIRouter(
     responses={404: {"description": "Not found"}},
@@ -68,14 +72,15 @@ async def get_catalog(
     try:
         logger.info(f"Fetching Encar catalog - page: {page}, q: {q[:50]}...")
 
-        # Fetch catalog from service
-        response = await service.get_catalog(
-            q=q,
-            sr=sr,
-            count=count,
-            page=page,
-            use_cache=cache
-        )
+        # Deduplicate concurrent identical requests via SingleFlight
+        flight_key = f"catalog:{q}:{sr}:{count}:{page}:{cache}"
+
+        async def _fetch():
+            return await service.get_catalog(
+                q=q, sr=sr, count=count, page=page, use_cache=cache
+            )
+
+        response = await _catalog_flight.do(flight_key, _fetch)
 
         if not response.success:
             logger.error(f"Failed to fetch Encar catalog: {response.message}")
@@ -142,15 +147,20 @@ async def get_filters(
     try:
         logger.info(f"Fetching Encar filters - manufacturer: {manufacturer}")
 
-        # Fetch filters from service
-        response = await service.get_filters(
-            manufacturer=manufacturer,
-            model_group=model_group,
-            model=model,
-            configuration=configuration,
-            badge=badge,
-            use_cache=cache
-        )
+        # Deduplicate concurrent identical requests via SingleFlight
+        flight_key = f"filters:{manufacturer}:{model_group}:{model}:{configuration}:{badge}:{cache}"
+
+        async def _fetch():
+            return await service.get_filters(
+                manufacturer=manufacturer,
+                model_group=model_group,
+                model=model,
+                configuration=configuration,
+                badge=badge,
+                use_cache=cache,
+            )
+
+        response = await _filters_flight.do(flight_key, _fetch)
 
         if not response.success:
             logger.error(f"Failed to fetch Encar filters: {response.message}")

@@ -499,7 +499,7 @@ class HappyCarService:
                 "search_type": search_type, "search_text": search_text,
             }
             cache_key = self._make_cache_key("cars", cache_params)
-            cached = self._get_from_cache(cache_key, ttl=180)
+            cached = self._get_from_cache(cache_key, ttl=settings.cache_ttl_car_list)
             if cached is not None:
                 logger.debug("📦 HappyCar cars cache hit")
                 return cached
@@ -590,7 +590,7 @@ class HappyCarService:
 
             # Check cache (1800s TTL for details)
             cache_key = self._make_cache_key("detail", {"idx": idx})
-            cached = self._get_from_cache(cache_key, ttl=1800)
+            cached = self._get_from_cache(cache_key, ttl=settings.cache_ttl_car_detail)
             if cached is not None:
                 logger.debug(f"📦 HappyCar detail cache hit: {idx}")
                 return cached

@@ -63,10 +63,10 @@ class Settings(BaseSettings):
     cache_ttl: int = 300  # 5 минут (default, backward compat)
     cache_ttl_static: int = 86400       # 24h - manufacturers, models, generations
     cache_ttl_auction_date: int = 43200  # 12h - auction dates
-    cache_ttl_car_list: int = 180        # 3min - car listings
-    cache_ttl_car_detail: int = 1800     # 30min - car details
-    cache_ttl_filters: int = 3600        # 1h - filter metadata
-    cache_ttl_exchange_rate: int = 1800  # 30min - exchange rates
+    cache_ttl_car_list: int = 600        # 10min - car listings
+    cache_ttl_car_detail: int = 3600     # 1h - car details
+    cache_ttl_filters: int = 7200        # 2h - filter metadata
+    cache_ttl_exchange_rate: int = 900   # 15min - exchange rates
 
     class Config:
         env_file = ".env"

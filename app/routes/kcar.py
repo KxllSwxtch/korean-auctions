@@ -16,11 +16,13 @@ from app.models.kcar import (
     KCAR_MANUFACTURERS,
 )
 from app.services.kcar_service import KCarService
+from app.core.single_flight import SingleFlight
 
 router = APIRouter(prefix="/api/v1/kcar", tags=["KCar"])
 
 # Создаем глобальный экземпляр сервиса
 kcar_service = KCarService()
+_kcar_flight = SingleFlight()
 
 
 @router.get("/cars", response_model=KCarResponse)
@@ -91,8 +93,11 @@ async def get_kcar_cars(
         if lane_type:
             params["lane_type"] = lane_type
 
-        # Получаем данные (wrap sync call to unblock event loop)
-        result = await asyncio.to_thread(kcar_service.get_cars, params)
+        # Deduplicate concurrent identical requests via SingleFlight
+        flight_key = f"kcar:cars:{sorted(params.items())}"
+        result = await _kcar_flight.do(
+            flight_key, lambda: asyncio.to_thread(kcar_service.get_cars, params)
+        )
 
         if not result.success:
             # Только если это реальная ошибка (не пустой список), показываем fallback

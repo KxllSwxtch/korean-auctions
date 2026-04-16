@@ -397,7 +397,7 @@ class KCarService:
         try:
             # Check cache first (car list: 3min TTL)
             cache_key = self._make_cache_key("cars", params)
-            cached = self._get_from_cache(cache_key, ttl=180)
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
             if cached is not None:
                 return cached
 
@@ -1500,7 +1500,7 @@ class KCarService:
         """
         try:
             cache_key = self._make_cache_key("manufacturers")
-            cached = self._get_from_cache(cache_key, ttl=86400)  # 24h
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)  # 24h
             if cached is not None:
                 return cached
 
@@ -1536,7 +1536,7 @@ class KCarService:
         """
         try:
             cache_key = self._make_cache_key("models", {"mfr": manufacturer_code, "car": input_car_code})
-            cached = self._get_from_cache(cache_key, ttl=86400)  # 24h
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)  # 24h
             if cached is not None:
                 return cached
 
@@ -2011,7 +2011,7 @@ class KCarService:
         try:
             # Check cache first (count: 2min TTL)
             cache_key = self._make_cache_key("total_count")
-            cached = self._get_from_cache(cache_key, ttl=120)
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
             if cached is not None:
                 return cached
 
