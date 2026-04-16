@@ -92,10 +92,11 @@ async def warm_lotte_cars():
 async def warm_sessions():
     """Proactively refresh auction sessions before they expire."""
     try:
+        import asyncio
         from app.routes.lotte import get_lotte_service
         service = get_lotte_service()
         if hasattr(service, '_ensure_session'):
-            service._ensure_session()
+            await asyncio.to_thread(service._ensure_session)
             logger.info("Cache warmer: Lotte session refreshed")
     except Exception as e:
         logger.warning(f"Cache warmer: Lotte session refresh failed: {e}")
