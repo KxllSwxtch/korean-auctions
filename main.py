@@ -22,6 +22,7 @@ from app.routes import (
     encar_truck,
     sk_auction,
     pan_auto,
+    customs,
     green_equipment,
     happycar,
     exchange_rate,
@@ -116,6 +117,9 @@ app.include_router(sk_auction.router, tags=["SK Auction"])
 
 # Pan-Auto routes - HP and Russian customs costs data
 app.include_router(pan_auto.router, prefix="/api/v1/pan-auto", tags=["Pan-Auto"])
+
+# Customs Calculator - server-to-server proxy for calcus.ru (turnkey HP flow)
+app.include_router(customs.router, prefix="/api/v1/customs", tags=["Customs Calculator"])
 
 # Green Heavy Equipment routes - 4396200.com heavy equipment marketplace
 app.include_router(green_equipment.router, prefix="/api/v1/green", tags=["Green Heavy Equipment"])
