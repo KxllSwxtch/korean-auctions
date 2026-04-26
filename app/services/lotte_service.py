@@ -1,6 +1,12 @@
 import asyncio
 import time
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+# Lotte runs auctions on Korea Standard Time. Backend may be deployed on a UTC host
+# (Render.com), so any "today" computation MUST be anchored to KST or it will silently
+# query yesterday's auction during 15:00–23:59 UTC.
+KST = ZoneInfo("Asia/Seoul")
 from typing import List, Optional, Dict, Any
 from urllib.parse import urljoin
 
@@ -341,7 +347,10 @@ class LotteService(BaseAuctionService):
     )
     async def get_auction_date(self) -> Optional[LotteAuctionDate]:
         """Получение даты аукциона"""
-        cache_key = "lotte_auction_date"
+        # Scope cache per KST day so a 12h TTL cannot span Korean midnight and serve
+        # yesterday's auction date to today's users.
+        kst_today = datetime.now(KST).strftime("%Y%m%d")
+        cache_key = f"lotte_auction_date_{kst_today}"
 
         # Проверяем кеш (auction date: 12h TTL)
         cached_data = self._get_from_cache(cache_key, ttl=settings.cache_ttl_auction_date)
@@ -739,11 +748,12 @@ class LotteService(BaseAuctionService):
                 auction_date_str = auction_date.auction_date.replace("-", "")
                 logger.info(f"Используем дату аукциона: {auction_date.auction_date} -> {auction_date_str}")
             else:
-                # Если не удалось получить дату, используем сегодняшнюю
-                from datetime import datetime
-                today = datetime.now()
-                auction_date_str = today.strftime("%Y%m%d")
-                logger.warning(f"Не удалось получить дату аукциона, используем сегодня: {auction_date_str}")
+                # Если не удалось получить дату, используем сегодняшнюю по KST
+                # (Lotte работает по Сеульскому времени; UTC-сервер иначе подставит вчера)
+                auction_date_str = datetime.now(KST).strftime("%Y%m%d")
+                logger.warning(
+                    f"Не удалось получить дату аукциона, используем сегодня (KST): {auction_date_str}"
+                )
 
             # Формируем payload для POST запроса
             payload = {

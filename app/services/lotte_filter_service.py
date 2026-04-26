@@ -26,6 +26,15 @@ from app.models.lotte_filters import (
 from app.parsers.lotte_filter_parser import LotteFilterParser
 
 
+def _normalize_exhibition_number(raw: Optional[str]) -> str:
+    """Lotte's search_exhiNo expects zero-padded 4-digit format (e.g. '0034', not '34').
+    Defense-in-depth normalization for any caller that bypasses the frontend padding."""
+    s = (raw or "").strip()
+    if s.isdigit() and len(s) < 4:
+        return s.zfill(4)
+    return s
+
+
 class LotteFilterService:
     """Сервис для работы с фильтрами Lotte"""
 
@@ -481,6 +490,12 @@ class LotteFilterService:
         try:
             logger.info(f"Поиск автомобилей с фильтрами: {filter_request.model_dump()}")
 
+            exhi_norm = _normalize_exhibition_number(filter_request.exhibition_number)
+            if filter_request.exhibition_number and filter_request.exhibition_number != exhi_norm:
+                logger.info(
+                    f"[lotte] exhibition_number normalized: '{filter_request.exhibition_number}' -> '{exhi_norm}'"
+                )
+
             # Подготовка данных для поиска — всегда включаем все поля (как реальная форма Lotte)
             search_data = {
                 "searchPageUnit": str(filter_request.per_page),
@@ -491,7 +506,7 @@ class LotteFilterService:
                 "excelDiv": "",
                 "searchLaneDiv": filter_request.lane_division or "",
                 "search_doimCd": filter_request.production_origin or "",
-                "search_exhiNo": filter_request.exhibition_number or "",
+                "search_exhiNo": exhi_norm,
                 "set_search_maker": filter_request.manufacturer_code or "",
                 "set_search_mdl": filter_request.model_code or "",
                 "searchAuctDt": filter_request.auction_date or "",
@@ -584,6 +599,12 @@ class LotteFilterService:
         try:
             logger.info(f"Поиск автомобилей с парсингом: {filter_request.model_dump()}")
 
+            exhi_norm = _normalize_exhibition_number(filter_request.exhibition_number)
+            if filter_request.exhibition_number and filter_request.exhibition_number != exhi_norm:
+                logger.info(
+                    f"[lotte] exhibition_number normalized: '{filter_request.exhibition_number}' -> '{exhi_norm}'"
+                )
+
             # Подготовка данных для поиска — всегда включаем все поля (как реальная форма Lotte)
             search_data = {
                 "searchPageUnit": str(filter_request.per_page),
@@ -594,7 +615,7 @@ class LotteFilterService:
                 "excelDiv": "",
                 "searchLaneDiv": filter_request.lane_division or "",
                 "search_doimCd": filter_request.production_origin or "",
-                "search_exhiNo": filter_request.exhibition_number or "",
+                "search_exhiNo": exhi_norm,
                 "set_search_maker": filter_request.manufacturer_code or "",
                 "set_search_mdl": filter_request.model_code or "",
                 "searchAuctDt": filter_request.auction_date or "",
@@ -617,6 +638,25 @@ class LotteFilterService:
             # Выполняем поиск
             session = self._init_session()
 
+            # Lot-number searches are the highest-signal queries; a stale Lotte session
+            # silently returns the login page (parsed as `no_table`). For these searches,
+            # ensure we're authenticated up-front so we don't waste a round-trip.
+            if exhi_norm and not self.authenticated:
+                logger.info("[lotte] lot-number search but not authenticated; logging in first")
+                if not self._authenticate():
+                    logger.error("[lotte] pre-search authentication failed")
+                    return LotteSearchResponse(
+                        success=False,
+                        message="Lotte authentication failed before search",
+                        error_code="SESSION_REAUTH_FAILED",
+                        cars=[],
+                        total_count=0,
+                        page=filter_request.page,
+                        per_page=filter_request.per_page,
+                        filters_applied=filter_request.model_dump(),
+                    )
+                session = self._init_session()
+
             # Обновляем headers для поиска
             search_headers = self.headers.copy()
             search_headers.update(
@@ -634,19 +674,25 @@ class LotteFilterService:
 
             logger.info(f"Выполняем поиск по URL: {search_url}")
 
-            response = session.post(
-                search_url,
-                data=search_data,
-                headers=search_headers,
-                timeout=30,
-                verify=False,
-            )
+            def _do_post():
+                return session.post(
+                    search_url,
+                    data=search_data,
+                    headers=search_headers,
+                    timeout=30,
+                    verify=False,
+                )
+
+            response = _do_post()
 
             if response.status_code != 200:
-                logger.error(f"Ошибка поиска HTTP {response.status_code}")
+                logger.error(
+                    f"[lotte] search HTTP {response.status_code}, body[:500]={response.text[:500]!r}"
+                )
                 return LotteSearchResponse(
                     success=False,
-                    message=f"HTTP ошибка {response.status_code}",
+                    message=f"Lotte upstream returned HTTP {response.status_code}",
+                    error_code="UPSTREAM_HTTP_ERROR",
                     cars=[],
                     total_count=0,
                     page=filter_request.page,
@@ -654,9 +700,50 @@ class LotteFilterService:
                     filters_applied=filter_request.model_dump(),
                 )
 
-            # Парсим HTML результаты
+            # Парсим HTML результаты + получаем статус, чтобы отличить
+            # реальный пустой ответ от поломки разметки/протухшей сессии
             html_content = response.text
-            cars = self.parser.parse_car_search_html(html_content)
+            cars, parse_status = self.parser.parse_car_search_html_with_status(html_content)
+
+            # If the table is missing on a lot-number search, the most likely cause is
+            # a silently-expired Lotte session returning the login redirect. Re-auth
+            # once and retry — this is the single most common "works for dev, not for users"
+            # failure mode in shared-backend setups.
+            if parse_status == "no_table" and exhi_norm:
+                logger.warning(
+                    "[lotte] tbl-t02 missing on lot-number search; attempting re-auth + retry"
+                )
+                self.authenticated = False
+                if self._authenticate():
+                    response = _do_post()
+                    if response.status_code == 200:
+                        html_content = response.text
+                        cars, parse_status = self.parser.parse_car_search_html_with_status(html_content)
+
+            if parse_status in ("no_table", "no_tbody", "parse_error"):
+                error_code_map = {
+                    "no_table": "PARSE_NO_TABLE",
+                    "no_tbody": "PARSE_NO_TBODY",
+                    "parse_error": "PARSE_ERROR",
+                }
+                logger.error(
+                    f"[lotte] search parse failed with status='{parse_status}' "
+                    f"(exhibition_number='{exhi_norm}'); response body[:500]={response.text[:500]!r}"
+                )
+                return LotteSearchResponse(
+                    success=False,
+                    message=(
+                        "Lotte returned a page without the expected results table — "
+                        "session may have expired or markup changed"
+                    ),
+                    error_code=error_code_map[parse_status],
+                    cars=[],
+                    total_count=0,
+                    page=filter_request.page,
+                    per_page=filter_request.per_page,
+                    filters_applied=filter_request.model_dump(),
+                )
+
             total_count = self.parser.extract_total_count(html_content)
 
             # Рассчитываем пагинацию
@@ -687,6 +774,7 @@ class LotteFilterService:
             return LotteSearchResponse(
                 success=False,
                 message=f"Ошибка поиска: {str(e)}",
+                error_code="SEARCH_EXCEPTION",
                 cars=[],
                 total_count=0,
                 page=filter_request.page,

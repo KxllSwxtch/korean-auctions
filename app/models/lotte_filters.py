@@ -207,6 +207,10 @@ class LotteSearchResponse(BaseModel):
     has_next: bool = False
     has_previous: bool = False
     filters_applied: Optional[Dict[str, Any]] = None
+    # Distinguishes silent zero-results from real failure modes so the frontend can
+    # show the right UI (error state vs "lot not found"). Values: UPSTREAM_HTTP_ERROR,
+    # PARSE_NO_TABLE, PARSE_NO_TBODY, PARSE_ERROR, SEARCH_EXCEPTION, SESSION_REAUTH_FAILED.
+    error_code: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

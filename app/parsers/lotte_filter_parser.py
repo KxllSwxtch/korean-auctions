@@ -1,5 +1,5 @@
 import json
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from bs4 import BeautifulSoup
 import re
 from app.models.lotte_filters import (
@@ -320,29 +320,43 @@ class LotteFilterParser:
 
     def parse_car_search_html(self, html_content: str) -> List[LotteCarResult]:
         """
-        Парсинг HTML страницы с результатами поиска автомобилей
+        Парсинг HTML страницы с результатами поиска автомобилей.
+        Back-compat wrapper around parse_car_search_html_with_status that drops the status.
+        """
+        cars, _status = self.parse_car_search_html_with_status(html_content)
+        return cars
 
-        Args:
-            html_content: HTML контент страницы
+    def parse_car_search_html_with_status(
+        self, html_content: str
+    ) -> Tuple[List[LotteCarResult], str]:
+        """
+        Same as parse_car_search_html but also returns a status string so callers can
+        distinguish "Lotte returned a real empty result set" from "the page didn't even
+        contain the expected results table" (which usually means session expired or
+        Lotte changed their markup).
 
         Returns:
-            Список объектов LotteCarResult
+            (cars, status) where status is one of:
+              - 'ok'          — table parsed successfully (cars may still be empty)
+              - 'no_table'    — tbl-t02 not present (likely auth/markup issue)
+              - 'no_tbody'    — table present but no tbody (markup change)
+              - 'parse_error' — unhandled exception during parse
         """
         try:
             soup = BeautifulSoup(html_content, "html.parser")
-            cars = []
+            cars: List[LotteCarResult] = []
 
-            # Находим основную таблицу с автомобилями
             main_table = soup.find("table", class_="tbl-t02")
             if not main_table:
-                logger.warning("Не найдена основная таблица с автомобилями")
-                return []
+                logger.warning(
+                    "[lotte] tbl-t02 missing — possible session expiry or markup change"
+                )
+                return [], "no_table"
 
-            # Находим все строки с данными автомобилей
             tbody = main_table.find("tbody")
             if not tbody:
-                logger.warning("Не найден tbody в таблице автомобилей")
-                return []
+                logger.warning("[lotte] tbody missing inside tbl-t02 — markup change")
+                return [], "no_tbody"
 
             rows = tbody.find_all("tr")
             logger.info(f"Найдено {len(rows)} строк с автомобилями")
@@ -357,11 +371,11 @@ class LotteFilterParser:
                     continue
 
             logger.info(f"Успешно спарсено {len(cars)} автомобилей")
-            return cars
+            return cars, "ok"
 
         except Exception as e:
             logger.error(f"Ошибка парсинга HTML страницы: {e}")
-            return []
+            return [], "parse_error"
 
     def _parse_car_row(self, row) -> Optional[LotteCarResult]:
         """
