@@ -8,12 +8,18 @@ URL: https://auction.skcarrental.com
 import time
 import json
 import hashlib
+import threading
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from loguru import logger
+
+# Process-wide cap on concurrent outbound requests to auction.skcarrental.com.
+# Mirrors the Autohub Phase 1 mitigation. Sessions are recreated on refresh,
+# so we gate get/post inside _create_session().
+_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
 
 from app.models.sk_auction import (
     SKAuctionCar,
@@ -171,15 +177,20 @@ class SKAuctionService:
 
         session = requests.Session()
 
-        # Configure retry strategy
+        # Configure retry strategy — exponential backoff + Retry-After awareness
         retry_strategy = Retry(
             total=3,
-            backoff_factor=1,
+            backoff_factor=2,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["HEAD", "GET", "POST", "OPTIONS"],
+            respect_retry_after_header=True,
         )
 
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=10,
+        )
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
@@ -191,6 +202,24 @@ class SKAuctionService:
 
         # Disable SSL verification (some corporate sites have issues)
         session.verify = False
+
+        # Gate session.get/post with the process-wide outbound semaphore.
+        # Idempotency guard prevents compound wrapping on re-init.
+        if not getattr(session.get, "_is_gated", False):
+            _orig_get, _orig_post = session.get, session.post
+
+            def _gated_get(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_get(*args, **kwargs)
+            _gated_get._is_gated = True
+
+            def _gated_post(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_post(*args, **kwargs)
+            _gated_post._is_gated = True
+
+            session.get = _gated_get
+            session.post = _gated_post
 
         self._session = session
         self._session_created_at = datetime.now()

@@ -9,7 +9,7 @@ Only one worker runs warming jobs at a time, coordinated via file lock.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -129,21 +129,32 @@ async def start_scheduler():
     logger.info("Scheduler: this worker is the leader, starting warming jobs")
     _scheduler = AsyncIOScheduler()
 
-    # Car listing warming — every 8 minutes (well within 10-min cache TTL)
+    # Car listing warming — every 8 minutes (well within 10-min cache TTL).
+    # Stagger the three car-list warmers so we don't fire requests at three
+    # different vendors on the same minute every 8 min — that's a synchronized
+    # thundering herd. Offset each job by ~3 minutes from the previous one.
+    # Exchange-rates and sessions get small offsets too so the cold-start
+    # cascade doesn't pile up.
+    _now = datetime.now()
     _scheduler.add_job(warm_encar_catalog, "interval", minutes=8,
-                       next_run_time=datetime.now(), id="warm_encar")
+                       next_run_time=_now + timedelta(seconds=10),
+                       id="warm_encar")
     _scheduler.add_job(warm_kcar_cars, "interval", minutes=8,
-                       next_run_time=datetime.now(), id="warm_kcar")
+                       next_run_time=_now + timedelta(minutes=3, seconds=10),
+                       id="warm_kcar")
     _scheduler.add_job(warm_lotte_cars, "interval", minutes=8,
-                       next_run_time=datetime.now(), id="warm_lotte")
+                       next_run_time=_now + timedelta(minutes=5, seconds=30),
+                       id="warm_lotte")
 
     # Exchange rates — every 12 minutes (within 15-min TTL)
     _scheduler.add_job(warm_exchange_rates, "interval", minutes=12,
-                       next_run_time=datetime.now(), id="warm_rates")
+                       next_run_time=_now + timedelta(minutes=1),
+                       id="warm_rates")
 
     # Session pre-warming — every 20 minutes (before 25-min expiry)
     _scheduler.add_job(warm_sessions, "interval", minutes=20,
-                       next_run_time=datetime.now(), id="warm_sessions")
+                       next_run_time=_now + timedelta(minutes=2),
+                       id="warm_sessions")
 
     # Weekly Autohub snapshot — Tuesday 22:00 KST
     # Gated by env so we can deploy the code dark before flipping the switch.

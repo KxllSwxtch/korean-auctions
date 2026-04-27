@@ -2,13 +2,21 @@ import requests
 import json
 import time
 import hashlib
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any, List
 from urllib3.exceptions import InsecureRequestWarning
 from urllib3 import disable_warnings
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from loguru import logger
 from fake_useragent import UserAgent
 from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Process-wide cap on concurrent outbound requests to www.kcarauction.com.
+# Mirrors Autohub's _OUTBOUND_LIMIT pattern. Prevents the per-detail lane
+# fanout × N concurrent users from saturating KCar.
+_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
 
 from app.core.config import get_settings
 from app.models.kcar import (
@@ -71,6 +79,51 @@ class KCarService:
             # Настройка сессии
             self.session.verify = False  # Отключаем проверку SSL
             self.session.timeout = 30
+
+            # Configure outbound HTTP behavior to mirror the Autohub Phase 1
+            # mitigations — bounded connection pool, exponential backoff,
+            # and Retry-After honored on 429s.
+            retry_strategy = Retry(
+                total=3,
+                backoff_factor=2,
+                status_forcelist=[429, 500, 502, 503, 504],
+                respect_retry_after_header=True,
+                allowed_methods=frozenset(["GET", "POST", "HEAD"]),
+            )
+            adapter = HTTPAdapter(
+                max_retries=retry_strategy,
+                pool_connections=10,
+                pool_maxsize=10,
+            )
+            self.session.mount("https://", adapter)
+            self.session.mount("http://", adapter)
+
+            # Replace session.get/post with semaphore-gated versions. This
+            # caps total in-flight outbound requests to KCar per worker at
+            # _OUTBOUND_LIMIT (=5), regardless of which call site fires.
+            # Done once here so all 16 outbound sites in this file are gated
+            # automatically without touching their bodies.
+            #
+            # Idempotency guard: this method mutates self.session in place
+            # (rather than creating a fresh session). If _initialize_session
+            # is ever called twice on the same instance — e.g. session
+            # refresh — naive re-wrapping would compound the semaphore
+            # acquire. Mark the wrapped functions so re-runs no-op.
+            if not getattr(self.session.get, "_is_gated", False):
+                _orig_get, _orig_post = self.session.get, self.session.post
+
+                def _gated_get(*args, **kwargs):
+                    with _OUTBOUND_LIMIT:
+                        return _orig_get(*args, **kwargs)
+                _gated_get._is_gated = True
+
+                def _gated_post(*args, **kwargs):
+                    with _OUTBOUND_LIMIT:
+                        return _orig_post(*args, **kwargs)
+                _gated_post._is_gated = True
+
+                self.session.get = _gated_get
+                self.session.post = _gated_post
 
             # Базовые заголовки
             self.session.headers.update(

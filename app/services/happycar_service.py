@@ -23,6 +23,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 settings = get_settings()
 
+# Process-wide cap on concurrent outbound requests to www.happycarservice.com.
+# Mirrors the Autohub Phase 1 mitigation. Sessions are recreated on proxy
+# rotation, so we gate get/post inside _create_session().
+_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
+
 
 class HappyCarService:
     """Service for scraping HappyCar insurance auction website.
@@ -107,12 +112,13 @@ class HappyCarService:
         """Create a requests.Session with retry logic, proxy, and SSL workaround."""
         session = requests.Session()
 
-        # Retry strategy
+        # Retry strategy — exponential backoff + Retry-After awareness
         retry_strategy = Retry(
             total=3,
             backoff_factor=2,
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["HEAD", "GET", "OPTIONS", "POST"],
+            respect_retry_after_header=True,
         )
         adapter = HTTPAdapter(
             max_retries=retry_strategy,
@@ -124,6 +130,24 @@ class HappyCarService:
 
         # Default headers
         session.headers.update(self.BASE_HEADERS)
+
+        # Gate session.get/post with the process-wide outbound semaphore.
+        # Idempotency guard prevents compound wrapping on re-init.
+        if not getattr(session.get, "_is_gated", False):
+            _orig_get, _orig_post = session.get, session.post
+
+            def _gated_get(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_get(*args, **kwargs)
+            _gated_get._is_gated = True
+
+            def _gated_post(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_post(*args, **kwargs)
+            _gated_post._is_gated = True
+
+            session.get = _gated_get
+            session.post = _gated_post
 
         # Proxy — pulled from the per-instance ProxyPool so the same session
         # uses one consistent provider until _reset_proxy_session() advances it.

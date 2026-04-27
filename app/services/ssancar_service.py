@@ -1,6 +1,7 @@
 import json
 import hashlib
 import re
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any, Tuple
@@ -19,6 +20,11 @@ from app.parsers.ssancar_parser import SSANCARParser
 from app.core.config import get_settings
 from app.core.session_manager import SessionManager
 from app.core.proxy_config import get_proxy_pool
+
+# Process-wide cap on concurrent outbound requests to www.ssancar.com.
+# Mirrors the Autohub Phase 1 mitigation. The session is recreated on
+# proxy rotation, so we gate get/post inside _create_session().
+_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
 
 
 class SSANCARService:
@@ -162,20 +168,46 @@ class SSANCARService:
         session.proxies = self._proxy_pool.current_dict()
         logger.info(f"🔐 SSANCAR session using proxy '{entry.name}'")
 
-        # Setup retry strategy
+        # Setup retry strategy — exponential backoff + Retry-After awareness
         retry_strategy = Retry(
             total=3,
-            backoff_factor=1,
+            backoff_factor=2,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "OPTIONS", "POST"]
+            allowed_methods=["HEAD", "GET", "OPTIONS", "POST"],
+            respect_retry_after_header=True,
         )
 
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=10,
+        )
         session.mount("http://", adapter)
         session.mount("https://", adapter)
 
         # Set default headers
         session.headers.update(self.DEFAULT_HEADERS)
+
+        # Gate session.get/post with the process-wide outbound semaphore.
+        # Done here so every new session (including post-proxy-rotation) is
+        # gated automatically without touching individual call sites.
+        # Idempotency guard prevents compound wrapping if this is ever called
+        # against an already-gated session.
+        if not getattr(session.get, "_is_gated", False):
+            _orig_get, _orig_post = session.get, session.post
+
+            def _gated_get(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_get(*args, **kwargs)
+            _gated_get._is_gated = True
+
+            def _gated_post(*args, **kwargs):
+                with _OUTBOUND_LIMIT:
+                    return _orig_post(*args, **kwargs)
+            _gated_post._is_gated = True
+
+            session.get = _gated_get
+            session.post = _gated_post
 
         return session
 
