@@ -278,8 +278,13 @@ class AutohubService:
 
     # ===== Core Methods =====
 
-    def get_car_list(self, params: AutohubSearchRequest) -> AutohubResponse:
-        """Fetch car listing from API. Dispatches to entry search when needed."""
+    def get_car_list(self, params: AutohubSearchRequest, force_live: bool = False) -> AutohubResponse:
+        """Fetch car listing from API. Dispatches to entry search when needed.
+
+        `force_live` is reserved for Phase C — when the mode resolver lands,
+        callers (the snapshot job, admin-triggered runs) can pass force_live=True
+        to bypass the snapshot read path. In Phase B it has no effect.
+        """
         if params.entry_number:
             return self._search_by_entry_number(params)
         return self._fetch_car_page(params)
@@ -426,8 +431,11 @@ class AutohubService:
         self._save_to_cache(cache_key, not_found)
         return not_found
 
-    def get_brands(self) -> AutohubBrandsResponse:
-        """Fetch hierarchical brands from API (cached 24h)."""
+    def get_brands(self, force_live: bool = False) -> AutohubBrandsResponse:
+        """Fetch hierarchical brands from API (cached 24h).
+
+        `force_live`: see note on `get_car_list`. No effect in Phase B.
+        """
         cache_key = self._make_cache_key("brands")
         cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
         if cached:
@@ -446,8 +454,11 @@ class AutohubService:
             logger.error(f"Error fetching brands: {e}", exc_info=True)
             return AutohubBrandsResponse(success=False, error=str(e))
 
-    def get_car_detail(self, car_id: str, perf_id: Optional[str] = None) -> AutohubCarDetailResponse:
-        """Fetch composite car detail from multiple endpoints."""
+    def get_car_detail(self, car_id: str, perf_id: Optional[str] = None, force_live: bool = False) -> AutohubCarDetailResponse:
+        """Fetch composite car detail from multiple endpoints.
+
+        `force_live`: see note on `get_car_list`. No effect in Phase B.
+        """
         cache_key = self._make_cache_key("car_detail", {"car_id": car_id, "perf_id": perf_id})
         cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_detail)
         if cached:
@@ -584,6 +595,81 @@ class AutohubService:
             mileage_options=AUTOHUB_MILEAGE_OPTIONS,
             price_options=AUTOHUB_PRICE_OPTIONS,
         )
+
+    # ===== Raw fetchers (used by the snapshot job) =====
+    # These return the unparsed response dict so the snapshot stores the
+    # original API payload. Reads later go through the same map_* parsers
+    # the live path uses, which keeps the two paths bit-identical.
+
+    def fetch_brands_raw(self) -> Dict[str, Any]:
+        """Raw /entry/car/brand/list response. No caching, no parsing."""
+        return self._api_get("/auction/external/rest/api/v1/entry/car/brand/list")
+
+    def fetch_listing_page_raw(self, params: AutohubSearchRequest) -> Dict[str, Any]:
+        """Raw listing page response."""
+        return self._api_post(
+            "/auction/external/rest/api/v1/entry/list/paging",
+            params.to_api_body(),
+        )
+
+    def fetch_car_detail_raw(
+        self,
+        car_id: str,
+        perf_id: Optional[str] = None,
+    ) -> Dict[str, Optional[Dict[str, Any]]]:
+        """Fetch the 5 detail endpoints as raw dicts (omits entry_listing — the
+        snapshot job already has that data from the listing page).
+
+        Returns a dict with keys: detail, inspection, diagram, legend, perf_frame.
+        Sub-fetches that fail are recorded as None rather than aborting the
+        whole bundle — the snapshot is best-effort per car.
+        """
+        results: Dict[str, Optional[Dict[str, Any]]] = {
+            "detail": None, "inspection": None, "diagram": None,
+            "legend": None, "perf_frame": None,
+        }
+
+        def fetch_detail():
+            return self._api_get(f"/cardata/external/rest/api/v1/data/info/{car_id}")
+
+        def fetch_inspection():
+            if not perf_id:
+                return None
+            return self._api_get(f"/inspection/external/rest/api/v1/perf/review/report/{perf_id}")
+
+        def fetch_diagram():
+            return self._api_get(
+                "/inspection/external/rest/api/v1/layout/list",
+                params={"carId": car_id, "perfClsSet": "EXTERIOR"},
+            )
+
+        def fetch_legend():
+            return self._api_get("/inspection/external/rest/api/v1/layout/criteria/frames")
+
+        def fetch_perf_frame():
+            if not perf_id:
+                return None
+            return self._api_get(
+                "/inspection/external/rest/api/v1/perf/frame/info",
+                params={"perfId": perf_id},
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {
+                executor.submit(fetch_detail): "detail",
+                executor.submit(fetch_inspection): "inspection",
+                executor.submit(fetch_diagram): "diagram",
+                executor.submit(fetch_legend): "legend",
+                executor.submit(fetch_perf_frame): "perf_frame",
+            }
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    results[name] = future.result()
+                except Exception as e:
+                    logger.warning(f"Snapshot: {name} failed for car {car_id}: {e}")
+                    results[name] = None
+        return results
 
     def get_image(self, file_id: str) -> tuple:
         """Fetch image from Autohub API, returns (bytes, content_type)."""

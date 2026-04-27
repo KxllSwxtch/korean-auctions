@@ -1,8 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+import asyncio
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
 from typing import Optional
 from pydantic import BaseModel
 
+from app.core.config import get_settings
 from app.models.autohub import (
     AutohubResponse,
     AutohubCarDetailResponse,
@@ -171,6 +176,107 @@ async def set_token(
         "message": "Token set successfully",
         "is_valid": is_valid,
     }
+
+
+# ===== Snapshot mode (Wednesday catalogue cache) =====
+
+
+@router.get(
+    "/snapshot/status",
+    summary="Snapshot mode status",
+)
+async def snapshot_status():
+    """Report active snapshot metadata and which mode today resolves to.
+
+    Public — used for monitoring and the frontend banner.
+    """
+    settings = get_settings()
+    if not settings.autohub_snapshot_enabled:
+        return {
+            "snapshot_enabled": False,
+            "mode_today": "live",
+            "active_snapshot": None,
+            "recent": [],
+        }
+    try:
+        from app.services.autohub_snapshot_job import get_repo
+        repo = await get_repo()
+        active = await asyncio.to_thread(repo.get_active_snapshot)
+        recent = await asyncio.to_thread(repo.list_snapshots, 5)
+    except Exception as e:
+        logger.error(f"snapshot/status repo failure: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Snapshot repo unavailable")
+
+    tz = ZoneInfo(settings.autohub_snapshot_timezone)
+    weekday = datetime.now(tz).weekday()
+    snapshot_days = {int(d) for d in settings.autohub_snapshot_days.split(",") if d.strip().isdigit()}
+    mode_today = "snapshot" if weekday in snapshot_days else "live"
+
+    age_hours: Optional[float] = None
+    if active and active.get("completed_at"):
+        completed = datetime.fromisoformat(active["completed_at"])
+        if completed.tzinfo is None:
+            completed = completed.replace(tzinfo=ZoneInfo("UTC"))
+        age_hours = round((datetime.now(ZoneInfo("UTC")) - completed).total_seconds() / 3600, 2)
+
+    return {
+        "snapshot_enabled": True,
+        "mode_today": mode_today,
+        "snapshot_days": sorted(snapshot_days),
+        "timezone": settings.autohub_snapshot_timezone,
+        "active_snapshot": (
+            None if not active else {
+                **active,
+                "age_hours": age_hours,
+            }
+        ),
+        "recent": recent,
+    }
+
+
+@router.post(
+    "/snapshot/run",
+    status_code=202,
+    summary="Manually trigger a snapshot run (admin)",
+)
+async def snapshot_run(
+    background_tasks: BackgroundTasks,
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+):
+    """Fire a snapshot run in the background.
+
+    Auth: requires `X-Admin-Token` header matching `AUTOHUB_SNAPSHOT_ADMIN_TOKEN`.
+    The job acquires its own filelock; if a run is already in progress this
+    endpoint returns 409 immediately.
+    """
+    settings = get_settings()
+    expected = settings.autohub_snapshot_admin_token
+    if not expected:
+        raise HTTPException(status_code=503, detail="Admin trigger not configured")
+    if not x_admin_token or x_admin_token != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from app.services.autohub_snapshot_job import run_snapshot_job, _run_lock_path
+    from filelock import FileLock, Timeout
+    # Probe the lock without holding it — surfaces "already running" cleanly.
+    probe = FileLock(_run_lock_path(), timeout=0)
+    try:
+        probe.acquire()
+        probe.release()
+    except Timeout:
+        raise HTTPException(status_code=409, detail="A snapshot run is already in progress")
+
+    background_tasks.add_task(_safe_run_snapshot)
+    return {"accepted": True, "message": "Snapshot run scheduled in background"}
+
+
+async def _safe_run_snapshot() -> None:
+    """Wrap run_snapshot_job in a try/except so background-task failures are logged."""
+    from app.services.autohub_snapshot_job import run_snapshot_job
+    try:
+        await run_snapshot_job(triggered_by="admin")
+    except Exception as e:
+        logger.error(f"Background snapshot run failed: {e}", exc_info=True)
 
 
 # ===== Filters & Health =====

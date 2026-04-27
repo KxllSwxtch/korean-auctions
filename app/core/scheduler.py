@@ -13,8 +13,11 @@ from datetime import datetime
 from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from filelock import FileLock, Timeout
 from loguru import logger
+
+from app.core.config import get_settings
 
 SESSIONS_DIR = Path("cache/sessions")
 SCHEDULER_LOCK = SESSIONS_DIR / "scheduler_leader.lock"
@@ -141,6 +144,34 @@ async def start_scheduler():
     # Session pre-warming — every 20 minutes (before 25-min expiry)
     _scheduler.add_job(warm_sessions, "interval", minutes=20,
                        next_run_time=datetime.now(), id="warm_sessions")
+
+    # Weekly Autohub snapshot — Tuesday 22:00 KST
+    # Gated by env so we can deploy the code dark before flipping the switch.
+    settings = get_settings()
+    if settings.autohub_snapshot_enabled:
+        from app.services.autohub_snapshot_job import run_snapshot_job
+        _scheduler.add_job(
+            run_snapshot_job,
+            CronTrigger(
+                day_of_week="tue",
+                hour=22,
+                minute=0,
+                timezone=settings.autohub_snapshot_timezone,
+            ),
+            id="autohub_weekly_snapshot",
+            misfire_grace_time=1800,   # 30-min grace if leader was restarting at 22:00
+            max_instances=1,           # never run two snapshots in parallel
+            coalesce=True,             # if multiple firings queued, run only latest
+        )
+        logger.info(
+            "Scheduler: registered Autohub snapshot job "
+            "(Tuesday 22:00 {})", settings.autohub_snapshot_timezone,
+        )
+    else:
+        logger.info(
+            "Scheduler: Autohub snapshot job DISABLED "
+            "(set AUTOHUB_SNAPSHOT_ENABLED=true to enable)"
+        )
 
     _scheduler.start()
     logger.info("Scheduler: started with {} jobs", len(_scheduler.get_jobs()))
