@@ -1,5 +1,6 @@
+import hashlib
 import re
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from bs4 import BeautifulSoup
 from loguru import logger
 
@@ -7,9 +8,83 @@ from app.models.ssancar import (
     SSANCARCar, SSANCARCarDetail, SSANCARManufacturer, SSANCARModel
 )
 
+# Status codes returned by parse_car_detail alongside the parsed object.
+# The service layer translates these into HTTP error codes for the route.
+PARSE_STATUS_VALID = "valid"
+PARSE_STATUS_SESSION_EXPIRED = "session_expired"
+PARSE_STATUS_NOT_FOUND = "not_found"
+PARSE_STATUS_EMPTY = "empty"
+PARSE_STATUS_INVALID_DATA = "invalid_data"
+PARSE_STATUS_EXCEPTION = "exception"
+
+# Markers that indicate SSANCAR returned a login/session-expired page instead
+# of the requested car detail. Lowercased before matching.
+_LOGIN_REDIRECT_MARKERS = (
+    '/member/login',
+    'name="loginform"',
+    "name='loginform'",
+    "id='loginform'",
+    'id="loginform"',
+    'session expired',
+    'session_expired',
+    '로그인',
+)
+
+# Markers that indicate the car was archived / not found by SSANCAR
+# (200 OK with a "no such car" page).
+_NOT_FOUND_MARKERS = (
+    '차량을 찾을 수 없습니다',
+    '존재하지 않는',
+    '잘못된 접근',
+    'no such car',
+)
+
+# Minimum HTML length we'd plausibly accept as a real car detail page.
+# A real car_view.php page is multi-KB; anything substantially smaller is
+# almost certainly an empty body, error envelope, or redirect stub.
+_MIN_HTML_LENGTH = 500
+
 
 class SSANCARParser:
     """Parser for SSANCAR auction HTML responses"""
+
+    @staticmethod
+    def _classify_html(html: str) -> str:
+        """Classify a raw HTML body before attempting selector extraction.
+
+        Returns one of the PARSE_STATUS_* codes. Anything other than
+        PARSE_STATUS_VALID means the parser should bail out without
+        constructing a (zero-filled) object.
+        """
+        if not html or len(html.strip()) < _MIN_HTML_LENGTH:
+            return PARSE_STATUS_EMPTY
+
+        haystack = html.lower()
+        for marker in _LOGIN_REDIRECT_MARKERS:
+            if marker in haystack:
+                return PARSE_STATUS_SESSION_EXPIRED
+        for marker in _NOT_FOUND_MARKERS:
+            if marker in html:  # Korean markers — case preserved
+                return PARSE_STATUS_NOT_FOUND
+        return PARSE_STATUS_VALID
+
+    @staticmethod
+    def _is_minimally_valid(detail: SSANCARCarDetail) -> bool:
+        """Reject objects that lack core identity fields.
+
+        A usable detail record must have a car_no plus enough naming/pricing
+        info to render a meaningful page. Without these the UI degrades to
+        "Unknown Car / N/A / TBA / $0", which is the bug we're closing.
+        """
+        if not detail.car_no:
+            return False
+        has_name = bool(detail.full_name) or (
+            bool(detail.manufacturer) and bool(detail.model)
+        )
+        has_signal = (
+            detail.year and detail.year > 0
+        ) or bool(detail.starting_price) or bool(detail.images)
+        return has_name and has_signal
     
     def parse_car_list(self, html: str) -> List[SSANCARCar]:
         """Parse car list from SSANCAR HTML response"""
@@ -200,8 +275,32 @@ class SSANCARParser:
 
         return year, mileage, mileage_formatted, fuel, transmission, grade
     
-    def parse_car_detail(self, html: str) -> Optional[SSANCARCarDetail]:
-        """Parse detailed car information from SSANCAR detail page"""
+    def parse_car_detail(
+        self, html: str
+    ) -> Tuple[Optional[SSANCARCarDetail], str]:
+        """Parse detailed car information from SSANCAR detail page.
+
+        Returns a tuple of (parsed_detail, status_code). The detail is None
+        whenever status is anything other than PARSE_STATUS_VALID. The status
+        lets the service/route layer translate the failure into a
+        discriminated HTTP 404 (session_expired vs car_unavailable) instead
+        of silently returning a zero-filled object.
+        """
+        # Pre-flight: detect non-detail responses (login redirect, empty
+        # body, archived page) before we construct any object.
+        pre_status = self._classify_html(html)
+        if pre_status != PARSE_STATUS_VALID:
+            html_len = len(html) if html else 0
+            html_sha = (
+                hashlib.sha256(html.encode("utf-8", "ignore")).hexdigest()[:12]
+                if html else "-"
+            )
+            logger.warning(
+                f"⚠️ SSANCAR detail pre-flight rejected: status={pre_status} "
+                f"len={html_len} sha={html_sha}"
+            )
+            return None, pre_status
+
         try:
             soup = BeautifulSoup(html, 'html.parser')
             
@@ -392,14 +491,29 @@ class SSANCARParser:
                 parsed_at=datetime.now().isoformat()
             )
             
+            # Post-parse validation: reject objects that lack core identity.
+            # Without this gate, a 200 OK page with the wrong markup yields
+            # a zero-filled SSANCARCarDetail that the UI renders as
+            # "Unknown Car / N/A / TBA / $0".
+            if not self._is_minimally_valid(car_detail):
+                html_sha = hashlib.sha256(
+                    html.encode("utf-8", "ignore")
+                ).hexdigest()[:12]
+                logger.warning(
+                    f"⚠️ SSANCAR parser produced empty/invalid result: "
+                    f"car_no='{car_no}' year={year} name='{full_name}' "
+                    f"len={len(html)} sha={html_sha}"
+                )
+                return None, PARSE_STATUS_INVALID_DATA
+
             logger.info(f"✅ Successfully parsed car detail for {car_no}")
-            return car_detail
-            
+            return car_detail, PARSE_STATUS_VALID
+
         except Exception as e:
             logger.error(f"Error parsing car detail: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return None
+            return None, PARSE_STATUS_EXCEPTION
     
     def parse_manufacturers(self, html: str) -> List[SSANCARManufacturer]:
         """Parse manufacturer list from dropdown or JavaScript"""

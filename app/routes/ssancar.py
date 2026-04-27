@@ -11,7 +11,27 @@ from app.models.ssancar import (
     SSANCARTotalCountResponse
 )
 from app.services.ssancar_service import SSANCARService
+from app.parsers.ssancar_parser import (
+    PARSE_STATUS_VALID,
+    PARSE_STATUS_SESSION_EXPIRED,
+    PARSE_STATUS_NOT_FOUND,
+    PARSE_STATUS_EMPTY,
+    PARSE_STATUS_INVALID_DATA,
+    PARSE_STATUS_EXCEPTION,
+)
 from app.core.logging import get_logger
+
+# Maps internal parse statuses to public error codes the frontend branches on.
+# Anything other than session_expired collapses to car_unavailable so the UI
+# can show the same "auction may have ended / listing removed" copy.
+_DETAIL_ERROR_CODES = {
+    PARSE_STATUS_SESSION_EXPIRED: "session_expired",
+    PARSE_STATUS_NOT_FOUND: "car_unavailable",
+    PARSE_STATUS_EMPTY: "car_unavailable",
+    PARSE_STATUS_INVALID_DATA: "car_unavailable",
+    "request_error": "upstream_error",
+    PARSE_STATUS_EXCEPTION: "upstream_error",
+}
 
 # Setup logger
 ssancar_logger = get_logger("ssancar_routes")
@@ -348,10 +368,12 @@ async def get_car_detail(
     """
     try:
         ssancar_logger.info(f"📥 Request for car detail: {car_no}")
-        
-        car_detail = await asyncio.to_thread(service.get_car_detail, car_no)
-        
-        if car_detail:
+
+        car_detail, status = await asyncio.to_thread(
+            service.get_car_detail, car_no
+        )
+
+        if status == PARSE_STATUS_VALID and car_detail is not None:
             ssancar_logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
             return SSANCARDetailResponse(
                 success=True,
@@ -359,20 +381,51 @@ async def get_car_detail(
                 car_detail=car_detail,
                 timestamp=datetime.now()
             )
-        else:
-            ssancar_logger.error(f"❌ Car not found: {car_no}")
+
+        # Translate internal parse status into a public, frontend-actionable
+        # error code. Session-expired is recoverable (operator refreshes
+        # cookies via /update-cookies); car_unavailable is permanent for the
+        # current TTL window (auction ended or listing pulled upstream).
+        code = _DETAIL_ERROR_CODES.get(status, "car_unavailable")
+        ssancar_logger.warning(
+            f"❌ SSANCAR car detail unavailable for {car_no}: "
+            f"status={status} code={code}"
+        )
+
+        if code == "upstream_error":
             raise HTTPException(
-                status_code=404,
-                detail=f"Car not found: {car_no}"
+                status_code=502,
+                detail={
+                    "code": code,
+                    "message": "SSANCAR upstream did not respond as expected",
+                    "car_no": car_no,
+                },
             )
-            
+
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": code,
+                "message": (
+                    "SSANCAR session expired — refresh cookies and retry"
+                    if code == "session_expired"
+                    else "Car details are not available"
+                ),
+                "car_no": car_no,
+            },
+        )
+
     except HTTPException:
         raise
     except Exception as e:
         ssancar_logger.error(f"❌ Unexpected error getting car detail: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Internal server error: {str(e)}"
+            detail={
+                "code": "internal_error",
+                "message": str(e),
+                "car_no": car_no,
+            },
         )
 
 

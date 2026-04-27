@@ -16,7 +16,15 @@ from app.models.ssancar import (
     SSANCARManufacturer, SSANCARModel,
     SSANCARManufacturersResponse, SSANCARModelsResponse
 )
-from app.parsers.ssancar_parser import SSANCARParser
+from app.parsers.ssancar_parser import (
+    SSANCARParser,
+    PARSE_STATUS_VALID,
+    PARSE_STATUS_SESSION_EXPIRED,
+    PARSE_STATUS_NOT_FOUND,
+    PARSE_STATUS_EMPTY,
+    PARSE_STATUS_INVALID_DATA,
+    PARSE_STATUS_EXCEPTION,
+)
 from app.core.config import get_settings
 from app.core.session_manager import SessionManager
 from app.core.proxy_config import get_proxy_pool
@@ -454,39 +462,55 @@ class SSANCARService:
             logger.error(f"❌ Error getting models: {e}")
             return [], False
     
-    def get_car_detail(self, car_no: str) -> Optional[SSANCARCarDetail]:
-        """Get detailed information about a specific car"""
-        try:
-            # Check cache (30min TTL for car details)
-            cache_key = self._make_cache_key("detail", {"car_no": car_no})
-            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl_car_detail)
-            if cached is not None:
-                logger.debug(f"📦 SSANCAR car detail cache hit: {car_no}")
-                return cached
+    def get_car_detail(
+        self, car_no: str
+    ) -> Tuple[Optional[SSANCARCarDetail], str]:
+        """Get detailed information about a specific car.
 
-            url = f"{self.CAR_VIEW_URL}?car_no={car_no}"
-            logger.info(f"📄 Fetching car detail from: {url}")
-            
+        Returns (detail, status). Status is one of the parser PARSE_STATUS_*
+        codes plus "request_error" for transport failures. Only valid results
+        are cached — empty/expired/invalid responses bypass the cache so a
+        single bad parse never poisons subsequent requests for the TTL window.
+        """
+        cache_key = self._make_cache_key("detail", {"car_no": car_no})
+        cached = self._get_from_cache(
+            cache_key, ttl=get_settings().cache_ttl_car_detail
+        )
+        if cached is not None:
+            logger.debug(f"📦 SSANCAR car detail cache hit: {car_no}")
+            return cached, PARSE_STATUS_VALID
+
+        url = f"{self.CAR_VIEW_URL}?car_no={car_no}"
+        logger.info(f"📄 Fetching car detail from: {url}")
+
+        try:
             response = self.session.get(url, timeout=15)
             response.raise_for_status()
-            
-            # Parse the detail page
-            car_detail = self.parser.parse_car_detail(response.text)
-            
-            if not car_detail:
-                logger.error(f"❌ Failed to parse car detail for car_no: {car_no}")
-                return None
-            
-            # Ensure car_no is set
+        except requests.RequestException as e:
+            logger.error(f"❌ Request error fetching car detail: {e}")
+            return None, "request_error"
+
+        try:
+            car_detail, status = self.parser.parse_car_detail(response.text)
+
+            if status != PARSE_STATUS_VALID or car_detail is None:
+                logger.warning(
+                    f"❌ SSANCAR car detail unavailable for {car_no}: "
+                    f"status={status}"
+                )
+                self._maybe_dump_empty_html(car_no, response.text, status)
+                return None, status
+
+            # Ensure car_no is set (parser may not always extract it from
+            # the HTML, but we know it from the request URL).
             if not car_detail.car_no:
                 car_detail.car_no = car_no
-            
-            # Additional processing for SSANCAR specific fields
-            # Ensure we have all required fields for the frontend
+
+            # Backfill display name if only manufacturer/model are present.
             if not car_detail.full_name and car_detail.manufacturer and car_detail.model:
                 car_detail.full_name = f"[{car_detail.manufacturer}] {car_detail.model}"
-            
-            # Parse bid price from starting_price if needed
+
+            # Parse bid price from starting_price if needed.
             if car_detail.starting_price and not car_detail.bid_price:
                 price_match = re.search(r'(\d+(?:,\d+)*)', car_detail.starting_price)
                 if price_match:
@@ -494,31 +518,54 @@ class SSANCARService:
                         car_detail.bid_price = int(price_match.group(1).replace(',', ''))
                     except ValueError:
                         car_detail.bid_price = 0
-            
-            # Ensure we have the main_image set
+
             if not car_detail.main_image and car_detail.images:
                 car_detail.main_image = car_detail.images[0]
-            
-            # Set engine_volume if we have engine_size
+
             if not hasattr(car_detail, 'engine_volume') and car_detail.engine_size:
                 car_detail.engine_volume = car_detail.engine_size
-            
-            # Set fuel_type if we have fuel
+
             if not hasattr(car_detail, 'fuel_type') and car_detail.fuel:
                 car_detail.fuel_type = car_detail.fuel
-            
+
             logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
             self._save_to_cache(cache_key, car_detail)
-            return car_detail
-            
-        except requests.RequestException as e:
-            logger.error(f"❌ Request error fetching car detail: {e}")
-            return None
+            return car_detail, PARSE_STATUS_VALID
+
         except Exception as e:
             logger.error(f"❌ Unexpected error fetching car detail: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return None
+            return None, PARSE_STATUS_EXCEPTION
+
+    def _maybe_dump_empty_html(
+        self, car_no: str, html: str, status: str
+    ) -> None:
+        """Dump the offending response to debug_html/ when the env flag is on.
+
+        Operators flip DEBUG_DUMP_EMPTY_RESPONSES=1 when the new 404s start
+        appearing to inspect whether SSANCAR returned a login redirect, an
+        archived-car page, or something else. Off by default in production.
+        """
+        import os
+        if os.environ.get("DEBUG_DUMP_EMPTY_RESPONSES") != "1":
+            return
+        try:
+            base = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "debug_html",
+            )
+            os.makedirs(base, exist_ok=True)
+            ts = int(time.time())
+            path = os.path.join(
+                base, f"ssancar_empty_{car_no}_{status}_{ts}.html"
+            )
+            # Cap dump at 100 KB so a runaway body can't fill the disk.
+            with open(path, "w", encoding="utf-8") as f:
+                f.write((html or "")[:100_000])
+            logger.info(f"📝 Dumped empty SSANCAR response to {path}")
+        except Exception as e:
+            logger.warning(f"Could not dump empty SSANCAR response: {e}")
     
     def update_cookies(self, new_cookies: Dict[str, str]):
         """Update service cookies"""
