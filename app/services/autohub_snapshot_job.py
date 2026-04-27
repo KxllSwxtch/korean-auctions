@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,7 @@ from filelock import FileLock, Timeout
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.models.autohub_filters import AutohubSearchRequest, AutohubSortOrder
+from app.parsers.autohub_parser import _extract_total_pages
 from app.services.autohub_service import autohub_service
 from app.storage.autohub_snapshot_repo import SnapshotRepo
 
@@ -55,15 +57,26 @@ def _run_lock_path() -> str:
 # ---------------------------------------------------------------------------
 # Singleton repo (one per process; reuses the same SQLite DB file)
 # ---------------------------------------------------------------------------
+# We deliberately use a threading.Lock here, not an asyncio.Lock. asyncio
+# locks bind to the running event loop on first use, which would break if
+# the singleton is created on one loop (e.g. uvicorn's main loop) and later
+# accessed from another (e.g. a test that calls asyncio.run multiple times).
+# threading.Lock is loop-agnostic and protects the one-time race we care
+# about: two coroutines calling get_repo() concurrently before init.
 
 _repo_singleton: Optional[SnapshotRepo] = None
-_repo_lock = asyncio.Lock()
+_repo_init_lock = threading.Lock()
 
 
 async def get_repo() -> SnapshotRepo:
-    """Lazy-construct the repo on first use."""
+    """Lazy-construct the repo on first use. Safe across event loops."""
     global _repo_singleton
-    async with _repo_lock:
+    if _repo_singleton is not None:
+        return _repo_singleton
+    # threading.Lock.acquire() may block briefly on first init; it returns
+    # immediately on subsequent calls because the singleton check above
+    # short-circuits. We don't need to_thread for it.
+    with _repo_init_lock:
         if _repo_singleton is None:
             settings = get_settings()
             _repo_singleton = SnapshotRepo(settings.autohub_snapshot_db_path)
@@ -107,13 +120,17 @@ async def run_snapshot_job(triggered_by: str = "cron") -> dict:
         logger.warning(msg)
         raise RuntimeError(msg)
 
-    repo = await get_repo()
-    snap_id = repo.begin_snapshot()
-    cars_buffered: list[dict] = []
-    detail_count = 0
-    error: Optional[str] = None
-
+    # Everything from here until the bottom finally must run inside the
+    # release-on-exit guard, so a failure in get_repo() / begin_snapshot()
+    # never leaks the run lock.
+    snap_id: Optional[int] = None
+    repo: Optional[SnapshotRepo] = None
     try:
+        repo = await get_repo()
+        snap_id = repo.begin_snapshot()
+        cars_buffered: list[dict] = []
+        detail_count = 0
+
         # ---- Stage 1: paginate listings -----------------------------------
         page = 1
         while True:
@@ -132,8 +149,11 @@ async def run_snapshot_job(triggered_by: str = "cron") -> dict:
                 # Surface as job failure — incomplete listings is unacceptable
                 raise
 
-            entries = (raw.get("data") or {}).get("list") or []
-            total_pages = (raw.get("data") or {}).get("totalPages") or 0
+            data = raw.get("data") or {}
+            entries = data.get("list") or []
+            # Autohub returns totalPages under varying field names. Reuse the
+            # parser's resilient extractor so we behave the same in both paths.
+            total_pages = _extract_total_pages(data, total_count=len(entries) * 1000, page_size=_PAGE_SIZE)
 
             if not entries:
                 logger.info(f"Snapshot: page {page} returned no entries — stopping")
@@ -239,11 +259,14 @@ async def run_snapshot_job(triggered_by: str = "cron") -> dict:
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
         logger.exception(f"Snapshot {snap_id} failed: {error}")
-        try:
-            repo.fail_snapshot(snap_id, error)
-        except Exception as fail_err:
-            logger.error(f"Failed to mark snapshot failed: {fail_err}")
-        await _alert_failure(snap_id, error)
+        # repo/snap_id may be None if get_repo() or begin_snapshot() raised.
+        # Mark the snapshot row failed only if we got far enough to create one.
+        if repo is not None and snap_id is not None:
+            try:
+                repo.fail_snapshot(snap_id, error)
+            except Exception as fail_err:
+                logger.error(f"Failed to mark snapshot failed: {fail_err}")
+        await _alert_failure(snap_id if snap_id is not None else -1, error)
         raise
     finally:
         try:
