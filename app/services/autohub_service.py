@@ -8,6 +8,7 @@ import time
 import json
 import hashlib
 import base64
+import threading
 from typing import Optional, Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
@@ -44,6 +45,10 @@ from app.core.logging import get_logger
 
 logger = get_logger("autohub_service")
 
+# Process-wide cap on concurrent outbound requests to api.ahsellcar.co.kr.
+# Prevents the 6-way car-detail fanout × N concurrent users from saturating Autohub.
+_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
+
 
 class AutohubService:
     """Service for Autohub JSON API"""
@@ -77,10 +82,15 @@ class AutohubService:
         s.headers.update(self._get_base_headers())
         retry_strategy = Retry(
             total=3,
-            backoff_factor=1,
+            backoff_factor=2,
             status_forcelist=[429, 500, 502, 503, 504],
+            respect_retry_after_header=True,
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,
+            pool_maxsize=10,
+        )
         s.mount("https://", adapter)
         s.mount("http://", adapter)
         return s
@@ -219,22 +229,24 @@ class AutohubService:
         self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"GET {url}")
-        response = self.session.get(
-            url,
-            headers=self._get_auth_headers(),
-            params=params,
-            timeout=self.settings.request_timeout,
-        )
+        with _OUTBOUND_LIMIT:
+            response = self.session.get(
+                url,
+                headers=self._get_auth_headers(),
+                params=params,
+                timeout=self.settings.request_timeout,
+            )
         if response.status_code in (401, 403):
             logger.warning(f"Got {response.status_code} on GET, re-authenticating...")
             logger.debug(f"Response body: {response.text[:500]}")
             if self._authenticate():
-                response = self.session.get(
-                    url,
-                    headers=self._get_auth_headers(),
-                    params=params,
-                    timeout=self.settings.request_timeout,
-                )
+                with _OUTBOUND_LIMIT:
+                    response = self.session.get(
+                        url,
+                        headers=self._get_auth_headers(),
+                        params=params,
+                        timeout=self.settings.request_timeout,
+                    )
         response.raise_for_status()
         return response.json()
 
@@ -243,22 +255,24 @@ class AutohubService:
         self._ensure_authenticated()
         url = f"{self.api_base}{path}"
         logger.info(f"POST {url}")
-        response = self.session.post(
-            url,
-            headers=self._get_auth_headers(),
-            json=body,
-            timeout=self.settings.request_timeout,
-        )
+        with _OUTBOUND_LIMIT:
+            response = self.session.post(
+                url,
+                headers=self._get_auth_headers(),
+                json=body,
+                timeout=self.settings.request_timeout,
+            )
         if response.status_code in (401, 403):
             logger.warning(f"Got {response.status_code} on POST, re-authenticating...")
             logger.debug(f"Response body: {response.text[:500]}")
             if self._authenticate():
-                response = self.session.post(
-                    url,
-                    headers=self._get_auth_headers(),
-                    json=body,
-                    timeout=self.settings.request_timeout,
-                )
+                with _OUTBOUND_LIMIT:
+                    response = self.session.post(
+                        url,
+                        headers=self._get_auth_headers(),
+                        json=body,
+                        timeout=self.settings.request_timeout,
+                    )
         response.raise_for_status()
         return response.json()
 
@@ -371,7 +385,7 @@ class AutohubService:
         scan_params.sort_direction = "asc"
         scan_params.page = 1
 
-        max_pages = 30  # safety limit (~3000 cars)
+        max_pages = 5  # safety limit (~500 cars). Reduced from 30 to relieve outbound load.
 
         for page_num in range(1, max_pages + 1):
             scan_params.page = page_num
@@ -486,7 +500,7 @@ class AutohubService:
                     {"tenant": "1", "carId": car_id, "pageSize": 5, "pageIndex": 1},
                 )
 
-            with ThreadPoolExecutor(max_workers=6) as executor:
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 futures = {
                     executor.submit(fetch_detail): "detail",
                     executor.submit(fetch_inspection): "inspection",
@@ -580,19 +594,21 @@ class AutohubService:
 
         self._ensure_authenticated()
         url = f"{self.api_base}/file/external/rest/api/v1/image/{file_id}"
-        response = self.session.get(
-            url,
-            headers=self._get_auth_headers(),
-            timeout=self.settings.request_timeout,
-        )
+        with _OUTBOUND_LIMIT:
+            response = self.session.get(
+                url,
+                headers=self._get_auth_headers(),
+                timeout=self.settings.request_timeout,
+            )
         if response.status_code == 401:
             logger.warning("Got 401 on image fetch, re-authenticating...")
             if self._authenticate():
-                response = self.session.get(
-                    url,
-                    headers=self._get_auth_headers(),
-                    timeout=self.settings.request_timeout,
-                )
+                with _OUTBOUND_LIMIT:
+                    response = self.session.get(
+                        url,
+                        headers=self._get_auth_headers(),
+                        timeout=self.settings.request_timeout,
+                    )
         response.raise_for_status()
 
         content_type = response.headers.get("content-type", "image/jpeg")
