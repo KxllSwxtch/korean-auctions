@@ -279,15 +279,36 @@ class AutohubService:
     # ===== Core Methods =====
 
     def get_car_list(self, params: AutohubSearchRequest, force_live: bool = False) -> AutohubResponse:
-        """Fetch car listing from API. Dispatches to entry search when needed.
+        """Fetch car listing.
 
-        `force_live` is reserved for Phase C — when the mode resolver lands,
-        callers (the snapshot job, admin-triggered runs) can pass force_live=True
-        to bypass the snapshot read path. In Phase B it has no effect.
+        Dispatch order:
+            - force_live=True → live API (the snapshot job uses this)
+            - mode resolver returns "snapshot" → SQLite-backed snapshot source
+            - mode resolver returns "snapshot_unavailable" → 503-style error
+            - otherwise (default) → live API, identical to pre-Phase-C behavior
         """
+        if not force_live:
+            mode = self._resolve_mode_safe()
+            if mode is not None:
+                if mode.is_snapshot:
+                    resp = self._snapshot_source().get_car_list(params, mode.snapshot_id)
+                    return _stamp_metadata(resp, mode)
+                if mode.is_unavailable:
+                    return AutohubResponse(
+                        success=False,
+                        error="Auction data is being prepared — please check back shortly.",
+                        current_page=params.page,
+                        page_size=params.page_size,
+                        cache_mode="snapshot",
+                    )
+
+        # Live path — unchanged from before.
         if params.entry_number:
-            return self._search_by_entry_number(params)
-        return self._fetch_car_page(params)
+            resp = self._search_by_entry_number(params)
+        else:
+            resp = self._fetch_car_page(params)
+        resp.cache_mode = "live"
+        return resp
 
     def _fetch_car_page(self, params: AutohubSearchRequest) -> AutohubResponse:
         """Fetch a single page of car listings from the external API."""
@@ -432,13 +453,29 @@ class AutohubService:
         return not_found
 
     def get_brands(self, force_live: bool = False) -> AutohubBrandsResponse:
-        """Fetch hierarchical brands from API (cached 24h).
+        """Fetch hierarchical brands.
 
-        `force_live`: see note on `get_car_list`. No effect in Phase B.
+        Dispatch as in get_car_list. force_live=True is used by the snapshot
+        job itself.
         """
+        if not force_live:
+            mode = self._resolve_mode_safe()
+            if mode is not None:
+                if mode.is_snapshot:
+                    resp = self._snapshot_source().get_brands(mode.snapshot_id)
+                    return _stamp_metadata(resp, mode)
+                if mode.is_unavailable:
+                    return AutohubBrandsResponse(
+                        success=False,
+                        error="Auction data is being prepared — please check back shortly.",
+                        cache_mode="snapshot",
+                    )
+
+        # Live path — unchanged.
         cache_key = self._make_cache_key("brands")
         cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_static)
         if cached:
+            cached.cache_mode = "live"
             return cached
 
         try:
@@ -448,20 +485,37 @@ class AutohubService:
             groups = map_brands(response_data)
             result = AutohubBrandsResponse(success=True, data=groups)
             self._save_to_cache(cache_key, result)
+            result.cache_mode = "live"
             return result
 
         except Exception as e:
             logger.error(f"Error fetching brands: {e}", exc_info=True)
-            return AutohubBrandsResponse(success=False, error=str(e))
+            return AutohubBrandsResponse(success=False, error=str(e), cache_mode="live")
 
     def get_car_detail(self, car_id: str, perf_id: Optional[str] = None, force_live: bool = False) -> AutohubCarDetailResponse:
-        """Fetch composite car detail from multiple endpoints.
+        """Fetch composite car detail.
 
-        `force_live`: see note on `get_car_list`. No effect in Phase B.
+        Dispatch as in get_car_list. force_live=True is used by the snapshot
+        job itself.
         """
+        if not force_live:
+            mode = self._resolve_mode_safe()
+            if mode is not None:
+                if mode.is_snapshot:
+                    resp = self._snapshot_source().get_car_detail(car_id, perf_id, mode.snapshot_id)
+                    return _stamp_metadata(resp, mode)
+                if mode.is_unavailable:
+                    return AutohubCarDetailResponse(
+                        success=False,
+                        error="Auction data is being prepared — please check back shortly.",
+                        cache_mode="snapshot",
+                    )
+
+        # Live path — unchanged from before.
         cache_key = self._make_cache_key("car_detail", {"car_id": car_id, "perf_id": perf_id})
         cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_detail)
         if cached:
+            cached.cache_mode = "live"
             return cached
 
         try:
@@ -559,6 +613,7 @@ class AutohubService:
 
             result = AutohubCarDetailResponse(success=True, data=car_detail)
             self._save_to_cache(cache_key, result)
+            result.cache_mode = "live"
             return result
 
         except requests.exceptions.HTTPError as e:
@@ -568,10 +623,11 @@ class AutohubService:
             return AutohubCarDetailResponse(
                 success=False,
                 error=error_msg,
+                cache_mode="live",
             )
         except Exception as e:
             logger.error(f"Error fetching car detail: {e}", exc_info=True)
-            return AutohubCarDetailResponse(success=False, error=str(e))
+            return AutohubCarDetailResponse(success=False, error=str(e), cache_mode="live")
 
     def get_filters_info(self) -> AutohubFilterInfo:
         """Get filter options for frontend."""
@@ -595,6 +651,31 @@ class AutohubService:
             mileage_options=AUTOHUB_MILEAGE_OPTIONS,
             price_options=AUTOHUB_PRICE_OPTIONS,
         )
+
+    # ===== Mode dispatch helpers (Phase C) =====
+    # Defensive: any failure inside the resolver or snapshot source falls
+    # back to the live path. We never break the user-facing site because
+    # the snapshot subsystem misbehaves.
+
+    def _resolve_mode_safe(self):
+        """Resolve the read mode; on any error, return None (= use live path)."""
+        try:
+            from app.services.autohub_mode import resolve_mode
+            return resolve_mode()
+        except Exception as e:
+            logger.warning(f"Mode resolver crashed (falling back to live): {e}")
+            return None
+
+    def _snapshot_source(self):
+        """Lazy-construct the snapshot source. Cached on the service instance."""
+        src = getattr(self, "_snap_src_cache", None)
+        if src is None:
+            from app.services.autohub_snapshot_source import AutohubSnapshotSource
+            from app.storage.autohub_snapshot_repo import SnapshotRepo
+            repo = SnapshotRepo(self.settings.autohub_snapshot_db_path)
+            src = AutohubSnapshotSource(repo)
+            self._snap_src_cache = src
+        return src
 
     # ===== Raw fetchers (used by the snapshot job) =====
     # These return the unparsed response dict so the snapshot stores the
@@ -717,6 +798,18 @@ class AutohubService:
         if self._session:
             self._session.close()
             self._session = None
+
+
+def _stamp_metadata(resp, mode):
+    """Attach Phase-C metadata fields onto any response wrapper. Tolerant to
+    missing attributes — only sets what the response model defines."""
+    try:
+        resp.cache_mode = "snapshot"
+        resp.snapshot_taken_at = mode.snapshot_taken_at_iso
+        resp.stale = mode.stale
+    except Exception:
+        pass
+    return resp
 
 
 # Global service instance

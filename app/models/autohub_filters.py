@@ -79,6 +79,10 @@ class AutohubBrandsResponse(BaseModel):
     success: bool = True
     data: List[AutohubBrandsGroup] = Field(default_factory=list)
     error: Optional[str] = None
+    # Phase C metadata — optional, defaults preserve live-mode shape.
+    cache_mode: Optional[str] = None
+    snapshot_taken_at: Optional[str] = None
+    stale: bool = False
 
 
 # ===== Search Request =====

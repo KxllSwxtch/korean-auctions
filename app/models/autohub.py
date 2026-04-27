@@ -273,6 +273,12 @@ class AutohubResponse(BaseModel):
     total_pages: int = 0
     current_page: int = 1
     page_size: int = 20
+    # Phase C metadata — optional, defaults preserve live-mode shape:
+    # cache_mode = "live" or "snapshot"; stale = True when snapshot is older
+    # than the configured staleness threshold; snapshot_taken_at is ISO UTC.
+    cache_mode: Optional[str] = None
+    snapshot_taken_at: Optional[str] = None
+    stale: bool = False
 
 
 class AutohubCarDetailResponse(BaseModel):
@@ -280,3 +286,6 @@ class AutohubCarDetailResponse(BaseModel):
     success: bool = True
     data: Optional[AutohubCarDetail] = None
     error: Optional[str] = None
+    cache_mode: Optional[str] = None
+    snapshot_taken_at: Optional[str] = None
+    stale: bool = False
