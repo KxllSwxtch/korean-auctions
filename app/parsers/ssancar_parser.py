@@ -72,18 +72,21 @@ class SSANCARParser:
     def _is_minimally_valid(detail: SSANCARCarDetail) -> bool:
         """Reject objects that lack core identity fields.
 
-        A usable detail record must have a car_no plus enough naming/pricing
-        info to render a meaningful page. Without these the UI degrades to
-        "Unknown Car / N/A / TBA / $0", which is the bug we're closing.
+        SSANCAR's car_view.php does NOT emit the car_no in the HTML body
+        (it's only in the request URL), so the parser's car_no is almost
+        always empty — the service backfills it after parsing. We therefore
+        cannot gate on car_no here. Instead we gate on a real name AND at
+        least one meaningful signal (year, price, images). Fake/login/error
+        pages carry none of those.
         """
-        if not detail.car_no:
-            return False
         has_name = bool(detail.full_name) or (
             bool(detail.manufacturer) and bool(detail.model)
         )
         has_signal = (
-            detail.year and detail.year > 0
-        ) or bool(detail.starting_price) or bool(detail.images)
+            (detail.year and detail.year > 0)
+            or bool(detail.starting_price)
+            or bool(detail.images)
+        )
         return has_name and has_signal
     
     def parse_car_list(self, html: str) -> List[SSANCARCar]:
