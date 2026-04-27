@@ -10,4 +10,26 @@ services:
         value: 3.12.1
       - key: PORT
         value: 10000
+      # Wednesday-snapshot mode (see plans/wednesday-snapshot-mode.md).
+      # Deploy dark first: leave AUTOHUB_SNAPSHOT_ENABLED=false until the
+      # first manual run is verified, then flip to true.
+      - key: AUTOHUB_SNAPSHOT_ENABLED
+        value: "false"
+      - key: AUTOHUB_SNAPSHOT_DAYS
+        value: "2"
+      - key: AUTOHUB_SNAPSHOT_DB_PATH
+        value: /data/autohub_snapshot.db
+      - key: AUTOHUB_SNAPSHOT_RETENTION
+        value: "2"
+      - key: AUTOHUB_SNAPSHOT_TIMEZONE
+        value: Asia/Seoul
+      - key: AUTOHUB_SNAPSHOT_MAX_AGE_DAYS
+        value: "8"
+      # Set in the Render dashboard (sync: false in YAML to avoid logging the secret).
+      - key: AUTOHUB_SNAPSHOT_ADMIN_TOKEN
+        sync: false
     healthCheckPath: /health
+    disk:
+      name: autohub-cache
+      mountPath: /data
+      sizeGB: 2

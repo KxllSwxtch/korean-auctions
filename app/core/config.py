@@ -68,6 +68,20 @@ class Settings(BaseSettings):
     cache_ttl_filters: int = 7200        # 2h - filter metadata
     cache_ttl_exchange_rate: int = 900   # 15min - exchange rates
 
+    # Autohub Wednesday-snapshot mode
+    # Tuesday 22:00 KST snapshots the catalogue; Wednesday serves it without
+    # touching api.ahsellcar.co.kr. See plans/wednesday-snapshot-mode.md.
+    autohub_snapshot_enabled: bool = False
+    # Comma-separated weekday numbers (Mon=0 ... Sun=6) when snapshot mode is active.
+    # "2" = Wednesday only. "" disables snapshot mode entirely. "0,1,2,3,4,5,6" = all week.
+    autohub_snapshot_days: str = "2"
+    autohub_snapshot_db_path: str = "/data/autohub_snapshot.db"
+    autohub_snapshot_retention: int = 2  # number of recent snapshots to keep on disk
+    autohub_snapshot_timezone: str = "Asia/Seoul"
+    autohub_snapshot_max_age_days: int = 8  # snapshots older than this are "stale"
+    autohub_snapshot_admin_token: Optional[str] = None  # gate /snapshot/run endpoint
+    autohub_snapshot_alert_webhook: Optional[str] = None  # POSTed to on job failure
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
