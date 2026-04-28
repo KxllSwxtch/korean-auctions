@@ -278,7 +278,12 @@ class AutohubService:
 
     # ===== Core Methods =====
 
-    def get_car_list(self, params: AutohubSearchRequest, force_live: bool = False) -> AutohubResponse:
+    def get_car_list(
+        self,
+        params: AutohubSearchRequest,
+        force_live: bool = False,
+        bypass_cache: bool = False,
+    ) -> AutohubResponse:
         """Fetch car listing.
 
         Dispatch order:
@@ -286,6 +291,10 @@ class AutohubService:
             - mode resolver returns "snapshot" → SQLite-backed snapshot source
             - mode resolver returns "snapshot_unavailable" → 503-style error
             - otherwise (default) → live API, identical to pre-Phase-C behavior
+
+        bypass_cache=True skips the in-memory result cache for this request
+        (useful for diagnosing stale cache pollution). Snapshot reads are
+        unaffected because they read straight from SQLite.
         """
         if not force_live:
             mode = self._resolve_mode_safe()
@@ -304,19 +313,24 @@ class AutohubService:
 
         # Live path — unchanged from before.
         if params.entry_number:
-            resp = self._search_by_entry_number(params)
+            resp = self._search_by_entry_number(params, bypass_cache=bypass_cache)
         else:
-            resp = self._fetch_car_page(params)
+            resp = self._fetch_car_page(params, bypass_cache=bypass_cache)
         resp.cache_mode = "live"
         return resp
 
-    def _fetch_car_page(self, params: AutohubSearchRequest) -> AutohubResponse:
+    def _fetch_car_page(
+        self,
+        params: AutohubSearchRequest,
+        bypass_cache: bool = False,
+    ) -> AutohubResponse:
         """Fetch a single page of car listings from the external API."""
         api_body = params.to_api_body()
         cache_key = self._make_cache_key("car_list", api_body)
-        cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
-        if cached:
-            return cached
+        if not bypass_cache:
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
+            if cached:
+                return cached
 
         try:
             response_data = self._api_post(
@@ -366,12 +380,20 @@ class AutohubService:
                 page_size=params.page_size,
             )
 
-    def _search_by_entry_number(self, params: AutohubSearchRequest) -> AutohubResponse:
-        """Search for a specific car by entry number using server-side filtering.
+    def _search_by_entry_number(
+        self,
+        params: AutohubSearchRequest,
+        bypass_cache: bool = False,
+    ) -> AutohubResponse:
+        """Search for a specific car by entry number via binary-search pagination.
 
-        The external API does not support entryNo as a request filter,
-        so we fetch pages sorted by entry number and scan for the match.
-        Early termination: stop once we pass the target in sorted order.
+        The external API does not support entryNo as a request filter, so we
+        fetch sorted pages and scan for the match. With pages sorted ASC by
+        entry, the corpus is effectively a sorted array of integers across
+        page boundaries — we binary-search for the page whose [first, last]
+        range contains the target, then scan only that page. Worst case is
+        ~log2(total_pages) page fetches (~7 for 100-page catalogues, ~10 for
+        1000), which keeps outbound load on api.ahsellcar.co.kr bounded.
         """
         target = params.entry_number
         try:
@@ -382,7 +404,6 @@ class AutohubService:
                 total_pages=0, current_page=1, page_size=params.page_size,
             )
 
-        # Check cache (keyed by normalized entry number + active filters)
         cache_key = self._make_cache_key("entry_search", {
             "entry": target_int,
             "brands": params.car_brands,
@@ -399,58 +420,111 @@ class AutohubService:
             "auction_result": params.auction_result.value if params.auction_result else None,
             "condition_grade": params.condition_grade,
         })
-        cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
-        if cached:
-            return cached
+        if not bypass_cache:
+            cached = self._get_from_cache(cache_key, ttl=self.settings.cache_ttl_car_list)
+            if cached:
+                return cached
 
-        # Build scan params: no entry_number, large page, sorted by entry asc
+        # Scan params: drop entry_number filter, max page size, ASC by entry.
         scan_params = params.model_copy()
         scan_params.entry_number = None
         scan_params.page_size = 100
         scan_params.sort_order = AutohubSortOrder.ENTRY
         scan_params.sort_direction = "asc"
-        scan_params.page = 1
 
-        max_pages = 5  # safety limit (~500 cars). Reduced from 30 to relieve outbound load.
+        def make_not_found() -> AutohubResponse:
+            return AutohubResponse(
+                success=True, data=[], total_count=0,
+                total_pages=0, current_page=1, page_size=params.page_size,
+            )
 
-        for page_num in range(1, max_pages + 1):
-            scan_params.page = page_num
-            result = self._fetch_car_page(scan_params)
-
-            if not result.success or not result.data:
-                break
-
-            for car in result.data:
+        def scan_page(cars) -> Optional[Any]:
+            for car in cars:
                 try:
-                    car_entry_int = int(car.auction_number)
+                    if int(car.auction_number) == target_int:
+                        return car
                 except (ValueError, TypeError):
                     continue
+            return None
 
-                if car_entry_int == target_int:
-                    found = AutohubResponse(
-                        success=True, data=[car],
+        # Probe page 1 — gives us total_pages and the lowest entry seen.
+        scan_params.page = 1
+        page1 = self._fetch_car_page(scan_params, bypass_cache=bypass_cache)
+        if not page1.success or not page1.data:
+            self._save_to_cache(cache_key, make_not_found())
+            return make_not_found()
+
+        found = scan_page(page1.data)
+        if found is not None:
+            result = AutohubResponse(
+                success=True, data=[found],
+                total_count=1, total_pages=1,
+                current_page=1, page_size=params.page_size,
+            )
+            self._save_to_cache(cache_key, result)
+            return result
+
+        try:
+            page1_last = int(page1.data[-1].auction_number)
+        except (ValueError, TypeError):
+            # Non-numeric entries — can't binary-search safely.
+            self._save_to_cache(cache_key, make_not_found())
+            return make_not_found()
+
+        # Target ≤ page 1's max but not matched ⇒ sits in a gap or absent.
+        if target_int <= page1_last:
+            self._save_to_cache(cache_key, make_not_found())
+            return make_not_found()
+
+        # Sanity cap: never probe more than 200 distinct pages (= 20k cars).
+        total_pages = min(page1.total_pages or 1, 200)
+        if total_pages <= 1:
+            self._save_to_cache(cache_key, make_not_found())
+            return make_not_found()
+
+        # Binary-search pages [2 .. total_pages].
+        low, high = 2, total_pages
+        visited: set[int] = {1}
+        max_probes = 12  # log2(2000) ≈ 11; covers our 200-page cap with slack.
+
+        for _ in range(max_probes):
+            if low > high:
+                break
+            mid = (low + high) // 2
+            if mid in visited:
+                break
+            visited.add(mid)
+
+            scan_params.page = mid
+            page = self._fetch_car_page(scan_params, bypass_cache=bypass_cache)
+            if not page.success or not page.data:
+                break
+
+            try:
+                first_int = int(page.data[0].auction_number)
+                last_int = int(page.data[-1].auction_number)
+            except (ValueError, TypeError):
+                break
+
+            if first_int <= target_int <= last_int:
+                found = scan_page(page.data)
+                if found is not None:
+                    result = AutohubResponse(
+                        success=True, data=[found],
                         total_count=1, total_pages=1,
                         current_page=1, page_size=params.page_size,
                     )
-                    self._save_to_cache(cache_key, found)
-                    return found
-
-                if car_entry_int > target_int:
-                    # Passed target in sorted order — not found
-                    break
+                    self._save_to_cache(cache_key, result)
+                    return result
+                # Target falls in a gap on this page — not in catalogue.
+                break
+            elif target_int < first_int:
+                high = mid - 1
             else:
-                # Inner loop completed without break; check if more pages exist
-                if page_num >= result.total_pages:
-                    break
-                continue
-            break  # Inner loop broke (early termination)
+                low = mid + 1
 
-        not_found = AutohubResponse(
-            success=True, data=[], total_count=0,
-            total_pages=0, current_page=1, page_size=params.page_size,
-        )
-        self._save_to_cache(cache_key, not_found)
-        return not_found
+        self._save_to_cache(cache_key, make_not_found())
+        return make_not_found()
 
     def get_brands(self, force_live: bool = False) -> AutohubBrandsResponse:
         """Fetch hierarchical brands.

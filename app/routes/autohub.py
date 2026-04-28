@@ -46,12 +46,22 @@ def get_autohub_service() -> AutohubService:
 )
 async def search_cars(
     search_params: AutohubSearchRequest,
+    bypass_cache: bool = Query(
+        False,
+        description=(
+            "Skip the in-memory result cache for this request. Useful when "
+            "an earlier upstream blip cached an empty/stale page."
+        ),
+    ),
     service: AutohubService = Depends(get_autohub_service),
 ) -> AutohubResponse:
     """Search cars with multi-brand filters and pagination."""
     try:
-        logger.info(f"Search request: page={search_params.page}, brands={search_params.car_brands}")
-        return service.get_car_list(search_params)
+        logger.info(
+            f"Search request: page={search_params.page}, "
+            f"brands={search_params.car_brands}, bypass_cache={bypass_cache}"
+        )
+        return service.get_car_list(search_params, bypass_cache=bypass_cache)
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
         return AutohubResponse(
