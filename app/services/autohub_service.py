@@ -497,8 +497,15 @@ class AutohubService:
 
             scan_params.page = mid
             page = self._fetch_car_page(scan_params, bypass_cache=bypass_cache)
-            if not page.success or not page.data:
+            if not page.success:
+                # Genuine upstream error — abort rather than guess.
                 break
+            if not page.data:
+                # Empty page beyond the real end of the catalogue (the API's
+                # total_pages can be overstated). Narrow the upper bound and
+                # keep probing instead of giving up.
+                high = mid - 1
+                continue
 
             try:
                 first_int = int(page.data[0].auction_number)
