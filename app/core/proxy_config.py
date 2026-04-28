@@ -48,25 +48,11 @@ class ProxyEntry:
 # Order defines the round-robin sequence on a fresh pool instance.
 _DEFAULT_ENTRIES: List[ProxyEntry] = [
     ProxyEntry(
-        name="oxylabs-kr",
-        host="pr.oxylabs.io:7777",
-        username_template="customer-arman_zVdZn-cc-kr",
-        password="~eEYPgwRzO+I2",
+        name="bestproxy-kr-primary",
+        host="proxy.bestproxy.com:2312",
+        username_template="bp-hjmqitj9abkx_area-KR_life-5_session-svvOi3VRd8MB",
+        password="B1Tdf3CVWjhrwbp0",
         supports_sticky=False,
-    ),
-    ProxyEntry(
-        name="bestproxy-1",
-        host="proxy.bestproxy.com:2312",
-        username_template="bp-bfk2u7wtb3gy_area-KR_life-60_session-{session}",
-        password="zwj1SkzW69P1nhUs",
-        supports_sticky=True,
-    ),
-    ProxyEntry(
-        name="bestproxy-2",
-        host="proxy.bestproxy.com:2312",
-        username_template="bp-lahzo3m0c207_area-KR_life-60_session-{session}",
-        password="8IXa2Dlz8XtIy0zN",
-        supports_sticky=True,
     ),
 ]
 
