@@ -1,5 +1,6 @@
 import requests
 import json
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -8,6 +9,7 @@ import warnings
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.core.session_manager import SessionManager
 from app.models.lotte_filters import (
     LotteManufacturer,
     LotteModel,
@@ -24,6 +26,16 @@ from app.models.lotte_filters import (
     LotteCarResult,
 )
 from app.parsers.lotte_filter_parser import LotteFilterParser
+
+
+# Indicators that Lotte returned a login page (or its JSON equivalent) instead
+# of the requested resource — used to detect a silently-expired session.
+_LOTTE_LOGIN_PAGE_MARKERS = (
+    "<title>로그인 | 롯데오토옥션</title>",
+    "경매회원전용 로그인",
+    '"result":"fail_notAuctLogin"',
+    "fail_notAuctLogin",
+)
 
 
 def _normalize_exhibition_number(raw: Optional[str]) -> str:
@@ -45,14 +57,23 @@ class LotteFilterService:
         self.authenticated = False
         self.cache = {}
         self.cache_ttl = 3600  # 1 час для фильтров
-        
+
+        # Session lifecycle state — mirrors LotteService so we can reuse
+        # SessionManager and the cross-worker auth_coordinator.
+        self.session_manager = SessionManager()
+        self.session_max_age_minutes = 25
+        self.session_created_at: Optional[datetime] = None
+        self.consecutive_failures = 0
+
         # Disable SSL warnings
         warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
         # URL для API фильтров и аутентификации
         self.filter_url = "/hp/auct/myp/entry/selectMultiComboVehi.do"
         self.search_url = "/hp/auct/myp/entry/selectMypEntryList.do"
-        
+        # Lightweight protected page used by _validate_session.
+        self.session_probe_url = "/hp/auct/myp/entry/selectMypEntryList.do"
+
         # URLs для аутентификации (такие же как в LotteService)
         self.login_url = "/hp/auct/cmm/viewLoginUsr.do?loginMode=redirect"
         self.login_check_url = "/hp/auct/cmm/selectAuctMemLoginCheckAjax.do"
@@ -76,6 +97,10 @@ class LotteFilterService:
             "sec-ch-ua-platform": '"macOS"',
         }
 
+        # Pick up cookies persisted by LotteService or a previous Filter run.
+        # Mirrors LotteService.__init__ → _restore_session().
+        self._restore_session()
+
     def _init_session(self) -> requests.Session:
         """Инициализация сессии с retry стратегией"""
         if self.session is None:
@@ -96,132 +121,242 @@ class LotteFilterService:
 
         return self.session
     
-    def _authenticate(self) -> bool:
-        """Аутентификация в системе Lotte (двухэтапный процесс)"""
-        try:
-            session = self._init_session()
-            
-            # Логин и пароль из конфига
-            login = settings.lotte_username
-            password = settings.lotte_password
-            
-            logger.info(f"Начинаем аутентификацию в Lotte Filter Service для пользователя: {login}")
-            
-            # Шаг 1: Получаем страницу логина для получения cookies и сессии
-            login_page_url = urljoin(self.base_url, self.login_url)
-            response = session.get(login_page_url, timeout=30, verify=False)
-            
-            if response.status_code != 200:
-                logger.error(f"Не удалось получить страницу логина: HTTP {response.status_code}")
-                return False
-            
-            logger.debug(f"Страница логина получена, размер: {len(response.text)} символов")
-            
-            # Шаг 2: Проверяем логин данные через AJAX
-            login_check_url = urljoin(self.base_url, self.login_check_url)
-            
-            # Подготавливаем данные для проверки логина
-            login_check_data = {
-                "userId": login,
-                "userPwd": password,
-                "resultCd": "",
-            }
-            
-            # Обновляем headers для AJAX запроса
-            session.headers.update({
-                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-                "X-Requested-With": "XMLHttpRequest",
-                "Referer": login_page_url,
-                "Accept": "application/json, text/javascript, */*; q=0.01",
-            })
-            
-            # Отправляем AJAX запрос для проверки логина
-            check_response = session.post(
-                login_check_url, data=login_check_data, timeout=30, verify=False
-            )
-            
-            logger.debug(f"Проверка логина: HTTP {check_response.status_code}")
-            
-            if check_response.status_code != 200:
-                logger.error(f"Ошибка проверки логина: HTTP {check_response.status_code}")
-                return False
-            
-            # Проверяем результат
-            try:
-                check_result = check_response.json()
-                logger.debug(f"Результат проверки логина: {check_result}")
-                
-                # Lotte возвращает пустой объект или специфичные поля при успехе
-                # Проверяем отсутствие ошибок
-                if check_result.get("resultCd") == "0000" or (
-                    not check_result.get("error") and 
-                    not check_result.get("fail") and
-                    "auPswdUptEndYn" in check_result
-                ):
-                    logger.info("Проверка логина прошла успешно")
-                    
-                    # Шаг 3: Финальный логин
-                    login_action_url = urljoin(self.base_url, self.login_action_url)
-                    
-                    # Данные для финального логина
-                    final_login_data = {
-                        "userId": login,
-                        "userPwd": password,
-                    }
-                    
-                    # Обновляем headers для финального логина
-                    session.headers.update({
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Referer": login_page_url,
-                    })
-                    # Удаляем AJAX заголовок
-                    if "X-Requested-With" in session.headers:
-                        del session.headers["X-Requested-With"]
-                    
-                    final_response = session.post(
-                        login_action_url,
-                        data=final_login_data,
-                        timeout=30,
-                        verify=False,
-                    )
-                    
-                    logger.debug(f"Финальный логин: HTTP {final_response.status_code}")
-                    
-                    if final_response.status_code in [200, 302, 303]:
-                        self.authenticated = True
-                        logger.info("✅ Аутентификация в Lotte Filter Service успешна!")
-                        logger.debug(f"Cookies после аутентификации: {session.cookies.get_dict()}")
-                        
-                        # Восстанавливаем заголовок для последующих запросов
-                        session.headers["X-Requested-With"] = "XMLHttpRequest"
-                        
-                        return True
-                    else:
-                        logger.error(f"Неожиданный статус финального логина: {final_response.status_code}")
-                        return False
-                else:
-                    logger.error(f"Неверный результат проверки логина: {check_result}")
-                    return False
-                    
-            except json.JSONDecodeError as json_error:
-                logger.error(f"Ошибка при разборе ответа: {json_error}")
-                logger.error(f"Текст ответа: {check_response.text[:500]}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Ошибка аутентификации: {e}")
+    def _is_login_page(self, html: str) -> bool:
+        """Detect a Lotte login redirect / fail_notAuctLogin marker in a response body."""
+        if not html:
             return False
+        return any(marker in html for marker in _LOTTE_LOGIN_PAGE_MARKERS)
+
+    def _validate_session(self) -> bool:
+        """Validate current cookies by hitting a protected page; True if not the login page."""
+        try:
+            if self.session is None:
+                return False
+            probe_url = urljoin(self.base_url, self.session_probe_url)
+            response = self.session.get(probe_url, timeout=15, verify=False)
+            if response.status_code != 200:
+                logger.warning(
+                    f"[lotte-filter] session probe HTTP {response.status_code}"
+                )
+                return False
+            if self._is_login_page(response.text):
+                logger.warning("[lotte-filter] session probe returned login page")
+                return False
+            return True
+        except Exception as e:
+            logger.warning(f"[lotte-filter] session validation error: {e}")
+            return False
+
+    def _is_session_expired(self) -> bool:
+        """Tell auth_coordinator whether to refresh based on age."""
+        if self.session_created_at is None:
+            return True
+        age = datetime.now() - self.session_created_at
+        return age > timedelta(minutes=self.session_max_age_minutes)
+
+    def _record_failure(self, _err: Exception) -> None:
+        """Track consecutive failures (used by auth_coordinator-style flows)."""
+        self.consecutive_failures += 1
+
+    def _save_session(self) -> None:
+        """Persist current cookies to disk so other workers/services can reuse them."""
+        try:
+            if self.session is None or not self.authenticated:
+                return
+            cookies = dict(self.session.cookies)
+            metadata = {
+                "authenticated": True,
+                "base_url": self.base_url,
+                "saved_by": "LotteFilterService",
+            }
+            self.session_manager.save_session("lotte", cookies, metadata=metadata)
+            logger.info("✅ Lotte filter session saved (shared with LotteService)")
+        except Exception as e:
+            logger.error(f"Error saving Lotte filter session: {e}")
+
+    def _restore_session(self) -> None:
+        """Load cookies persisted by LotteService (or a previous run) and validate them."""
+        try:
+            session_data = self.session_manager.load_session("lotte")
+            if not session_data:
+                return
+
+            age = self.session_manager.get_session_age("lotte")
+            if age and age > timedelta(minutes=self.session_max_age_minutes):
+                logger.warning(
+                    f"[lotte-filter] saved session too old "
+                    f"({age.total_seconds() / 60:.1f} min), discarding"
+                )
+                return
+
+            self.session = None  # force a fresh _init_session
+            session = self._init_session()
+
+            cookies = session_data if isinstance(session_data, dict) else {}
+            if "cookies" in cookies and isinstance(cookies.get("cookies"), dict):
+                cookies = cookies["cookies"]
+            for name, value in cookies.items():
+                if isinstance(value, str):
+                    session.cookies.set(name, value)
+
+            if self._validate_session():
+                self.authenticated = True
+                self.session_created_at = datetime.now()
+                logger.info("✅ Lotte filter session restored from shared store")
+            else:
+                logger.warning(
+                    "[lotte-filter] restored session failed validation, will re-auth on demand"
+                )
+                self.authenticated = False
+                self.session = None
+        except Exception as e:
+            logger.error(f"[lotte-filter] error restoring session: {e}")
+            self.authenticated = False
+
+    def _load_shared_session(self) -> bool:
+        """Hook called by auth_coordinator when another worker just authenticated."""
+        try:
+            session_data = self.session_manager.load_session("lotte")
+            if not session_data:
+                return False
+
+            age = self.session_manager.get_session_age("lotte")
+            if age and age > timedelta(minutes=self.session_max_age_minutes):
+                return False
+
+            self.session = None
+            session = self._init_session()
+            cookies = session_data if isinstance(session_data, dict) else {}
+            if "cookies" in cookies and isinstance(cookies.get("cookies"), dict):
+                cookies = cookies["cookies"]
+            for name, value in cookies.items():
+                if isinstance(value, str):
+                    session.cookies.set(name, value)
+
+            if self._validate_session():
+                self.authenticated = True
+                self.session_created_at = datetime.now()
+                return True
+            self.session = None
+            return False
+        except Exception as e:
+            logger.debug(f"[lotte-filter] error loading shared session: {e}")
+            return False
+
+    def _authenticate(self) -> bool:
+        """Cross-worker-safe re-auth via the shared auth_coordinator."""
+        from app.core.auth_coordinator import ensure_authenticated
+        return ensure_authenticated(self)
+
+    def _ensure_session(self) -> bool:
+        """Single entry point: returns True iff we have a valid authenticated session."""
+        if self.authenticated and self.session and not self._is_session_expired():
+            return True
+        return self._authenticate()
+
+    def _do_authenticate(self) -> bool:
+        """Core 3-step Lotte login. Called by auth_coordinator under cross-worker lock.
+
+        Returns True on success, False on non-retriable failure. Raises on retriable
+        network/protocol failures so the coordinator can record state correctly.
+        """
+        # Force a fresh session so previous broken cookies don't poison the login flow.
+        self.session = None
+        session = self._init_session()
+
+        login = settings.lotte_username
+        password = settings.lotte_password
+
+        logger.info(
+            f"[lotte-filter] начинаем аутентификацию для пользователя: {login}"
+        )
+
+        # Step 1: GET login page (collect cookies + JSESSIONID).
+        login_page_url = urljoin(self.base_url, self.login_url)
+        response = session.get(login_page_url, timeout=30, verify=False)
+        if response.status_code != 200:
+            raise Exception(
+                f"Lotte login page fetch failed: HTTP {response.status_code}"
+            )
+        logger.debug(
+            f"[lotte-filter] login page fetched ({len(response.text)} chars)"
+        )
+
+        # Step 2: AJAX credential check.
+        login_check_url = urljoin(self.base_url, self.login_check_url)
+        login_check_data = {
+            "userId": login,
+            "userPwd": password,
+            "resultCd": "",
+        }
+        session.headers.update({
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": login_page_url,
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        })
+        check_response = session.post(
+            login_check_url, data=login_check_data, timeout=30, verify=False
+        )
+        if check_response.status_code != 200:
+            raise Exception(
+                f"Lotte login check failed: HTTP {check_response.status_code}"
+            )
+        try:
+            check_result = check_response.json()
+        except json.JSONDecodeError as json_error:
+            logger.error(
+                f"[lotte-filter] login check non-JSON body[:500]={check_response.text[:500]!r}"
+            )
+            raise Exception(f"Lotte login check returned non-JSON: {json_error}")
+
+        ok = check_result.get("resultCd") == "0000" or (
+            not check_result.get("error")
+            and not check_result.get("fail")
+            and "auPswdUptEndYn" in check_result
+        )
+        if not ok:
+            logger.error(f"[lotte-filter] login check rejected: {check_result}")
+            return False
+
+        # Step 3: final POST that actually establishes the auth cookie.
+        login_action_url = urljoin(self.base_url, self.login_action_url)
+        final_login_data = {"userId": login, "userPwd": password}
+        session.headers.update({
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Referer": login_page_url,
+        })
+        session.headers.pop("X-Requested-With", None)
+
+        final_response = session.post(
+            login_action_url,
+            data=final_login_data,
+            timeout=30,
+            verify=False,
+            allow_redirects=False,
+        )
+        if final_response.status_code not in (200, 302, 303):
+            raise Exception(
+                f"Lotte final login failed: HTTP {final_response.status_code}"
+            )
+
+        # Restore AJAX header for subsequent filter requests.
+        session.headers["X-Requested-With"] = "XMLHttpRequest"
+
+        # Validate cookies actually unlock protected pages.
+        if not self._validate_session():
+            raise Exception("Lotte login POST succeeded but session validation failed")
+
+        logger.info("✅ Lotte filter authentication validated")
+        return True
 
     def _make_request(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Выполнение POST запроса к API фильтров с аутентификацией"""
         try:
-            # Проверяем аутентификацию
-            if not self.authenticated:
-                logger.info("Требуется аутентификация для API фильтров")
-                if not self._authenticate():
-                    logger.error("Не удалось аутентифицироваться для API фильтров")
-                    return None
-            
+            if not self._ensure_session():
+                logger.error("Не удалось аутентифицироваться для API фильтров")
+                return None
+
             session = self._init_session()
             url = self.base_url + self.filter_url
 
@@ -233,26 +368,37 @@ class LotteFilterService:
                 try:
                     json_data = response.json()
                     logger.info(f"Получен ответ от API: {len(str(json_data))} символов")
-                    
-                    # Проверяем, не истекла ли сессия
-                    if isinstance(json_data, dict) and json_data.get("result") == "fail_notAuctLogin":
-                        logger.warning("Сессия истекла, требуется повторная аутентификация")
+
+                    # Detect a stale-session response and re-auth once.
+                    if (
+                        isinstance(json_data, dict)
+                        and json_data.get("result") == "fail_notAuctLogin"
+                    ):
+                        logger.warning(
+                            "Сессия истекла, требуется повторная аутентификация"
+                        )
                         self.authenticated = False
-                        
-                        # Пробуем аутентифицироваться заново
+                        self.session_created_at = None
+
                         if self._authenticate():
-                            # Повторяем запрос после успешной аутентификации
-                            response = session.post(url, data=data, timeout=30, verify=False)
+                            session = self._init_session()
+                            response = session.post(
+                                url, data=data, timeout=30, verify=False
+                            )
                             if response.status_code == 200:
                                 json_data = response.json()
-                                logger.info(f"Повторный запрос успешен: {len(str(json_data))} символов")
+                                logger.info(
+                                    f"Повторный запрос успешен: {len(str(json_data))} символов"
+                                )
                             else:
-                                logger.error(f"Повторный запрос неудачен: HTTP {response.status_code}")
+                                logger.error(
+                                    f"Повторный запрос неудачен: HTTP {response.status_code}"
+                                )
                                 return None
                         else:
                             logger.error("Не удалось повторно аутентифицироваться")
                             return None
-                    
+
                     return json_data
                 except json.JSONDecodeError:
                     logger.error("Ошибка декодирования JSON ответа")
@@ -635,27 +781,24 @@ class LotteFilterService:
             if filter_request.mprice_car_codes:
                 search_data["set_search_chk_mpriceCar"] = filter_request.mprice_car_codes
 
-            # Выполняем поиск
+            # Ensure a valid session up front. _ensure_session re-auths only if
+            # cookies are stale; cheap on the warm path.
+            if not self._ensure_session():
+                logger.error("[lotte-filter] pre-search authentication failed")
+                return LotteSearchResponse(
+                    success=False,
+                    message=(
+                        "Сессия Lotte истекла, идёт восстановление. "
+                        "Попробуйте через минуту."
+                    ),
+                    error_code="SESSION_REAUTH_FAILED",
+                    cars=[],
+                    total_count=0,
+                    page=filter_request.page,
+                    per_page=filter_request.per_page,
+                    filters_applied=filter_request.model_dump(),
+                )
             session = self._init_session()
-
-            # Lot-number searches are the highest-signal queries; a stale Lotte session
-            # silently returns the login page (parsed as `no_table`). For these searches,
-            # ensure we're authenticated up-front so we don't waste a round-trip.
-            if exhi_norm and not self.authenticated:
-                logger.info("[lotte] lot-number search but not authenticated; logging in first")
-                if not self._authenticate():
-                    logger.error("[lotte] pre-search authentication failed")
-                    return LotteSearchResponse(
-                        success=False,
-                        message="Lotte authentication failed before search",
-                        error_code="SESSION_REAUTH_FAILED",
-                        cars=[],
-                        total_count=0,
-                        page=filter_request.page,
-                        per_page=filter_request.per_page,
-                        filters_applied=filter_request.model_dump(),
-                    )
-                session = self._init_session()
 
             # Обновляем headers для поиска
             search_headers = self.headers.copy()
@@ -687,11 +830,15 @@ class LotteFilterService:
 
             if response.status_code != 200:
                 logger.error(
-                    f"[lotte] search HTTP {response.status_code}, body[:500]={response.text[:500]!r}"
+                    f"[lotte-filter] search HTTP {response.status_code}, "
+                    f"body[:500]={response.text[:500]!r}"
                 )
                 return LotteSearchResponse(
                     success=False,
-                    message=f"Lotte upstream returned HTTP {response.status_code}",
+                    message=(
+                        f"Сервер Lotte вернул ошибку (HTTP {response.status_code}). "
+                        "Попробуйте позже."
+                    ),
                     error_code="UPSTREAM_HTTP_ERROR",
                     cars=[],
                     total_count=0,
@@ -701,42 +848,65 @@ class LotteFilterService:
                 )
 
             # Парсим HTML результаты + получаем статус, чтобы отличить
-            # реальный пустой ответ от поломки разметки/протухшей сессии
+            # реальный пустой ответ от поломки разметки/протухшей сессии.
             html_content = response.text
             cars, parse_status = self.parser.parse_car_search_html_with_status(html_content)
 
-            # If the table is missing on a lot-number search, the most likely cause is
-            # a silently-expired Lotte session returning the login redirect. Re-auth
-            # once and retry — this is the single most common "works for dev, not for users"
-            # failure mode in shared-backend setups.
-            if parse_status == "no_table" and exhi_norm:
+            # Detect a silently-expired Lotte session: either the parser couldn't
+            # find tbl-t02 OR the body explicitly looks like the login redirect /
+            # `fail_notAuctLogin` JSON. Re-auth once and retry — this is the single
+            # most common production failure mode (shared-backend cookie aging,
+            # parallel worker invalidation, etc.). Applies to ALL filter searches,
+            # not just lot-number lookups.
+            looks_like_login = self._is_login_page(html_content)
+            if parse_status == "no_table" or looks_like_login:
                 logger.warning(
-                    "[lotte] tbl-t02 missing on lot-number search; attempting re-auth + retry"
+                    f"[lotte-filter] stale-session signature detected "
+                    f"(parse_status={parse_status}, login_page={looks_like_login}); "
+                    f"attempting re-auth + retry"
                 )
                 self.authenticated = False
+                self.session_created_at = None
                 if self._authenticate():
+                    session = self._init_session()
                     response = _do_post()
                     if response.status_code == 200:
                         html_content = response.text
-                        cars, parse_status = self.parser.parse_car_search_html_with_status(html_content)
+                        cars, parse_status = self.parser.parse_car_search_html_with_status(
+                            html_content
+                        )
+                        looks_like_login = self._is_login_page(html_content)
+                    else:
+                        logger.error(
+                            f"[lotte-filter] post-reauth retry HTTP {response.status_code}"
+                        )
 
-            if parse_status in ("no_table", "no_tbody", "parse_error"):
-                error_code_map = {
-                    "no_table": "PARSE_NO_TABLE",
-                    "no_tbody": "PARSE_NO_TBODY",
-                    "parse_error": "PARSE_ERROR",
-                }
+            if parse_status != "ok":
+                # Distinguish a still-stale session (login page) from a true markup
+                # change so the frontend can show different copy / retry behaviour.
+                if looks_like_login or parse_status == "no_table":
+                    final_code = "SESSION_EXPIRED" if looks_like_login else "PARSE_NO_TABLE"
+                    user_msg = (
+                        "Сессия Lotte истекла, идёт восстановление. "
+                        "Попробуйте через минуту."
+                        if final_code == "SESSION_EXPIRED"
+                        else "Lotte изменил разметку страницы. Мы уже разбираемся."
+                    )
+                elif parse_status == "no_tbody":
+                    final_code = "PARSE_NO_TBODY"
+                    user_msg = "Lotte изменил разметку страницы. Мы уже разбираемся."
+                else:
+                    final_code = "PARSE_ERROR"
+                    user_msg = "Не удалось обработать ответ Lotte. Попробуйте позже."
+
                 logger.error(
-                    f"[lotte] search parse failed with status='{parse_status}' "
-                    f"(exhibition_number='{exhi_norm}'); response body[:500]={response.text[:500]!r}"
+                    f"[lotte-filter] search parse failed status={parse_status} "
+                    f"final_code={final_code} body[:500]={response.text[:500]!r}"
                 )
                 return LotteSearchResponse(
                     success=False,
-                    message=(
-                        "Lotte returned a page without the expected results table — "
-                        "session may have expired or markup changed"
-                    ),
-                    error_code=error_code_map[parse_status],
+                    message=user_msg,
+                    error_code=final_code,
                     cars=[],
                     total_count=0,
                     page=filter_request.page,
