@@ -65,3 +65,15 @@ debug_*.json
 # Documentation (будем создавать на сервере)
 README_*.md
 *_REPORT.md
+
+# Runtime artifacts — never commit (sessions, caches, debug dumps)
+cache/
+debug_html/
+accident_diagram_*.json
+api_response_*.json
+car_detail_*.html
+current_auction_sessions.json
+direct_api_response.html
+ssancar_response.html
+debug_generations_response.txt
+auctions-auth.txt
