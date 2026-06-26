@@ -1015,6 +1015,14 @@ async def get_heydealer_car_detail_with_tech_sheet(
             customer_comment=detail_section.get("customer_comment"),
             inspector_comment=detail_section.get("inspector_comment"),
             comment=detail_section.get("comment"),
+            # Новые секции HeyDealer (도막 측정 / 평가사 의견 / 엔진음)
+            paint_thickness_inspection=detail_section.get(
+                "paint_thickness_inspection"
+            ),
+            refined_inspector_comment_items=detail_section.get(
+                "refined_inspector_comment_items"
+            ),
+            engine_sound_video=detail_section.get("engine_sound_video"),
             # История автомобиля
             carhistory=detail_section.get("carhistory"),
             carhistory_summary=detail_section.get("carhistory_summary"),

@@ -887,6 +887,17 @@ class HeyDealerCarWithTechSheet(BaseModel):
     inspector_comment: Optional[str] = Field(None, description="Комментарий инспектора")
     comment: Optional[str] = Field(None, description="Общий комментарий")
 
+    # Новые секции HeyDealer
+    paint_thickness_inspection: Optional[Dict[str, Any]] = Field(
+        None, description="Замеры толщины ЛКП по панелям (도막 측정결과)"
+    )
+    refined_inspector_comment_items: Optional[List[Dict[str, Any]]] = Field(
+        default=None, description="Структурированное мнение оценщика (평가사 기타 의견)"
+    )
+    engine_sound_video: Optional[str] = Field(
+        None, description="URL видео со звуком двигателя (엔진음)"
+    )
+
     # История автомобиля
     carhistory: Optional[Dict[str, Any]] = Field(
         None, description="Полная история автомобиля"
