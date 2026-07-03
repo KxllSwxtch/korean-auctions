@@ -57,9 +57,9 @@ async def get_ssancar_cars(
     fuel: Optional[str] = Query(None, description="Fuel type in Korean"),
     color: Optional[str] = Query(None, description="Color in Korean"),
     year_from: Optional[int] = Query(2000, description="Year from"),
-    year_to: Optional[int] = Query(2025, description="Year to"),
-    price_from: Optional[int] = Query(0, description="Price from in USD"),
-    price_to: Optional[int] = Query(200000, description="Price to in USD"),
+    year_to: Optional[int] = Query(None, description="Year to (defaults to next year)"),
+    price_from: Optional[int] = Query(0, description="Price from (upstream ssancar.com filter units — historically USD)"),
+    price_to: Optional[int] = Query(200000, description="Price to (upstream ssancar.com filter units — historically USD)"),
     stock_no: Optional[str] = Query(None, description="Stock number search"),
     service: SSANCARService = Depends(get_ssancar_service)
 ) -> SSANCARResponse:
@@ -87,7 +87,7 @@ async def get_ssancar_cars(
             fuel=fuel or "",
             color=color or "",
             yearFrom=str(year_from),
-            yearTo=str(year_to),
+            yearTo=str(year_to or (datetime.now().year + 1)),
             priceFrom=str(price_from),
             priceTo=str(price_to),
             list=str(page_size),
@@ -167,9 +167,9 @@ async def get_total_count(
     model: Optional[str] = Query(None, description="Model code"),
     fuel: Optional[str] = Query(None, description="Fuel type in Korean"),
     year_from: Optional[int] = Query(2000, description="Year from"),
-    year_to: Optional[int] = Query(2025, description="Year to"),
-    price_from: Optional[int] = Query(0, description="Price from in USD"),
-    price_to: Optional[int] = Query(200000, description="Price to in USD"),
+    year_to: Optional[int] = Query(None, description="Year to (defaults to next year)"),
+    price_from: Optional[int] = Query(0, description="Price from (upstream ssancar.com filter units — historically USD)"),
+    price_to: Optional[int] = Query(200000, description="Price to (upstream ssancar.com filter units — historically USD)"),
     service: SSANCARService = Depends(get_ssancar_service)
 ) -> SSANCARTotalCountResponse:
     """
@@ -195,8 +195,10 @@ async def get_total_count(
             week_no = "5" if current_day >= 3 else "2"
         
         # Build filters if any provided
+        default_year_to = datetime.now().year + 1
+        effective_year_to = year_to or default_year_to
         filters = None
-        if any([manufacturer, model, fuel, year_from != 2000, year_to != 2025, 
+        if any([manufacturer, model, fuel, year_from != 2000, effective_year_to != default_year_to,
                 price_from != 0, price_to != 200000, week_no]):
             filters = SSANCARFilters(
                 weekNo=week_no,  # Always pass a week number
@@ -204,7 +206,7 @@ async def get_total_count(
                 model=model or "",
                 fuel=fuel or "",
                 yearFrom=str(year_from),
-                yearTo=str(year_to),
+                yearTo=str(effective_year_to),
                 priceFrom=str(price_from),
                 priceTo=str(price_to),
                 list="15",
@@ -224,7 +226,7 @@ async def get_total_count(
             filters_applied["fuel"] = fuel
         if year_from != 2000:
             filters_applied["year_from"] = year_from
-        if year_to != 2025:
+        if year_to and year_to != default_year_to:
             filters_applied["year_to"] = year_to
         if price_from != 0:
             filters_applied["price_from"] = price_from
@@ -601,7 +603,7 @@ async def search_ssancar_cars_compat(
         fuel=filters.get("fuel", ""),
         color=filters.get("color", ""),
         yearFrom=str(filters.get("year_from", 2000)),
-        yearTo=str(filters.get("year_to", 2025)),
+        yearTo=str(filters.get("year_to") or (datetime.now().year + 1)),
         priceFrom=str(filters.get("price_from", 0)),
         priceTo=str(filters.get("price_to", 200000)),
         list=str(filters.get("page_size", 15)),

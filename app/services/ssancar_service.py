@@ -299,8 +299,11 @@ class SSANCARService:
     def fetch_cars(self, filters: SSANCARFilters) -> SSANCARResponse:
         """Fetch cars from SSANCAR with filters"""
         try:
-            # Auto-set weekNo if not provided
-            if not filters.weekNo or filters.weekNo == "4":
+            # Auto-set weekNo unless it names a real auction day (2=Tue, 5=Fri).
+            # Clients occasionally send weekday numbers 1/3/4 — normalize them
+            # via the Seoul-time schedule instead of hitting upstream with an
+            # invalid auction day (which returns an empty list).
+            if filters.weekNo not in ("2", "5"):
                 filters.weekNo = self._get_week_number()
                 logger.info(f"📅 Auto-set weekNo to {filters.weekNo} based on current day")
 

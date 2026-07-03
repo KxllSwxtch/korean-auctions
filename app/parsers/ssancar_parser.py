@@ -77,17 +77,106 @@ class SSANCARParser:
         always empty — the service backfills it after parsing. We therefore
         cannot gate on car_no here. Instead we gate on a real name AND at
         least one meaningful signal (year, price, images). Fake/login/error
-        pages carry none of those.
+        pages carry none of those. The price signal requires at least one
+        digit so a scraped label like "Bid" never counts.
         """
         has_name = bool(detail.full_name) or (
             bool(detail.manufacturer) and bool(detail.model)
         )
         has_signal = (
             (detail.year and detail.year > 0)
-            or bool(detail.starting_price)
+            or bool(re.search(r'\d', detail.starting_price or ""))
             or bool(detail.images)
         )
         return has_name and has_signal
+
+    @staticmethod
+    def _extract_year(text: str) -> int:
+        """Extract a model year from a detail span.
+
+        SSANCAR emits either a bare year ("2016") or year.month ("2022.03")
+        depending on markup generation. Values outside a plausible model-year
+        window are rejected so bare numbers like a 4-digit mileage never
+        classify as a year.
+        """
+        match = re.match(r'^(\d{4})(?:\.\d{1,2})?$', text)
+        if not match:
+            return 0
+        year = int(match.group(1))
+        from datetime import datetime
+        if 1980 <= year <= datetime.now().year + 2:
+            return year
+        return 0
+
+    @staticmethod
+    def _parse_money_block(money_elem) -> Tuple[int, str, str]:
+        """Extract (price, currency, raw display string) from a p.money node.
+
+        Handles every observed markup generation, canonical-currency first:
+        - 2026 detail markup: <span class="pr-lbl">Bid</span> followed by
+          <span class="pr-cur">₩ <b>10,400,000</b></span> (+ $/€ variants).
+        - 2026 list markup: symbols as loose text between plain num spans —
+          "Bid ₩ <span class='num'>10,400,000</span> $ <span class='num'>6,797</span> …".
+        - legacy markup: <span class="bid">Bid</span> <span class="num">3,083</span>$~
+          (single pre-converted USD figure, symbol AFTER the number).
+        The ₩ figure always wins over $/€ so bid_price stays whole KRW.
+        Returns (0, "KRW", "") when nothing parses.
+        """
+        def to_int(text: str) -> int:
+            digits = re.sub(r'[^\d]', '', text)
+            return int(digits) if digits else 0
+
+        if money_elem is None:
+            return 0, "KRW", ""
+
+        # Currency-tagged pr-cur spans (₩ preferred over $)
+        pr_spans = money_elem.find_all('span', class_='pr-cur')
+        for symbol, currency in (('₩', 'KRW'), ('$', 'USD')):
+            for span in pr_spans:
+                span_text = ' '.join(span.get_text().split())
+                if symbol in span_text:
+                    amount_elem = span.find('b')
+                    amount = to_int(amount_elem.get_text() if amount_elem else span_text)
+                    if amount > 0:
+                        return amount, currency, span_text
+
+        # Symbol-adjacent amounts in the flattened block text. Covers the
+        # 2026 list markup (symbol before the number) and any ₩/$ mix —
+        # the ₩ amount is checked first because KRW is canonical.
+        block_text = ' '.join(money_elem.get_text().split())
+        won_match = re.search(r'₩\s*([\d,]+)', block_text)
+        if won_match and to_int(won_match.group(1)) > 0:
+            amount = to_int(won_match.group(1))
+            return amount, "KRW", f"₩ {won_match.group(1)}"
+        usd_match = (
+            re.search(r'\$\s*([\d,]+)', block_text)
+            or re.search(r'([\d,]+)\s*\$', block_text)  # legacy "3,083$~"
+        )
+        if usd_match and to_int(usd_match.group(1)) > 0:
+            amount = to_int(usd_match.group(1))
+            return amount, "USD", f"$ {usd_match.group(1)}"
+
+        # No currency symbol at all: take span.num and guess by magnitude
+        # (Won amounts are 6-9 digits, converted USD figures 3-5).
+        num_span = money_elem.find('span', class_='num')
+        if num_span:
+            amount = to_int(num_span.get_text())
+            if amount > 0:
+                currency = "KRW" if amount >= 1_000_000 else "USD"
+                return amount, currency, ' '.join(num_span.get_text().split())
+
+        # Last resort: first digit-carrying span that isn't the "Bid" label
+        for span in money_elem.find_all('span'):
+            classes = span.get('class') or []
+            span_text = ' '.join(span.get_text().split())
+            if 'pr-lbl' in classes or 'bid' in classes or span_text.lower() == 'bid':
+                continue
+            if re.search(r'\d', span_text):
+                amount = to_int(span_text)
+                currency = "KRW" if amount >= 1_000_000 else "USD"
+                return amount, currency, span_text
+
+        return 0, "KRW", ""
     
     def parse_car_list(self, html: str) -> List[SSANCARCar]:
         """Parse car list from SSANCAR HTML response"""
@@ -124,18 +213,9 @@ class SSANCARParser:
                     detail_elem = item.find('ul', class_='detail')
                     year, mileage, mileage_formatted, fuel, transmission, grade = self._parse_details(detail_elem)
                     
-                    # Extract price
+                    # Extract price (canonical unit: whole KRW)
                     money_elem = item.find('p', class_='money')
-                    bid_price = 0
-                    if money_elem:
-                        # Find the span with class 'num' inside money element
-                        price_span = money_elem.find('span', class_='num')
-                        if price_span:
-                            price_text = price_span.text.strip().replace(',', '')
-                            try:
-                                bid_price = int(price_text)
-                            except ValueError:
-                                bid_price = 0
+                    bid_price, currency, _ = self._parse_money_block(money_elem)
                     
                     # Extract thumbnail
                     img_elem = item.find('img')
@@ -157,6 +237,7 @@ class SSANCARParser:
                         transmission=transmission,
                         grade=grade,
                         bid_price=bid_price,
+                        currency=currency,
                         thumbnail_url=thumbnail_url,
                         detail_url=detail_url,
                         source="SSANCAR"
@@ -236,9 +317,9 @@ class SSANCARParser:
         for i, span in enumerate(spans):
             text = span.text.strip()
 
-            # Year (4 digits)
-            if re.match(r'^\d{4}$', text):
-                year = int(text)
+            # Year ("2016" or "2022.03")
+            if self._extract_year(text):
+                year = self._extract_year(text)
             # Mileage (contains 'km')
             elif 'km' in text.lower():
                 mileage_formatted = text
@@ -363,9 +444,9 @@ class SSANCARParser:
                     for span in spans:
                         text = span.text.strip()
 
-                        # Year (4 digits)
-                        if re.match(r'^\d{4}$', text):
-                            year = int(text)
+                        # Year ("2016" or "2022.03")
+                        if self._extract_year(text):
+                            year = self._extract_year(text)
                         # Transmission
                         elif text.upper() in ['A/T', 'M/T', 'CVT', 'DCT']:
                             transmission = text
@@ -395,20 +476,9 @@ class SSANCARParser:
                             if mileage_num:
                                 mileage = int(mileage_num)
             
-            # Extract starting price
-            starting_price = ""
-            currency = "USD"
+            # Extract starting price (canonical unit: whole KRW)
             money_elem = soup.find('p', class_='money')
-            if money_elem:
-                money_span = money_elem.find('span')
-                if money_span:
-                    price_text = money_span.text.strip()
-                    starting_price = price_text
-                    # Determine currency from price format
-                    if '$' in price_text:
-                        currency = "USD"
-                    elif '₩' in price_text or 'won' in price_text.lower():
-                        currency = "KRW"
+            bid_price, currency, starting_price = self._parse_money_block(money_elem)
             
             # Extract images from swiper slides
             images = []
@@ -448,12 +518,13 @@ class SSANCARParser:
                         auction_start_date = start_match.group(1)
                         auction_end_date = auction_start_date  # SSANCAR typically has same day auctions
             
-            # Extract remaining time
+            # Extract remaining time. The page ships a JS-filled template
+            # ("Time :DHms") that collapses to a digit-free string when the
+            # countdown script hasn't run — treat that as no data.
             timer_elem = soup.find('strong', id='timer')
             if timer_elem:
-                # Get the formatted time string
                 time_text = timer_elem.get_text(strip=True)
-                auction_time_remaining = time_text if time_text else "Time :DHms"
+                auction_time_remaining = time_text if re.search(r'\d', time_text) else ""
             
             # Build the SSANCARCarDetail object
             from datetime import datetime
@@ -475,10 +546,10 @@ class SSANCARParser:
                 engine_size=engine_volume,
                 engine_volume=engine_volume,  # Set both engine_size and engine_volume
                 vin="",  # VIN not shown in public view
-                bid_price=0,  # Will be parsed from starting_price
+                bid_price=bid_price,
                 buy_now_price=0,  # Not available in SSANCAR
                 auction_date=datetime.now() if auction_start_date else None,
-                auction_status="active" if auction_time_remaining and "D" in auction_time_remaining else "ended",
+                auction_status="active" if re.search(r'\d', auction_time_remaining) else "ended",
                 images=images,
                 inspection_sheet_url="",  # Not provided in the HTML
                 features=[],  # Features not listed in detail page

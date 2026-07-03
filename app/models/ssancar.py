@@ -16,7 +16,8 @@ class SSANCARCar(BaseModel):
     fuel: str = Field(..., description="Fuel type")
     transmission: str = Field(..., description="Transmission type")
     grade: str = Field(..., description="Car grade (A1-D2)")
-    bid_price: int = Field(..., description="Starting bid price in USD")
+    bid_price: int = Field(..., description="Starting bid price in KRW (whole won)")
+    currency: str = Field("KRW", description="Currency of bid_price (KRW)")
     thumbnail_url: str = Field(..., description="Thumbnail image URL")
     detail_url: str = Field(..., description="Detail page URL")
     source: str = Field("SSANCAR", description="Auction source (SSANCAR/Glovis)")
@@ -35,7 +36,8 @@ class SSANCARCar(BaseModel):
                 "fuel": "Gasoline",
                 "transmission": "Automatic",
                 "grade": "A2",
-                "bid_price": 8002,
+                "bid_price": 10400000,
+                "currency": "KRW",
                 "thumbnail_url": "https://www.kcarauction.com/auction/IMAGE_UPLOAD/CAR/2032/CA20325265/CA2032526519f23838_370.JPG",
                 "detail_url": "https://www.ssancar.com/page/car_view.php?car_no=1536311"
             }
@@ -70,8 +72,8 @@ class SSANCARCarDetail(BaseModel):
     condition_notes: Optional[str]
     
     # SSANCAR specific fields
-    starting_price: str = Field(..., description="Starting price with currency symbol")
-    currency: str = Field(default="USD", description="Currency code (USD/KRW)")
+    starting_price: str = Field(..., description="Raw upstream price string, e.g. '₩ 10,400,000'")
+    currency: str = Field(default="KRW", description="Currency code of bid_price (KRW/USD)")
     main_image: str = Field(default="", description="Primary car image URL")
     auction_start_date: Optional[str] = Field(None, description="Auction start date/time")
     auction_end_date: Optional[str] = Field(None, description="Auction end date/time")
@@ -100,10 +102,10 @@ class SSANCARCarDetail(BaseModel):
                 "engine_size": "4,395cc",
                 "engine_volume": "4,395cc",
                 "vin": "WBAYH8C57BG123456",
-                "bid_price": 8002,
-                "buy_now_price": 12000,
-                "starting_price": "8,002$~",
-                "currency": "USD",
+                "bid_price": 10400000,
+                "buy_now_price": 0,
+                "starting_price": "₩ 10,400,000",
+                "currency": "KRW",
                 "auction_date": "2025-01-28T13:00:00",
                 "auction_status": "upcoming",
                 "auction_start_date": "2025-01-28 1:00PM",
@@ -167,7 +169,10 @@ class SSANCARFilters(BaseModel):
     fuel: Optional[str] = Field("", description="Fuel type in Korean")
     color: Optional[str] = Field("", description="Color in Korean")
     yearFrom: str = Field("2000", description="Year from")
-    yearTo: str = Field("2025", description="Year to")
+    yearTo: str = Field(
+        default_factory=lambda: str(datetime.now().year + 1),
+        description="Year to (defaults to next year)"
+    )
     priceFrom: str = Field("0", description="Price from in USD")
     priceTo: str = Field("200000", description="Price to in USD")
     list: str = Field("15", description="Items per page")
@@ -242,7 +247,9 @@ class SSANCARFilterOptionsResponse(BaseModel):
     grades: List[SSANCARFilterOption] = Field(default_factory=list)
     colors: List[Dict[str, str]] = Field(default_factory=list)
     weeks: List[Dict[str, Any]] = Field(default_factory=list)
-    year_range: Dict[str, int] = Field(default={"min": 2000, "max": 2025})
+    year_range: Dict[str, int] = Field(
+        default_factory=lambda: {"min": 2000, "max": datetime.now().year + 1}
+    )
     price_range: Dict[str, int] = Field(default={"min": 0, "max": 200000})
     mileage_range: Dict[str, int] = Field(default={"min": 0, "max": 500000})
     timestamp: datetime = Field(default_factory=datetime.now)
