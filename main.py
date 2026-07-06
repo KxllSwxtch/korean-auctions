@@ -44,7 +44,11 @@ async def lifespan(app: FastAPI):
     # Eagerly initialise service singletons so the first user request
     # doesn't pay the initialisation cost.
     from app.routes.lotte import get_lotte_service
-    get_lotte_service()
+    from app.routes.lotte_filters import get_filter_service
+    main_service = get_lotte_service()
+    # Warm the filter singleton wired to the shared main service, so the first
+    # /filters request reuses the proven authenticated session.
+    get_filter_service(main_service)
 
     # Start background cache warming scheduler
     await start_scheduler()

@@ -140,292 +140,82 @@ class LotteFilterService:
             return False
         return any(marker in html for marker in _LOTTE_LOGIN_PAGE_MARKERS)
 
-    def _validate_session(self) -> bool:
-        """Validate current cookies by hitting a protected page; True if not the login page."""
-        try:
-            if self.session is None:
-                return False
-            probe_url = urljoin(self.base_url, self.session_probe_url)
-            response = self.session.get(probe_url, timeout=15, verify=False)
-            if response.status_code != 200:
-                logger.warning(
-                    f"[lotte-filter] session probe HTTP {response.status_code}"
-                )
-                return False
-            if self._is_login_page(response.text):
-                logger.warning("[lotte-filter] session probe returned login page")
-                return False
-            return True
-        except Exception as e:
-            logger.warning(f"[lotte-filter] session validation error: {e}")
-            return False
+    def _make_request(
+        self, data: Dict[str, Any]
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+        """POST to the Lotte combo-filter endpoint on the shared session.
 
-    def _is_session_expired(self) -> bool:
-        """Tell auth_coordinator whether to refresh based on age."""
-        if self.session_created_at is None:
-            return True
-        age = datetime.now() - self.session_created_at
-        return age > timedelta(minutes=self.session_max_age_minutes)
-
-    def _record_failure(self, _err: Exception) -> None:
-        """Track consecutive failures (used by auth_coordinator-style flows)."""
-        self.consecutive_failures += 1
-
-    def _save_session(self) -> None:
-        """Persist current cookies to disk so other workers/services can reuse them."""
-        try:
-            if self.session is None or not self.authenticated:
-                return
-            cookies = dict(self.session.cookies)
-            metadata = {
-                "authenticated": True,
-                "base_url": self.base_url,
-                "saved_by": "LotteFilterService",
-            }
-            self.session_manager.save_session("lotte", cookies, metadata=metadata)
-            logger.info("✅ Lotte filter session saved (shared with LotteService)")
-        except Exception as e:
-            logger.error(f"Error saving Lotte filter session: {e}")
-
-    def _restore_session(self) -> None:
-        """Load cookies persisted by LotteService (or a previous run) and validate them."""
-        try:
-            session_data = self.session_manager.load_session("lotte")
-            if not session_data:
-                return
-
-            age = self.session_manager.get_session_age("lotte")
-            if age and age > timedelta(minutes=self.session_max_age_minutes):
-                logger.warning(
-                    f"[lotte-filter] saved session too old "
-                    f"({age.total_seconds() / 60:.1f} min), discarding"
-                )
-                return
-
-            self.session = None  # force a fresh _init_session
-            session = self._init_session()
-
-            cookies = session_data if isinstance(session_data, dict) else {}
-            if "cookies" in cookies and isinstance(cookies.get("cookies"), dict):
-                cookies = cookies["cookies"]
-            for name, value in cookies.items():
-                if isinstance(value, str):
-                    session.cookies.set(name, value)
-
-            if self._validate_session():
-                self.authenticated = True
-                self.session_created_at = datetime.now()
-                logger.info("✅ Lotte filter session restored from shared store")
-            else:
-                logger.warning(
-                    "[lotte-filter] restored session failed validation, will re-auth on demand"
-                )
-                self.authenticated = False
-                self.session = None
-        except Exception as e:
-            logger.error(f"[lotte-filter] error restoring session: {e}")
-            self.authenticated = False
-
-    def _load_shared_session(self) -> bool:
-        """Hook called by auth_coordinator when another worker just authenticated."""
-        try:
-            session_data = self.session_manager.load_session("lotte")
-            if not session_data:
-                return False
-
-            age = self.session_manager.get_session_age("lotte")
-            if age and age > timedelta(minutes=self.session_max_age_minutes):
-                return False
-
-            self.session = None
-            session = self._init_session()
-            cookies = session_data if isinstance(session_data, dict) else {}
-            if "cookies" in cookies and isinstance(cookies.get("cookies"), dict):
-                cookies = cookies["cookies"]
-            for name, value in cookies.items():
-                if isinstance(value, str):
-                    session.cookies.set(name, value)
-
-            if self._validate_session():
-                self.authenticated = True
-                self.session_created_at = datetime.now()
-                return True
-            self.session = None
-            return False
-        except Exception as e:
-            logger.debug(f"[lotte-filter] error loading shared session: {e}")
-            return False
-
-    def _authenticate(self) -> bool:
-        """Cross-worker-safe re-auth via the shared auth_coordinator."""
-        from app.core.auth_coordinator import ensure_authenticated
-        return ensure_authenticated(self)
-
-    def _ensure_session(self) -> bool:
-        """Single entry point: returns True iff we have a valid authenticated session."""
-        if self.authenticated and self.session and not self._is_session_expired():
-            return True
-        return self._authenticate()
-
-    def _do_authenticate(self) -> bool:
-        """Core 3-step Lotte login. Called by auth_coordinator under cross-worker lock.
-
-        Returns True on success, False on non-retriable failure. Raises on retriable
-        network/protocol failures so the coordinator can record state correctly.
+        Returns (json_data, None) on success, or (None, error_code) on failure.
+        error_code ∈ {SESSION_REAUTH_FAILED, UPSTREAM_HTTP_ERROR, PARSE_ERROR}.
+        Headers are passed explicitly per request so the shared (navigation-header)
+        session is never mutated.
         """
-        # Force a fresh session so previous broken cookies don't poison the login flow.
-        self.session = None
-        session = self._init_session()
+        url = self.base_url + self.filter_url
 
-        login = settings.lotte_username
-        password = settings.lotte_password
-
-        logger.info(
-            f"[lotte-filter] начинаем аутентификацию для пользователя: {login}"
-        )
-
-        # Step 1: GET login page (collect cookies + JSESSIONID).
-        login_page_url = urljoin(self.base_url, self.login_url)
-        response = session.get(login_page_url, timeout=30, verify=False)
-        if response.status_code != 200:
-            raise Exception(
-                f"Lotte login page fetch failed: HTTP {response.status_code}"
-            )
-        logger.debug(
-            f"[lotte-filter] login page fetched ({len(response.text)} chars)"
-        )
-
-        # Step 2: AJAX credential check.
-        login_check_url = urljoin(self.base_url, self.login_check_url)
-        login_check_data = {
-            "userId": login,
-            "userPwd": password,
-            "resultCd": "",
-        }
-        session.headers.update({
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-            "Referer": login_page_url,
-            "Accept": "application/json, text/javascript, */*; q=0.01",
-        })
-        check_response = session.post(
-            login_check_url, data=login_check_data, timeout=30, verify=False
-        )
-        if check_response.status_code != 200:
-            raise Exception(
-                f"Lotte login check failed: HTTP {check_response.status_code}"
-            )
-        try:
-            check_result = check_response.json()
-        except json.JSONDecodeError as json_error:
-            logger.error(
-                f"[lotte-filter] login check non-JSON body[:500]={check_response.text[:500]!r}"
-            )
-            raise Exception(f"Lotte login check returned non-JSON: {json_error}")
-
-        ok = check_result.get("resultCd") == "0000" or (
-            not check_result.get("error")
-            and not check_result.get("fail")
-            and "auPswdUptEndYn" in check_result
-        )
-        if not ok:
-            logger.error(f"[lotte-filter] login check rejected: {check_result}")
-            return False
-
-        # Step 3: final POST that actually establishes the auth cookie.
-        login_action_url = urljoin(self.base_url, self.login_action_url)
-        final_login_data = {"userId": login, "userPwd": password}
-        session.headers.update({
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": login_page_url,
-        })
-        session.headers.pop("X-Requested-With", None)
-
-        final_response = session.post(
-            login_action_url,
-            data=final_login_data,
-            timeout=30,
-            verify=False,
-            allow_redirects=False,
-        )
-        if final_response.status_code not in (200, 302, 303):
-            raise Exception(
-                f"Lotte final login failed: HTTP {final_response.status_code}"
+        def _post() -> requests.Response:
+            return self._init_session().post(
+                url, data=data, headers=self.headers, timeout=30, verify=False
             )
 
-        # Restore AJAX header for subsequent filter requests.
-        session.headers["X-Requested-With"] = "XMLHttpRequest"
-
-        # Validate cookies actually unlock protected pages.
-        if not self._validate_session():
-            raise Exception("Lotte login POST succeeded but session validation failed")
-
-        logger.info("✅ Lotte filter authentication validated")
-        return True
-
-    def _make_request(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Выполнение POST запроса к API фильтров с аутентификацией"""
         try:
             if not self._ensure_session():
-                logger.error("Не удалось аутентифицироваться для API фильтров")
-                return None
+                logger.error("[lotte-filter] authentication failed for combo API")
+                return None, "SESSION_REAUTH_FAILED"
 
-            session = self._init_session()
-            url = self.base_url + self.filter_url
+            logger.info(f"[lotte-filter] combo request: {data}")
+            response = _post()
 
-            logger.info(f"Запрос к API фильтров: {data}")
+            # Stale-session recovery. A dead Lotte session answers either with an
+            # HTML login redirect OR a `fail_notAuctLogin` marker — `_is_login_page`
+            # detects both. Invalidate the shared session, re-auth once, retry.
+            if response.status_code == 200 and self._is_login_page(response.text):
+                logger.warning(
+                    "[lotte-filter] stale-session signature on combo API; re-auth + retry"
+                )
+                self.main_service.invalidate_session()
+                if not self._ensure_session():
+                    logger.error("[lotte-filter] re-auth failed after stale session")
+                    return None, "SESSION_REAUTH_FAILED"
+                response = _post()
+                if response.status_code == 200 and self._is_login_page(response.text):
+                    logger.error("[lotte-filter] combo API still stale after re-auth")
+                    return None, "SESSION_REAUTH_FAILED"
 
-            response = session.post(url, data=data, timeout=30, verify=False)
+            if response.status_code != 200:
+                logger.error(
+                    f"[lotte-filter] combo API HTTP {response.status_code}: "
+                    f"{response.text[:300]!r}"
+                )
+                return None, "UPSTREAM_HTTP_ERROR"
 
-            if response.status_code == 200:
-                try:
-                    json_data = response.json()
-                    logger.info(f"Получен ответ от API: {len(str(json_data))} символов")
+            try:
+                json_data = response.json()
+            except json.JSONDecodeError:
+                logger.error(
+                    f"[lotte-filter] combo API returned non-JSON: {response.text[:300]!r}"
+                )
+                return None, "PARSE_ERROR"
 
-                    # Detect a stale-session response and re-auth once.
-                    if (
-                        isinstance(json_data, dict)
-                        and json_data.get("result") == "fail_notAuctLogin"
-                    ):
-                        logger.warning(
-                            "Сессия истекла, требуется повторная аутентификация"
-                        )
-                        self.authenticated = False
-                        self.session_created_at = None
-
-                        if self._authenticate():
-                            session = self._init_session()
-                            response = session.post(
-                                url, data=data, timeout=30, verify=False
-                            )
-                            if response.status_code == 200:
-                                json_data = response.json()
-                                logger.info(
-                                    f"Повторный запрос успешен: {len(str(json_data))} символов"
-                                )
-                            else:
-                                logger.error(
-                                    f"Повторный запрос неудачен: HTTP {response.status_code}"
-                                )
-                                return None
-                        else:
-                            logger.error("Не удалось повторно аутентифицироваться")
-                            return None
-
-                    return json_data
-                except json.JSONDecodeError:
-                    logger.error("Ошибка декодирования JSON ответа")
-                    return None
-            else:
-                logger.error(f"Ошибка HTTP {response.status_code}: {response.text}")
-                return None
+            logger.info(f"[lotte-filter] combo API ok ({len(str(json_data))} chars)")
+            return json_data, None
 
         except Exception as e:
-            logger.error(f"Ошибка запроса к API фильтров: {e}")
-            return None
+            logger.error(f"[lotte-filter] combo API request error: {e}")
+            return None, "UPSTREAM_HTTP_ERROR"
+
+    def _static_manufacturers_fallback(self) -> List[LotteManufacturer]:
+        """Bundled manufacturers list, served only when the live combo API is down.
+
+        Names are cleaned with the same parser rule as the live path so the
+        fallback is indistinguishable from a live response to the frontend.
+        """
+        return [
+            LotteManufacturer(code=m["code"], name=self.parser._clean_name(m["name"]))
+            for m in _load_manufacturers_fallback()
+        ]
 
     def get_manufacturers(self) -> LotteManufacturersResponse:
-        """Получение списка производителей"""
+        """Получение списка производителей (live, с резервным списком)."""
         try:
             # Проверяем кэш
             cache_key = "manufacturers"
@@ -439,14 +229,33 @@ class LotteFilterService:
                 "search_doimCd": "",
             }
 
-            json_response = self._make_request(data)
+            json_response, error_code = self._make_request(data)
 
             if json_response is None:
+                # Live session unavailable — serve the bundled list so the dropdown
+                # always populates. Do NOT cache a stale fallback, or a brief outage
+                # would pin the dropdown to stale data for the full TTL.
+                fallback = self._static_manufacturers_fallback()
+                if fallback:
+                    logger.warning(
+                        f"[lotte-filter] manufacturers live fetch failed "
+                        f"({error_code}); serving {len(fallback)} from static fallback"
+                    )
+                    return LotteManufacturersResponse(
+                        success=True,
+                        message="Список производителей (резервные данные)",
+                        manufacturers=fallback,
+                        total_count=len(fallback),
+                        error_code=error_code,
+                        source="static_fallback",
+                        stale=True,
+                    )
                 return LotteManufacturersResponse(
                     success=False,
                     message="Не удалось получить данные от API",
                     manufacturers=[],
                     total_count=0,
+                    error_code=error_code,
                 )
 
             manufacturers = self.parser.parse_manufacturers(json_response)
@@ -456,9 +265,10 @@ class LotteFilterService:
                 message=f"Получено {len(manufacturers)} производителей",
                 manufacturers=manufacturers,
                 total_count=len(manufacturers),
+                source="live",
             )
 
-            # Сохраняем в кэш
+            # Cache LIVE responses only.
             self.cache[cache_key] = response
 
             return response
@@ -470,6 +280,7 @@ class LotteFilterService:
                 message=f"Ошибка: {str(e)}",
                 manufacturers=[],
                 total_count=0,
+                error_code="PARSE_ERROR",
             )
 
     def get_models(self, manufacturer_code: str) -> LotteModelsResponse:
@@ -487,7 +298,7 @@ class LotteFilterService:
                 "searchCode": manufacturer_code,
             }
 
-            json_response = self._make_request(data)
+            json_response, error_code = self._make_request(data)
 
             if json_response is None:
                 return LotteModelsResponse(
@@ -496,6 +307,7 @@ class LotteFilterService:
                     models=[],
                     manufacturer_code=manufacturer_code,
                     total_count=0,
+                    error_code=error_code,
                 )
 
             models = self.parser.parse_models(json_response, manufacturer_code)
@@ -538,7 +350,7 @@ class LotteFilterService:
                 "searchCode": model_code,
             }
 
-            json_response = self._make_request(data)
+            json_response, error_code = self._make_request(data)
 
             if json_response is None:
                 return LotteCarGroupsResponse(
@@ -547,6 +359,7 @@ class LotteFilterService:
                     car_groups=[],
                     model_code=model_code,
                     total_count=0,
+                    error_code=error_code,
                 )
 
             car_groups = self.parser.parse_car_groups(json_response, model_code)
@@ -589,7 +402,7 @@ class LotteFilterService:
                 "searchCode": car_group_code,
             }
 
-            json_response = self._make_request(data)
+            json_response, error_code = self._make_request(data)
 
             if json_response is None:
                 return LotteMPriceCarsResponse(
@@ -598,6 +411,7 @@ class LotteFilterService:
                     mprice_cars=[],
                     car_group_code=car_group_code,
                     total_count=0,
+                    error_code=error_code,
                 )
 
             mprice_cars = self.parser.parse_mprice_cars(json_response, car_group_code)
@@ -631,10 +445,9 @@ class LotteFilterService:
         logger.info("Кэш фильтров очищен")
     
     def reset_authentication(self):
-        """Сброс состояния аутентификации"""
-        self.authenticated = False
-        self.session = None
-        logger.info("Аутентификация Lotte Filter Service сброшена")
+        """Drop the shared session so the next request re-authenticates (delegated)."""
+        self.main_service.reset_authentication()
+        logger.info("Аутентификация Lotte Filter Service сброшена (delegated)")
 
     def search_cars(self, filter_request: LotteFilterRequest) -> Dict[str, Any]:
         """
@@ -878,9 +691,8 @@ class LotteFilterService:
                     f"(parse_status={parse_status}, login_page={looks_like_login}); "
                     f"attempting re-auth + retry"
                 )
-                self.authenticated = False
-                self.session_created_at = None
-                if self._authenticate():
+                self.main_service.invalidate_session()
+                if self._ensure_session():
                     session = self._init_session()
                     response = _do_post()
                     if response.status_code == 200:

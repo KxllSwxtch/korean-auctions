@@ -14,6 +14,8 @@ from app.models.lotte_filters import (
     LotteSearchResponse,
 )
 from app.services.lotte_filter_service import LotteFilterService
+from app.services.lotte_service import LotteService
+from app.routes.lotte import get_lotte_service
 from app.core.logging import logger
 
 router = APIRouter(prefix="/api/v1/lotte/filters", tags=["Lotte Filters"])
@@ -22,11 +24,18 @@ router = APIRouter(prefix="/api/v1/lotte/filters", tags=["Lotte Filters"])
 _filter_service = None
 
 
-def get_filter_service() -> LotteFilterService:
-    """Dependency для получения сервиса фильтров Lotte"""
+def get_filter_service(
+    lotte_service: LotteService = Depends(get_lotte_service),
+) -> LotteFilterService:
+    """Dependency: Lotte filter service wired to the shared, authenticated LotteService.
+
+    The filter service reuses the main service's single valid session instead of
+    maintaining its own (which is what broke the filters). Also callable directly
+    (e.g. from the lifespan warm) by passing a LotteService positionally.
+    """
     global _filter_service
     if _filter_service is None:
-        _filter_service = LotteFilterService()
+        _filter_service = LotteFilterService(lotte_service)
     return _filter_service
 
 
