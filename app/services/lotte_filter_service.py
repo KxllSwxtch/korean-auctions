@@ -1,15 +1,11 @@
-import requests
+import os
 import json
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-from urllib.parse import urljoin
 import warnings
+from typing import List, Optional, Dict, Any, Tuple, TYPE_CHECKING
 
-from app.core.config import settings
+import requests
+
 from app.core.logging import logger
-from app.core.session_manager import SessionManager
 from app.models.lotte_filters import (
     LotteManufacturer,
     LotteModel,
@@ -26,6 +22,42 @@ from app.models.lotte_filters import (
     LotteCarResult,
 )
 from app.parsers.lotte_filter_parser import LotteFilterParser
+
+if TYPE_CHECKING:
+    from app.services.lotte_service import LotteService
+
+
+# Repo-root data file: verbatim manufacturers list captured from a live Lotte
+# session, used as a resilience fallback when the live combo API is momentarily
+# unavailable. Mirrors the SSANCAR `ssancar_carlist.json` static-data pattern.
+_FALLBACK_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "lotte_manufacturers_fallback.json",
+)
+_MANUFACTURERS_FALLBACK: Optional[List[Dict[str, str]]] = None
+
+
+def _load_manufacturers_fallback() -> List[Dict[str, str]]:
+    """Load (once, cached) the bundled manufacturers fallback list."""
+    global _MANUFACTURERS_FALLBACK
+    if _MANUFACTURERS_FALLBACK is not None:
+        return _MANUFACTURERS_FALLBACK
+    try:
+        with open(_FALLBACK_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        entries = data.get("manufacturers", []) if isinstance(data, dict) else []
+        _MANUFACTURERS_FALLBACK = [
+            {"code": e["code"], "name": e["name"]}
+            for e in entries
+            if isinstance(e, dict) and e.get("code") and e.get("name")
+        ]
+        logger.info(
+            f"[lotte-filter] loaded {len(_MANUFACTURERS_FALLBACK)} fallback manufacturers"
+        )
+    except Exception as e:
+        logger.error(f"[lotte-filter] failed to load manufacturers fallback: {e}")
+        _MANUFACTURERS_FALLBACK = []
+    return _MANUFACTURERS_FALLBACK
 
 
 # Indicators that Lotte returned a login page (or its JSON equivalent) instead
@@ -48,38 +80,34 @@ def _normalize_exhibition_number(raw: Optional[str]) -> str:
 
 
 class LotteFilterService:
-    """Сервис для работы с фильтрами Lotte"""
+    """Сервис для работы с фильтрами Lotte.
 
-    def __init__(self):
+    Auth/session are NOT owned here — this service reuses the single authenticated
+    session that LotteService already keeps valid (constructor-injected). One
+    account → one session → one login path. This deletes the diverged auth copy
+    that caused the filters 500 and removes the "two concurrent logins for one
+    account" hazard.
+    """
+
+    def __init__(self, lotte_service: "LotteService"):
+        # Reuse the proven, already-authenticated LotteService session/cookies.
+        self.main_service = lotte_service
+
         self.base_url = "https://www.lotteautoauction.net"
         self.parser = LotteFilterParser()
-        self.session = None
-        self.authenticated = False
         self.cache = {}
         self.cache_ttl = 3600  # 1 час для фильтров
-
-        # Session lifecycle state — mirrors LotteService so we can reuse
-        # SessionManager and the cross-worker auth_coordinator.
-        self.session_manager = SessionManager()
-        self.session_max_age_minutes = 25
-        self.session_created_at: Optional[datetime] = None
-        self.consecutive_failures = 0
 
         # Disable SSL warnings
         warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 
-        # URL для API фильтров и аутентификации
+        # Combo-filter + search endpoints.
         self.filter_url = "/hp/auct/myp/entry/selectMultiComboVehi.do"
         self.search_url = "/hp/auct/myp/entry/selectMypEntryList.do"
-        # Lightweight protected page used by _validate_session.
-        self.session_probe_url = "/hp/auct/myp/entry/selectMypEntryList.do"
 
-        # URLs для аутентификации (такие же как в LotteService)
-        self.login_url = "/hp/auct/cmm/viewLoginUsr.do?loginMode=redirect"
-        self.login_check_url = "/hp/auct/cmm/selectAuctMemLoginCheckAjax.do"
-        self.login_action_url = "/hp/auct/cmm/actionLogin.do"
-
-        # Default headers
+        # AJAX headers for the combo-filter endpoint. Passed EXPLICITLY on each
+        # request (never mutated onto the shared session, which carries the main
+        # service's navigation headers).
         self.headers = {
             "Accept": "application/json, text/javascript, */*; q=0.01",
             "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
@@ -97,30 +125,15 @@ class LotteFilterService:
             "sec-ch-ua-platform": '"macOS"',
         }
 
-        # Pick up cookies persisted by LotteService or a previous Filter run.
-        # Mirrors LotteService.__init__ → _restore_session().
-        self._restore_session()
-
+    # ---- Session/auth delegated to the proven LotteService ----
     def _init_session(self) -> requests.Session:
-        """Инициализация сессии с retry стратегией"""
-        if self.session is None:
-            self.session = requests.Session()
+        """Reuse the main service's authenticated, connection-pooled session."""
+        return self.main_service._init_session()
 
-            # Настройка retry стратегии
-            retry_strategy = Retry(
-                total=3,
-                backoff_factor=1,
-                status_forcelist=[429, 500, 502, 503, 504],
-            )
-            adapter = HTTPAdapter(max_retries=retry_strategy)
-            self.session.mount("http://", adapter)
-            self.session.mount("https://", adapter)
+    def _ensure_session(self) -> bool:
+        """True iff a valid authenticated Lotte session is available (delegated)."""
+        return self.main_service._ensure_session()
 
-            # Устанавливаем default headers
-            self.session.headers.update(self.headers)
-
-        return self.session
-    
     def _is_login_page(self, html: str) -> bool:
         """Detect a Lotte login redirect / fail_notAuctLogin marker in a response body."""
         if not html:

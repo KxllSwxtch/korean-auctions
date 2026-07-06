@@ -83,6 +83,13 @@ class LotteManufacturersResponse(BaseModel):
     message: str = "Список производителей получен успешно"
     manufacturers: List[LotteManufacturer] = Field(default_factory=list)
     total_count: int = 0
+    # Distinguishes upstream/session failure modes for diagnostics + frontend.
+    # Values mirror LotteSearchResponse: SESSION_REAUTH_FAILED, UPSTREAM_HTTP_ERROR, PARSE_ERROR.
+    error_code: Optional[str] = None
+    # "live" = fetched from Lotte this request; "static_fallback" = served from the
+    # bundled list because the live session was momentarily unavailable.
+    source: str = "live"
+    stale: bool = False
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -94,6 +101,7 @@ class LotteModelsResponse(BaseModel):
     models: List[LotteModel] = Field(default_factory=list)
     manufacturer_code: Optional[str] = None
     total_count: int = 0
+    error_code: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -105,6 +113,7 @@ class LotteCarGroupsResponse(BaseModel):
     car_groups: List[LotteCarGroup] = Field(default_factory=list)
     model_code: Optional[str] = None
     total_count: int = 0
+    error_code: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -116,6 +125,7 @@ class LotteMPriceCarsResponse(BaseModel):
     mprice_cars: List[LotteMPriceCar] = Field(default_factory=list)
     car_group_code: Optional[str] = None
     total_count: int = 0
+    error_code: Optional[str] = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

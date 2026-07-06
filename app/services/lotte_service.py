@@ -661,6 +661,17 @@ class LotteService(BaseAuctionService):
         self.session = None
         logger.info("Аутентификация Lotte сброшена")
 
+    def invalidate_session(self) -> None:
+        """Force a fresh login on the next request.
+
+        Public, encapsulated hook so collaborators (e.g. LotteFilterService, which
+        reuses this service's authenticated session) can drop a stale session
+        without reaching into private attributes. The next `_ensure_session()`
+        re-authenticates via the cross-worker auth_coordinator.
+        """
+        self.authenticated = False
+        self.session = None
+
     async def _fetch_total_count_from_home_page(self) -> int:
         """Fetch total registered car count from full-page GET response.
         The full page contains .total-carnum with the true total (e.g. 1,257).
