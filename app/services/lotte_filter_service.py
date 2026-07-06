@@ -678,14 +678,19 @@ class LotteFilterService:
             html_content = response.text
             cars, parse_status = self.parser.parse_car_search_html_with_status(html_content)
 
-            # Detect a silently-expired Lotte session: either the parser couldn't
-            # find tbl-t02 OR the body explicitly looks like the login redirect /
-            # `fail_notAuctLogin` JSON. Re-auth once and retry — this is the single
-            # most common production failure mode (shared-backend cookie aging,
-            # parallel worker invalidation, etc.). Applies to ALL filter searches,
-            # not just lot-number lookups.
+            # Detect a silently-expired Lotte session and re-auth once. A stale
+            # session returns the login page, which has no tbl-t02 → parse_status
+            # == "no_table". A successfully-parsed results table (parse_status ==
+            # "ok") is NEVER a login page: Lotte's list pages embed a login
+            # link/modal in the markup even when authenticated, so `_is_login_page`
+            # alone is a FALSE POSITIVE on valid (including zero-result) pages.
+            # Gating on `parse_status != "ok"` stops an empty result from needlessly
+            # churning the shared session.
             looks_like_login = self._is_login_page(html_content)
-            if parse_status == "no_table" or looks_like_login:
+            stale_session = parse_status == "no_table" or (
+                looks_like_login and parse_status != "ok"
+            )
+            if stale_session:
                 logger.warning(
                     f"[lotte-filter] stale-session signature detected "
                     f"(parse_status={parse_status}, login_page={looks_like_login}); "
