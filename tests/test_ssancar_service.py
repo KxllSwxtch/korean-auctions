@@ -23,6 +23,7 @@ from app.services.ssancar_transport import (
     SSANCARTransportResult,
     SSANCARUpstreamAuthError,
     SSANCARUpstreamInvalidResponseError,
+    SSANCARUpstreamTimeoutError,
     SSANCARUpstreamUnavailableError,
 )
 
@@ -72,6 +73,8 @@ class CandidateSession:
         outcome = self.outcomes.pop(0)
         if isinstance(outcome, BaseException):
             raise outcome
+        if callable(outcome):
+            return outcome()
         return outcome
 
 
@@ -165,13 +168,17 @@ def make_service(
     *outcomes: Any,
     now: datetime | None = None,
     cache_clock=None,
+    deadline_clock=None,
 ) -> tuple[SSANCARService, QueueTransport]:
     transport = QueueTransport(*outcomes)
-    service = SSANCARService(
+    service_kwargs = dict(
         transport=transport,
         now_provider=(lambda: now) if now is not None else None,
         cache_clock=cache_clock,
     )
+    if deadline_clock is not None:
+        service_kwargs["deadline_clock"] = deadline_clock
+    service = SSANCARService(**service_kwargs)
     service._cache.clear()
     return service, transport
 
@@ -273,6 +280,37 @@ def test_recognized_node_with_unusable_identity_is_failure_and_not_cached():
     </ul>
     """
     service, _ = make_service(StubResponse(drifted_html))
+
+    with pytest.raises(SSANCARUpstreamInvalidResponseError):
+        service.fetch_cars(SSANCARFilters(weekNo="2"))
+
+    assert not any(key.startswith("ssancar:cars:") for key in service._cache)
+
+
+def test_list_service_drops_invalid_ids_from_mixed_parser_output(monkeypatch):
+    response_html = valid_list_html("2120388387")
+    service, transport = make_service(StubResponse(response_html))
+    valid_car = service.parser.parse_car_list(response_html)[0]
+    unicode_car = valid_car.model_copy(update={"car_no": "１２３"})
+    overlong_car = valid_car.model_copy(update={"car_no": "1" * 21})
+    monkeypatch.setattr(
+        service.parser,
+        "parse_car_list",
+        lambda html: [unicode_car, valid_car, overlong_car],
+    )
+    filters = SSANCARFilters(weekNo="2", list="15", pages="0")
+
+    result = service.fetch_cars(filters)
+    cached = service.fetch_cars(filters)
+
+    assert [car.car_no for car in result.cars] == ["2120388387"]
+    assert cached is result
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.parametrize("invalid_car_no", ["１２３", "1" * 21])
+def test_list_with_only_invalid_id_is_failure_and_not_cached(invalid_car_no):
+    service, _ = make_service(StubResponse(valid_list_html(invalid_car_no)))
 
     with pytest.raises(SSANCARUpstreamInvalidResponseError):
         service.fetch_cars(SSANCARFilters(weekNo="2"))
@@ -396,13 +434,37 @@ def test_valid_detail_with_passive_login_script_is_cached():
 
 
 def test_detail_rejects_returned_car_number_mismatch_without_caching():
-    service, _ = make_service(StubResponse(valid_detail_html("2222222")))
+    response_html = valid_detail_html("2222222").replace(
+        "<html><body>",
+        """
+        <html><head>
+          <link rel="canonical"
+                href="https://www.ssancar.com/page/car_view.php?car_no=2222222">
+        </head><body>
+        """,
+    )
+    service, _ = make_service(StubResponse(response_html))
     cache_key = service._make_cache_key("detail", {"car_no": "1111111"})
 
     with pytest.raises(SSANCARUpstreamInvalidResponseError):
         service.get_car_detail("1111111")
 
     assert cache_key not in service._cache
+
+
+def test_detail_unrelated_car_link_is_ignored_and_requested_id_is_backfilled():
+    requested_car_no = "1111111"
+    unrelated_html = valid_detail_html("2222222").replace(
+        "Self link",
+        "Recommended car",
+    )
+    service, _ = make_service(StubResponse(unrelated_html))
+
+    detail, status = service.get_car_detail(requested_car_no)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == requested_car_no
 
 
 @pytest.mark.parametrize(
@@ -528,6 +590,63 @@ def test_detail_health_positive_count_validates_current_sample_and_caches_5_minu
     assert first.sample_car_no == car_no
     assert first.egress == "direct"
     assert len(transport.calls) == 3
+
+
+def test_detail_health_uses_one_absolute_deadline_for_all_three_requests():
+    car_no = "2120398967"
+    service, transport = make_service(
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse(valid_detail_html(car_no)),
+        deadline_clock=lambda: 100.0,
+    )
+
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert [call["deadline_at"] for call in transport.calls] == [
+        124.0,
+        124.0,
+        124.0,
+    ]
+
+
+def test_detail_health_cannot_consume_three_independent_deadline_budgets():
+    now = [0.0]
+    car_no = "2120398967"
+
+    def finish_at(value: float, response: StubResponse):
+        def outcome() -> StubResponse:
+            now[0] = value
+            return response
+
+        return outcome
+
+    direct = CandidateSession(
+        finish_at(8.0, StubResponse("1")),
+        finish_at(16.0, StubResponse(valid_list_html(car_no))),
+        finish_at(25.0, StubResponse(valid_detail_html(car_no))),
+    )
+    transport = SSANCARTransport(
+        session_factory=lambda: direct,
+        proxy_urls=[],
+        clock=lambda: now[0],
+    )
+    service = SSANCARService(
+        transport=transport,
+        deadline_clock=lambda: now[0],
+    )
+    service._cache.clear()
+
+    with pytest.raises(SSANCARUpstreamTimeoutError):
+        service.check_detail_health("2")
+
+    assert now[0] == 25.0
+    assert len(direct.calls) == 3
+    assert not any(
+        key.startswith("ssancar:detail_health_probe:")
+        for key in service._cache
+    )
 
 
 def test_detail_health_failure_is_not_cached():

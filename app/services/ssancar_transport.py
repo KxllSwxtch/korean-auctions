@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 from queue import Empty, Queue
 import re
@@ -351,6 +352,7 @@ class SSANCARTransport:
         validator: Validator[T],
         *,
         operation: str = "request",
+        deadline_at: Optional[float] = None,
         **kwargs: Any,
     ) -> SSANCARTransportResult[T]:
         """Execute one attempt per candidate and return only validated data."""
@@ -362,6 +364,11 @@ class SSANCARTransport:
             else "unknown"
         )
         deadline = started_at + self._overall_deadline_seconds
+        if deadline_at is not None:
+            shared_deadline = float(deadline_at)
+            if not math.isfinite(shared_deadline):
+                raise ValueError("deadline_at must be a finite monotonic timestamp")
+            deadline = min(deadline, shared_deadline)
         failures: List[SSANCARUpstreamError] = []
 
         for candidate in self._candidates:

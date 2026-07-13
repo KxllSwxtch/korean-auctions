@@ -24,6 +24,7 @@ from app.parsers.ssancar_parser import (
 from app.parsers.ssancar_auth import is_ssancar_login_html
 from app.core.config import get_settings
 from app.services.ssancar_transport import (
+    OVERALL_DEADLINE_SECONDS,
     PayloadValidation,
     SSANCARTransport,
     SSANCARUpstreamAuthError,
@@ -173,6 +174,7 @@ class SSANCARService:
         transport: Optional[SSANCARTransport] = None,
         now_provider: Optional[Callable[[], datetime]] = None,
         cache_clock: Optional[Callable[[], float]] = None,
+        deadline_clock: Optional[Callable[[], float]] = None,
     ):
         # Load car list data first
         self._load_carlist_data()
@@ -183,6 +185,7 @@ class SSANCARService:
         )
         self._now_provider = now_provider
         self._cache_clock = cache_clock or time.time
+        self._deadline_clock = deadline_clock or time.monotonic
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
@@ -317,13 +320,18 @@ class SSANCARService:
             raise SSANCARUpstreamInvalidResponseError(selector_count=0)
 
         cars = self.parser.parse_car_list(html)
-        cars = [
-            car
-            for car in cars
-            if car.source.upper() == "SSANCAR"
-            and re.fullmatch(r"\d+", car.car_no or "")
-            and bool((car.full_name or "").strip())
-        ]
+        validated_cars: List[SSANCARCar] = []
+        for car in cars:
+            if car.source.upper() != "SSANCAR" or not (
+                car.full_name or ""
+            ).strip():
+                continue
+            try:
+                car.car_no = validate_ssancar_car_no(car.car_no)
+            except ValueError:
+                continue
+            validated_cars.append(car)
+        cars = validated_cars
         if not cars:
             raise SSANCARUpstreamInvalidResponseError(
                 selector_count=selector_count
@@ -466,6 +474,7 @@ class SSANCARService:
         *,
         operation: str,
         require_valid: bool = False,
+        deadline_at: Optional[float] = None,
     ):
         car_no = validate_ssancar_car_no(car_no)
 
@@ -484,6 +493,7 @@ class SSANCARService:
             self.CAR_VIEW_URL,
             validate_detail,
             operation=operation,
+            deadline_at=deadline_at,
             params={"car_no": car_no},
             headers=self.DETAIL_HEADERS,
         )
@@ -659,12 +669,14 @@ class SSANCARService:
         filters: SSANCARFilters,
         *,
         operation: str = "count",
+        deadline_at: Optional[float] = None,
     ) -> Tuple[int, str]:
         result = self.transport.request(
             "POST",
             self.AJAX_CAR_NUM_URL,
             self._validate_count_response,
             operation=operation,
+            deadline_at=deadline_at,
             data=self._build_count_data(filters),
             headers=self.AJAX_HEADERS,
         )
@@ -711,10 +723,12 @@ class SSANCARService:
         if cached is not None:
             return cached
 
+        deadline_at = self._deadline_clock() + OVERALL_DEADLINE_SECONDS
         filters = SSANCARFilters(weekNo=resolved_week, list="1", pages="0")
         count, count_egress = self._request_total_count(
             filters,
             operation="detail_health_count",
+            deadline_at=deadline_at,
         )
         if count == 0:
             probe = SSANCARDetailHealthProbe(
@@ -752,6 +766,7 @@ class SSANCARService:
             self.AJAX_CAR_LIST_URL,
             validate_health_list,
             operation="detail_health_list",
+            deadline_at=deadline_at,
             data=self._build_post_data(filters),
             headers=self.AJAX_HEADERS,
         )
@@ -761,6 +776,7 @@ class SSANCARService:
             sample_car_no,
             operation="detail_health_detail",
             require_valid=True,
+            deadline_at=deadline_at,
         )
 
         probe = SSANCARDetailHealthProbe(

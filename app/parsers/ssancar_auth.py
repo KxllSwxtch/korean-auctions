@@ -19,12 +19,18 @@ _SESSION_ENVELOPE_MARKERS = (
     "session_expired",
     "로그인 해주세요",
 )
-_SCRIPT_REDIRECT_RE = re.compile(
-    r"\s*(?:(?:window\.)?location(?:\.href)?\s*=\s*"
-    r"|(?:window\.)?location\.replace\(\s*)"
-    r"['\"][^'\"]*(?:/bbs/login\.php|/member/login(?:\.php)?)[^'\"]*['\"]"
-    r"\s*\)?\s*;?\s*",
-    re.IGNORECASE,
+_SCRIPT_REDIRECT_RES = (
+    re.compile(
+        r"\s*(?:window\.)?location(?:\.href)?\s*=\s*"
+        r"(?P<quote>['\"])(?P<target>[^'\"]+)(?P=quote)\s*;?\s*",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"\s*(?:window\.)?location\.replace\(\s*"
+        r"(?P<quote>['\"])(?P<target>[^'\"]+)(?P=quote)"
+        r"\s*\)\s*;?\s*",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -41,6 +47,30 @@ def is_ssancar_login_url(url: str | None) -> bool:
     """Return true only for an actual SSANCAR login endpoint URL."""
 
     return _path(url) in _LOGIN_PATHS
+
+
+def _meta_refresh_target(content: str) -> str | None:
+    match = re.search(r"(?:^|;)\s*url\s*=\s*(.+?)\s*$", content, re.IGNORECASE)
+    if not match:
+        return None
+    target = match.group(1).strip()
+    if target.endswith(";"):
+        target = target[:-1].rstrip()
+    if (
+        len(target) >= 2
+        and target[0] in {"'", '"'}
+        and target[-1] == target[0]
+    ):
+        target = target[1:-1].strip()
+    return target or None
+
+
+def _script_redirect_target(script_text: str) -> str | None:
+    for pattern in _SCRIPT_REDIRECT_RES:
+        match = pattern.fullmatch(script_text)
+        if match:
+            return match.group("target").strip()
+    return None
 
 
 def is_ssancar_login_html(html: str | None) -> bool:
@@ -73,11 +103,11 @@ def is_ssancar_login_html(html: str | None) -> bool:
         if str(meta.get("http-equiv", "")).lower() != "refresh":
             continue
         content = str(meta.get("content", ""))
-        target = re.search(r"url\s*=\s*([^;]+)$", content, re.IGNORECASE)
+        target = _meta_refresh_target(content)
         if (
             not has_payload
             and target
-            and is_ssancar_login_url(target.group(1).strip(" '\""))
+            and is_ssancar_login_url(target)
         ):
             return True
 
@@ -105,10 +135,8 @@ def is_ssancar_login_html(html: str | None) -> bool:
             return True
 
     for script in soup.find_all("script"):
-        if (
-            not has_payload
-            and _SCRIPT_REDIRECT_RE.fullmatch(script.get_text(" ", strip=True))
-        ):
+        target = _script_redirect_target(script.get_text(" ", strip=True))
+        if not has_payload and target and is_ssancar_login_url(target):
             return True
 
     return False

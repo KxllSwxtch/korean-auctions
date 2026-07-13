@@ -1,6 +1,7 @@
 import hashlib
 import re
 from typing import List, Optional, Dict, Any, Tuple
+from urllib.parse import parse_qsl, urlsplit
 from bs4 import BeautifulSoup
 from loguru import logger
 
@@ -33,6 +34,53 @@ _NOT_FOUND_MARKERS = (
 # A real car_view.php page is multi-KB; anything substantially smaller is
 # almost certainly an empty body, error envelope, or redirect stub.
 _MIN_HTML_LENGTH = 500
+_CAR_NO_RE = re.compile(r"[0-9]{1,20}")
+
+
+def _car_no_from_car_view_url(url: Any) -> str:
+    """Extract an unambiguous ASCII SSANCAR ID from a car-view URL."""
+
+    try:
+        parsed = urlsplit(str(url or ""))
+        hostname = (parsed.hostname or "").lower()
+    except ValueError:
+        return ""
+    if parsed.scheme.lower() not in {"", "http", "https"}:
+        return ""
+    if hostname and hostname not in {"ssancar.com", "www.ssancar.com"}:
+        return ""
+    if parsed.path.rsplit("/", 1)[-1] != "car_view.php":
+        return ""
+    values = [
+        value
+        for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+        if key == "car_no"
+    ]
+    if len(values) != 1 or not _CAR_NO_RE.fullmatch(values[0]):
+        return ""
+    return values[0]
+
+
+def _authoritative_detail_car_no(soup: BeautifulSoup) -> str:
+    """Read identity only from canonical metadata owned by the detail page."""
+
+    candidate_urls: List[Any] = []
+    for link in soup.find_all("link", href=True):
+        rel_values = link.get("rel") or []
+        if isinstance(rel_values, str):
+            rel_values = rel_values.split()
+        if "canonical" in {str(value).lower() for value in rel_values}:
+            candidate_urls.append(link.get("href"))
+    for meta in soup.find_all("meta", content=True):
+        property_name = str(meta.get("property") or meta.get("name") or "")
+        if property_name.lower() == "og:url":
+            candidate_urls.append(meta.get("content"))
+
+    for candidate_url in candidate_urls:
+        car_no = _car_no_from_car_view_url(candidate_url)
+        if car_no:
+            return car_no
+    return ""
 
 
 class SSANCARParser:
@@ -185,8 +233,9 @@ class SSANCARParser:
                 
                 try:
                     # Extract car_no from URL
-                    car_no_match = re.search(r'car_no=(\d+)', link['href'])
-                    car_no = car_no_match.group(1) if car_no_match else ""
+                    car_no = _car_no_from_car_view_url(link["href"])
+                    if not car_no:
+                        continue
                     
                     # Extract stock number
                     stock_elem = item.find('span', class_='num')
@@ -378,17 +427,11 @@ class SSANCARParser:
         try:
             soup = BeautifulSoup(html, 'html.parser')
             
-            # Extract car_no from URL parameter in the HTML or from script tags
-            car_no = ""
-            # Try to find in URL parameters first
-            car_no_match = re.search(r'car_no=(\d+)', html)
-            if car_no_match:
-                car_no = car_no_match.group(1)
-            else:
-                # Try to find in JavaScript or other places
-                car_no_script_match = re.search(r"['\"]car_no['\"]:\s*['\"](\d+)['\"]", html)
-                if car_no_script_match:
-                    car_no = car_no_script_match.group(1)
+            # Detail identity is authoritative only when SSANCAR declares it
+            # in canonical metadata. Recommended-car links and script data can
+            # refer to unrelated inventory, so the service backfills from the
+            # validated request URL when this metadata is absent.
+            car_no = _authoritative_detail_car_no(soup)
             
             # Extract stock number
             stock_elem = soup.find('p', class_='num')

@@ -26,7 +26,11 @@ def _valid_html(car_no: str = "1820158") -> str:
     """Build an HTML body that exercises every selector the parser uses."""
     return f"""
     <html>
-      <head><title>SSANCAR</title></head>
+      <head>
+        <title>SSANCAR</title>
+        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no={car_no}">
+      </head>
       <body>
         <a href="/page/car_view.php?car_no={car_no}">Self link</a>
         <p class="num"><span>STK-001</span></p>
@@ -74,6 +78,79 @@ def test_parses_valid_detail_page():
     assert detail.images, "expected at least one image"
 
 
+def test_detail_identity_uses_canonical_not_earlier_recommended_link():
+    authoritative_car_no = "1820158"
+    body = _valid_html(authoritative_car_no).replace(
+        f"""        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no={authoritative_car_no}">""",
+        "",
+    ).replace(
+        f'<a href="/page/car_view.php?car_no={authoritative_car_no}">Self link</a>',
+        """
+        <a href="/page/car_view.php?car_no=9999999">Recommended car</a>
+        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no=1820158">
+        """,
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == authoritative_car_no
+
+
+def test_detail_identity_accepts_authoritative_og_url():
+    body = _valid_html("1820158").replace(
+        """        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no=1820158">""",
+        "",
+    ).replace(
+        '<a href="/page/car_view.php?car_no=1820158">Self link</a>',
+        """
+        <a href="/page/car_view.php?car_no=9999999">Recommended car</a>
+        <meta property="og:url"
+              content="https://www.ssancar.com/page/car_view.php?car_no=1820158">
+        """,
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == "1820158"
+
+
+def test_detail_identity_ignores_unrelated_car_link_without_metadata():
+    body = _valid_html("1820158").replace(
+        """        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no=1820158">""",
+        "",
+    ).replace(
+        '<a href="/page/car_view.php?car_no=1820158">Self link</a>',
+        '<a href="/page/car_view.php?car_no=9999999">Recommended car</a>',
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == ""
+
+
+def test_detail_identity_rejects_external_canonical_lookalike():
+    body = _valid_html("1820158").replace(
+        "https://www.ssancar.com/page/car_view.php?car_no=1820158",
+        "https://attacker.example/page/car_view.php?car_no=9999999",
+    ).replace("Self link", "Recommended car")
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == ""
+
+
 def test_valid_detail_with_passive_comment_login_script_is_not_auth():
     body = _valid_html().replace(
         "</body>",
@@ -110,12 +187,8 @@ def test_passive_login_link_and_generic_login_text_do_not_override_detail_shape(
 
 def test_login_canonical_or_session_words_alone_do_not_override_valid_payload():
     body = _valid_html().replace(
-        "<head><title>SSANCAR</title></head>",
-        """
-        <head><title>SSANCAR</title>
-          <link rel="canonical" href="https://www.ssancar.com/bbs/login.php">
-        </head>
-        """,
+        "https://www.ssancar.com/page/car_view.php?car_no=1820158",
+        "https://www.ssancar.com/bbs/login.php",
     ).replace("</body>", "<p>로그인 해주세요</p></body>")
 
     detail, status = _make_parser().parse_car_detail(body)
@@ -215,6 +288,44 @@ def test_meta_refresh_to_login_is_session_expired():
     assert status == PARSE_STATUS_SESSION_EXPIRED
 
 
+def test_meta_refresh_to_exact_login_accepts_trailing_semicolon():
+    body = (
+        '<html><head><meta http-equiv="refresh" '
+        'content="0; url=/bbs/login.php;"></head><body></body></html>'
+    )
+
+    assert is_ssancar_login_html(body) is True
+
+
+def test_meta_refresh_nested_login_query_is_not_authentication_page():
+    body = (
+        '<html><head><meta http-equiv="refresh" '
+        'content="0; url=/help?next=/bbs/login.php"></head><body></body></html>'
+    )
+
+    assert is_ssancar_login_html(body) is False
+
+
+def test_exact_script_redirect_to_login_is_authentication_page():
+    body = (
+        "<html><body><script>"
+        "window.location.replace('/bbs/login.php');"
+        "</script></body></html>"
+    )
+
+    assert is_ssancar_login_html(body) is True
+
+
+def test_script_redirect_containing_login_only_in_query_is_not_authentication():
+    body = (
+        "<html><body><script>"
+        "location.href='/help?next=/bbs/login.php';"
+        "</script></body></html>"
+    )
+
+    assert is_ssancar_login_html(body) is False
+
+
 def test_archived_car_detected_as_not_found():
     body = (
         "<html><body>"
@@ -312,6 +423,10 @@ def test_minimally_valid_predicate():
 def _new_markup_detail_html(car_no: str = "2120388387") -> str:
     return f"""
     <html>
+      <head>
+        <link rel="canonical"
+              href="https://www.ssancar.com/page/car_view.php?car_no={car_no}">
+      </head>
       <body>
         <a href="/page/car_view.php?car_no={car_no}">Self link</a>
         <p class="num"><span>1001</span></p>
@@ -341,6 +456,7 @@ def test_parses_new_markup_detail():
     detail, status = parser.parse_car_detail(_new_markup_detail_html())
     assert status == PARSE_STATUS_VALID
     assert detail is not None
+    assert detail.car_no == "2120388387"
     assert detail.bid_price == 10_400_000
     assert detail.currency == "KRW"
     assert "10,400,000" in detail.starting_price
@@ -391,6 +507,32 @@ def test_parse_car_list_new_markup():
     assert second.bid_price == 1_850_000
     assert second.currency == "KRW", "₩ pr-cur span must win over the $ one"
     assert second.year == 2013
+
+
+def test_parse_car_list_drops_non_ascii_and_overlong_car_numbers():
+    def item(car_no: str, stock_no: str) -> str:
+        return f"""
+        <li>
+          <a href="/page/car_view.php?car_no={car_no}">
+            <span class="num">{stock_no}</span>
+            <span class="name">[Kia] K3</span>
+            <ul class="detail"><li><span>2022</span></li></ul>
+            <p class="money">₩ <span class="num">10,400,000</span></p>
+          </a>
+        </li>
+        """
+
+    html = "<ul>" + "".join(
+        [
+            item("１２３", "bad-unicode"),
+            item("2120388387", "valid"),
+            item("1" * 21, "bad-overlong"),
+        ]
+    ) + "</ul>"
+
+    cars = _make_parser().parse_car_list(html)
+
+    assert [car.car_no for car in cars] == ["2120388387"]
 
 
 def test_parse_money_block_bare_number_magnitude_heuristic():

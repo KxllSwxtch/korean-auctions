@@ -307,6 +307,25 @@ def test_overall_deadline_stops_before_another_candidate():
     assert proxy.calls == []
 
 
+def test_expired_shared_deadline_stops_before_session_request():
+    direct = StubSession([StubResponse(text="must not be requested")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+        clock=lambda: 50.0,
+    )
+
+    with pytest.raises(SSANCARUpstreamTimeoutError):
+        transport.request(
+            "GET",
+            "https://www.ssancar.com/page/car",
+            accept_text,
+            deadline_at=50.0,
+        )
+
+    assert direct.calls == []
+
+
 def test_semaphore_acquisition_is_bounded_by_overall_deadline(monkeypatch):
     class ExhaustedSemaphore:
         def __init__(self) -> None:
