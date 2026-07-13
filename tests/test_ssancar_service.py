@@ -4,18 +4,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import pytest
+import requests
 
 from app.models.ssancar import SSANCARFilters
-from app.parsers.ssancar_parser import PARSE_STATUS_VALID
+from app.parsers.ssancar_parser import PARSE_STATUS_NOT_FOUND, PARSE_STATUS_VALID
 from app.services.ssancar_service import (
     SSANCARService,
     resolve_ssancar_week,
 )
 from app.services.ssancar_transport import (
+    PayloadValidation,
+    SSANCARTransport,
     SSANCARTransportResult,
     SSANCARUpstreamAuthError,
     SSANCARUpstreamInvalidResponseError,
@@ -54,6 +58,37 @@ class QueueTransport:
         )
 
 
+class CandidateSession:
+    def __init__(self, *outcomes: Any) -> None:
+        self.outcomes = list(outcomes)
+        self.calls: list[dict[str, Any]] = []
+        self.headers: dict[str, str] = {}
+        self.proxies: dict[str, str] = {}
+        self.cookies = requests.cookies.RequestsCookieJar()
+        self.trust_env = True
+
+    def request(self, method: str, url: str, **kwargs: Any) -> StubResponse:
+        self.calls.append({"method": method, "url": url, **kwargs})
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+
+def make_failover_service(
+    direct: CandidateSession,
+    proxy: CandidateSession,
+) -> SSANCARService:
+    sessions = [direct, proxy]
+    transport = SSANCARTransport(
+        session_factory=lambda: sessions.pop(0),
+        proxy_urls=["http://fallback.example:8000"],
+    )
+    service = SSANCARService(transport=transport)
+    service._cache.clear()
+    return service
+
+
 def valid_list_html(car_no: str = "2120388387") -> str:
     return f"""
     <ul>
@@ -86,6 +121,15 @@ def valid_detail_html(car_no: str = "1820158") -> str:
       {'X' * 600}
     </body></html>
     """
+
+
+def archived_detail_html() -> str:
+    return (
+        "<html><body>"
+        + ("padding " * 100)
+        + "차량을 찾을 수 없습니다"
+        + "</body></html>"
+    )
 
 
 def passive_login_detail_html(car_no: str = "1820158") -> str:
@@ -519,3 +563,105 @@ def test_detail_health_bypasses_normal_detail_cache():
 
     assert probe.detail_checked is True
     assert len(transport.calls) == 4
+
+
+def test_detail_health_empty_direct_list_fails_over_to_valid_proxy():
+    car_no = "2120398967"
+    direct = CandidateSession(
+        StubResponse("1"),
+        StubResponse(" \n\t "),
+        StubResponse(valid_detail_html(car_no)),
+    )
+    proxy = CandidateSession(StubResponse(valid_list_html(car_no)))
+    service = make_failover_service(direct, proxy)
+
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert probe.sample_car_no == car_no
+    assert len(direct.calls) == 3
+    assert len(proxy.calls) == 1
+
+
+def test_detail_health_bad_direct_sample_fails_over_to_valid_proxy(monkeypatch):
+    car_no = "2120398967"
+    direct = CandidateSession(
+        StubResponse("1"),
+        StubResponse("bad-sample"),
+        StubResponse(valid_detail_html(car_no)),
+    )
+    proxy = CandidateSession(StubResponse("valid-sample"))
+    service = make_failover_service(direct, proxy)
+
+    def validate_list(response):
+        sample = "not-a-number" if response.text == "bad-sample" else car_no
+        return PayloadValidation(
+            value=[SimpleNamespace(car_no=sample)],
+            selector_count=1,
+        )
+
+    monkeypatch.setattr(service, "_validate_car_list_response", validate_list)
+
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert probe.sample_car_no == car_no
+    assert len(direct.calls) == 3
+    assert len(proxy.calls) == 1
+
+
+def test_detail_health_archived_direct_detail_fails_over_to_valid_proxy():
+    car_no = "2120398967"
+    direct = CandidateSession(
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse(archived_detail_html()),
+    )
+    proxy = CandidateSession(StubResponse(valid_detail_html(car_no)))
+    service = make_failover_service(direct, proxy)
+
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert probe.sample_car_no == car_no
+    assert len(direct.calls) == 3
+    assert len(proxy.calls) == 1
+
+
+def test_ordinary_archived_detail_remains_not_found_without_failover():
+    car_no = "2120398967"
+    direct = CandidateSession(StubResponse(archived_detail_html()))
+    proxy = CandidateSession(StubResponse(valid_detail_html(car_no)))
+    service = make_failover_service(direct, proxy)
+
+    detail, status = service.get_car_detail(car_no)
+
+    assert detail is None
+    assert status == PARSE_STATUS_NOT_FOUND
+    assert len(direct.calls) == 1
+    assert proxy.calls == []
+
+
+@pytest.mark.parametrize("sample_car_no", [None, "", "not-a-number"])
+def test_detail_health_malformed_sample_is_structured_upstream_invalid(
+    sample_car_no,
+):
+    class InvalidSampleTransport:
+        def request(self, method, url, validator, **kwargs):
+            if "ajax_car_num" in url:
+                value = 1
+            else:
+                value = [SimpleNamespace(car_no=sample_car_no)]
+            return SSANCARTransportResult(
+                value=value,
+                egress="direct",
+                status_code=200,
+                selector_count=1,
+                elapsed_ms=1,
+            )
+
+    service = SSANCARService(transport=InvalidSampleTransport())
+    service._cache.clear()
+
+    with pytest.raises(SSANCARUpstreamInvalidResponseError):
+        service.check_detail_health("2")

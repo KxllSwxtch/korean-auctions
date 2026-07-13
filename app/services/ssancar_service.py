@@ -460,11 +460,24 @@ class SSANCARService:
             selector_count=1,
         )
 
-    def _request_car_detail(self, car_no: str, *, operation: str):
+    def _request_car_detail(
+        self,
+        car_no: str,
+        *,
+        operation: str,
+        require_valid: bool = False,
+    ):
         car_no = validate_ssancar_car_no(car_no)
 
         def validate_detail(response):
-            return self._validate_detail_response(response, car_no)
+            validation = self._validate_detail_response(response, car_no)
+            if require_valid:
+                car_detail, status = validation.value
+                if status != PARSE_STATUS_VALID or car_detail is None:
+                    raise SSANCARUpstreamInvalidResponseError(
+                        selector_count=validation.selector_count,
+                    )
+            return validation
 
         return self.transport.request(
             "GET",
@@ -715,21 +728,35 @@ class SSANCARService:
             self._save_to_cache(cache_key, probe)
             return probe
 
+        def validate_health_list(response):
+            validation = self._validate_car_list_response(response)
+            if not validation.value:
+                raise SSANCARUpstreamInvalidResponseError(
+                    selector_count=validation.selector_count,
+                )
+            return validation
+
         list_result = self.transport.request(
             "POST",
             self.AJAX_CAR_LIST_URL,
-            self._validate_car_list_response,
+            validate_health_list,
             operation="detail_health_list",
             data=self._build_post_data(filters),
             headers=self.AJAX_HEADERS,
         )
-        if not list_result.value:
-            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
 
-        sample_car_no = validate_ssancar_car_no(list_result.value[0].car_no)
+        try:
+            sample_car_no = validate_ssancar_car_no(
+                list_result.value[0].car_no
+            )
+        except (AttributeError, IndexError, TypeError, ValueError) as error:
+            raise SSANCARUpstreamInvalidResponseError(
+                selector_count=0,
+            ) from error
         detail_result = self._request_car_detail(
             sample_car_no,
             operation="detail_health_detail",
+            require_valid=True,
         )
         car_detail, status = detail_result.value
         if status != PARSE_STATUS_VALID or car_detail is None:

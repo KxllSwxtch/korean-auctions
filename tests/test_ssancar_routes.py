@@ -407,6 +407,19 @@ def test_detail_health_failure_returns_structured_non_cacheable_503():
     assert response.headers["cache-control"] == "no-store"
 
 
+def test_detail_health_invalid_sample_returns_upstream_invalid_503():
+    service = StubService()
+    service.health_error = SSANCARUpstreamInvalidResponseError()
+
+    response = make_client(service).get(
+        "/api/v1/ssancar/health/detail?week_number=2"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["code"] == "upstream_invalid_response"
+    assert response.headers["cache-control"] == "no-store"
+
+
 def test_update_cookies_is_gone_and_does_not_mutate_transport_state():
     service = StubService()
     response = make_client(service).post(
