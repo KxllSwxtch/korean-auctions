@@ -20,6 +20,7 @@ PARSE_STATUS_EXCEPTION = "exception"
 # Markers that indicate SSANCAR returned a login/session-expired page instead
 # of the requested car detail. Lowercased before matching.
 _LOGIN_REDIRECT_MARKERS = (
+    '/bbs/login.php',
     '/member/login',
     'name="loginform"',
     "name='loginform'",

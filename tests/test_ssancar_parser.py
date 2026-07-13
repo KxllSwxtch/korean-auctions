@@ -97,6 +97,16 @@ def test_login_redirect_detected_as_session_expired():
     assert status == PARSE_STATUS_SESSION_EXPIRED
 
 
+def test_bbs_login_page_detected_as_session_expired():
+    body = "<html><body>" + ("padding " * 100) + (
+        '<form action="/bbs/login.php"><input name="mb_id" /></form>'
+    ) + "</body></html>"
+    parser = _make_parser()
+    detail, status = parser.parse_car_detail(body)
+    assert detail is None
+    assert status == PARSE_STATUS_SESSION_EXPIRED
+
+
 def test_korean_login_marker_detected_as_session_expired():
     body = "<html><body>" + ("padding " * 100) + "로그인 해주세요" + "</body></html>"
     parser = _make_parser()

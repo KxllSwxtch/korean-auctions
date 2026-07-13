@@ -51,6 +51,8 @@ Thumbs.db
 # Test files
 test_*.py
 *_test.py
+!tests/test_ssancar_routes.py
+!tests/test_ssancar_transport.py
 
 # Temporary files
 *.tmp

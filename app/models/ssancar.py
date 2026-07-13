@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -161,9 +161,12 @@ class SSANCARModel(BaseModel):
         }
 
 
+SSANCARAuctionWeek = Literal["2", "5"]
+
+
 class SSANCARFilters(BaseModel):
     """Filters for SSANCAR search"""
-    weekNo: str = Field("4", description="Week number (2 for Tuesday, 5 for Friday)")
+    weekNo: str = Field("", description="Week number (2 for Tuesday, 5 for Friday)")
     maker: Optional[str] = Field("", description="Manufacturer in Korean")
     model: Optional[str] = Field("", description="Model code")
     fuel: Optional[str] = Field("", description="Fuel type in Korean")
@@ -191,6 +194,7 @@ class SSANCARResponse(BaseModel):
     page_size: int = 15
     has_next_page: bool = False
     has_prev_page: bool = False
+    week_number: SSANCARAuctionWeek
     timestamp: datetime = Field(default_factory=datetime.now)
 
 
@@ -226,8 +230,12 @@ class SSANCARHealthResponse(BaseModel):
     success: bool
     message: str
     service: str = "SSANCAR Auction"
-    status: str = "active"
+    status: str = "healthy"
     base_url: str = "https://www.ssancar.com"
+    week_number: SSANCARAuctionWeek
+    upstream_count: int
+    egress: str
+    checked_at: datetime
 
 
 class SSANCARFilterOption(BaseModel):
@@ -259,6 +267,7 @@ class SSANCARTotalCountResponse(BaseModel):
     """Response for total car count"""
     success: bool
     total_count: int
+    week_number: SSANCARAuctionWeek
     message: str
     filters_applied: Dict[str, Any] = Field(default_factory=dict)
     timestamp: datetime = Field(default_factory=datetime.now)

@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Body, Depends
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, NoReturn
 from datetime import datetime
-from loguru import logger
 import asyncio
 
 from app.models.ssancar import (
@@ -10,7 +9,11 @@ from app.models.ssancar import (
     SSANCARHealthResponse, SSANCARFilterOptionsResponse,
     SSANCARTotalCountResponse
 )
-from app.services.ssancar_service import SSANCARService
+from app.services.ssancar_service import SSANCARService, resolve_ssancar_week
+from app.services.ssancar_transport import (
+    SSANCARUpstreamError,
+    SSANCARUpstreamTimeoutError,
+)
 from app.parsers.ssancar_parser import (
     PARSE_STATUS_VALID,
     PARSE_STATUS_SESSION_EXPIRED,
@@ -32,6 +35,26 @@ _DETAIL_ERROR_CODES = {
     "request_error": "upstream_error",
     PARSE_STATUS_EXCEPTION: "upstream_error",
 }
+
+
+def _raise_upstream_error(
+    error: SSANCARUpstreamError,
+    *,
+    status_override: Optional[int] = None,
+    message: str = "SSANCAR is temporarily unavailable",
+) -> NoReturn:
+    status_code = status_override or (
+        504 if isinstance(error, SSANCARUpstreamTimeoutError) else 502
+    )
+    raise HTTPException(
+        status_code=status_code,
+        detail={
+            "code": error.code,
+            "message": message,
+            "retryable": True,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 # Setup logger
 ssancar_logger = get_logger("ssancar_routes")
@@ -78,10 +101,11 @@ async def get_ssancar_cars(
     """
     try:
         ssancar_logger.info(f"📥 Request for SSANCAR cars (page {page})")
+        resolved_week = resolve_ssancar_week(week_number)
         
         # Build filters
         filters = SSANCARFilters(
-            weekNo=week_number or "",
+            weekNo=resolved_week,
             maker=manufacturer or "",
             model=model or "",
             fuel=fuel or "",
@@ -104,7 +128,12 @@ async def get_ssancar_cars(
             ssancar_logger.error(f"❌ Error fetching SSANCAR data: {result.message}")
         
         return result
-        
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR list upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(error)
     except Exception as e:
         ssancar_logger.error(f"❌ Unexpected error fetching SSANCAR cars: {e}")
         raise HTTPException(
@@ -139,6 +168,9 @@ async def search_ssancar_cars(
     """
     try:
         ssancar_logger.info(f"🔍 Search SSANCAR cars with filters")
+        filters = filters.model_copy(
+            update={"weekNo": resolve_ssancar_week(filters.weekNo)}
+        )
         
         result = await asyncio.to_thread(service.search_cars, filters)
 
@@ -151,7 +183,12 @@ async def search_ssancar_cars(
             ssancar_logger.error(f"❌ Search error: {result.message}")
         
         return result
-        
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR search upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(error)
     except Exception as e:
         ssancar_logger.error(f"❌ Unexpected error in search: {e}")
         raise HTTPException(
@@ -184,34 +221,23 @@ async def get_total_count(
     try:
         ssancar_logger.info(f"📊 Request for total car count with week_number: {week_number}")
         
-        # Determine week number - use provided or default based on current day
-        if week_number:
-            week_no = week_number
-        else:
-            # Default to Tuesday (2) or Friday (5) based on current day
-            from datetime import datetime as dt
-            current_day = dt.now().weekday()  # 0=Monday, 6=Sunday
-            # If it's Thursday-Sunday, use Friday auction (5), otherwise use Tuesday (2)
-            week_no = "5" if current_day >= 3 else "2"
+        week_no = resolve_ssancar_week(week_number)
         
         # Build filters if any provided
         default_year_to = datetime.now().year + 1
         effective_year_to = year_to or default_year_to
-        filters = None
-        if any([manufacturer, model, fuel, year_from != 2000, effective_year_to != default_year_to,
-                price_from != 0, price_to != 200000, week_no]):
-            filters = SSANCARFilters(
-                weekNo=week_no,  # Always pass a week number
-                maker=manufacturer or "",
-                model=model or "",
-                fuel=fuel or "",
-                yearFrom=str(year_from),
-                yearTo=str(effective_year_to),
-                priceFrom=str(price_from),
-                priceTo=str(price_to),
-                list="15",
-                pages="0"
-            )
+        filters = SSANCARFilters(
+            weekNo=week_no,
+            maker=manufacturer or "",
+            model=model or "",
+            fuel=fuel or "",
+            yearFrom=str(year_from),
+            yearTo=str(effective_year_to),
+            priceFrom=str(price_from),
+            priceTo=str(price_to),
+            list="15",
+            pages="0"
+        )
         
         # Get total count
         total_count = await asyncio.to_thread(service.fetch_total_count, filters)
@@ -233,26 +259,30 @@ async def get_total_count(
         if price_to != 200000:
             filters_applied["price_to"] = price_to
         if week_number:
-            filters_applied["week_number"] = week_number
+            filters_applied["week_number"] = week_no
         
         ssancar_logger.info(f"✅ Total count retrieved: {total_count} (week_no: {week_no})")
         
         return SSANCARTotalCountResponse(
             success=True,
             total_count=total_count,
+            week_number=week_no,
             message="Total count retrieved successfully",
             filters_applied=filters_applied,
             timestamp=datetime.now()
         )
         
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR count upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(error)
     except Exception as e:
         ssancar_logger.error(f"❌ Error getting total count: {e}")
-        return SSANCARTotalCountResponse(
-            success=False,
-            total_count=0,
-            message=f"Failed to get total count: {str(e)}",
-            filters_applied={},
-            timestamp=datetime.now()
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error",
         )
 
 
@@ -384,10 +414,9 @@ async def get_car_detail(
                 timestamp=datetime.now()
             )
 
-        # Translate internal parse status into a public, frontend-actionable
-        # error code. Session-expired is recoverable (operator refreshes
-        # cookies via /update-cookies); car_unavailable is permanent for the
-        # current TTL window (auction ended or listing pulled upstream).
+        # The isolated transport raises authentication/invalid-payload errors
+        # before this point. Retain the legacy parser-status mapping only for
+        # genuine archived/not-found detail responses.
         code = _DETAIL_ERROR_CODES.get(status, "car_unavailable")
         ssancar_logger.warning(
             f"❌ SSANCAR car detail unavailable for {car_no}: "
@@ -401,22 +430,26 @@ async def get_car_detail(
                     "code": code,
                     "message": "SSANCAR upstream did not respond as expected",
                     "car_no": car_no,
+                    "retryable": True,
                 },
+                headers={"Cache-Control": "no-store"},
             )
 
         raise HTTPException(
             status_code=404,
             detail={
                 "code": code,
-                "message": (
-                    "SSANCAR session expired — refresh cookies and retry"
-                    if code == "session_expired"
-                    else "Car details are not available"
-                ),
+                "message": "Car details are not available",
                 "car_no": car_no,
             },
         )
 
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR detail upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(error)
     except HTTPException:
         raise
     except Exception as e:
@@ -433,54 +466,34 @@ async def get_car_detail(
 
 @router.post("/update-cookies", response_model=Dict[str, Any])
 async def update_cookies(
-    cookies: Dict[str, str] = Body(..., description="Fresh cookies from browser"),
+    cookies: Optional[Dict[str, str]] = Body(
+        None,
+        description="Deprecated compatibility body",
+    ),
     service: SSANCARService = Depends(get_ssancar_service)
 ) -> Dict[str, Any]:
-    """
-    Update SSANCAR cookies manually
-    
-    **Request body example:**
-    ```json
-    {
-        "_gcl_au": "1.1.78877594.1751338453",
-        "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
-        "PHPSESSID": "new_session_id",
-        "2a0d2363701f23f8a75028924a3af643": "new_token"
-    }
-    ```
-    """
-    try:
-        ssancar_logger.info("🍪 Updating SSANCAR cookies")
-        
-        # Update service cookies
-        service.update_cookies(cookies)
+    """Compatibility tombstone; transport sessions manage their own cookies."""
 
-        # Test if cookies work
-        test_filters = SSANCARFilters(
-            weekNo="2",
-            list="1",
-            pages="0"
-        )
-        test_result = await asyncio.to_thread(service.fetch_cars, test_filters)
-        
-        return {
-            "success": True,
-            "message": "Cookies updated successfully",
-            "cookies_count": len(cookies),
-            "test_passed": test_result.success,
-            "timestamp": datetime.now().isoformat()
-        }
-        
-    except Exception as e:
-        ssancar_logger.error(f"❌ Error updating cookies: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to update cookies: {str(e)}"
-        )
+    del cookies, service
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "code": "manual_cookie_updates_removed",
+            "message": "Manual SSANCAR cookie updates are no longer supported",
+            "retryable": False,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/health", response_model=SSANCARHealthResponse)
-async def health_check() -> SSANCARHealthResponse:
+async def health_check(
+    week_number: Optional[str] = Query(
+        None,
+        description="Week number (2 for Tuesday, 5 for Friday)",
+    ),
+    service: SSANCARService = Depends(get_ssancar_service),
+) -> SSANCARHealthResponse:
     """
     Check health status of SSANCAR service
     
@@ -492,24 +505,27 @@ async def health_check() -> SSANCARHealthResponse:
     try:
         ssancar_logger.info("🏥 Health check request")
         
+        probe = await asyncio.to_thread(service.check_health, week_number)
         return SSANCARHealthResponse(
             success=True,
-            message="SSANCAR service is healthy",
+            message="SSANCAR upstream is healthy",
             service="SSANCAR Auction",
-            status="active",
-            base_url=ssancar_service.BASE_URL,
-            timestamp=datetime.now()
+            status="healthy",
+            base_url=service.BASE_URL,
+            week_number=probe.week_number,
+            upstream_count=probe.upstream_count,
+            egress=probe.egress,
+            checked_at=probe.checked_at,
         )
-        
-    except Exception as e:
-        ssancar_logger.error(f"❌ Health check failed: {e}")
-        return SSANCARHealthResponse(
-            success=False,
-            message=f"Service unhealthy: {str(e)}",
-            service="SSANCAR Auction",
-            status="error",
-            base_url=ssancar_service.BASE_URL,
-            timestamp=datetime.now()
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR health upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(
+            error,
+            status_override=503,
+            message="SSANCAR readiness probe failed",
         )
 
 
@@ -623,5 +639,6 @@ async def search_ssancar_cars_compat(
         "page_size": response.page_size,
         "has_next_page": response.has_next_page,
         "has_prev_page": response.has_prev_page,
+        "week_number": response.week_number,
         "timestamp": response.timestamp.isoformat()
     }
