@@ -1,38 +1,76 @@
 import json
 import hashlib
 import re
-import threading
 import time
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any, Tuple
-import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Callable, List, Optional, Dict, Any, Tuple
+
+from bs4 import BeautifulSoup
 from loguru import logger
+import pytz
 
 from app.models.ssancar import (
     SSANCARCar, SSANCARCarDetail, SSANCARFilters,
-    SSANCARResponse, SSANCARDetailResponse,
+    SSANCARResponse,
     SSANCARManufacturer, SSANCARModel,
-    SSANCARManufacturersResponse, SSANCARModelsResponse
 )
 from app.parsers.ssancar_parser import (
     SSANCARParser,
     PARSE_STATUS_VALID,
     PARSE_STATUS_SESSION_EXPIRED,
     PARSE_STATUS_NOT_FOUND,
-    PARSE_STATUS_EMPTY,
-    PARSE_STATUS_INVALID_DATA,
-    PARSE_STATUS_EXCEPTION,
 )
 from app.core.config import get_settings
-from app.core.session_manager import SessionManager
-from app.core.proxy_config import get_proxy_pool
+from app.services.ssancar_transport import (
+    PayloadValidation,
+    SSANCARTransport,
+    SSANCARUpstreamAuthError,
+    SSANCARUpstreamInvalidResponseError,
+)
 
-# Process-wide cap on concurrent outbound requests to www.ssancar.com.
-# Mirrors the Autohub Phase 1 mitigation. The session is recreated on
-# proxy rotation, so we gate get/post inside _create_session().
-_OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
+
+SEOUL_TIMEZONE = pytz.timezone("Asia/Seoul")
+
+
+def resolve_ssancar_week(
+    supplied: Optional[Any] = None,
+    *,
+    now: Optional[datetime] = None,
+) -> str:
+    """Return the selected Tuesday (2) or Friday (5) auction window.
+
+    Valid supplied values are authoritative. Missing and legacy/invalid values
+    use the exact Seoul-time transition schedule used by SSANCAR.
+    """
+
+    supplied_text = str(supplied) if supplied is not None else ""
+    if supplied_text in {"2", "5"}:
+        return supplied_text
+
+    current = now or datetime.now(SEOUL_TIMEZONE)
+    if current.tzinfo is None:
+        current = SEOUL_TIMEZONE.localize(current)
+    else:
+        current = current.astimezone(SEOUL_TIMEZONE)
+
+    weekday = current.weekday()
+    switch_reached = (current.hour, current.minute, current.second) >= (18, 0, 0)
+    if weekday == 0:
+        return "2" if switch_reached else "5"
+    if weekday in {1, 2}:
+        return "2"
+    if weekday == 3:
+        return "5" if switch_reached else "2"
+    return "5"
+
+
+@dataclass(frozen=True)
+class SSANCARHealthProbe:
+    week_number: str
+    upstream_count: int
+    egress: str
+    checked_at: datetime
 
 
 class SSANCARService:
@@ -43,14 +81,6 @@ class SSANCARService:
     AJAX_CAR_NUM_URL = f"{BASE_URL}/ajax/ajax_car_num.php"
     CAR_VIEW_URL = f"{BASE_URL}/page/car_view.php"
     LIST_PAGE_URL = f"{BASE_URL}/bbs/board.php?bo_table=list"
-    
-    # Default cookies from the provided example
-    DEFAULT_COOKIES = {
-        "_gcl_au": "1.1.78877594.1751338453",
-        "e1192aefb64683cc97abb83c71057733": "bGlzdA%3D%3D",
-        "PHPSESSID": "3tkj2orbe4h537fjor8b3623cb",
-        "2a0d2363701f23f8a75028924a3af643": "MTc2LjY0LjIzLjg%3D",
-    }
     
     # Default headers from the provided example
     DEFAULT_HEADERS = {
@@ -111,20 +141,22 @@ class SSANCARService:
             logger.error(f"❌ Error loading ssancar_carlist.json: {e}")
             cls.CAR_LIST_MAP = {}
     
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        transport: Optional[SSANCARTransport] = None,
+        now_provider: Optional[Callable[[], datetime]] = None,
+        cache_clock: Optional[Callable[[], float]] = None,
+    ):
         # Load car list data first
         self._load_carlist_data()
 
-        self.session_manager = SessionManager()
         self.parser = SSANCARParser()
-        # Per-instance pool: pre-seeded by ProxyPool.__post_init__.
-        self._proxy_pool = get_proxy_pool()
-        logger.info(
-            f"🔐 SSANCAR proxy pool: {self._proxy_pool.names}, "
-            f"starting on '{self._proxy_pool.current()[0].name}'"
+        self.transport = transport or SSANCARTransport(
+            headers=self.DEFAULT_HEADERS,
         )
-        self.session = self._create_session()
-        self._load_or_set_cookies()
+        self._now_provider = now_provider
+        self._cache_clock = cache_clock or time.time
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
@@ -135,7 +167,7 @@ class SSANCARService:
         """Get data from in-memory cache with per-key TTL."""
         if key in self._cache:
             data, timestamp = self._cache[key]
-            if time.time() - timestamp < ttl:
+            if self._cache_clock() - timestamp < ttl:
                 self._cache_hits += 1
                 return data
             del self._cache[key]
@@ -144,7 +176,7 @@ class SSANCARService:
 
     def _save_to_cache(self, key: str, data: Any) -> None:
         """Save data to in-memory cache."""
-        self._cache[key] = (data, time.time())
+        self._cache[key] = (data, self._cache_clock())
 
     def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
         """Create a cache key from prefix and optional params dict."""
@@ -166,237 +198,98 @@ class SSANCARService:
             "hit_rate_percent": round(hit_rate, 2),
         }
     
-    def _create_session(self) -> requests.Session:
-        """Create a requests session with retry logic and pooled proxy."""
-        session = requests.Session()
-
-        # Pull current proxy from the per-instance pool. _rotate_proxy() will
-        # advance and recreate the session when a provider stops working.
-        entry, _ = self._proxy_pool.current()
-        session.proxies = self._proxy_pool.current_dict()
-        logger.info(f"🔐 SSANCAR session using proxy '{entry.name}'")
-
-        # Setup retry strategy — exponential backoff + Retry-After awareness
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=2,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "OPTIONS", "POST"],
-            respect_retry_after_header=True,
+    def _current_time(self) -> datetime:
+        current = (
+            self._now_provider()
+            if self._now_provider is not None
+            else datetime.now(SEOUL_TIMEZONE)
         )
+        if current.tzinfo is None:
+            return SEOUL_TIMEZONE.localize(current)
+        return current.astimezone(SEOUL_TIMEZONE)
 
-        adapter = HTTPAdapter(
-            max_retries=retry_strategy,
-            pool_connections=10,
-            pool_maxsize=10,
-        )
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
+    def _resolve_week(self, supplied: Optional[Any]) -> str:
+        return resolve_ssancar_week(supplied, now=self._current_time())
 
-        # Set default headers
-        session.headers.update(self.DEFAULT_HEADERS)
-
-        # Gate session.get/post with the process-wide outbound semaphore.
-        # Done here so every new session (including post-proxy-rotation) is
-        # gated automatically without touching individual call sites.
-        # Idempotency guard prevents compound wrapping if this is ever called
-        # against an already-gated session.
-        if not getattr(session.get, "_is_gated", False):
-            _orig_get, _orig_post = session.get, session.post
-
-            def _gated_get(*args, **kwargs):
-                with _OUTBOUND_LIMIT:
-                    return _orig_get(*args, **kwargs)
-            _gated_get._is_gated = True
-
-            def _gated_post(*args, **kwargs):
-                with _OUTBOUND_LIMIT:
-                    return _orig_post(*args, **kwargs)
-            _gated_post._is_gated = True
-
-            session.get = _gated_get
-            session.post = _gated_post
-
-        return session
-
-    def _rotate_proxy(self) -> None:
-        """Advance to the next pool entry and rebuild the session.
-
-        Call this when the current proxy starts returning failures the retry
-        adapter cannot handle (e.g. exhausted quota, persistent 407/403).
-        """
-        entry, _ = self._proxy_pool.advance()
-        logger.info(f"🔁 SSANCAR rotating proxy to '{entry.name}'")
-        # Preserve cookies across rotation — server-side session is tied to PHPSESSID.
-        old_cookies = dict(self.session.cookies)
-        self.session = self._create_session()
-        self.session.cookies.update(old_cookies)
-    
-    def _load_or_set_cookies(self):
-        """Load saved cookies or use default ones"""
-        saved_cookies = self.session_manager.load_session('ssancar')
-        
-        if saved_cookies:
-            self.session.cookies.update(saved_cookies)
-            logger.info("✅ Loaded saved SSANCAR cookies")
-        else:
-            self.session.cookies.update(self.DEFAULT_COOKIES)
-            logger.info("📝 Using default SSANCAR cookies")
-            self._save_cookies()
-    
-    def _save_cookies(self):
-        """Save current session cookies"""
-        cookies_dict = dict(self.session.cookies)
-        self.session_manager.save_session('ssancar', cookies_dict)
-        logger.info("💾 Saved SSANCAR cookies")
-    
     def _get_week_number(self) -> str:
-        """Get the appropriate week number based on Seoul time
-        
-        Auction schedule:
-        - Tuesday auction (weekNo=2): Switches at 6PM Monday Seoul time
-        - Friday auction (weekNo=5): Switches at 6PM Thursday Seoul time
-        """
-        import pytz
-        
-        # Get current time in Seoul timezone (KST = UTC+9)
-        seoul_tz = pytz.timezone('Asia/Seoul')
-        seoul_time = datetime.now(seoul_tz)
-        
-        weekday = seoul_time.weekday()  # 0=Monday, 6=Sunday
-        hour = seoul_time.hour
-        
-        logger.info(f"📅 Seoul time: {seoul_time.strftime('%Y-%m-%d %H:%M:%S %Z')}, weekday: {weekday}, hour: {hour}")
-        
-        # Monday: switch at 6PM
-        if weekday == 0:  # Monday
-            if hour < 18:
-                logger.info("🎯 Monday before 6PM Seoul → Friday auction (weekNo=5)")
-                return "5"  # Still showing previous Friday auction
-            else:
-                logger.info("🎯 Monday after 6PM Seoul → Tuesday auction (weekNo=2)")
-                return "2"  # Switch to Tuesday auction
-        
-        # Tuesday to Wednesday: Tuesday auction
-        elif weekday in [1, 2]:  # Tuesday, Wednesday
-            logger.info("🎯 Tuesday/Wednesday → Tuesday auction (weekNo=2)")
-            return "2"
-        
-        # Thursday: switch at 6PM
-        elif weekday == 3:  # Thursday
-            if hour < 18:
-                logger.info("🎯 Thursday before 6PM Seoul → Tuesday auction (weekNo=2)")
-                return "2"  # Still showing Tuesday auction
-            else:
-                logger.info("🎯 Thursday after 6PM Seoul → Friday auction (weekNo=5)")
-                return "5"  # Switch to Friday auction
-        
-        # Friday to Sunday: Friday auction
-        else:  # Friday, Saturday, Sunday
-            logger.info("🎯 Friday/Weekend → Friday auction (weekNo=5)")
-            return "5"
+        """Backward-compatible accessor for the current auction window."""
+
+        return self._resolve_week(None)
     
     def fetch_cars(self, filters: SSANCARFilters) -> SSANCARResponse:
-        """Fetch cars from SSANCAR with filters"""
-        try:
-            # Auto-set weekNo unless it names a real auction day (2=Tue, 5=Fri).
-            # Clients occasionally send weekday numbers 1/3/4 — normalize them
-            # via the Seoul-time schedule instead of hitting upstream with an
-            # invalid auction day (which returns an empty list).
-            if filters.weekNo not in ("2", "5"):
-                filters.weekNo = self._get_week_number()
-                logger.info(f"📅 Auto-set weekNo to {filters.weekNo} based on current day")
+        """Fetch and cache only a semantically validated SSANCAR list."""
 
-            # Check cache (3min TTL for car listings)
-            cache_params = filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters)
-            cache_key = self._make_cache_key("cars", cache_params)
-            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl_car_list)
-            if cached is not None:
-                logger.debug(f"📦 SSANCAR cars cache hit")
-                return cached
-            
-            # Prepare POST data
-            data = {
-                "weekNo": filters.weekNo,
-                "maker": filters.maker or "",
-                "model": filters.model or "",
-                "fuel": filters.fuel or "",
-                "color": filters.color or "",
-                "yearFrom": filters.yearFrom,
-                "yearTo": filters.yearTo,
-                "priceFrom": filters.priceFrom,
-                "priceTo": filters.priceTo,
-                "list": filters.list,
-                "pages": filters.pages,
-                "no": filters.no or "",
-            }
-            
-            logger.info(f"🚗 Fetching SSANCAR cars with filters: {data}")
-            
-            # Make request
-            response = self.session.post(
-                self.AJAX_CAR_LIST_URL,
-                data=data,
-                timeout=15
+        normalized = filters.model_copy(
+            update={"weekNo": self._resolve_week(filters.weekNo)}
+        )
+        cache_params = normalized.model_dump()
+        cache_key = self._make_cache_key("cars", cache_params)
+        cached = self._get_from_cache(
+            cache_key,
+            ttl=get_settings().cache_ttl_car_list,
+        )
+        if cached is not None:
+            logger.debug("📦 SSANCAR cars cache hit")
+            return cached
+
+        data = self._build_post_data(normalized)
+        transport_result = self.transport.request(
+            "POST",
+            self.AJAX_CAR_LIST_URL,
+            self._validate_car_list_response,
+            data=data,
+        )
+        cars = transport_result.value
+        current_page = int(normalized.pages) + 1
+        page_size = int(normalized.list)
+        result = SSANCARResponse(
+            success=True,
+            message="Cars fetched successfully",
+            cars=cars,
+            total_count=len(cars),
+            current_page=current_page,
+            page_size=page_size,
+            has_next_page=len(cars) == page_size,
+            has_prev_page=current_page > 1,
+            week_number=normalized.weekNo,
+        )
+        self._save_to_cache(cache_key, result)
+        return result
+
+    @staticmethod
+    def _build_post_data(filters: SSANCARFilters) -> Dict[str, str]:
+        return {
+            "weekNo": filters.weekNo,
+            "maker": filters.maker or "",
+            "model": filters.model or "",
+            "fuel": filters.fuel or "",
+            "color": filters.color or "",
+            "yearFrom": filters.yearFrom,
+            "yearTo": filters.yearTo,
+            "priceFrom": filters.priceFrom,
+            "priceTo": filters.priceTo,
+            "list": filters.list,
+            "pages": filters.pages,
+            "no": filters.no or "",
+        }
+
+    def _validate_car_list_response(self, response) -> PayloadValidation[List[SSANCARCar]]:
+        html = response.text or ""
+        if not html.strip():
+            return PayloadValidation(value=[], selector_count=0)
+
+        soup = BeautifulSoup(html, "html.parser")
+        selector_count = len(soup.select('li a[href*="car_view.php"]'))
+        if selector_count == 0:
+            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
+
+        cars = self.parser.parse_car_list(html)
+        cars = [car for car in cars if car.source.upper() == "SSANCAR"]
+        if not cars:
+            raise SSANCARUpstreamInvalidResponseError(
+                selector_count=selector_count
             )
-            
-            response.raise_for_status()
-
-            # Parse HTML response
-            cars = self.parser.parse_car_list(response.text)
-
-            # CRITICAL: Always filter to ensure ONLY SSANCAR cars are returned
-            # The SSANCAR website may aggregate cars from multiple sources
-            original_count = len(cars)
-            cars = [car for car in cars if car.source.upper() == "SSANCAR"]
-            filtered_count = len(cars)
-
-            if original_count != filtered_count:
-                logger.warning(
-                    f"⚠️ Filtered out {original_count - filtered_count} non-SSANCAR cars! "
-                    f"Returning {filtered_count} SSANCAR-only cars"
-                )
-            else:
-                logger.info(f"✅ All {filtered_count} cars are from SSANCAR source")
-
-            # Get total count (would need separate request)
-            total_count = len(cars)  # Simplified for now
-            current_page = int(filters.pages) + 1  # Convert 0-based to 1-based
-            page_size = int(filters.list)
-            
-            result = SSANCARResponse(
-                success=True,
-                message="Cars fetched successfully",
-                cars=cars,
-                total_count=total_count,
-                current_page=current_page,
-                page_size=page_size,
-                has_next_page=len(cars) == page_size,
-                has_prev_page=current_page > 1
-            )
-            self._save_to_cache(cache_key, result)
-            return result
-            
-        except requests.RequestException as e:
-            logger.error(f"❌ Request error fetching SSANCAR cars: {e}")
-            return SSANCARResponse(
-                success=False,
-                message=f"Failed to fetch cars: {str(e)}",
-                cars=[],
-                total_count=0,
-                current_page=1,
-                page_size=15
-            )
-        except Exception as e:
-            logger.error(f"❌ Unexpected error fetching SSANCAR cars: {e}")
-            return SSANCARResponse(
-                success=False,
-                message=f"Unexpected error: {str(e)}",
-                cars=[],
-                total_count=0,
-                current_page=1,
-                page_size=15
-            )
+        return PayloadValidation(value=cars, selector_count=selector_count)
     
     def search_cars(self, filters: SSANCARFilters) -> SSANCARResponse:
         """Search cars with filters - same as fetch_cars for SSANCAR"""
@@ -468,13 +361,8 @@ class SSANCARService:
     def get_car_detail(
         self, car_no: str
     ) -> Tuple[Optional[SSANCARCarDetail], str]:
-        """Get detailed information about a specific car.
+        """Get a validated detail through the same isolated egress chain."""
 
-        Returns (detail, status). Status is one of the parser PARSE_STATUS_*
-        codes plus "request_error" for transport failures. Only valid results
-        are cached — empty/expired/invalid responses bypass the cache so a
-        single bad parse never poisons subsequent requests for the TTL window.
-        """
         cache_key = self._make_cache_key("detail", {"car_no": car_no})
         cached = self._get_from_cache(
             cache_key, ttl=get_settings().cache_ttl_car_detail
@@ -484,36 +372,26 @@ class SSANCARService:
             return cached, PARSE_STATUS_VALID
 
         url = f"{self.CAR_VIEW_URL}?car_no={car_no}"
-        logger.info(f"📄 Fetching car detail from: {url}")
+        logger.info("📄 Fetching SSANCAR car detail car_no={}", car_no)
 
-        try:
-            response = self.session.get(url, timeout=15)
-            response.raise_for_status()
-        except requests.RequestException as e:
-            logger.error(f"❌ Request error fetching car detail: {e}")
-            return None, "request_error"
-
-        try:
+        def validate_detail(response) -> PayloadValidation[
+            Tuple[Optional[SSANCARCarDetail], str]
+        ]:
             car_detail, status = self.parser.parse_car_detail(response.text)
-
-            if status != PARSE_STATUS_VALID or car_detail is None:
-                logger.warning(
-                    f"❌ SSANCAR car detail unavailable for {car_no}: "
-                    f"status={status}"
+            if status == PARSE_STATUS_SESSION_EXPIRED:
+                raise SSANCARUpstreamAuthError(selector_count=0)
+            if status == PARSE_STATUS_NOT_FOUND:
+                return PayloadValidation(
+                    value=(None, status),
+                    selector_count=0,
                 )
-                self._maybe_dump_empty_html(car_no, response.text, status)
-                return None, status
+            if status != PARSE_STATUS_VALID or car_detail is None:
+                raise SSANCARUpstreamInvalidResponseError(selector_count=0)
 
-            # Ensure car_no is set (parser may not always extract it from
-            # the HTML, but we know it from the request URL).
             if not car_detail.car_no:
                 car_detail.car_no = car_no
-
-            # Backfill display name if only manufacturer/model are present.
             if not car_detail.full_name and car_detail.manufacturer and car_detail.model:
                 car_detail.full_name = f"[{car_detail.manufacturer}] {car_detail.model}"
-
-            # Parse bid price from starting_price if needed.
             if car_detail.starting_price and not car_detail.bid_price:
                 price_match = re.search(r'(\d+(?:,\d+)*)', car_detail.starting_price)
                 if price_match:
@@ -524,57 +402,24 @@ class SSANCARService:
 
             if not car_detail.main_image and car_detail.images:
                 car_detail.main_image = car_detail.images[0]
-
-            if not hasattr(car_detail, 'engine_volume') and car_detail.engine_size:
+            if not car_detail.engine_volume and car_detail.engine_size:
                 car_detail.engine_volume = car_detail.engine_size
-
-            if not hasattr(car_detail, 'fuel_type') and car_detail.fuel:
+            if not car_detail.fuel_type and car_detail.fuel:
                 car_detail.fuel_type = car_detail.fuel
+            return PayloadValidation(
+                value=(car_detail, PARSE_STATUS_VALID),
+                selector_count=1,
+            )
 
-            logger.info(f"✅ Successfully retrieved car detail for: {car_no}")
+        transport_result = self.transport.request(
+            "GET",
+            url,
+            validate_detail,
+        )
+        car_detail, status = transport_result.value
+        if status == PARSE_STATUS_VALID and car_detail is not None:
             self._save_to_cache(cache_key, car_detail)
-            return car_detail, PARSE_STATUS_VALID
-
-        except Exception as e:
-            logger.error(f"❌ Unexpected error fetching car detail: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            return None, PARSE_STATUS_EXCEPTION
-
-    def _maybe_dump_empty_html(
-        self, car_no: str, html: str, status: str
-    ) -> None:
-        """Dump the offending response to debug_html/ when the env flag is on.
-
-        Operators flip DEBUG_DUMP_EMPTY_RESPONSES=1 when the new 404s start
-        appearing to inspect whether SSANCAR returned a login redirect, an
-        archived-car page, or something else. Off by default in production.
-        """
-        import os
-        if os.environ.get("DEBUG_DUMP_EMPTY_RESPONSES") != "1":
-            return
-        try:
-            base = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                "debug_html",
-            )
-            os.makedirs(base, exist_ok=True)
-            ts = int(time.time())
-            path = os.path.join(
-                base, f"ssancar_empty_{car_no}_{status}_{ts}.html"
-            )
-            # Cap dump at 100 KB so a runaway body can't fill the disk.
-            with open(path, "w", encoding="utf-8") as f:
-                f.write((html or "")[:100_000])
-            logger.info(f"📝 Dumped empty SSANCAR response to {path}")
-        except Exception as e:
-            logger.warning(f"Could not dump empty SSANCAR response: {e}")
-    
-    def update_cookies(self, new_cookies: Dict[str, str]):
-        """Update service cookies"""
-        self.session.cookies.update(new_cookies)
-        self._save_cookies()
-        logger.info("✅ Updated SSANCAR cookies")
+        return car_detail, status
     
     def get_filter_options(self) -> Dict[str, Any]:
         """Get all available filter options for SSANCAR"""
@@ -693,81 +538,90 @@ class SSANCARService:
             return error_response.model_dump()
     
     def fetch_total_count(self, filters: Optional[SSANCARFilters] = None) -> int:
-        """Fetch total car count from SSANCAR using the same pattern as fetch_cars
+        """Fetch and cache a strictly validated numeric count."""
 
-        Args:
-            filters: Optional filters to apply for count
+        normalized = self._normalized_count_filters(filters)
+        cache_key = self._make_cache_key(
+            "total_count",
+            normalized.model_dump(),
+        )
+        cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl)
+        if cached is not None:
+            logger.debug("📦 SSANCAR total count cache hit")
+            return cached
 
-        Returns:
-            Total count of cars matching the filters
-        """
-        try:
-            # Determine week number - same logic as fetch_cars
-            if filters and filters.weekNo:
-                week_no = filters.weekNo
-            else:
-                week_no = self._get_week_number()
-                logger.info(f"📅 Auto-set weekNo to {week_no} for total count")
+        count, _ = self._request_total_count(normalized)
+        self._save_to_cache(cache_key, count)
+        return count
 
-            # Check cache (5min TTL for total count)
-            cache_params = {"week_no": week_no}
-            if filters:
-                cache_params.update(filters.model_dump() if hasattr(filters, 'model_dump') else vars(filters))
-            cache_key = self._make_cache_key("total_count", cache_params)
-            cached = self._get_from_cache(cache_key, ttl=get_settings().cache_ttl)
-            if cached is not None:
-                logger.debug("📦 SSANCAR total count cache hit")
-                return cached
-            
-            # Build data dictionary - NOT a string! Same format as fetch_cars
-            data = {
-                "weekNo": week_no,
-                "maker": filters.maker or "" if filters else "",
-                "model": filters.model or "" if filters else "",
-                "fuel": filters.fuel or "" if filters else "",
-                "color": filters.color or "" if filters else "",
-                "yearFrom": filters.yearFrom or "2000" if filters else "2000",
-                "yearTo": filters.yearTo or "2025" if filters else "2025",
-                "priceFrom": filters.priceFrom or "0" if filters else "0",
-                "priceTo": filters.priceTo or "200000" if filters else "200000",
+    def _normalized_count_filters(
+        self,
+        filters: Optional[SSANCARFilters],
+    ) -> SSANCARFilters:
+        source = filters or SSANCARFilters()
+        return source.model_copy(
+            update={"weekNo": self._resolve_week(source.weekNo)}
+        )
+
+    @staticmethod
+    def _build_count_data(filters: SSANCARFilters) -> Dict[str, str]:
+        data = SSANCARService._build_post_data(filters)
+        data.update(
+            {
                 "kmFrom": "0",
                 "kmTo": "500000",
                 "gearbox": "",
                 "list": "15",
                 "pages": "1",
                 "sorts": "Low.Price",
-                "no": filters.no or "" if filters else "",
             }
-            
-            logger.info(f"📊 Fetching total count from SSANCAR with filters: {data}")
-            
-            # Make the request using the same pattern as fetch_cars
-            response = self.session.post(
-                self.AJAX_CAR_NUM_URL,
-                data=data,  # Send as dictionary, NOT string!
-                timeout=15  # Same timeout as fetch_cars
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"❌ Non-200 status from SSANCAR car num: {response.status_code}")
-                return 0
-            
-            # The response should be a simple HTML with just a number
-            count_text = response.text.strip()
-            
-            # Try to extract the number
-            try:
-                total_count = int(count_text)
-                logger.info(f"✅ Successfully fetched total count: {total_count}")
-                self._save_to_cache(cache_key, total_count)
-                return total_count
-            except ValueError:
-                logger.error(f"❌ Could not parse count from response: {count_text[:100]}")
-                return 0
-                
-        except requests.RequestException as e:
-            logger.error(f"❌ Request error fetching total count: {e}")
-            return 0
-        except Exception as e:
-            logger.error(f"❌ Unexpected error fetching total count: {e}")
-            return 0
+        )
+        return data
+
+    @staticmethod
+    def _validate_count_response(response) -> PayloadValidation[int]:
+        count_text = (response.text or "").strip()
+        if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+)", count_text):
+            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
+        return PayloadValidation(
+            value=int(count_text.replace(",", "")),
+            selector_count=1,
+        )
+
+    def _request_total_count(
+        self,
+        filters: SSANCARFilters,
+    ) -> Tuple[int, str]:
+        result = self.transport.request(
+            "POST",
+            self.AJAX_CAR_NUM_URL,
+            self._validate_count_response,
+            data=self._build_count_data(filters),
+        )
+        return result.value, result.egress
+
+    def check_health(
+        self,
+        week_number: Optional[Any] = None,
+    ) -> SSANCARHealthProbe:
+        """Run a separate 30-second-cached, validated readiness probe."""
+
+        resolved_week = self._resolve_week(week_number)
+        cache_key = self._make_cache_key(
+            "health_probe",
+            {"week_number": resolved_week},
+        )
+        cached = self._get_from_cache(cache_key, ttl=30)
+        if cached is not None:
+            return cached
+
+        filters = SSANCARFilters(weekNo=resolved_week)
+        count, egress = self._request_total_count(filters)
+        probe = SSANCARHealthProbe(
+            week_number=resolved_week,
+            upstream_count=count,
+            egress=egress,
+            checked_at=self._current_time(),
+        )
+        self._save_to_cache(cache_key, probe)
+        return probe
