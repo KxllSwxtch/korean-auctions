@@ -207,6 +207,35 @@ def test_invalid_legacy_week_is_normalized_before_cache_and_request():
     assert transport.calls[0]["data"]["weekNo"] == "5"
 
 
+def test_search_and_count_pass_all_ui_filters_to_upstream_without_overwrite():
+    service, transport = make_service(
+        StubResponse(valid_list_html()),
+        StubResponse("17"),
+    )
+    filters = SSANCARFilters(
+        weekNo="2",
+        color="White",
+        gearbox="A/T",
+        kmFrom="12345",
+        kmTo="67890",
+        no="STK-900",
+    )
+
+    service.search_cars(filters)
+    service.fetch_total_count(filters)
+
+    expected = {
+        "color": "White",
+        "gearbox": "A/T",
+        "kmFrom": "12345",
+        "kmTo": "67890",
+        "no": "STK-900",
+    }
+    assert len(transport.calls) == 2
+    for call in transport.calls:
+        assert {key: call["data"][key] for key in expected} == expected
+
+
 def test_comma_formatted_count_is_normalized_and_cached():
     service, transport = make_service(StubResponse("1,010"))
     filters = SSANCARFilters(weekNo="2")
