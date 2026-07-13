@@ -177,6 +177,26 @@ def test_recognized_nodes_that_parse_no_cars_are_failure_and_not_cached(monkeypa
     assert not any(key.startswith("ssancar:cars:") for key in service._cache)
 
 
+def test_recognized_node_with_unusable_identity_is_failure_and_not_cached():
+    drifted_html = """
+    <ul>
+      <li>
+        <a href="/page/car_view.php?car_no=not-numeric">
+          <span class="num">1001</span>
+          <span class="name">   </span>
+          <ul class="detail"><li><span>2022</span></li></ul>
+        </a>
+      </li>
+    </ul>
+    """
+    service, _ = make_service(StubResponse(drifted_html))
+
+    with pytest.raises(SSANCARUpstreamInvalidResponseError):
+        service.fetch_cars(SSANCARFilters(weekNo="2"))
+
+    assert not any(key.startswith("ssancar:cars:") for key in service._cache)
+
+
 def test_invalid_legacy_week_is_normalized_before_cache_and_request():
     now = datetime(2026, 7, 13, 10, 0, tzinfo=ZoneInfo("Asia/Seoul"))
     service, transport = make_service(StubResponse(" "), now=now)

@@ -284,7 +284,13 @@ class SSANCARService:
             raise SSANCARUpstreamInvalidResponseError(selector_count=0)
 
         cars = self.parser.parse_car_list(html)
-        cars = [car for car in cars if car.source.upper() == "SSANCAR"]
+        cars = [
+            car
+            for car in cars
+            if car.source.upper() == "SSANCAR"
+            and re.fullmatch(r"\d+", car.car_no or "")
+            and bool((car.full_name or "").strip())
+        ]
         if not cars:
             raise SSANCARUpstreamInvalidResponseError(
                 selector_count=selector_count
