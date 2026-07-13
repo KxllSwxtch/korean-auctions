@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from queue import Empty, Queue
 import re
 import threading
 import time
@@ -103,6 +104,13 @@ class SSANCARTransportResult(Generic[T]):
 
 
 @dataclass(frozen=True)
+class _AttemptOutcome(Generic[T]):
+    response: Optional[requests.Response]
+    validation: Optional[PayloadValidation[T]]
+    error: Optional[Exception]
+
+
+@dataclass(frozen=True)
 class SSANCAREgressCandidate:
     name: str
     session: requests.Session
@@ -122,8 +130,12 @@ class SSANCARTransport:
         headers: Optional[Mapping[str, str]] = None,
         session_factory: SessionFactory = requests.Session,
         clock: Callable[[], float] = time.monotonic,
+        overall_deadline_seconds: float = OVERALL_DEADLINE_SECONDS,
     ) -> None:
         self._clock = clock
+        if overall_deadline_seconds <= 0:
+            raise ValueError("overall_deadline_seconds must be positive")
+        self._overall_deadline_seconds = float(overall_deadline_seconds)
         configured_urls = (
             self._load_proxy_urls_from_env() if proxy_urls is None else proxy_urls
         )
@@ -359,7 +371,7 @@ class SSANCARTransport:
         """Execute one attempt per candidate and return only validated data."""
 
         started_at = self._clock()
-        deadline = started_at + OVERALL_DEADLINE_SECONDS
+        deadline = started_at + self._overall_deadline_seconds
         failures: List[SSANCARUpstreamError] = []
 
         for candidate in self._candidates:
@@ -372,11 +384,12 @@ class SSANCARTransport:
             response: Optional[requests.Response] = None
             try:
                 acquired = False
+                limiter = _OUTBOUND_LIMIT
                 try:
                     acquire_remaining = deadline - self._clock()
                     if acquire_remaining <= 0:
                         raise SSANCARUpstreamTimeoutError()
-                    acquired = _OUTBOUND_LIMIT.acquire(timeout=acquire_remaining)
+                    acquired = limiter.acquire(timeout=acquire_remaining)
                     if not acquired:
                         raise SSANCARUpstreamTimeoutError()
 
@@ -388,17 +401,66 @@ class SSANCARTransport:
                     request_kwargs["timeout"] = self._timeout_for_remaining(
                         request_remaining
                     )
-                    response = candidate.session.request(
-                        method,
-                        url,
-                        **request_kwargs,
+                    outcomes: Queue[_AttemptOutcome[T]] = Queue(maxsize=1)
+                    attempt_response: List[Optional[requests.Response]] = [None]
+
+                    def execute_attempt() -> None:
+                        outcome: _AttemptOutcome[T]
+                        try:
+                            worker_response = candidate.session.request(
+                                method,
+                                url,
+                                **request_kwargs,
+                            )
+                            attempt_response[0] = worker_response
+                            self._classify_response(worker_response)
+                            worker_validation = validator(worker_response)
+                            outcome = _AttemptOutcome(
+                                response=worker_response,
+                                validation=worker_validation,
+                                error=None,
+                            )
+                        except Exception as error:
+                            outcome = _AttemptOutcome(
+                                response=attempt_response[0],
+                                validation=None,
+                                error=error,
+                            )
+                        finally:
+                            limiter.release()
+                        outcomes.put(outcome)
+
+                    worker = threading.Thread(
+                        target=execute_attempt,
+                        name=f"ssancar-{candidate.name}",
+                        daemon=True,
                     )
+                    worker.start()
+                    # The worker owns the limiter slot until the actual HTTP
+                    # request and semantic validation both finish. If the
+                    # caller deadline expires first, at most the configured
+                    # process-wide number of daemon attempts can remain live.
+                    acquired = False
+
+                    wait_remaining = deadline - self._clock()
+                    if wait_remaining <= 0:
+                        raise SSANCARUpstreamTimeoutError()
+                    try:
+                        outcome = outcomes.get(timeout=wait_remaining)
+                    except Empty:
+                        response = attempt_response[0]
+                        raise SSANCARUpstreamTimeoutError()
+
+                    response = outcome.response
+                    if outcome.error is not None:
+                        raise outcome.error
+                    if outcome.validation is None:
+                        raise SSANCARUpstreamInvalidResponseError()
+                    validation = outcome.validation
                 finally:
                     if acquired:
-                        _OUTBOUND_LIMIT.release()
+                        limiter.release()
 
-                self._classify_response(response)
-                validation = validator(response)
                 elapsed_ms = int((self._clock() - attempt_started) * 1000)
                 if self._clock() > deadline:
                     raise SSANCARUpstreamTimeoutError(

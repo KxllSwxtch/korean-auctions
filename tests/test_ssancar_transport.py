@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import threading
+import time
 from typing import Any, Callable
 
 from loguru import logger
@@ -334,6 +336,65 @@ def test_request_timeout_uses_budget_remaining_after_semaphore_wait(monkeypatch)
     assert result.value == "within remaining budget"
     assert direct.calls[0]["timeout"] == (2.0, 2.0)
     assert semaphore.release_calls == 1
+
+
+@pytest.mark.parametrize("blocked_stage", ["request", "validator"])
+def test_overall_deadline_returns_while_attempt_work_is_still_blocked(
+    monkeypatch,
+    blocked_stage,
+):
+    work_started = threading.Event()
+    release_work = threading.Event()
+    limiter_released = threading.Event()
+
+    class GrantedSemaphore:
+        def acquire(self, *, timeout: float) -> bool:
+            return True
+
+        def release(self) -> None:
+            limiter_released.set()
+
+    monkeypatch.setattr(
+        transport_module,
+        "_OUTBOUND_LIMIT",
+        GrantedSemaphore(),
+    )
+
+    def slow_response() -> StubResponse:
+        if blocked_stage == "request":
+            work_started.set()
+            release_work.wait(timeout=1.0)
+        return StubResponse(text="validated")
+
+    def slow_validator(response: StubResponse) -> PayloadValidation[str]:
+        if blocked_stage == "validator":
+            work_started.set()
+            release_work.wait(timeout=1.0)
+        return PayloadValidation(value=response.text, selector_count=1)
+
+    direct = StubSession([slow_response])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+        overall_deadline_seconds=0.05,
+    )
+
+    started_at = time.monotonic()
+    try:
+        with pytest.raises(SSANCARUpstreamTimeoutError):
+            transport.request(
+                "GET",
+                "https://www.ssancar.com/page/car",
+                slow_validator,
+            )
+        elapsed = time.monotonic() - started_at
+        assert work_started.is_set()
+        assert elapsed < 0.25
+        assert not limiter_released.is_set()
+    finally:
+        release_work.set()
+
+    assert limiter_released.wait(timeout=0.5)
 
 
 def test_request_errors_do_not_leak_proxy_credentials_to_logs():
