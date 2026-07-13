@@ -301,6 +301,41 @@ def test_semaphore_is_released_when_request_fails(monkeypatch):
     assert len(direct.calls) == 1
 
 
+def test_request_timeout_uses_budget_remaining_after_semaphore_wait(monkeypatch):
+    now = [10.0]
+
+    class DelayedSemaphore:
+        def __init__(self) -> None:
+            self.release_calls = 0
+
+        def acquire(self, *, timeout: float) -> bool:
+            assert timeout == 24.0
+            now[0] = 30.0
+            return True
+
+        def release(self) -> None:
+            self.release_calls += 1
+
+    semaphore = DelayedSemaphore()
+    monkeypatch.setattr(transport_module, "_OUTBOUND_LIMIT", semaphore)
+    direct = StubSession([StubResponse(text="within remaining budget")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+        clock=lambda: now[0],
+    )
+
+    result = transport.request(
+        "GET",
+        "https://www.ssancar.com/page/car",
+        accept_text,
+    )
+
+    assert result.value == "within remaining budget"
+    assert direct.calls[0]["timeout"] == (2.0, 2.0)
+    assert semaphore.release_calls == 1
+
+
 def test_request_errors_do_not_leak_proxy_credentials_to_logs():
     secret = "DO-NOT-LOG-THIS"
     direct = StubSession([requests.ConnectionError(secret)])
