@@ -9,6 +9,7 @@ from loguru import logger
 import pytest
 import requests
 
+from app.services import ssancar_transport as transport_module
 from app.services.ssancar_transport import (
     PayloadValidation,
     SSANCARTransport,
@@ -238,6 +239,66 @@ def test_overall_deadline_stops_before_another_candidate():
 
     assert len(direct.calls) == 1
     assert proxy.calls == []
+
+
+def test_semaphore_acquisition_is_bounded_by_overall_deadline(monkeypatch):
+    class ExhaustedSemaphore:
+        def __init__(self) -> None:
+            self.acquire_calls: list[float] = []
+            self.release_calls = 0
+
+        def acquire(self, *, timeout: float) -> bool:
+            self.acquire_calls.append(timeout)
+            return False
+
+        def release(self) -> None:
+            self.release_calls += 1
+
+    semaphore = ExhaustedSemaphore()
+    monkeypatch.setattr(transport_module, "_OUTBOUND_LIMIT", semaphore)
+    direct = StubSession([StubResponse(text="must not be requested")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+        clock=lambda: 10.0,
+    )
+
+    with pytest.raises(SSANCARUpstreamTimeoutError):
+        transport.request("GET", "https://www.ssancar.com/page/car", accept_text)
+
+    assert semaphore.acquire_calls == [24.0]
+    assert semaphore.release_calls == 0
+    assert direct.calls == []
+
+
+def test_semaphore_is_released_when_request_fails(monkeypatch):
+    class GrantedSemaphore:
+        def __init__(self) -> None:
+            self.acquire_calls: list[float] = []
+            self.release_calls = 0
+
+        def acquire(self, *, timeout: float) -> bool:
+            self.acquire_calls.append(timeout)
+            return True
+
+        def release(self) -> None:
+            self.release_calls += 1
+
+    semaphore = GrantedSemaphore()
+    monkeypatch.setattr(transport_module, "_OUTBOUND_LIMIT", semaphore)
+    direct = StubSession([requests.ConnectionError("direct down")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+        clock=lambda: 10.0,
+    )
+
+    with pytest.raises(SSANCARUpstreamUnavailableError):
+        transport.request("GET", "https://www.ssancar.com/page/car", accept_text)
+
+    assert semaphore.acquire_calls == [24.0]
+    assert semaphore.release_calls == 1
+    assert len(direct.calls) == 1
 
 
 def test_request_errors_do_not_leak_proxy_credentials_to_logs():

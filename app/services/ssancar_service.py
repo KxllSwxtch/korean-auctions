@@ -264,6 +264,9 @@ class SSANCARService:
             "model": filters.model or "",
             "fuel": filters.fuel or "",
             "color": filters.color or "",
+            "gearbox": filters.gearbox or "",
+            "kmFrom": filters.kmFrom,
+            "kmTo": filters.kmTo,
             "yearFrom": filters.yearFrom,
             "yearTo": filters.yearTo,
             "priceFrom": filters.priceFrom,
@@ -574,9 +577,6 @@ class SSANCARService:
         data = SSANCARService._build_post_data(filters)
         data.update(
             {
-                "kmFrom": "0",
-                "kmTo": "500000",
-                "gearbox": "",
                 "list": "15",
                 "pages": "1",
                 "sorts": "Low.Price",
