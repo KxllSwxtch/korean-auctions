@@ -371,15 +371,29 @@ class SSANCARTransport:
 
             response: Optional[requests.Response] = None
             try:
+                acquire_remaining = deadline - self._clock()
+                if acquire_remaining <= 0:
+                    raise SSANCARUpstreamTimeoutError()
+                acquired = _OUTBOUND_LIMIT.acquire(timeout=acquire_remaining)
+                if not acquired:
+                    raise SSANCARUpstreamTimeoutError()
+
                 request_kwargs: Dict[str, Any] = dict(kwargs)
                 request_kwargs["allow_redirects"] = False
-                request_kwargs["timeout"] = self._timeout_for_remaining(remaining)
-                with _OUTBOUND_LIMIT:
+                try:
+                    request_remaining = deadline - self._clock()
+                    if request_remaining <= 0:
+                        raise SSANCARUpstreamTimeoutError()
+                    request_kwargs["timeout"] = self._timeout_for_remaining(
+                        request_remaining
+                    )
                     response = candidate.session.request(
                         method,
                         url,
                         **request_kwargs,
                     )
+                finally:
+                    _OUTBOUND_LIMIT.release()
 
                 self._classify_response(response)
                 validation = validator(response)

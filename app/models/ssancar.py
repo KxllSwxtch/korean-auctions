@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
@@ -171,6 +171,21 @@ class SSANCARFilters(BaseModel):
     model: Optional[str] = Field("", description="Model code")
     fuel: Optional[str] = Field("", description="Fuel type in Korean")
     color: Optional[str] = Field("", description="Color in Korean")
+    gearbox: Optional[str] = Field(
+        "",
+        description="Transmission/gearbox filter",
+        validation_alias=AliasChoices("gearbox", "transmission"),
+    )
+    kmFrom: str = Field(
+        "0",
+        description="Minimum mileage in kilometres",
+        validation_alias=AliasChoices("kmFrom", "mileageFrom"),
+    )
+    kmTo: str = Field(
+        "500000",
+        description="Maximum mileage in kilometres",
+        validation_alias=AliasChoices("kmTo", "mileageTo"),
+    )
     yearFrom: str = Field("2000", description="Year from")
     yearTo: str = Field(
         default_factory=lambda: str(datetime.now().year + 1),

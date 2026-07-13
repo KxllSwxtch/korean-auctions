@@ -207,15 +207,74 @@ def test_total_count_normalizes_invalid_legacy_week_before_service_call():
     assert response.json()["week_number"] == "5"
 
 
+@pytest.mark.parametrize("path", ["cars", "total-count"])
+def test_get_routes_pass_every_ui_filter_into_ssancar_filters(path):
+    service = StubService()
+    response = make_client(service).get(
+        f"/api/v1/ssancar/{path}",
+        params={
+            "week_number": "2",
+            "color": "White",
+            "transmission": "A/T",
+            "mileage_from": 12345,
+            "mileage_to": 67890,
+            "stock_no": "STK-900",
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.last_filters.color == "White"
+    assert service.last_filters.gearbox == "A/T"
+    assert service.last_filters.kmFrom == "12345"
+    assert service.last_filters.kmTo == "67890"
+    assert service.last_filters.no == "STK-900"
+
+
+def test_search_accepts_existing_frontend_filter_spellings():
+    service = StubService()
+    response = make_client(service).post(
+        "/api/v1/ssancar/search",
+        json={
+            "weekNo": "2",
+            "color": "White",
+            "transmission": "A/T",
+            "mileageFrom": "12345",
+            "mileageTo": "67890",
+            "no": "STK-900",
+        },
+    )
+
+    assert response.status_code == 200
+    assert service.last_filters.color == "White"
+    assert service.last_filters.gearbox == "A/T"
+    assert service.last_filters.kmFrom == "12345"
+    assert service.last_filters.kmTo == "67890"
+    assert service.last_filters.no == "STK-900"
+
+
 def test_compat_search_response_includes_selected_week():
     service = StubService()
     response = make_client(service).post(
         "/api/v1/ssancar/filters/ssancar/search",
-        json={"week_number": 2, "page": 1, "page_size": 15},
+        json={
+            "week_number": 2,
+            "page": 1,
+            "page_size": 15,
+            "color": "White",
+            "transmission": "A/T",
+            "mileage_from": 12345,
+            "mileage_to": 67890,
+            "stock_no": "STK-900",
+        },
     )
 
     assert response.status_code == 200
     assert response.json()["week_number"] == "2"
+    assert service.last_filters.color == "White"
+    assert service.last_filters.gearbox == "A/T"
+    assert service.last_filters.kmFrom == "12345"
+    assert service.last_filters.kmTo == "67890"
+    assert service.last_filters.no == "STK-900"
 
 
 def test_valid_zero_count_health_probe_is_healthy():

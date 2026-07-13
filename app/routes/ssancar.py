@@ -79,6 +79,9 @@ async def get_ssancar_cars(
     model: Optional[str] = Query(None, description="Model code"),
     fuel: Optional[str] = Query(None, description="Fuel type in Korean"),
     color: Optional[str] = Query(None, description="Color in Korean"),
+    transmission: Optional[str] = Query(None, description="Transmission/gearbox"),
+    mileage_from: Optional[int] = Query(0, ge=0, description="Mileage from"),
+    mileage_to: Optional[int] = Query(500000, ge=0, description="Mileage to"),
     year_from: Optional[int] = Query(2000, description="Year from"),
     year_to: Optional[int] = Query(None, description="Year to (defaults to next year)"),
     price_from: Optional[int] = Query(0, description="Price from (upstream ssancar.com filter units — historically USD)"),
@@ -110,6 +113,9 @@ async def get_ssancar_cars(
             model=model or "",
             fuel=fuel or "",
             color=color or "",
+            gearbox=transmission or "",
+            kmFrom=str(mileage_from),
+            kmTo=str(mileage_to),
             yearFrom=str(year_from),
             yearTo=str(year_to or (datetime.now().year + 1)),
             priceFrom=str(price_from),
@@ -203,6 +209,11 @@ async def get_total_count(
     manufacturer: Optional[str] = Query(None, description="Manufacturer in Korean"),
     model: Optional[str] = Query(None, description="Model code"),
     fuel: Optional[str] = Query(None, description="Fuel type in Korean"),
+    color: Optional[str] = Query(None, description="Color in Korean"),
+    transmission: Optional[str] = Query(None, description="Transmission/gearbox"),
+    mileage_from: Optional[int] = Query(0, ge=0, description="Mileage from"),
+    mileage_to: Optional[int] = Query(500000, ge=0, description="Mileage to"),
+    stock_no: Optional[str] = Query(None, description="Stock number search"),
     year_from: Optional[int] = Query(2000, description="Year from"),
     year_to: Optional[int] = Query(None, description="Year to (defaults to next year)"),
     price_from: Optional[int] = Query(0, description="Price from (upstream ssancar.com filter units — historically USD)"),
@@ -231,12 +242,17 @@ async def get_total_count(
             maker=manufacturer or "",
             model=model or "",
             fuel=fuel or "",
+            color=color or "",
+            gearbox=transmission or "",
+            kmFrom=str(mileage_from),
+            kmTo=str(mileage_to),
             yearFrom=str(year_from),
             yearTo=str(effective_year_to),
             priceFrom=str(price_from),
             priceTo=str(price_to),
             list="15",
-            pages="0"
+            pages="0",
+            no=stock_no or "",
         )
         
         # Get total count
@@ -250,6 +266,16 @@ async def get_total_count(
             filters_applied["model"] = model
         if fuel:
             filters_applied["fuel"] = fuel
+        if color:
+            filters_applied["color"] = color
+        if transmission:
+            filters_applied["transmission"] = transmission
+        if mileage_from != 0:
+            filters_applied["mileage_from"] = mileage_from
+        if mileage_to != 500000:
+            filters_applied["mileage_to"] = mileage_to
+        if stock_no:
+            filters_applied["stock_no"] = stock_no
         if year_from != 2000:
             filters_applied["year_from"] = year_from
         if year_to and year_to != default_year_to:
@@ -618,6 +644,9 @@ async def search_ssancar_cars_compat(
         model=filters.get("model", ""),
         fuel=filters.get("fuel", ""),
         color=filters.get("color", ""),
+        gearbox=filters.get("transmission", ""),
+        kmFrom=str(filters.get("mileage_from", 0)),
+        kmTo=str(filters.get("mileage_to", 500000)),
         yearFrom=str(filters.get("year_from", 2000)),
         yearTo=str(filters.get("year_to") or (datetime.now().year + 1)),
         priceFrom=str(filters.get("price_from", 0)),
