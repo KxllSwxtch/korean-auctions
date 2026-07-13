@@ -645,23 +645,26 @@ def test_ordinary_archived_detail_remains_not_found_without_failover():
 @pytest.mark.parametrize("sample_car_no", [None, "", "not-a-number"])
 def test_detail_health_malformed_sample_is_structured_upstream_invalid(
     sample_car_no,
+    monkeypatch,
 ):
-    class InvalidSampleTransport:
-        def request(self, method, url, validator, **kwargs):
-            if "ajax_car_num" in url:
-                value = 1
-            else:
-                value = [SimpleNamespace(car_no=sample_car_no)]
-            return SSANCARTransportResult(
-                value=value,
-                egress="direct",
-                status_code=200,
-                selector_count=1,
-                elapsed_ms=1,
-            )
+    direct = CandidateSession(
+        StubResponse("1"),
+        StubResponse("bad-direct-sample"),
+    )
+    proxy = CandidateSession(StubResponse("bad-proxy-sample"))
+    service = make_failover_service(direct, proxy)
 
-    service = SSANCARService(transport=InvalidSampleTransport())
-    service._cache.clear()
+    monkeypatch.setattr(
+        service,
+        "_validate_car_list_response",
+        lambda response: PayloadValidation(
+            value=[SimpleNamespace(car_no=sample_car_no)],
+            selector_count=1,
+        ),
+    )
 
     with pytest.raises(SSANCARUpstreamInvalidResponseError):
         service.check_detail_health("2")
+
+    assert len(direct.calls) == 2
+    assert len(proxy.calls) == 1

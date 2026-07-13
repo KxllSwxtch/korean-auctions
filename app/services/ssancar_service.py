@@ -734,7 +734,18 @@ class SSANCARService:
                 raise SSANCARUpstreamInvalidResponseError(
                     selector_count=validation.selector_count,
                 )
-            return validation
+            try:
+                sample_car_no = validate_ssancar_car_no(
+                    validation.value[0].car_no
+                )
+            except (AttributeError, IndexError, TypeError, ValueError) as error:
+                raise SSANCARUpstreamInvalidResponseError(
+                    selector_count=validation.selector_count,
+                ) from error
+            return PayloadValidation(
+                value=sample_car_no,
+                selector_count=validation.selector_count,
+            )
 
         list_result = self.transport.request(
             "POST",
@@ -745,22 +756,12 @@ class SSANCARService:
             headers=self.AJAX_HEADERS,
         )
 
-        try:
-            sample_car_no = validate_ssancar_car_no(
-                list_result.value[0].car_no
-            )
-        except (AttributeError, IndexError, TypeError, ValueError) as error:
-            raise SSANCARUpstreamInvalidResponseError(
-                selector_count=0,
-            ) from error
+        sample_car_no = list_result.value
         detail_result = self._request_car_detail(
             sample_car_no,
             operation="detail_health_detail",
             require_valid=True,
         )
-        car_detail, status = detail_result.value
-        if status != PARSE_STATUS_VALID or car_detail is None:
-            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
 
         probe = SSANCARDetailHealthProbe(
             week_number=resolved_week,
