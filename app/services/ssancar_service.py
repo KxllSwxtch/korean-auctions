@@ -21,6 +21,7 @@ from app.parsers.ssancar_parser import (
     PARSE_STATUS_SESSION_EXPIRED,
     PARSE_STATUS_NOT_FOUND,
 )
+from app.parsers.ssancar_auth import is_ssancar_login_html
 from app.core.config import get_settings
 from app.services.ssancar_transport import (
     PayloadValidation,
@@ -73,6 +74,25 @@ class SSANCARHealthProbe:
     checked_at: datetime
 
 
+@dataclass(frozen=True)
+class SSANCARDetailHealthProbe:
+    week_number: str
+    upstream_count: int
+    detail_checked: bool
+    sample_car_no: Optional[str]
+    egress: str
+    checked_at: datetime
+
+
+def validate_ssancar_car_no(car_no: Any) -> str:
+    """Return a safe SSANCAR identifier or reject it before any I/O."""
+
+    value = str(car_no) if car_no is not None else ""
+    if not re.fullmatch(r"[0-9]{1,20}", value):
+        raise ValueError("car_no must contain 1 to 20 ASCII digits")
+    return value
+
+
 class SSANCARService:
     """Service for interacting with SSANCAR auction website"""
     
@@ -82,22 +102,28 @@ class SSANCARService:
     CAR_VIEW_URL = f"{BASE_URL}/page/car_view.php"
     LIST_PAGE_URL = f"{BASE_URL}/bbs/board.php?bo_table=list"
     
-    # Default headers from the provided example
-    DEFAULT_HEADERS = {
-        "Accept": "*/*",
+    COMMON_HEADERS = {
         "Accept-Language": "en,ru;q=0.9,en-CA;q=0.8,la;q=0.7,fr;q=0.6,ko;q=0.5",
         "Connection": "keep-alive",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
+    }
+    AJAX_HEADERS = {
+        "Accept": "*/*",
         "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
         "Origin": "https://www.ssancar.com",
         "Referer": "https://www.ssancar.com/bbs/board.php?bo_table=list",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "same-origin",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
         "X-Requested-With": "XMLHttpRequest",
-        "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
+    }
+    DETAIL_HEADERS = {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Referer": "https://www.ssancar.com/bbs/board.php?bo_table=list",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Upgrade-Insecure-Requests": "1",
     }
     
     # Load car manufacturer and model mapping from JSON
@@ -153,7 +179,7 @@ class SSANCARService:
 
         self.parser = SSANCARParser()
         self.transport = transport or SSANCARTransport(
-            headers=self.DEFAULT_HEADERS,
+            headers=self.COMMON_HEADERS,
         )
         self._now_provider = now_provider
         self._cache_clock = cache_clock or time.time
@@ -237,7 +263,9 @@ class SSANCARService:
             "POST",
             self.AJAX_CAR_LIST_URL,
             self._validate_car_list_response,
+            operation="list",
             data=data,
+            headers=self.AJAX_HEADERS,
         )
         cars = transport_result.value
         current_page = int(normalized.pages) + 1
@@ -278,6 +306,8 @@ class SSANCARService:
 
     def _validate_car_list_response(self, response) -> PayloadValidation[List[SSANCARCar]]:
         html = response.text or ""
+        if is_ssancar_login_html(html):
+            raise SSANCARUpstreamAuthError(selector_count=0)
         if not html.strip():
             return PayloadValidation(value=[], selector_count=0)
 
@@ -372,6 +402,7 @@ class SSANCARService:
     ) -> Tuple[Optional[SSANCARCarDetail], str]:
         """Get a validated detail through the same isolated egress chain."""
 
+        car_no = validate_ssancar_car_no(car_no)
         cache_key = self._make_cache_key("detail", {"car_no": car_no})
         cached = self._get_from_cache(
             cache_key, ttl=get_settings().cache_ttl_car_detail
@@ -380,55 +411,69 @@ class SSANCARService:
             logger.debug(f"📦 SSANCAR car detail cache hit: {car_no}")
             return cached, PARSE_STATUS_VALID
 
-        url = f"{self.CAR_VIEW_URL}?car_no={car_no}"
         logger.info("📄 Fetching SSANCAR car detail car_no={}", car_no)
 
-        def validate_detail(response) -> PayloadValidation[
-            Tuple[Optional[SSANCARCarDetail], str]
-        ]:
-            car_detail, status = self.parser.parse_car_detail(response.text)
-            if status == PARSE_STATUS_SESSION_EXPIRED:
-                raise SSANCARUpstreamAuthError(selector_count=0)
-            if status == PARSE_STATUS_NOT_FOUND:
-                return PayloadValidation(
-                    value=(None, status),
-                    selector_count=0,
-                )
-            if status != PARSE_STATUS_VALID or car_detail is None:
-                raise SSANCARUpstreamInvalidResponseError(selector_count=0)
-
-            if not car_detail.car_no:
-                car_detail.car_no = car_no
-            if not car_detail.full_name and car_detail.manufacturer and car_detail.model:
-                car_detail.full_name = f"[{car_detail.manufacturer}] {car_detail.model}"
-            if car_detail.starting_price and not car_detail.bid_price:
-                price_match = re.search(r'(\d+(?:,\d+)*)', car_detail.starting_price)
-                if price_match:
-                    try:
-                        car_detail.bid_price = int(price_match.group(1).replace(',', ''))
-                    except ValueError:
-                        car_detail.bid_price = 0
-
-            if not car_detail.main_image and car_detail.images:
-                car_detail.main_image = car_detail.images[0]
-            if not car_detail.engine_volume and car_detail.engine_size:
-                car_detail.engine_volume = car_detail.engine_size
-            if not car_detail.fuel_type and car_detail.fuel:
-                car_detail.fuel_type = car_detail.fuel
-            return PayloadValidation(
-                value=(car_detail, PARSE_STATUS_VALID),
-                selector_count=1,
-            )
-
-        transport_result = self.transport.request(
-            "GET",
-            url,
-            validate_detail,
-        )
+        transport_result = self._request_car_detail(car_no, operation="detail")
         car_detail, status = transport_result.value
         if status == PARSE_STATUS_VALID and car_detail is not None:
             self._save_to_cache(cache_key, car_detail)
         return car_detail, status
+
+    def _validate_detail_response(
+        self,
+        response,
+        requested_car_no: str,
+    ) -> PayloadValidation[Tuple[Optional[SSANCARCarDetail], str]]:
+        if is_ssancar_login_html(response.text):
+            raise SSANCARUpstreamAuthError(selector_count=0)
+
+        car_detail, status = self.parser.parse_car_detail(response.text)
+        if status == PARSE_STATUS_SESSION_EXPIRED:
+            raise SSANCARUpstreamAuthError(selector_count=0)
+        if status == PARSE_STATUS_NOT_FOUND:
+            return PayloadValidation(value=(None, status), selector_count=0)
+        if status != PARSE_STATUS_VALID or car_detail is None:
+            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
+
+        if car_detail.car_no and car_detail.car_no != requested_car_no:
+            raise SSANCARUpstreamInvalidResponseError(selector_count=1)
+        if not car_detail.car_no:
+            car_detail.car_no = requested_car_no
+        if not car_detail.full_name and car_detail.manufacturer and car_detail.model:
+            car_detail.full_name = f"[{car_detail.manufacturer}] {car_detail.model}"
+        if car_detail.starting_price and not car_detail.bid_price:
+            price_match = re.search(r'(\d+(?:,\d+)*)', car_detail.starting_price)
+            if price_match:
+                try:
+                    car_detail.bid_price = int(price_match.group(1).replace(',', ''))
+                except ValueError:
+                    car_detail.bid_price = 0
+
+        if not car_detail.main_image and car_detail.images:
+            car_detail.main_image = car_detail.images[0]
+        if not car_detail.engine_volume and car_detail.engine_size:
+            car_detail.engine_volume = car_detail.engine_size
+        if not car_detail.fuel_type and car_detail.fuel:
+            car_detail.fuel_type = car_detail.fuel
+        return PayloadValidation(
+            value=(car_detail, PARSE_STATUS_VALID),
+            selector_count=1,
+        )
+
+    def _request_car_detail(self, car_no: str, *, operation: str):
+        car_no = validate_ssancar_car_no(car_no)
+
+        def validate_detail(response):
+            return self._validate_detail_response(response, car_no)
+
+        return self.transport.request(
+            "GET",
+            self.CAR_VIEW_URL,
+            validate_detail,
+            operation=operation,
+            params={"car_no": car_no},
+            headers=self.DETAIL_HEADERS,
+        )
     
     def get_filter_options(self) -> Dict[str, Any]:
         """Get all available filter options for SSANCAR"""
@@ -587,6 +632,8 @@ class SSANCARService:
     @staticmethod
     def _validate_count_response(response) -> PayloadValidation[int]:
         count_text = (response.text or "").strip()
+        if is_ssancar_login_html(count_text):
+            raise SSANCARUpstreamAuthError(selector_count=0)
         if not re.fullmatch(r"(?:\d+|\d{1,3}(?:,\d{3})+)", count_text):
             raise SSANCARUpstreamInvalidResponseError(selector_count=0)
         return PayloadValidation(
@@ -597,12 +644,16 @@ class SSANCARService:
     def _request_total_count(
         self,
         filters: SSANCARFilters,
+        *,
+        operation: str = "count",
     ) -> Tuple[int, str]:
         result = self.transport.request(
             "POST",
             self.AJAX_CAR_NUM_URL,
             self._validate_count_response,
+            operation=operation,
             data=self._build_count_data(filters),
+            headers=self.AJAX_HEADERS,
         )
         return result.value, result.egress
 
@@ -627,6 +678,69 @@ class SSANCARService:
             week_number=resolved_week,
             upstream_count=count,
             egress=egress,
+            checked_at=self._current_time(),
+        )
+        self._save_to_cache(cache_key, probe)
+        return probe
+
+    def check_detail_health(
+        self,
+        week_number: Optional[Any] = None,
+    ) -> SSANCARDetailHealthProbe:
+        """Validate the current detail capability without using detail cache."""
+
+        resolved_week = self._resolve_week(week_number)
+        cache_key = self._make_cache_key(
+            "detail_health_probe",
+            {"week_number": resolved_week},
+        )
+        cached = self._get_from_cache(cache_key, ttl=300)
+        if cached is not None:
+            return cached
+
+        filters = SSANCARFilters(weekNo=resolved_week, list="1", pages="0")
+        count, count_egress = self._request_total_count(
+            filters,
+            operation="detail_health_count",
+        )
+        if count == 0:
+            probe = SSANCARDetailHealthProbe(
+                week_number=resolved_week,
+                upstream_count=0,
+                detail_checked=False,
+                sample_car_no=None,
+                egress=count_egress,
+                checked_at=self._current_time(),
+            )
+            self._save_to_cache(cache_key, probe)
+            return probe
+
+        list_result = self.transport.request(
+            "POST",
+            self.AJAX_CAR_LIST_URL,
+            self._validate_car_list_response,
+            operation="detail_health_list",
+            data=self._build_post_data(filters),
+            headers=self.AJAX_HEADERS,
+        )
+        if not list_result.value:
+            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
+
+        sample_car_no = validate_ssancar_car_no(list_result.value[0].car_no)
+        detail_result = self._request_car_detail(
+            sample_car_no,
+            operation="detail_health_detail",
+        )
+        car_detail, status = detail_result.value
+        if status != PARSE_STATUS_VALID or car_detail is None:
+            raise SSANCARUpstreamInvalidResponseError(selector_count=0)
+
+        probe = SSANCARDetailHealthProbe(
+            week_number=resolved_week,
+            upstream_count=count,
+            detail_checked=True,
+            sample_car_no=sample_car_no,
+            egress=detail_result.egress,
             checked_at=self._current_time(),
         )
         self._save_to_cache(cache_key, probe)

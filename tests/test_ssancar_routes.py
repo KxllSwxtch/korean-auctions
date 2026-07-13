@@ -48,6 +48,14 @@ class StubService:
             egress="direct",
             checked_at=datetime(2026, 7, 13, 12, 0, 0),
         )
+        self.detail_health_probe = SimpleNamespace(
+            week_number="2",
+            upstream_count=1,
+            detail_checked=True,
+            sample_car_no="2120398967",
+            egress="direct",
+            checked_at=datetime(2026, 7, 13, 12, 0, 0),
+        )
 
     def fetch_cars(self, filters):
         self.last_filters = filters
@@ -76,6 +84,11 @@ class StubService:
         if self.health_error:
             raise self.health_error
         return self.health_probe
+
+    def check_detail_health(self, week_number=None):
+        if self.health_error:
+            raise self.health_error
+        return self.detail_health_probe
 
     def update_cookies(self, cookies):
         self.cookie_mutated = True
@@ -177,6 +190,33 @@ def test_detail_uses_same_structured_upstream_error_mapping(
     assert response.json()["detail"]["code"] == expected_code
     assert response.json()["detail"]["retryable"] is True
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("car_no", ["abc", "123%26other=1", "1" * 21, "１２３"])
+def test_detail_rejects_invalid_car_number_with_structured_422(car_no):
+    response = make_client(StubService()).get(
+        f"/api/v1/ssancar/car/{car_no}"
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == {
+        "code": "invalid_car_no",
+        "message": "car_no must contain 1 to 20 ASCII digits",
+        "retryable": False,
+    }
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_archived_detail_404_is_structured_and_not_retryable():
+    response = make_client(StubService()).get("/api/v1/ssancar/car/123")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == {
+        "code": "car_unavailable",
+        "message": "Car details are not available",
+        "car_no": "123",
+        "retryable": False,
+    }
 
 
 def test_successful_list_and_count_echo_the_normalized_week():
@@ -308,6 +348,60 @@ def test_exhausted_health_probe_returns_non_cacheable_503():
     assert response.json()["detail"] == {
         "code": "upstream_unavailable",
         "message": "SSANCAR readiness probe failed",
+        "retryable": True,
+    }
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_detail_health_returns_capability_probe_contract():
+    response = make_client(StubService()).get(
+        "/api/v1/ssancar/health/detail?week_number=2"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "healthy",
+        "week_number": "2",
+        "upstream_count": 1,
+        "detail_checked": True,
+        "sample_car_no": "2120398967",
+        "egress": "direct",
+        "checked_at": "2026-07-13T12:00:00",
+    }
+
+
+def test_detail_health_zero_count_allows_null_sample():
+    service = StubService()
+    service.detail_health_probe = SimpleNamespace(
+        week_number="5",
+        upstream_count=0,
+        detail_checked=False,
+        sample_car_no=None,
+        egress="direct",
+        checked_at=datetime(2026, 7, 13, 12, 0, 0),
+    )
+
+    response = make_client(service).get(
+        "/api/v1/ssancar/health/detail?week_number=5"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sample_car_no"] is None
+    assert response.json()["detail_checked"] is False
+
+
+def test_detail_health_failure_returns_structured_non_cacheable_503():
+    service = StubService()
+    service.health_error = SSANCARUpstreamAuthError()
+
+    response = make_client(service).get(
+        "/api/v1/ssancar/health/detail?week_number=2"
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "upstream_auth",
+        "message": "SSANCAR detail readiness probe failed",
         "retryable": True,
     }
     assert response.headers["cache-control"] == "no-store"

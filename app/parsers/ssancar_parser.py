@@ -7,6 +7,7 @@ from loguru import logger
 from app.models.ssancar import (
     SSANCARCar, SSANCARCarDetail, SSANCARManufacturer, SSANCARModel
 )
+from app.parsers.ssancar_auth import is_ssancar_login_html
 
 # Status codes returned by parse_car_detail alongside the parsed object.
 # The service layer translates these into HTTP error codes for the route.
@@ -19,18 +20,6 @@ PARSE_STATUS_EXCEPTION = "exception"
 
 # Markers that indicate SSANCAR returned a login/session-expired page instead
 # of the requested car detail. Lowercased before matching.
-_LOGIN_REDIRECT_MARKERS = (
-    '/bbs/login.php',
-    '/member/login',
-    'name="loginform"',
-    "name='loginform'",
-    "id='loginform'",
-    'id="loginform"',
-    'session expired',
-    'session_expired',
-    '로그인',
-)
-
 # Markers that indicate the car was archived / not found by SSANCAR
 # (200 OK with a "no such car" page).
 _NOT_FOUND_MARKERS = (
@@ -57,13 +46,13 @@ class SSANCARParser:
         PARSE_STATUS_VALID means the parser should bail out without
         constructing a (zero-filled) object.
         """
-        if not html or len(html.strip()) < _MIN_HTML_LENGTH:
+        if not html or not html.strip():
             return PARSE_STATUS_EMPTY
 
-        haystack = html.lower()
-        for marker in _LOGIN_REDIRECT_MARKERS:
-            if marker in haystack:
-                return PARSE_STATUS_SESSION_EXPIRED
+        if is_ssancar_login_html(html):
+            return PARSE_STATUS_SESSION_EXPIRED
+        if len(html.strip()) < _MIN_HTML_LENGTH:
+            return PARSE_STATUS_EMPTY
         for marker in _NOT_FOUND_MARKERS:
             if marker in html:  # Korean markers — case preserved
                 return PARSE_STATUS_NOT_FOUND

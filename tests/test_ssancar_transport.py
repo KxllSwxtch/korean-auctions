@@ -11,6 +11,7 @@ from loguru import logger
 import pytest
 import requests
 
+from app.parsers.ssancar_auth import is_ssancar_login_html
 from app.services import ssancar_transport as transport_module
 from app.services.ssancar_transport import (
     PayloadValidation,
@@ -144,20 +145,51 @@ def test_login_redirect_is_auth_failure_and_redirects_are_disabled():
     assert direct.calls[0]["timeout"] == (3.0, 8.0)
 
 
-@pytest.mark.parametrize(
-    ("response"),
-    [
-        StubResponse(
-            text='<html><form name="loginForm" action="/bbs/login.php"></form></html>'
-        ),
-        StubResponse(
-            text="<html>account page</html>",
-            url="https://www.ssancar.com/bbs/login.php",
-        ),
-    ],
-)
-def test_http_200_login_page_or_login_final_url_is_auth_failure(response):
+def test_http_200_login_final_url_is_auth_failure():
+    response = StubResponse(
+        text="<html>account page</html>",
+        url="https://www.ssancar.com/bbs/login.php",
+    )
     direct = StubSession([response])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+    )
+
+    with pytest.raises(SSANCARUpstreamAuthError):
+        transport.request("GET", "https://www.ssancar.com/page/car", accept_text)
+
+
+def test_passive_login_script_in_valid_html_is_not_auth():
+    body = """
+    <html><body>
+      <p class="name"><span>[BMW] 330e</span></p>
+      <script>
+        if (confirm('Log in to comment?')) {
+          location.href = 'https://www.ssancar.com/bbs/login.php';
+        }
+      </script>
+    </body></html>
+    """
+    direct = StubSession([StubResponse(text=body)])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+    )
+
+    result = transport.request(
+        "GET",
+        "https://www.ssancar.com/page/car_view.php",
+        accept_text,
+        operation="detail",
+    )
+
+    assert result.value == body
+
+
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_http_auth_status_is_auth_failure(status_code):
+    direct = StubSession([StubResponse(status_code=status_code)])
     transport = SSANCARTransport(
         session_factory=session_factory_for(direct),
         proxy_urls=[],
@@ -183,6 +215,38 @@ def test_direct_connection_failure_falls_back_to_proxy_once():
     assert result.egress == "proxy-1"
     assert len(direct.calls) == 1
     assert len(proxy.calls) == 1
+
+
+def test_structural_login_validator_falls_back_to_valid_proxy():
+    login_html = """
+    <html><head><title>Login</title></head><body>
+      <form name="flogin" action="/bbs/login_check.php">
+        <input name="mb_id"><input type="password" name="mb_password">
+      </form>
+    </body></html>
+    """
+    direct = StubSession([StubResponse(text=login_html)])
+    proxy = StubSession([StubResponse(text="valid payload")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct, proxy),
+        proxy_urls=["http://fallback.example:8000"],
+    )
+
+    def validate(response: StubResponse) -> PayloadValidation[str]:
+        if is_ssancar_login_html(response.text):
+            raise SSANCARUpstreamAuthError(selector_count=0)
+        return PayloadValidation(value=response.text, selector_count=1)
+
+    result = transport.request(
+        "GET",
+        "https://www.ssancar.com/page/car",
+        validate,
+        operation="detail",
+    )
+
+    assert result.value == "valid payload"
+    assert result.egress == "proxy-1"
+    assert len(direct.calls) == len(proxy.calls) == 1
 
 
 def test_semantically_invalid_payload_advances_to_next_candidate():
@@ -420,3 +484,33 @@ def test_request_errors_do_not_leak_proxy_credentials_to_logs():
     assert "fallback.example" not in output
     assert "direct" in output
     assert "proxy-1" in output
+
+
+def test_logs_include_only_sanitized_operation_label():
+    direct = StubSession([StubResponse(text="ok"), StubResponse(text="ok")])
+    transport = SSANCARTransport(
+        session_factory=session_factory_for(direct),
+        proxy_urls=[],
+    )
+    captured: list[str] = []
+    sink = logger.add(captured.append, format="{message}")
+    try:
+        transport.request(
+            "GET",
+            "https://www.ssancar.com/page/car",
+            accept_text,
+            operation="detail",
+        )
+        transport.request(
+            "GET",
+            "https://www.ssancar.com/page/car",
+            accept_text,
+            operation="detail secret\ncredential",
+        )
+    finally:
+        logger.remove(sink)
+
+    output = "".join(captured)
+    assert "operation=detail" in output
+    assert "operation=unknown" in output
+    assert "credential" not in output

@@ -88,6 +88,35 @@ def valid_detail_html(car_no: str = "1820158") -> str:
     """
 
 
+def passive_login_detail_html(car_no: str = "1820158") -> str:
+    return valid_detail_html(car_no).replace(
+        "</body>",
+        """
+        <script>
+          if (confirm('You must log in to post a comment.')) {
+            location.href = 'https://www.ssancar.com/bbs/login.php';
+          }
+        </script>
+        </body>
+        """,
+    )
+
+
+def actual_login_html() -> str:
+    return """
+    <html><head>
+      <title>로그인 | Korean used car in Auction & Local market</title>
+      <link rel="canonical" href="https://www.ssancar.com/bbs/login.php">
+    </head><body>
+      <form name="flogin" action="/bbs/login_check.php">
+        <input name="mb_id">
+        <input type="password" name="mb_password">
+      </form>
+      %s
+    </body></html>
+    """ % ("padding " * 100)
+
+
 def make_service(
     *outcomes: Any,
     now: datetime | None = None,
@@ -165,6 +194,16 @@ def test_non_empty_unrecognized_list_markup_is_failure_and_not_cached():
         service.fetch_cars(filters)
 
     assert not any(key.startswith("ssancar:cars:") for key in service._cache)
+
+
+def test_login_html_is_auth_failure_for_list_and_count_validators():
+    list_service, _ = make_service(StubResponse(actual_login_html()))
+    count_service, _ = make_service(StubResponse(actual_login_html()))
+
+    with pytest.raises(SSANCARUpstreamAuthError):
+        list_service.fetch_cars(SSANCARFilters(weekNo="2"))
+    with pytest.raises(SSANCARUpstreamAuthError):
+        count_service.fetch_total_count(SSANCARFilters(weekNo="2"))
 
 
 def test_recognized_nodes_that_parse_no_cars_are_failure_and_not_cached(monkeypatch):
@@ -265,10 +304,7 @@ def test_invalid_count_payload_is_failure_and_not_cached(payload: str):
 
 
 def test_detail_login_payload_is_auth_failure_and_not_cached():
-    body = "<html><body>" + ("padding " * 100) + (
-        '<form name="loginForm" action="/bbs/login.php"></form>'
-    ) + "</body></html>"
-    service, _ = make_service(StubResponse(body))
+    service, _ = make_service(StubResponse(actual_login_html()))
     cache_key = service._make_cache_key("detail", {"car_no": "9999999"})
 
     with pytest.raises(SSANCARUpstreamAuthError):
@@ -298,6 +334,67 @@ def test_valid_detail_is_cached_and_returned():
     assert detail is not None and detail.car_no == car_no
     assert detail_again is detail
     assert len(transport.calls) == 1
+
+
+def test_valid_detail_with_passive_login_script_is_cached():
+    car_no = "2120398967"
+    service, transport = make_service(
+        StubResponse(passive_login_detail_html(car_no))
+    )
+
+    detail, status = service.get_car_detail(car_no)
+    cached, cached_status = service.get_car_detail(car_no)
+
+    assert status == cached_status == PARSE_STATUS_VALID
+    assert detail is not None and detail.car_no == car_no
+    assert cached is detail
+    assert len(transport.calls) == 1
+
+
+def test_detail_rejects_returned_car_number_mismatch_without_caching():
+    service, _ = make_service(StubResponse(valid_detail_html("2222222")))
+    cache_key = service._make_cache_key("detail", {"car_no": "1111111"})
+
+    with pytest.raises(SSANCARUpstreamInvalidResponseError):
+        service.get_car_detail("1111111")
+
+    assert cache_key not in service._cache
+
+
+@pytest.mark.parametrize(
+    "car_no",
+    ["", "abc", "123&other=1", "1" * 21, "１２３"],
+)
+def test_detail_service_rejects_invalid_car_number_before_transport(car_no):
+    service, transport = make_service(StubResponse(valid_detail_html()))
+
+    with pytest.raises(ValueError):
+        service.get_car_detail(car_no)
+
+    assert transport.calls == []
+
+
+def test_list_count_and_detail_use_endpoint_specific_headers_and_params():
+    service, transport = make_service(
+        StubResponse(valid_list_html()),
+        StubResponse("1"),
+        StubResponse(valid_detail_html("1820158")),
+    )
+
+    service.fetch_cars(SSANCARFilters(weekNo="2"))
+    service.fetch_total_count(SSANCARFilters(weekNo="2"))
+    service.get_car_detail("1820158")
+
+    list_call, count_call, detail_call = transport.calls
+    for call in (list_call, count_call):
+        assert call["headers"]["X-Requested-With"] == "XMLHttpRequest"
+        assert call["headers"]["Sec-Fetch-Dest"] == "empty"
+    assert detail_call["url"] == service.CAR_VIEW_URL
+    assert detail_call["params"] == {"car_no": "1820158"}
+    assert detail_call["headers"]["Sec-Fetch-Dest"] == "document"
+    assert "text/html" in detail_call["headers"]["Accept"]
+    assert "X-Requested-With" not in detail_call["headers"]
+    assert "Content-Type" not in detail_call["headers"]
 
 
 def test_detail_transport_failure_does_not_cache():
@@ -352,3 +449,73 @@ def test_invalid_health_probe_is_not_cached():
 
     assert service.check_health("2").upstream_count == 3
     assert len(transport.calls) == 2
+
+
+def test_detail_health_zero_count_is_healthy_without_detail_probe():
+    service, transport = make_service(StubResponse("0"))
+
+    probe = service.check_detail_health("2")
+
+    assert probe.week_number == "2"
+    assert probe.upstream_count == 0
+    assert probe.detail_checked is False
+    assert probe.sample_car_no is None
+    assert probe.egress == "direct"
+    assert len(transport.calls) == 1
+
+
+def test_detail_health_positive_count_validates_current_sample_and_caches_5_minutes():
+    cache_now = [100.0]
+    car_no = "2120398967"
+    service, transport = make_service(
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse(passive_login_detail_html(car_no)),
+        cache_clock=lambda: cache_now[0],
+    )
+
+    first = service.check_detail_health("2")
+    cache_now[0] += 299
+    cached = service.check_detail_health("2")
+
+    assert first is cached
+    assert first.upstream_count == 1
+    assert first.detail_checked is True
+    assert first.sample_car_no == car_no
+    assert first.egress == "direct"
+    assert len(transport.calls) == 3
+
+
+def test_detail_health_failure_is_not_cached():
+    car_no = "2120398967"
+    service, transport = make_service(
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse("<html>broken detail</html>"),
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse(valid_detail_html(car_no)),
+    )
+
+    with pytest.raises(SSANCARUpstreamInvalidResponseError):
+        service.check_detail_health("2")
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert len(transport.calls) == 6
+
+
+def test_detail_health_bypasses_normal_detail_cache():
+    car_no = "2120398967"
+    service, transport = make_service(
+        StubResponse(valid_detail_html(car_no)),
+        StubResponse("1"),
+        StubResponse(valid_list_html(car_no)),
+        StubResponse(valid_detail_html(car_no)),
+    )
+
+    service.get_car_detail(car_no)
+    probe = service.check_detail_health("2")
+
+    assert probe.detail_checked is True
+    assert len(transport.calls) == 4

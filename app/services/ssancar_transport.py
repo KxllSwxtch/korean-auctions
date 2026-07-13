@@ -21,6 +21,8 @@ from urllib.parse import urlsplit
 from loguru import logger
 import requests
 
+from app.parsers.ssancar_auth import is_ssancar_login_url
+
 
 T = TypeVar("T")
 
@@ -29,19 +31,6 @@ READ_TIMEOUT_SECONDS = 8.0
 OVERALL_DEADLINE_SECONDS = 24.0
 
 _OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
-_LOGIN_BODY_MARKERS = (
-    "/bbs/login.php",
-    "/member/login",
-    'name="loginform"',
-    "name='loginform'",
-    'id="loginform"',
-    "id='loginform'",
-    "session expired",
-    "session_expired",
-    "<title>login",
-    "<title>로그인",
-    "로그인 해주세요",
-)
 _KOREAN_PROXY_MARKER = re.compile(
     r"(?:area|country|region|geo)[_\-=:]*kr(?:\b|[_\-])",
     re.IGNORECASE,
@@ -249,13 +238,7 @@ class SSANCARTransport:
 
     @classmethod
     def _is_login_url(cls, url: Optional[str]) -> bool:
-        path = (cls._safe_path(url) or "").lower()
-        return path.endswith("/bbs/login.php") or "/member/login" in path
-
-    @staticmethod
-    def _is_login_body(text: str) -> bool:
-        lowered = (text or "").lower()
-        return any(marker in lowered for marker in _LOGIN_BODY_MARKERS)
+        return is_ssancar_login_url(url)
 
     @classmethod
     def _classify_response(cls, response: requests.Response) -> None:
@@ -295,8 +278,6 @@ class SSANCARTransport:
             raise SSANCARUpstreamUnavailableError(status_code=status_code)
         if status_code != 200:
             raise SSANCARUpstreamInvalidResponseError(status_code=status_code)
-        if cls._is_login_body(response.text):
-            raise SSANCARUpstreamAuthError(status_code=status_code)
 
     @staticmethod
     def _payload_metadata(response: Optional[requests.Response]) -> Tuple[int, str]:
@@ -310,6 +291,7 @@ class SSANCARTransport:
     def _log_attempt(
         cls,
         *,
+        operation: str,
         egress: str,
         response: Optional[requests.Response],
         selector_count: Optional[int],
@@ -325,9 +307,10 @@ class SSANCARTransport:
         event = "ssancar_upstream_failure" if error_code else "ssancar_upstream_success"
         log = logger.warning if error_code else logger.info
         log(
-            "{} egress={} status={} redirect_path={} payload_length={} "
+            "{} operation={} egress={} status={} redirect_path={} payload_length={} "
             "payload_hash={} selector_count={} elapsed_ms={} error_code={}",
             event,
+            operation,
             egress,
             status,
             safe_redirect_path,
@@ -366,11 +349,18 @@ class SSANCARTransport:
         method: str,
         url: str,
         validator: Validator[T],
+        *,
+        operation: str = "request",
         **kwargs: Any,
     ) -> SSANCARTransportResult[T]:
         """Execute one attempt per candidate and return only validated data."""
 
         started_at = self._clock()
+        operation_label = (
+            operation
+            if re.fullmatch(r"[a-z][a-z0-9_.-]{0,31}", operation or "")
+            else "unknown"
+        )
         deadline = started_at + self._overall_deadline_seconds
         failures: List[SSANCARUpstreamError] = []
 
@@ -468,6 +458,7 @@ class SSANCARTransport:
                         status_code=int(response.status_code),
                     )
                 self._log_attempt(
+                    operation=operation_label,
                     egress=candidate.name,
                     response=response,
                     selector_count=validation.selector_count,
@@ -497,6 +488,7 @@ class SSANCARTransport:
                 failure.status_code = int(response.status_code)
             elapsed_ms = int((self._clock() - attempt_started) * 1000)
             self._log_attempt(
+                operation=operation_label,
                 egress=candidate.name,
                 response=response,
                 selector_count=failure.selector_count,

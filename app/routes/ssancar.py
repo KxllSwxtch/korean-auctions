@@ -7,9 +7,13 @@ from app.models.ssancar import (
     SSANCARResponse, SSANCARDetailResponse, SSANCARFilters,
     SSANCARManufacturersResponse, SSANCARModelsResponse,
     SSANCARHealthResponse, SSANCARFilterOptionsResponse,
-    SSANCARTotalCountResponse
+    SSANCARTotalCountResponse, SSANCARDetailHealthResponse,
 )
-from app.services.ssancar_service import SSANCARService, resolve_ssancar_week
+from app.services.ssancar_service import (
+    SSANCARService,
+    resolve_ssancar_week,
+    validate_ssancar_car_no,
+)
 from app.services.ssancar_transport import (
     SSANCARUpstreamError,
     SSANCARUpstreamTimeoutError,
@@ -425,6 +429,19 @@ async def get_car_detail(
     ```
     """
     try:
+        try:
+            car_no = validate_ssancar_car_no(car_no)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "invalid_car_no",
+                    "message": str(error),
+                    "retryable": False,
+                },
+                headers={"Cache-Control": "no-store"},
+            ) from error
+
         ssancar_logger.info(f"📥 Request for car detail: {car_no}")
 
         car_detail, status = await asyncio.to_thread(
@@ -467,7 +484,9 @@ async def get_car_detail(
                 "code": code,
                 "message": "Car details are not available",
                 "car_no": car_no,
+                "retryable": False,
             },
+            headers={"Cache-Control": "no-store"},
         )
 
     except SSANCARUpstreamError as error:
@@ -552,6 +571,39 @@ async def health_check(
             error,
             status_override=503,
             message="SSANCAR readiness probe failed",
+        )
+
+
+@router.get("/health/detail", response_model=SSANCARDetailHealthResponse)
+async def detail_health_check(
+    week_number: Optional[str] = Query(
+        None,
+        description="Week number (2 for Tuesday, 5 for Friday)",
+    ),
+    service: SSANCARService = Depends(get_ssancar_service),
+) -> SSANCARDetailHealthResponse:
+    """Validate a live detail from the current auction when inventory exists."""
+
+    try:
+        probe = await asyncio.to_thread(service.check_detail_health, week_number)
+        return SSANCARDetailHealthResponse(
+            status="healthy",
+            week_number=probe.week_number,
+            upstream_count=probe.upstream_count,
+            detail_checked=probe.detail_checked,
+            sample_car_no=probe.sample_car_no,
+            egress=probe.egress,
+            checked_at=probe.checked_at,
+        )
+    except SSANCARUpstreamError as error:
+        ssancar_logger.warning(
+            "SSANCAR detail health upstream failure code={}",
+            error.code,
+        )
+        _raise_upstream_error(
+            error,
+            status_override=503,
+            message="SSANCAR detail readiness probe failed",
         )
 
 

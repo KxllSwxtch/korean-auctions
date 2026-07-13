@@ -253,6 +253,18 @@ class SSANCARHealthResponse(BaseModel):
     checked_at: datetime
 
 
+class SSANCARDetailHealthResponse(BaseModel):
+    """Validated readiness of the current SSANCAR detail capability."""
+
+    status: Literal["healthy"] = "healthy"
+    week_number: SSANCARAuctionWeek
+    upstream_count: int
+    detail_checked: bool
+    sample_car_no: Optional[str] = None
+    egress: str
+    checked_at: datetime
+
+
 class SSANCARFilterOption(BaseModel):
     """Single filter option"""
     value: str

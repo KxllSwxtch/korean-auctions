@@ -15,6 +15,7 @@ from app.parsers.ssancar_parser import (
     PARSE_STATUS_INVALID_DATA,
     PARSE_STATUS_EXCEPTION,
 )
+from app.parsers.ssancar_auth import is_ssancar_login_html
 
 
 def _make_parser() -> SSANCARParser:
@@ -73,6 +74,66 @@ def test_parses_valid_detail_page():
     assert detail.images, "expected at least one image"
 
 
+def test_valid_detail_with_passive_comment_login_script_is_not_auth():
+    body = _valid_html().replace(
+        "</body>",
+        """
+        <script>
+        $(document).on('click','#ham_btn',function(){
+          var con = confirm("You must log in to post a comment.");
+          if (con) location.href = 'https://www.ssancar.com/bbs/login.php';
+          return false;
+        });
+        </script>
+        </body>
+        """,
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+    assert detail.car_no == "1820158"
+
+
+def test_passive_login_link_and_generic_login_text_do_not_override_detail_shape():
+    body = _valid_html().replace(
+        "</body>",
+        '<a href="/bbs/login.php">로그인</a></body>',
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+
+
+def test_login_canonical_or_session_words_alone_do_not_override_valid_payload():
+    body = _valid_html().replace(
+        "<head><title>SSANCAR</title></head>",
+        """
+        <head><title>SSANCAR</title>
+          <link rel="canonical" href="https://www.ssancar.com/bbs/login.php">
+        </head>
+        """,
+    ).replace("</body>", "<p>로그인 해주세요</p></body>")
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert status == PARSE_STATUS_VALID
+    assert detail is not None
+
+
+def test_weak_login_form_without_password_is_not_auth_structure():
+    body = (
+        '<html><head><title>Login</title></head><body>'
+        '<form name="loginForm" action="/bbs/login.php">'
+        '<input name="mb_id"></form></body></html>'
+    )
+
+    assert is_ssancar_login_html(body) is False
+
+
 def test_empty_html_returns_empty_status():
     parser = _make_parser()
     detail, status = parser.parse_car_detail("")
@@ -89,7 +150,9 @@ def test_short_body_returns_empty_status():
 
 def test_login_redirect_detected_as_session_expired():
     body = "<html><body>" + ("padding " * 100) + (
-        '<form name="loginForm" action="/member/login.php"></form>'
+        '<form name="loginForm" action="/member/login.php">'
+        '<input name="mb_id"><input type="password" name="mb_password">'
+        '</form>'
     ) + "</body></html>"
     parser = _make_parser()
     detail, status = parser.parse_car_detail(body)
@@ -98,11 +161,37 @@ def test_login_redirect_detected_as_session_expired():
 
 
 def test_bbs_login_page_detected_as_session_expired():
-    body = "<html><body>" + ("padding " * 100) + (
-        '<form action="/bbs/login.php"><input name="mb_id" /></form>'
-    ) + "</body></html>"
+    body = """
+    <html>
+      <head>
+        <title>로그인 | Korean used car in Auction & Local market</title>
+        <link rel="canonical" href="https://www.ssancar.com/bbs/login.php">
+      </head>
+      <body>
+        <form name="flogin" action="/bbs/login_check.php" method="post">
+          <input type="text" name="mb_id">
+          <input type="password" name="mb_password">
+        </form>
+        %s
+      </body>
+    </html>
+    """ % ("padding " * 100)
     parser = _make_parser()
     detail, status = parser.parse_car_detail(body)
+    assert detail is None
+    assert status == PARSE_STATUS_SESSION_EXPIRED
+
+
+def test_short_but_structurally_complete_login_page_is_session_expired():
+    body = (
+        '<html><head><title>Login</title></head><body>'
+        '<form name="flogin" action="/bbs/login_check.php">'
+        '<input name="mb_id"><input type="password" name="mb_password">'
+        '</form></body></html>'
+    )
+
+    detail, status = _make_parser().parse_car_detail(body)
+
     assert detail is None
     assert status == PARSE_STATUS_SESSION_EXPIRED
 
@@ -115,8 +204,24 @@ def test_korean_login_marker_detected_as_session_expired():
     assert status == PARSE_STATUS_SESSION_EXPIRED
 
 
+def test_meta_refresh_to_login_is_session_expired():
+    body = "<html><head>" + (
+        '<meta http-equiv="refresh" content="0; url=/bbs/login.php">'
+    ) + "</head><body>" + ("padding " * 100) + "</body></html>"
+
+    detail, status = _make_parser().parse_car_detail(body)
+
+    assert detail is None
+    assert status == PARSE_STATUS_SESSION_EXPIRED
+
+
 def test_archived_car_detected_as_not_found():
-    body = "<html><body>" + ("padding " * 100) + "차량을 찾을 수 없습니다" + "</body></html>"
+    body = (
+        "<html><body>"
+        + ("padding " * 100)
+        + '차량을 찾을 수 없습니다<a href="/bbs/login.php">Login</a>'
+        + "</body></html>"
+    )
     parser = _make_parser()
     detail, status = parser.parse_car_detail(body)
     assert detail is None
