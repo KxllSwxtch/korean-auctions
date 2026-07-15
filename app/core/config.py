@@ -24,20 +24,24 @@ class Settings(BaseSettings):
     autohub_product_id: str = "03db628d-2795-11ef-8342-0e80fc1e2c3f"
 
     # Учётные данные для Autohub
-    autohub_username: str = "837301"
-    autohub_password: str = "782312"
+    autohub_username: Optional[str] = None
+    autohub_password: Optional[str] = None
     autohub_jwt_token: Optional[str] = None
 
     # Настройки для Lotte
     lotte_base_url: str = "https://www.lotteautoauction.net"
     
     # Учётные данные для Lotte
-    lotte_username: str = "119102"
-    lotte_password: str = "for1234@"
+    lotte_username: Optional[str] = None
+    lotte_password: Optional[str] = None
 
     # HappyCar credentials
-    happycar_username: str = "uztrade"
-    happycar_password: str = "u112358@"
+    happycar_username: Optional[str] = None
+    happycar_password: Optional[str] = None
+
+    # KCar credentials are provisioned only through the deployment environment.
+    kcar_username: Optional[str] = None
+    kcar_password: Optional[str] = None
 
     # User Agent для запросов
     user_agent: str = (

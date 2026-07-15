@@ -335,7 +335,9 @@ async def clear_glovis_cache_internal(
             code="admin_unavailable",
             message="Glovis cache administration is not configured",
         )
-    if not secrets.compare_digest(x_admin_token or "", expected):
+    provided_bytes = (x_admin_token or "").encode("utf-8")
+    expected_bytes = expected.encode("utf-8")
+    if not secrets.compare_digest(provided_bytes, expected_bytes):
         return _glovis_admin_error(
             status_code=403,
             code="forbidden",

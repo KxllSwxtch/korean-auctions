@@ -159,22 +159,16 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ## 🔐 Авторизация
 
-Парсеры поддерживают авторизацию на целевых сайтах:
+Учётные данные поставщиков не хранятся в репозитории. Перед запуском
+передайте их через менеджер секретов окружения:
 
-### Autohub (autohub.co.kr)
+- `AUTOHUB_USERNAME`, `AUTOHUB_PASSWORD`, `AUTOHUB_JWT_TOKEN`
+- `LOTTE_USERNAME`, `LOTTE_PASSWORD`
+- `HAPPYCAR_USERNAME`, `HAPPYCAR_PASSWORD`
+- `KCAR_USERNAME`, `KCAR_PASSWORD`
 
-- Логин: 785701
-- Пароль: 782312
-
-### Lotte Auction (lotteauction.co.kr)
-
-- Логин: 119102
-- Пароль: for1234@
-
-### KCar Auction (kcarauction.com)
-
-- Логин: autobaza
-- Пароль: for1657721@
+Полный контракт переменных, порядок развёртывания и поведение при отсутствии
+секретов описаны в `docs/glovis-dbauto-deployment.md`.
 
 ## 📊 Примеры использования
 

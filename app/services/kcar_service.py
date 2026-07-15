@@ -56,8 +56,8 @@ class KCarService:
         self.authenticated = False
 
         # Учетные данные из конфигурации
-        self.username = "autobaza"
-        self.password = "baza9851!!"
+        self.username = self.settings.kcar_username
+        self.password = self.settings.kcar_password
 
         # Отслеживание состояния сессии
         self.session_created_at = datetime.now()
@@ -143,7 +143,12 @@ class KCarService:
 
             logger.info("🔧 HTTP сессия инициализирована")
 
-            # Выполняем авторизацию
+            # Missing deployment secrets keep imports/startup safe and make
+            # KCar fail closed instead of sending blank credentials.
+            if not self.username or not self.password:
+                logger.warning("KCar credentials are not configured")
+                return
+
             self._authenticate()
 
         except Exception as e:

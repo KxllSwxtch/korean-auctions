@@ -531,14 +531,14 @@ def test_internal_glovis_cache_clear_rejects_missing_or_wrong_token(
 
 def test_internal_glovis_cache_clear_uses_constant_time_compare(monkeypatch):
     service = StubGlovisService()
-    calls: list[tuple[str, str]] = []
+    calls: list[tuple[bytes, bytes]] = []
     monkeypatch.setattr(glovis, "glovis_service", service)
     monkeypatch.setenv("GLOVIS_CACHE_ADMIN_TOKEN", "managed-admin-secret")
     secrets_module = getattr(main, "secrets", None)
     assert secrets_module is not None
     real_compare = secrets_module.compare_digest
 
-    def capture_compare(provided: str, expected: str) -> bool:
+    def capture_compare(provided: bytes, expected: bytes) -> bool:
         calls.append((provided, expected))
         return real_compare(provided, expected)
 
@@ -550,7 +550,7 @@ def test_internal_glovis_cache_clear_uses_constant_time_compare(monkeypatch):
     )
 
     assert response.status_code == 403
-    assert calls == [("wrong-value", "managed-admin-secret")]
+    assert calls == [(b"wrong-value", b"managed-admin-secret")]
 
 
 def test_authorized_internal_caller_can_clear_existing_glovis_cache(monkeypatch):
