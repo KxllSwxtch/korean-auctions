@@ -99,8 +99,11 @@ async def warm_sessions():
         from app.routes.lotte import get_lotte_service
         service = get_lotte_service()
         if hasattr(service, '_ensure_session'):
-            await asyncio.to_thread(service._ensure_session)
-            logger.info("Cache warmer: Lotte session refreshed")
+            refreshed = await asyncio.to_thread(service._ensure_session)
+            if refreshed:
+                logger.info("Cache warmer: Lotte session refreshed")
+            else:
+                logger.warning("Cache warmer: Lotte session refresh failed")
     except Exception as e:
         logger.warning(f"Cache warmer: Lotte session refresh failed: {e}")
 
@@ -108,8 +111,11 @@ async def warm_sessions():
         from app.routes.kcar import kcar_service
         if hasattr(kcar_service, '_ensure_session'):
             import asyncio
-            await asyncio.to_thread(kcar_service._ensure_session)
-            logger.info("Cache warmer: KCar session refreshed")
+            refreshed = await asyncio.to_thread(kcar_service._ensure_session)
+            if refreshed:
+                logger.info("Cache warmer: KCar session refreshed")
+            else:
+                logger.warning("Cache warmer: KCar session refresh failed")
     except Exception as e:
         logger.warning(f"Cache warmer: KCar session refresh failed: {e}")
 

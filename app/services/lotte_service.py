@@ -154,12 +154,15 @@ class LotteService(BaseAuctionService):
         Returns True on success, False on non-retriable failure.
         Raises exceptions on retriable failures (network errors, unexpected responses).
         """
+        login = settings.lotte_username
+        password = settings.lotte_password
+        if not login or not password:
+            logger.error("Lotte credentials are not configured")
+            return False
+
         # Force fresh session for clean headers/cookies
         self.session = None
         session = self._init_session()
-
-        login = settings.lotte_username
-        password = settings.lotte_password
 
         logger.info(f"Начинаем аутентификацию в Lotte для пользователя: {login}")
 
