@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
+from starlette.types import Receive, Scope, Send
 
 from app.models.glovis import (
     GlovisAuctionsResponse,
@@ -62,6 +63,24 @@ def _error_response(
 
 class _StableErrorRoute(APIRoute):
     """Keep framework-level validation and unexpected failures contract-safe."""
+
+    async def handle(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        if self.methods and scope["method"] not in self.methods:
+            response = _error_response(
+                status_code=405,
+                code="method_not_allowed",
+                message="Method not allowed",
+                retryable=False,
+            )
+            response.headers["Allow"] = ", ".join(sorted(self.methods))
+            await response(scope, receive, send)
+            return
+        await super().handle(scope, receive, send)
 
     def get_route_handler(self) -> Callable[[Request], Any]:
         route_handler = super().get_route_handler()

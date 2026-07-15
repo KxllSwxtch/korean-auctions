@@ -259,6 +259,60 @@ def test_page_size_above_contract_limit_is_a_stable_422():
 
 
 @pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("post", "/api/v1/glovis/cars"),
+        ("delete", "/api/v1/glovis/health/detail"),
+    ],
+)
+def test_known_glovis_paths_reject_unsupported_methods_with_stable_405(
+    method,
+    path,
+):
+    service = StubGlovisService()
+    response = getattr(make_client(service), method)(path)
+
+    assert response.status_code == 405
+    assert response.json() == {
+        "detail": {
+            "code": "method_not_allowed",
+            "message": "Method not allowed",
+            "retryable": False,
+        }
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["allow"] == "GET"
+    assert service.calls == []
+
+
+def test_method_handling_does_not_claim_unknown_glovis_paths():
+    response = make_client(StubGlovisService()).post(
+        "/api/v1/glovis/not-a-route"
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+
+
+def test_glovis_method_handling_does_not_change_other_application_routes():
+    response = TestClient(main.app).post("/health")
+
+    assert response.status_code == 405
+    assert response.json() == {"detail": "Method Not Allowed"}
+    assert "cache-control" not in response.headers
+
+
+def test_glovis_openapi_still_exposes_only_get_operations():
+    response = make_client(StubGlovisService()).get("/openapi.json")
+
+    assert response.status_code == 200
+    assert set(response.json()["paths"]["/api/v1/glovis/cars"]) == {"get"}
+    assert set(response.json()["paths"]["/api/v1/glovis/health/detail"]) == {
+        "get"
+    }
+
+
+@pytest.mark.parametrize(
     "path",
     [
         "/api/v1/glovis/cars?atn=abc&acc=20",
