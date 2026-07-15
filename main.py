@@ -15,6 +15,7 @@ from app.routes import (
     enhanced_lotte,
     heydealer,
     heydealer_filters,
+    glovis,
     ssancar,
     bikemart,
     encar,
@@ -45,18 +46,23 @@ async def lifespan(app: FastAPI):
     # doesn't pay the initialisation cost.
     from app.routes.lotte import get_lotte_service
     from app.routes.lotte_filters import get_filter_service
+    from app.routes.glovis import get_glovis_service
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
     # /filters request reuses the proven authenticated session.
     get_filter_service(main_service)
+    glovis_service = get_glovis_service()
 
-    # Start background cache warming scheduler
-    await start_scheduler()
-
-    yield
-
-    # Shutdown
-    await stop_scheduler()
+    try:
+        # Start background cache warming scheduler
+        await start_scheduler()
+        yield
+    finally:
+        # Stop scheduled work before closing the pooled provider sessions.
+        try:
+            await stop_scheduler()
+        finally:
+            glovis_service.close()
 
 
 # Создание FastAPI приложения
@@ -102,6 +108,9 @@ app.include_router(
 )
 # SSANCAR routes - Direct SSANCAR API without PLC wrapper
 app.include_router(ssancar.router, tags=["SSANCAR Auction"])
+
+# DB Auto Glovis routes - canonical Glovis provider contract
+app.include_router(glovis.router, tags=["Glovis Auction"])
 
 # Bikemart routes - Motorcycle marketplace
 app.include_router(bikemart.router, prefix="/api/v1/bikemart", tags=["Bikemart"])
@@ -190,6 +199,13 @@ async def cache_stats():
         pass
 
     try:
+        from app.routes.glovis import get_glovis_service
+        svc = get_glovis_service()
+        stats.append(svc.get_cache_stats())
+    except Exception:
+        pass
+
+    try:
         from app.routes.autohub import get_autohub_service
         svc = get_autohub_service()
         if svc and hasattr(svc, '_get_cache_stats'):
@@ -259,6 +275,14 @@ async def clear_cache():
             svc._cache_hits = 0
             svc._cache_misses = 0
             cleared.append("SSANCAR")
+    except Exception:
+        pass
+
+    try:
+        from app.routes.glovis import get_glovis_service
+        svc = get_glovis_service()
+        svc.clear_cache()
+        cleared.append("Glovis")
     except Exception:
         pass
 

@@ -28,17 +28,6 @@ class Settings(BaseSettings):
     autohub_password: str = "782312"
     autohub_jwt_token: Optional[str] = None
 
-    # Настройки для Glovis
-    glovis_base_url: str = "https://auction.autobell.co.kr"
-    glovis_list_url: str = (
-        "https://auction.autobell.co.kr/auction/exhibitListInclude.do"
-    )
-    glovis_main_url: str = "https://auction.autobell.co.kr/auction/exhibitList.do"
-
-    # Учётные данные для Glovis
-    glovis_username: str = "7552"
-    glovis_password: str = "for7721@"
-
     # Настройки для Lotte
     lotte_base_url: str = "https://www.lotteautoauction.net"
     
