@@ -1,0 +1,551 @@
+"""Deterministic tests for the Korean-only DB Auto transport."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import hashlib
+import threading
+import time
+from types import SimpleNamespace
+from typing import Any
+
+from loguru import logger
+import pytest
+import requests
+
+from app.services import glovis_transport as transport_module
+from app.services.glovis_transport import (
+    GlovisProxyUnavailableError,
+    GlovisTransport,
+    GlovisUpstreamAuthError,
+    GlovisUpstreamInvalidResponseError,
+    GlovisUpstreamTimeoutError,
+    GlovisUpstreamUnavailableError,
+)
+
+
+AUCTIONS_PATH = "/api/auctions/glovis/auctions"
+CARS_PATH = "/api/auctions/glovis/cars"
+
+
+@dataclass
+class StubResponse:
+    status_code: int = 200
+    json_data: Any = field(default_factory=dict)
+    text: str = "{}"
+    headers: dict[str, str] = field(default_factory=dict)
+    set_cookie: tuple[str, str] | None = None
+
+    def json(self) -> Any:
+        if isinstance(self.json_data, BaseException):
+            raise self.json_data
+        return self.json_data
+
+
+class StubSession:
+    def __init__(self, outcomes: list[Any] | None = None) -> None:
+        self.outcomes = list(outcomes or [])
+        self.calls: list[dict[str, Any]] = []
+        self.headers: dict[str, str] = {}
+        self.proxies: dict[str, str] = {}
+        self.cookies = requests.cookies.RequestsCookieJar()
+        self.trust_env = True
+        self.close_calls = 0
+        self.closed = threading.Event()
+
+    def request(self, method: str, url: str, **kwargs: Any) -> StubResponse:
+        self.calls.append({"method": method, "url": url, **kwargs})
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, BaseException):
+            raise outcome
+        if callable(outcome):
+            outcome = outcome()
+        if outcome.set_cookie:
+            self.cookies.set(*outcome.set_cookie)
+        return outcome
+
+    def close(self) -> None:
+        self.close_calls += 1
+        self.closed.set()
+
+
+class StubProxyPool:
+    def __init__(self, candidates: list[tuple[Any, str]]) -> None:
+        self.candidates = list(candidates)
+        self.index = 0
+
+    def __len__(self) -> int:
+        return len(self.candidates)
+
+    def current(self) -> tuple[Any, str]:
+        return self.candidates[self.index]
+
+    def advance(self) -> tuple[Any, str]:
+        self.index = (self.index + 1) % len(self.candidates)
+        return self.current()
+
+
+def token_response(value: str) -> StubResponse:
+    return StubResponse(
+        json_data={"ok": True},
+        set_cookie=("x-api-token", value),
+    )
+
+
+def make_transport(
+    *sessions: StubSession,
+    overall_deadline_seconds: float = 24.0,
+) -> GlovisTransport:
+    queue = list(sessions)
+    candidates = [
+        (f"kr-{index}", f"http://proxy-{index}.invalid:8080")
+        for index in range(1, len(sessions) + 1)
+    ]
+    return GlovisTransport(
+        proxy_candidates=candidates,
+        session_factory=lambda: queue.pop(0),
+        fingerprint_factory=lambda: "fingerprint-a",
+        overall_deadline_seconds=overall_deadline_seconds,
+    )
+
+
+def test_missing_proxy_pool_fails_closed_without_creating_direct_session() -> None:
+    created: list[StubSession] = []
+    with pytest.raises(GlovisProxyUnavailableError):
+        GlovisTransport(
+            proxy_candidates=[],
+            session_factory=lambda: created.append(StubSession()) or created[-1],
+        )
+    assert created == []
+
+
+def test_token_and_api_use_same_proxy_session_and_matching_fingerprint() -> None:
+    session = StubSession(
+        [
+            StubResponse(
+                json_data={"ok": True},
+                set_cookie=("x-api-token", "token"),
+            ),
+            StubResponse(json_data={"total": 0, "items": []}),
+        ]
+    )
+    transport = GlovisTransport(
+        proxy_candidates=[("kr-primary", "http://redacted.invalid:8080")],
+        session_factory=lambda: session,
+        fingerprint_factory=lambda: "fingerprint-a",
+    )
+
+    result = transport.get_json(
+        "/api/auctions/glovis/cars",
+        [("atn", "1102"), ("acc", "20")],
+        operation="cars",
+    )
+
+    assert result.value == {"total": 0, "items": []}
+    assert [call["url"] for call in session.calls] == [
+        "https://cars.dbauto.kr/api/auth/token",
+        "https://cars.dbauto.kr/api/auctions/glovis/cars",
+    ]
+    assert session.calls[0]["json"] == {"fingerprint": "fingerprint-a"}
+    assert session.calls[1]["headers"]["X-Fingerprint"] == "fingerprint-a"
+    assert session.proxies["https"] == "http://redacted.invalid:8080"
+    assert session.trust_env is False
+    assert "X-Fingerprint" not in session.headers
+    assert not any(key.lower().startswith("sec-ch-") for key in session.headers)
+    assert all(call["allow_redirects"] is False for call in session.calls)
+
+
+def test_proxy_pool_candidates_are_korean_only_and_capped_at_four(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidates = [
+        (
+            SimpleNamespace(name=f"kr-{index}"),
+            f"http://pool-proxy-{index}.invalid:8080",
+        )
+        for index in range(1, 6)
+    ]
+    pool = StubProxyPool(candidates)
+    sessions = [StubSession() for _ in range(4)]
+    available = list(sessions)
+    monkeypatch.setattr(transport_module, "get_proxy_pool", lambda: pool)
+
+    transport = GlovisTransport(session_factory=lambda: available.pop(0))
+
+    assert len(sessions) == 4
+    assert pool.index == 3
+    assert [session.proxies["https"] for session in sessions] == [
+        f"http://pool-proxy-{index}.invalid:8080" for index in range(1, 5)
+    ]
+    assert all(session.trust_env is False for session in sessions)
+    transport.close()
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_auth_failure_refreshes_once_on_same_slot(status: int) -> None:
+    session = StubSession(
+        [
+            token_response("first"),
+            StubResponse(status_code=status, json_data={"detail": "expired"}),
+            token_response("second"),
+            StubResponse(json_data={"items": [], "total": 0}),
+        ]
+    )
+    transport = make_transport(session)
+
+    transport.get_json(CARS_PATH, [], operation="cars")
+
+    assert [call["method"] for call in session.calls] == [
+        "POST",
+        "GET",
+        "POST",
+        "GET",
+    ]
+
+
+def test_second_auth_failure_is_reported_after_one_refresh() -> None:
+    session = StubSession(
+        [
+            token_response("first"),
+            StubResponse(status_code=401, json_data={"detail": "expired"}),
+            token_response("second"),
+            StubResponse(status_code=403, json_data={"detail": "denied"}),
+        ]
+    )
+
+    with pytest.raises(GlovisUpstreamAuthError) as raised:
+        make_transport(session).get_json(CARS_PATH, [], operation="cars")
+
+    assert raised.value.code == "upstream_auth"
+    assert raised.value.status_code == 403
+    assert raised.value.egress == "kr-1"
+    assert len(session.calls) == 4
+
+
+def test_token_is_reused_at_109_seconds_and_refreshed_at_110_seconds() -> None:
+    now = [0.0]
+    session = StubSession(
+        [
+            token_response("first"),
+            StubResponse(json_data=[]),
+            StubResponse(json_data=[]),
+            token_response("second"),
+            StubResponse(json_data=[]),
+        ]
+    )
+    transport = GlovisTransport(
+        proxy_candidates=[("kr-1", "http://proxy-1.invalid:8080")],
+        session_factory=lambda: session,
+        fingerprint_factory=lambda: "fingerprint-a",
+        clock=lambda: now[0],
+    )
+
+    transport.get_json(AUCTIONS_PATH, [], operation="auctions")
+    now[0] = 109.0
+    transport.get_json(AUCTIONS_PATH, [], operation="auctions")
+    now[0] = 110.0
+    transport.get_json(AUCTIONS_PATH, [], operation="auctions")
+
+    assert [call["method"] for call in session.calls] == [
+        "POST",
+        "GET",
+        "GET",
+        "POST",
+        "GET",
+    ]
+
+
+def test_retryable_failure_rotates_complete_proxy_session() -> None:
+    first = StubSession(
+        [token_response("one"), requests.ConnectionError("unavailable")]
+    )
+    second = StubSession([token_response("two"), StubResponse(json_data=[])])
+
+    result = make_transport(first, second).get_json(
+        AUCTIONS_PATH,
+        [],
+        operation="auctions",
+    )
+
+    assert result.egress == "kr-2"
+    assert len(first.calls) == 2
+    assert len(second.calls) == 2
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_retryable_http_status_rotates_complete_proxy_session(status: int) -> None:
+    first = StubSession(
+        [
+            token_response("one"),
+            StubResponse(status_code=status, json_data={"detail": "unavailable"}),
+        ]
+    )
+    second = StubSession([token_response("two"), StubResponse(json_data=[])])
+
+    result = make_transport(first, second).get_json(
+        AUCTIONS_PATH,
+        [],
+        operation="auctions",
+    )
+
+    assert result.egress == "kr-2"
+    assert len(first.calls) == len(second.calls) == 2
+
+
+@pytest.mark.parametrize(
+    ("response", "error_type", "code"),
+    [
+        (
+            StubResponse(status_code=401, json_data={"detail": "denied"}),
+            GlovisUpstreamAuthError,
+            "upstream_auth",
+        ),
+        (
+            StubResponse(status_code=503, json_data={"detail": "unavailable"}),
+            GlovisUpstreamUnavailableError,
+            "upstream_unavailable",
+        ),
+        (
+            StubResponse(json_data={"ok": False}),
+            GlovisUpstreamInvalidResponseError,
+            "upstream_invalid_response",
+        ),
+    ],
+)
+def test_token_failure_uses_structured_error(
+    response: StubResponse,
+    error_type: type[Exception],
+    code: str,
+) -> None:
+    session = StubSession([response])
+
+    with pytest.raises(error_type) as raised:
+        make_transport(session).get_json(CARS_PATH, [], operation="cars")
+
+    assert getattr(raised.value, "code") == code
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        StubResponse(json_data=ValueError("not json"), text="not json"),
+        StubResponse(json_data="scalar", text='"scalar"'),
+    ],
+)
+def test_http_200_requires_json_object_or_array(response: StubResponse) -> None:
+    session = StubSession([token_response("one"), response])
+
+    with pytest.raises(GlovisUpstreamInvalidResponseError) as raised:
+        make_transport(session).get_json(CARS_PATH, [], operation="cars")
+
+    assert raised.value.code == "upstream_invalid_response"
+    assert raised.value.status_code == 200
+
+
+def test_expired_shared_deadline_stops_before_session_request() -> None:
+    now = [50.0]
+    session = StubSession([token_response("unused")])
+    transport = GlovisTransport(
+        proxy_candidates=[("kr-1", "http://proxy-1.invalid:8080")],
+        session_factory=lambda: session,
+        fingerprint_factory=lambda: "fingerprint-a",
+        clock=lambda: now[0],
+    )
+
+    with pytest.raises(GlovisUpstreamTimeoutError):
+        transport.get_json(
+            CARS_PATH,
+            [],
+            operation="cars",
+            deadline_at=50.0,
+        )
+
+    assert session.calls == []
+
+
+def test_global_worker_concurrency_is_bounded_at_four() -> None:
+    release = threading.Event()
+    four_active = threading.Event()
+    lock = threading.Lock()
+    active = 0
+    maximum = 0
+
+    def blocked_token() -> StubResponse:
+        nonlocal active, maximum
+        with lock:
+            active += 1
+            maximum = max(maximum, active)
+            if active == 4:
+                four_active.set()
+        release.wait(timeout=2.0)
+        with lock:
+            active -= 1
+        return token_response("test-token")
+
+    sessions = [
+        StubSession([blocked_token, StubResponse(json_data=[])])
+        for _ in range(5)
+    ]
+    first = make_transport(*sessions[:4])
+    second = make_transport(sessions[4])
+    results: list[Any] = []
+    errors: list[BaseException] = []
+
+    def call(transport: GlovisTransport) -> None:
+        try:
+            results.append(
+                transport.get_json(AUCTIONS_PATH, [], operation="auctions")
+            )
+        except BaseException as error:
+            errors.append(error)
+
+    threads = [
+        threading.Thread(target=call, args=(first if index < 4 else second,))
+        for index in range(5)
+    ]
+    try:
+        for thread in threads:
+            thread.start()
+        assert four_active.wait(timeout=1.0)
+        time.sleep(0.05)
+        with lock:
+            assert maximum == 4
+            assert active == 4
+    finally:
+        release.set()
+        for thread in threads:
+            thread.join(timeout=1.0)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    assert len(results) == 5
+
+
+def test_hard_deadline_does_not_reuse_session_while_worker_is_blocked() -> None:
+    release = threading.Event()
+
+    def blocked_response() -> StubResponse:
+        release.wait(timeout=2.0)
+        return StubResponse(json_data=[])
+
+    session = StubSession(
+        [
+            token_response("one"),
+            blocked_response,
+            StubResponse(json_data=[]),
+        ]
+    )
+    transport = make_transport(session, overall_deadline_seconds=0.05)
+    started = time.monotonic()
+    try:
+        with pytest.raises(GlovisUpstreamTimeoutError):
+            transport.get_json(CARS_PATH, [], operation="cars")
+        assert time.monotonic() - started < 0.25
+
+        with pytest.raises(GlovisUpstreamTimeoutError):
+            transport.get_json(CARS_PATH, [], operation="cars")
+        assert len(session.calls) == 2
+    finally:
+        release.set()
+
+    result = transport.get_json(CARS_PATH, [], operation="cars")
+    assert result.value == []
+    assert len(session.calls) == 3
+
+
+def test_close_closes_idle_sessions_and_rejects_later_calls() -> None:
+    first = StubSession()
+    second = StubSession()
+    transport = make_transport(first, second)
+
+    transport.close()
+    transport.close()
+
+    assert first.close_calls == second.close_calls == 1
+    with pytest.raises(GlovisUpstreamUnavailableError):
+        transport.get_json(CARS_PATH, [], operation="cars")
+    assert first.calls == second.calls == []
+
+
+def test_close_defers_in_flight_session_close_until_worker_finishes() -> None:
+    release = threading.Event()
+
+    def blocked_response() -> StubResponse:
+        release.wait(timeout=2.0)
+        return StubResponse(json_data=[])
+
+    session = StubSession([token_response("one"), blocked_response])
+    transport = make_transport(session, overall_deadline_seconds=0.05)
+    try:
+        with pytest.raises(GlovisUpstreamTimeoutError):
+            transport.get_json(CARS_PATH, [], operation="cars")
+        transport.close()
+        assert session.close_calls == 0
+        with pytest.raises(GlovisUpstreamUnavailableError):
+            transport.get_json(CARS_PATH, [], operation="cars")
+    finally:
+        release.set()
+
+    assert session.closed.wait(timeout=0.5)
+    assert session.close_calls == 1
+
+
+def test_safe_logs_do_not_contain_transport_secrets() -> None:
+    captured: list[str] = []
+    sink = logger.add(captured.append, format="{message}")
+    session = StubSession(
+        [
+            token_response("token-a"),
+            requests.ConnectionError(
+                "proxy-user:proxy-password fingerprint-a opaque-value"
+            ),
+        ]
+    )
+    try:
+        with pytest.raises(GlovisUpstreamUnavailableError):
+            make_transport(session).get_json(CARS_PATH, [], operation="cars")
+    finally:
+        logger.remove(sink)
+
+    joined = "\n".join(captured)
+    for secret in (
+        "proxy-user",
+        "proxy-password",
+        "fingerprint-a",
+        "token-a",
+        "opaque-value",
+    ):
+        assert secret not in joined
+    assert "operation=cars" in joined
+    assert "egress=kr-1" in joined
+    assert "status=None" in joined
+    assert "payload_length=0" in joined
+    assert "payload_hash=-" in joined
+    assert "error_code=upstream_unavailable" in joined
+
+
+def test_response_logs_include_only_safe_payload_metadata() -> None:
+    response_body = "sensitive-provider-body"
+    response = StubResponse(
+        status_code=503,
+        json_data={"detail": "unavailable"},
+        text=response_body,
+    )
+    captured: list[str] = []
+    sink = logger.add(captured.append, format="{message}")
+    try:
+        with pytest.raises(GlovisUpstreamUnavailableError):
+            make_transport(StubSession([token_response("token"), response])).get_json(
+                CARS_PATH,
+                [],
+                operation="cars",
+            )
+    finally:
+        logger.remove(sink)
+
+    output = "".join(captured)
+    digest = hashlib.sha256(response_body.encode()).hexdigest()[:12]
+    assert response_body not in output
+    assert "status=503" in output
+    assert f"payload_length={len(response_body)}" in output
+    assert f"payload_hash={digest}" in output
