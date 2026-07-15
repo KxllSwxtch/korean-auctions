@@ -1,30 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Script to run Glovis filter tests
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-echo "Setting up test environment..."
-
-# Check if we're in the backend directory
-if [ ! -d "venv" ] && [ -d "../venv" ]; then
-    cd ..
-fi
-
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo "Activating virtual environment..."
-    source venv/bin/activate
-else
-    echo "Warning: No virtual environment found"
-fi
-
-# Install test requirements
-echo "Installing test requirements..."
-pip install -r tests/requirements.txt
-
-# Run the tests
-echo "Running Glovis filter tests..."
-echo ""
-python tests/test_glovis_filters.py $@
-
-# Exit with the same code as the test script
-exit $?
+exec venv/bin/python -m pytest \
+  tests/test_glovis_models.py \
+  tests/test_glovis_transport.py \
+  tests/test_glovis_service.py \
+  tests/test_glovis_routes.py \
+  "$@"
