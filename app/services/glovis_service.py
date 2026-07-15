@@ -33,6 +33,7 @@ from app.models.glovis import (
 from app.services.glovis_transport import (
     GlovisTransport,
     GlovisUpstreamInvalidResponseError,
+    GlovisUpstreamUnavailableError,
     OVERALL_DEADLINE_SECONDS,
 )
 
@@ -55,7 +56,14 @@ CACHE_MAX_ENTRIES = 512
 
 PROVIDER_ID_RE = re.compile(r"^[0-9]{1,12}$", re.ASCII)
 _ISO_DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", re.ASCII)
-_SAFE_EGRESS_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", re.ASCII)
+_INTERNAL_EGRESS_RE = re.compile(
+    r"^kr-[a-z0-9]{1,12}(?:-[a-z0-9]{1,12}){0,2}$",
+    re.ASCII,
+)
+_BESTPROXY_EGRESS_RE = re.compile(
+    r"^bestproxy-kr-([a-z0-9]{1,12}(?:-[a-z0-9]{1,12})?)$",
+    re.ASCII,
+)
 _SEARCH_FORM_FIELDS = (
     "colors",
     "options",
@@ -208,9 +216,55 @@ def _validated_gn(value: Any) -> str:
 
 
 def _safe_egress(value: Any) -> str:
-    if _is_str(value) and _SAFE_EGRESS_RE.fullmatch(value):
+    if not _is_str(value):
+        return "unknown"
+    if _INTERNAL_EGRESS_RE.fullmatch(value):
         return value
+    configured = _BESTPROXY_EGRESS_RE.fullmatch(value)
+    if configured:
+        return f"kr-bestproxy-{configured.group(1)}"
     return "unknown"
+
+
+def _is_substantive(value: Any) -> bool:
+    if value is None:
+        return False
+    if _is_str(value):
+        return bool(value.strip())
+    if isinstance(value, dict):
+        return any(_is_substantive(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_is_substantive(item) for item in value)
+    return True
+
+
+def _main_has_non_placeholder_data(main: dict[str, Any]) -> bool:
+    identity_fields = {"gn", "rc", "acc", "atn", "lot_number"}
+    for name, value in main.items():
+        if name in identity_fields:
+            if value is None or _is_str(value) or not _is_substantive(value):
+                continue
+            return True
+        if name == "title" and not _is_substantive(value):
+            continue
+        if _is_substantive(value):
+            return True
+    return False
+
+
+def _is_unavailable_detail(payload: dict[str, Any]) -> bool:
+    if not payload:
+        return True
+
+    raw_main = payload.get("main")
+    other_sections = {name: value for name, value in payload.items() if name != "main"}
+    if not isinstance(raw_main, dict):
+        return not _is_substantive(raw_main) and not _is_substantive(other_sections)
+    if not raw_main:
+        return not _is_substantive(other_sections)
+
+    title = raw_main.get("title")
+    return not _is_substantive(title) and not _main_has_non_placeholder_data(raw_main)
 
 
 class GlovisService:
@@ -229,6 +283,8 @@ class GlovisService:
         self._cache_hits = 0
         self._cache_misses = 0
         self._cache_evictions = 0
+        self._cache_generation = 0
+        self._closed = False
 
     def _cached(
         self,
@@ -238,6 +294,9 @@ class GlovisService:
     ) -> Any:
         now = self._clock()
         with self._cache_lock:
+            if self._closed:
+                raise GlovisUpstreamUnavailableError()
+            generation = self._cache_generation
             entry = self._cache.get(key)
             if entry is not None and entry.expires_at > now:
                 self._cache.move_to_end(key)
@@ -250,6 +309,8 @@ class GlovisService:
         value = loader()
 
         with self._cache_lock:
+            if self._closed or generation != self._cache_generation:
+                return value
             self._cache[key] = _CacheEntry(
                 value=value,
                 expires_at=self._clock() + ttl,
@@ -272,6 +333,7 @@ class GlovisService:
 
     def clear_cache(self) -> None:
         with self._cache_lock:
+            self._cache_generation += 1
             self._cache.clear()
 
     def _load_auctions(
@@ -371,6 +433,8 @@ class GlovisService:
         if type(total) is not int or total < 0:
             raise _invalid_response()
         raw_items = _require_list(payload.get("items"))
+        if len(raw_items) > query.page_size or len(raw_items) > total:
+            raise _invalid_response()
         seen: set[tuple[str, str]] = set()
         items: list[GlovisCar] = []
         for raw_item in raw_items:
@@ -583,15 +647,20 @@ class GlovisService:
     @staticmethod
     def _has_detail_substance(payload: dict[str, Any]) -> bool:
         main = payload["main"]
-        has_vehicle_fact = any(main.get(name) is not None for name in _VEHICLE_FACT_FIELDS)
-        has_price = any(main.get(name) is not None for name in _PRICE_FIELDS)
-        has_gallery = bool(payload.get("images") or payload.get("inspection_images"))
+        has_vehicle_fact = any(
+            _is_substantive(main.get(name)) for name in _VEHICLE_FACT_FIELDS
+        )
+        has_price = any(_is_substantive(main.get(name)) for name in _PRICE_FIELDS)
+        has_gallery = any(
+            _is_substantive(payload.get(name))
+            for name in ("images", "inspection_images")
+        )
         return bool(
             has_vehicle_fact
             or has_price
             or has_gallery
-            or payload.get("performance_image")
-            or payload.get("registration_certificate_image")
+            or _is_substantive(payload.get("performance_image"))
+            or _is_substantive(payload.get("registration_certificate_image"))
         )
 
     def _load_car_detail(
@@ -616,6 +685,8 @@ class GlovisService:
             deadline_at=deadline_at,
         )
         payload = _require_mapping(result.value)
+        if _is_unavailable_detail(payload):
+            raise GlovisCarUnavailableError()
         main = _require_mapping(payload.get("main"))
         identities = {
             "gn": _validated_gn(main.get("gn")),
@@ -627,7 +698,7 @@ class GlovisService:
             raise _invalid_response()
         title = main.get("title")
         if not _is_str(title) or not title.strip():
-            raise GlovisCarUnavailableError()
+            raise _invalid_response()
         self._validate_detail_shapes(payload)
         if not self._has_detail_substance(payload):
             raise GlovisCarUnavailableError()
@@ -747,5 +818,12 @@ class GlovisService:
         )
 
     def close(self) -> None:
-        self.clear_cache()
-        self._transport.close()
+        should_close = False
+        with self._cache_lock:
+            if not self._closed:
+                self._closed = True
+                self._cache_generation += 1
+                self._cache.clear()
+                should_close = True
+        if should_close:
+            self._transport.close()

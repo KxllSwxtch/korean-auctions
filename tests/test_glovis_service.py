@@ -32,6 +32,7 @@ from app.services.glovis_service import (
 from app.services.glovis_transport import (
     GlovisTransportResult,
     GlovisUpstreamInvalidResponseError,
+    GlovisUpstreamUnavailableError,
 )
 from tests.glovis_fixtures import (
     GN_RAW,
@@ -361,6 +362,79 @@ def test_placeholder_detail_is_terminal_unavailable():
     assert raised.value.retryable is False
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"main": None},
+        {"main": {}},
+        {"main": []},
+        {
+            "main": {"gn": "", "rc": "", "acc": "", "atn": "", "title": " "},
+            "properties": {},
+            "images": [],
+            "performance_image": None,
+        },
+    ],
+    ids=[
+        "empty-payload",
+        "null-main",
+        "empty-main-mapping",
+        "empty-main-list",
+        "blank-provider-placeholder",
+    ],
+)
+def test_empty_detail_shapes_are_terminal_unavailable(payload):
+    service = GlovisService(transport=StubTransport({DETAIL_PATH: payload}))
+
+    with pytest.raises(GlovisCarUnavailableError):
+        service.get_car_detail(gn=GN_RAW, rc="3100", acc="20", atn="1102")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"provider_error": "unexpected payload"},
+        {"main": ["unexpected payload"]},
+        {"main": {}, "images": ["https://images.invalid/a.jpg"]},
+        {
+            "main": {
+                "gn": GN_RAW,
+                "rc": "3100",
+                "acc": "20",
+                "atn": "1102",
+                "title": "",
+                "year": 2020,
+            }
+        },
+        {
+            "main": {
+                "gn": ["malformed"],
+                "rc": "",
+                "acc": "",
+                "atn": "",
+                "title": "",
+            }
+        },
+    ],
+    ids=[
+        "nonempty-without-main",
+        "nonempty-main-list",
+        "empty-main-with-image",
+        "blank-title-with-vehicle-fact",
+        "nonempty-malformed-identity",
+    ],
+)
+def test_nonempty_malformed_detail_is_invalid_upstream(payload):
+    service = GlovisService(transport=StubTransport({DETAIL_PATH: payload}))
+
+    assert_invalid_response(
+        lambda: service.get_car_detail(
+            gn=GN_RAW, rc="3100", acc="20", atn="1102"
+        )
+    )
+
+
 def test_detail_rejects_identity_mismatch():
     payload = valid_detail()
     payload["main"]["gn"] = "AAAAAAAAAAAAAAAAAAAAAA=="
@@ -450,6 +524,47 @@ def test_only_valid_successes_are_cached():
     assert transport.call_count(CARS_PATH) == 2
     assert service.get_cache_stats()["misses"] == 2
     assert service.get_cache_stats()["hits"] == 1
+
+
+@pytest.mark.parametrize(
+    ("query", "invalid_payload"),
+    [
+        (
+            base_query(page_size=1),
+            {
+                "total": 2,
+                "items": [
+                    valid_list_car(),
+                    {**valid_list_car(), "gn": "AAAAAAAAAAAAAAAAAAAAAA==", "rc": "3101"},
+                ],
+            },
+        ),
+        (
+            base_query(),
+            {
+                "total": 1,
+                "items": [
+                    valid_list_car(),
+                    {**valid_list_car(), "gn": "AAAAAAAAAAAAAAAAAAAAAA==", "rc": "3101"},
+                ],
+            },
+        ),
+        (base_query(), {"total": 0, "items": [valid_list_car()]}),
+    ],
+    ids=["over-page-size", "over-total", "zero-total-with-item"],
+)
+def test_invalid_pagination_is_rejected_and_never_cached(query, invalid_payload):
+    transport = StubTransport({
+        CARS_PATH: deque([invalid_payload, valid_list(total=0)])
+    })
+    service = GlovisService(transport=transport, clock=FakeClock())
+
+    with pytest.raises(GlovisUpstreamInvalidResponseError):
+        service.get_cars(query)
+    service.get_cars(query)
+    service.get_cars(query)
+
+    assert transport.call_count(CARS_PATH) == 2
 
 
 def test_cache_key_includes_full_normalized_query():
@@ -559,6 +674,54 @@ def test_clear_cache_removes_entries_without_closing_transport():
     assert transport.call_count(CARS_PATH) == 2
 
 
+class BlockingCacheTransport(StubTransport):
+    def __init__(self):
+        super().__init__({CARS_PATH: valid_list()})
+        self.loader_started = threading.Event()
+        self.release_loader = threading.Event()
+
+    def get_json(self, path, params, operation, deadline_at=None):
+        if self.call_count(path) == 0:
+            self.loader_started.set()
+            if not self.release_loader.wait(timeout=2):
+                raise AssertionError("test did not release cache loader")
+        return super().get_json(path, params, operation, deadline_at)
+
+
+@pytest.mark.parametrize("action", ["clear", "close"])
+def test_cache_loader_cannot_reinsert_after_clear_or_close(action):
+    transport = BlockingCacheTransport()
+    service = GlovisService(transport=transport, clock=FakeClock())
+    results = []
+    errors: list[BaseException] = []
+
+    def load() -> None:
+        try:
+            results.append(service.get_cars(base_query()))
+        except BaseException as error:
+            errors.append(error)
+
+    thread = threading.Thread(target=load)
+    thread.start()
+    assert transport.loader_started.wait(timeout=1)
+
+    getattr(service, action if action == "close" else "clear_cache")()
+    transport.release_loader.set()
+    thread.join(timeout=2)
+
+    assert not errors
+    assert len(results) == 1
+    assert not thread.is_alive()
+    assert service.get_cache_stats()["size"] == 0
+    if action == "close":
+        with pytest.raises(GlovisUpstreamUnavailableError):
+            service.get_cars(base_query())
+        assert transport.call_count(CARS_PATH) == 1
+    else:
+        service.get_cars(base_query())
+        assert transport.call_count(CARS_PATH) == 2
+
+
 class ConcurrentTransport(StubTransport):
     def __init__(self):
         super().__init__({CARS_PATH: valid_list()})
@@ -638,6 +801,26 @@ def test_health_chooses_first_sorted_auction_and_shares_one_deadline():
         ("lang", "en"),
         ("sort_order", "01"),
     ]
+
+
+def test_health_page_size_one_rejects_multiple_items_and_does_not_cache():
+    second_car = {**valid_list_car(), "gn": "AAAAAAAAAAAAAAAAAAAAAA==", "rc": "3101"}
+    transport = StubTransport({
+        AUCTIONS_PATH: raw_auctions(),
+        CARS_PATH: deque([
+            {"total": 2, "items": [valid_list_car(), second_car]},
+            valid_list(total=1),
+        ]),
+    })
+    service = GlovisService(transport=transport, clock=FakeClock())
+
+    with pytest.raises(GlovisUpstreamInvalidResponseError):
+        service.check_health()
+    probe = service.check_health()
+
+    assert probe.list_count == 1
+    assert transport.call_count(AUCTIONS_PATH) == 2
+    assert transport.call_count(CARS_PATH) == 2
 
 
 def test_invalid_health_result_is_not_cached():
@@ -766,6 +949,57 @@ def test_health_response_never_exposes_identity_or_proxy_address():
     assert "TEST-1001" not in dumped
     assert "SYNTHETICVIN00001" not in dumped
     assert proxy_address not in dumped
+
+
+@pytest.mark.parametrize(
+    "egress",
+    [
+        "192.0.2.10",
+        "2001:db8::10",
+        "proxy.internal",
+        "https://proxy.invalid:8443",
+        "admin123",
+        "password123",
+        "user-secret",
+    ],
+    ids=[
+        "ipv4",
+        "ipv6",
+        "hostname",
+        "url",
+        "username-like",
+        "password-like",
+        "auth-pair-like",
+    ],
+)
+def test_health_egress_rejects_address_and_auth_like_values(egress):
+    transport = StubTransport(
+        {AUCTIONS_PATH: raw_auctions(), CARS_PATH: valid_list(total=1)},
+        egress=egress,
+    )
+
+    probe = GlovisService(transport=transport, clock=FakeClock()).check_health()
+
+    assert probe.egress == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("egress", "expected"),
+    [
+        ("kr-primary", "kr-primary"),
+        ("kr-test-2", "kr-test-2"),
+        ("bestproxy-kr-primary", "kr-bestproxy-primary"),
+    ],
+)
+def test_health_egress_allows_only_controlled_korean_labels(egress, expected):
+    transport = StubTransport(
+        {AUCTIONS_PATH: raw_auctions(), CARS_PATH: valid_list(total=1)},
+        egress=egress,
+    )
+
+    probe = GlovisService(transport=transport, clock=FakeClock()).check_health()
+
+    assert probe.egress == expected
 
 
 def test_close_delegates_to_transport_and_clears_cached_values():
