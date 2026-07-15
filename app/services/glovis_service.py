@@ -351,7 +351,13 @@ class GlovisService:
         auctions: list[GlovisAuction] = []
         for raw_item in payload:
             item = _require_mapping(raw_item)
-            number = _validated_provider_id(item.get("atn"), "atn")
+            raw_number = item.get("number")
+            legacy_atn = item.get("atn")
+            if raw_number is None:
+                raw_number = legacy_atn
+            elif legacy_atn is not None and legacy_atn != raw_number:
+                raise _invalid_response()
+            number = _validated_provider_id(raw_number, "number")
             acc = _validated_provider_id(item.get("acc"), "acc")
             identity = (number, acc)
             if identity in seen:

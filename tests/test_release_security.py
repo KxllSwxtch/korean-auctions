@@ -115,6 +115,58 @@ def test_main_app_imports_without_legacy_provider_credentials(tmp_path: Path) ->
         pytest.fail("main.py: application import requires provider credentials", pytrace=False)
 
 
+def test_settings_accept_secret_managed_glovis_proxy_fields(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "\n".join(
+            (
+                "GLOVIS_PROXY_HOST=proxy.example.invalid:8443",
+                "GLOVIS_PROXY_USERNAME=test-account",
+                "GLOVIS_PROXY_PASSWORD=test-secret",
+                "GLOVIS_PROXY_COUNTRY=KR",
+                "GLOVIS_PROXY_EGRESS_LABEL=kr-test",
+            )
+        ),
+        encoding="utf-8",
+    )
+    environment = os.environ.copy()
+    for name in (
+        "GLOVIS_PROXY_HOST",
+        "GLOVIS_PROXY_USERNAME",
+        "GLOVIS_PROXY_PASSWORD",
+        "GLOVIS_PROXY_COUNTRY",
+        "GLOVIS_PROXY_EGRESS_LABEL",
+    ):
+        environment.pop(name, None)
+    environment["PYTHONPATH"] = str(ROOT)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from app.core.config import settings; "
+                "assert settings.glovis_proxy_host; "
+                "assert settings.glovis_proxy_username; "
+                "assert settings.glovis_proxy_password; "
+                "assert settings.glovis_proxy_country == 'KR'; "
+                "assert settings.glovis_proxy_egress_label == 'kr-test'"
+            ),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    if result.returncode != 0:
+        pytest.fail(
+            "app/core/config.py: Glovis proxy environment is rejected",
+            pytrace=False,
+        )
+
+
 def test_internal_glovis_cache_clear_rejects_non_ascii_token(monkeypatch) -> None:
     import main
 

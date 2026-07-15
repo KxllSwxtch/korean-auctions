@@ -129,6 +129,17 @@ def test_auctions_forward_english_only_and_normalize_sorted_provider_ids():
     ]
 
 
+def test_auctions_accept_live_provider_number_field():
+    payload = raw_auctions()
+    for item in payload:
+        item["number"] = item.pop("atn")
+    service = GlovisService(transport=StubTransport({AUCTIONS_PATH: payload}))
+
+    result = service.get_auctions()
+
+    assert [auction.number for auction in result.auctions] == ["1102", "1103"]
+
+
 def test_auctions_reject_duplicate_or_missing_identity():
     duplicate = raw_auctions()
     duplicate.append(deepcopy(duplicate[0]))

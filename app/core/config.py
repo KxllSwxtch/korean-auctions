@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     kcar_username: Optional[str] = None
     kcar_password: Optional[str] = None
 
+    # Dedicated Korean proxy for DB Auto Glovis. Values remain secret-managed;
+    # declaring them lets Pydantic accept the same environment used by the
+    # fail-closed Glovis transport.
+    glovis_proxy_host: Optional[str] = None
+    glovis_proxy_username: Optional[str] = None
+    glovis_proxy_password: Optional[str] = None
+    glovis_proxy_country: Optional[str] = None
+    glovis_proxy_egress_label: Optional[str] = None
+
     # User Agent для запросов
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
