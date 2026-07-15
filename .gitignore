@@ -79,3 +79,6 @@ direct_api_response.html
 ssancar_response.html
 debug_generations_response.txt
 auctions-auth.txt
+
+# Agent workflow state
+/.superpowers/
