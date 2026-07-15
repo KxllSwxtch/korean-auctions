@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from loguru import logger
 
 from app.models.glovis import GlovisCarsQuery
 from app.services.glovis_service import GlovisService
@@ -13,23 +14,37 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_live_auctions_list_and_detail_are_semantically_valid():
-    service = GlovisService()
-    auctions = service.get_auctions().auctions
-    assert auctions
-    auction = auctions[0]
-    cars = service.get_cars(
-        GlovisCarsQuery(
-            atn=auction.number,
-            acc=auction.acc,
-            page=1,
-            page_size=1,
-        )
-    )
-    assert cars.total >= len(cars.items)
-    if cars.items:
-        car = cars.items[0]
-        detail = service.get_car_detail(
-            gn=car.gn, rc=car.rc, acc=car.acc, atn=car.atn
-        )
-        assert detail.data.main.gn == car.gn
-        assert detail.data.main.title.strip()
+    logger.disable("app.services.glovis_transport")
+    try:
+        service = GlovisService()
+        try:
+            auctions = service.get_auctions().auctions
+            if not auctions:
+                pytest.fail("live Glovis auction list was empty", pytrace=False)
+            auction = auctions[0]
+            cars = service.get_cars(
+                GlovisCarsQuery(
+                    atn=auction.number,
+                    acc=auction.acc,
+                    page=1,
+                    page_size=1,
+                )
+            )
+            if cars.total < len(cars.items):
+                pytest.fail("live Glovis list total was inconsistent", pytrace=False)
+            if not cars.items:
+                pytest.fail("live Glovis first page was empty", pytrace=False)
+            car = cars.items[0]
+            detail = service.get_car_detail(
+                gn=car.gn, rc=car.rc, acc=car.acc, atn=car.atn
+            )
+            if detail is None:
+                pytest.fail("live Glovis detail was missing", pytrace=False)
+            if detail.data.main.gn != car.gn:
+                pytest.fail("live Glovis detail identity did not match", pytrace=False)
+            if not detail.data.main.title.strip():
+                pytest.fail("live Glovis detail title was blank", pytrace=False)
+        finally:
+            service.close()
+    finally:
+        logger.enable("app.services.glovis_transport")
