@@ -119,6 +119,48 @@ def test_missing_proxy_pool_fails_closed_without_creating_direct_session() -> No
     assert created == []
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "https://outside.invalid/api/auctions/glovis/cars",
+        "//outside.invalid/api/auctions/glovis/cars",
+        "/api/auctions/glovis/../cars",
+        "/api/auctions/glovis/cars?lang=ko",
+        "/api/auth/token",
+    ],
+)
+def test_reviewer_rejects_non_allowlisted_api_destination(path: str) -> None:
+    session = StubSession()
+    transport = make_transport(session)
+
+    with pytest.raises(ValueError, match="approved DB Auto Glovis endpoint"):
+        transport.get_json(path, [], operation="cars")
+
+    assert session.calls == []
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        [("atn", "1102")],
+        [("lang", "ko"), ("atn", "1102")],
+        [("lang", "ko"), ("atn", "1102"), ("lang", "en")],
+    ],
+)
+def test_reviewer_forces_exactly_one_english_language_parameter(
+    params: list[tuple[str, str]],
+) -> None:
+    session = StubSession([token_response("token"), StubResponse(json_data=[])])
+    transport = make_transport(session)
+
+    transport.get_json(CARS_PATH, params, operation="cars")
+
+    upstream_params = session.calls[-1]["params"]
+    assert upstream_params.count(("lang", "en")) == 1
+    assert [value for key, value in upstream_params if key == "lang"] == ["en"]
+    assert ("atn", "1102") in upstream_params
+
+
 def test_token_and_api_use_same_proxy_session_and_matching_fingerprint() -> None:
     session = StubSession(
         [
@@ -220,6 +262,35 @@ def test_second_auth_failure_is_reported_after_one_refresh() -> None:
     assert raised.value.status_code == 403
     assert raised.value.egress == "kr-1"
     assert len(session.calls) == 4
+
+
+def test_reviewer_auth_refresh_is_once_across_rotated_slots() -> None:
+    first = StubSession(
+        [
+            token_response("first"),
+            StubResponse(status_code=401, json_data={"detail": "expired"}),
+            token_response("refreshed"),
+            requests.ConnectionError("retry request unavailable"),
+        ]
+    )
+    second = StubSession(
+        [
+            token_response("second"),
+            StubResponse(status_code=403, json_data={"detail": "denied"}),
+        ]
+    )
+
+    with pytest.raises(GlovisUpstreamAuthError) as raised:
+        make_transport(first, second).get_json(CARS_PATH, [], operation="cars")
+
+    assert raised.value.status_code == 403
+    assert [call["method"] for call in first.calls] == [
+        "POST",
+        "GET",
+        "POST",
+        "GET",
+    ]
+    assert [call["method"] for call in second.calls] == ["POST", "GET"]
 
 
 def test_token_is_reused_at_109_seconds_and_refreshed_at_110_seconds() -> None:
@@ -363,6 +434,27 @@ def test_expired_shared_deadline_stops_before_session_request() -> None:
     assert session.calls == []
 
 
+def test_reviewer_every_request_uses_exact_connect_and_read_timeouts() -> None:
+    session = StubSession(
+        [
+            token_response("first"),
+            StubResponse(status_code=401, json_data={"detail": "expired"}),
+            token_response("second"),
+            StubResponse(json_data=[]),
+        ]
+    )
+    transport = make_transport(session, overall_deadline_seconds=0.5)
+
+    transport.get_json(CARS_PATH, [], operation="cars")
+
+    assert [call["timeout"] for call in session.calls] == [
+        (3.0, 8.0),
+        (3.0, 8.0),
+        (3.0, 8.0),
+        (3.0, 8.0),
+    ]
+
+
 def test_global_worker_concurrency_is_bounded_at_four() -> None:
     release = threading.Event()
     four_active = threading.Event()
@@ -419,6 +511,74 @@ def test_global_worker_concurrency_is_bounded_at_four() -> None:
     assert all(not thread.is_alive() for thread in threads)
     assert errors == []
     assert len(results) == 5
+
+
+def test_reviewer_rotation_waits_for_a_different_untried_egress() -> None:
+    first_request_started = threading.Event()
+    second_request_started = threading.Event()
+    release_second = threading.Event()
+
+    def fail_first_after_second_is_busy() -> StubResponse:
+        first_request_started.set()
+        assert second_request_started.wait(timeout=1.0)
+        raise requests.ConnectionError("first egress unavailable")
+
+    def block_second_request() -> StubResponse:
+        second_request_started.set()
+        assert release_second.wait(timeout=2.0)
+        return StubResponse(json_data=[])
+
+    first = StubSession(
+        [
+            token_response("first"),
+            fail_first_after_second_is_busy,
+            StubResponse(json_data=[]),
+        ]
+    )
+    second = StubSession(
+        [
+            token_response("second"),
+            block_second_request,
+            StubResponse(json_data=[]),
+        ]
+    )
+    transport = make_transport(first, second, overall_deadline_seconds=1.0)
+    results: dict[str, Any] = {}
+    errors: list[BaseException] = []
+
+    def call(name: str) -> None:
+        try:
+            results[name] = transport.get_json(
+                AUCTIONS_PATH,
+                [],
+                operation="auctions",
+            )
+        except BaseException as error:
+            errors.append(error)
+
+    primary = threading.Thread(target=call, args=("primary",))
+    competing = threading.Thread(target=call, args=("competing",))
+    try:
+        primary.start()
+        assert first_request_started.wait(timeout=0.5)
+        competing.start()
+        assert second_request_started.wait(timeout=0.5)
+        time.sleep(0.05)
+
+        assert primary.is_alive()
+        assert len(first.calls) == 2
+    finally:
+        release_second.set()
+        primary.join(timeout=1.0)
+        competing.join(timeout=1.0)
+
+    assert not primary.is_alive()
+    assert not competing.is_alive()
+    assert errors == []
+    assert results["primary"].egress == "kr-2"
+    assert results["competing"].egress == "kr-2"
+    assert len(first.calls) == 2
+    assert len(second.calls) == 3
 
 
 def test_hard_deadline_does_not_reuse_session_while_worker_is_blocked() -> None:
@@ -488,6 +648,56 @@ def test_close_defers_in_flight_session_close_until_worker_finishes() -> None:
 
     assert session.closed.wait(timeout=0.5)
     assert session.close_calls == 1
+
+
+def test_reviewer_constructor_closes_prior_sessions_when_factory_fails() -> None:
+    first = StubSession()
+    factory_calls = 0
+
+    def session_factory() -> StubSession:
+        nonlocal factory_calls
+        factory_calls += 1
+        if factory_calls == 1:
+            return first
+        raise RuntimeError("synthetic factory failure")
+
+    with pytest.raises(RuntimeError, match="synthetic factory failure"):
+        GlovisTransport(
+            proxy_candidates=[
+                ("kr-1", "http://proxy-1.invalid:8080"),
+                ("kr-2", "http://proxy-2.invalid:8080"),
+            ],
+            session_factory=session_factory,
+            fingerprint_factory=lambda: "fingerprint-a",
+        )
+
+    assert first.close_calls == 1
+
+
+def test_reviewer_constructor_closes_all_sessions_when_fingerprint_fails() -> None:
+    first = StubSession()
+    second = StubSession()
+    sessions = [first, second]
+    fingerprint_calls = 0
+
+    def fingerprint_factory() -> str:
+        nonlocal fingerprint_calls
+        fingerprint_calls += 1
+        if fingerprint_calls == 1:
+            return "fingerprint-a"
+        raise RuntimeError("synthetic fingerprint failure")
+
+    with pytest.raises(RuntimeError, match="synthetic fingerprint failure"):
+        GlovisTransport(
+            proxy_candidates=[
+                ("kr-1", "http://proxy-1.invalid:8080"),
+                ("kr-2", "http://proxy-2.invalid:8080"),
+            ],
+            session_factory=lambda: sessions.pop(0),
+            fingerprint_factory=fingerprint_factory,
+        )
+
+    assert first.close_calls == second.close_calls == 1
 
 
 def test_safe_logs_do_not_contain_transport_secrets() -> None:

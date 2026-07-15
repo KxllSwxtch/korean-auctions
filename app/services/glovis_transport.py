@@ -36,6 +36,17 @@ MAX_SESSIONS = 4
 
 _OUTBOUND_LIMIT = threading.BoundedSemaphore(MAX_SESSIONS)
 _SAFE_OPERATION = re.compile(r"[a-z][a-z0-9_.-]{0,31}")
+_ALLOWED_API_PATHS = frozenset(
+    {
+        "/api/auctions/glovis/auctions",
+        "/api/auctions/glovis/cars",
+        "/api/auctions/glovis/brands",
+        "/api/auctions/glovis/models",
+        "/api/auctions/glovis/submodels",
+        "/api/auctions/glovis/search-form",
+        "/api/auctions/glovis/car",
+    }
+)
 
 
 class GlovisUpstreamError(RuntimeError):
@@ -96,6 +107,7 @@ class _AttemptOutcome:
     response: requests.Response | None
     value: JsonValue | None
     error: GlovisUpstreamError | None
+    auth_refresh_used: bool
 
 
 class GlovisTransport:
@@ -127,23 +139,37 @@ class GlovisTransport:
         self._deadline_seconds = float(overall_deadline_seconds)
         self._closing = threading.Event()
         self._state_lock = threading.Lock()
+        self._availability = threading.Condition(self._state_lock)
+        self._availability_generation = 0
 
         selected = candidates[:MAX_SESSIONS]
         self._slots: Queue[_SessionSlot] = Queue(maxsize=len(selected))
         slots: list[_SessionSlot] = []
         make_fingerprint = fingerprint_factory or self._new_fingerprint
-        for egress, proxy_url in selected:
-            session = session_factory()
-            session.trust_env = False
-            session.proxies.update({"http": proxy_url, "https": proxy_url})
-            session.headers.update(self._base_headers())
-            slot = _SessionSlot(
-                egress=egress,
-                session=session,
-                fingerprint=make_fingerprint(),
-            )
-            slots.append(slot)
-            self._slots.put(slot)
+        try:
+            for egress, proxy_url in selected:
+                session: requests.Session | None = None
+                try:
+                    session = session_factory()
+                    session.trust_env = False
+                    session.proxies.update({"http": proxy_url, "https": proxy_url})
+                    session.headers.update(self._base_headers())
+                    fingerprint = make_fingerprint()
+                except Exception:
+                    if session is not None:
+                        self._close_session(session)
+                    raise
+                slot = _SessionSlot(
+                    egress=egress,
+                    session=session,
+                    fingerprint=fingerprint,
+                )
+                slots.append(slot)
+                self._slots.put(slot)
+        except Exception:
+            for slot in slots:
+                self._close_session(slot.session)
+            raise
         self._all_slots = tuple(slots)
 
     @staticmethod
@@ -174,14 +200,6 @@ class GlovisTransport:
             if candidate not in candidates:
                 candidates.append(candidate)
         return candidates
-
-    @staticmethod
-    def _timeout_for_remaining(remaining: float) -> tuple[float, float]:
-        if remaining >= CONNECT_TIMEOUT_SECONDS + READ_TIMEOUT_SECONDS:
-            return CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
-        connect = min(CONNECT_TIMEOUT_SECONDS, max(0.001, remaining / 2))
-        read = min(READ_TIMEOUT_SECONDS, max(0.001, remaining - connect))
-        return connect, read
 
     @staticmethod
     def _has_token_cookie(session: requests.Session) -> bool:
@@ -227,7 +245,7 @@ class GlovisTransport:
         remaining = deadline - self._clock()
         if remaining <= 0:
             raise GlovisUpstreamTimeoutError(egress=egress)
-        return self._timeout_for_remaining(remaining)
+        return CONNECT_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS
 
     def _ensure_token(
         self,
@@ -286,6 +304,8 @@ class GlovisTransport:
         deadline: float,
         capture_response: Callable[[requests.Response], None],
         clear_response: Callable[[], None],
+        allow_auth_refresh: bool,
+        mark_auth_refresh: Callable[[], None],
     ) -> tuple[requests.Response, JsonValue]:
         clear_response()
         response = slot.session.request(
@@ -298,6 +318,9 @@ class GlovisTransport:
         )
         capture_response(response)
         if int(response.status_code) in {401, 403}:
+            if not allow_auth_refresh:
+                self._classify_response(response, egress=slot.egress)
+            mark_auth_refresh()
             self._ensure_token(
                 slot,
                 deadline,
@@ -399,12 +422,14 @@ class GlovisTransport:
 
     def _release_unstarted_slot(self, slot: _SessionSlot) -> None:
         close_session = False
-        with self._state_lock:
+        with self._availability:
             if self._closing.is_set():
                 close_session = True
             else:
                 try:
                     self._slots.put_nowait(slot)
+                    self._availability_generation += 1
+                    self._availability.notify_all()
                 except Full:
                     close_session = True
         if close_session:
@@ -419,10 +444,12 @@ class GlovisTransport:
         deadline: float,
         outcomes: Queue[_AttemptOutcome],
         limiter: threading.BoundedSemaphore,
+        allow_auth_refresh: bool,
     ) -> None:
         response: requests.Response | None = None
         value: JsonValue | None = None
         error: GlovisUpstreamError | None = None
+        auth_refresh_used = False
 
         def capture_response(worker_response: requests.Response) -> None:
             nonlocal response
@@ -431,6 +458,10 @@ class GlovisTransport:
         def clear_response() -> None:
             nonlocal response
             response = None
+
+        def mark_auth_refresh() -> None:
+            nonlocal auth_refresh_used
+            auth_refresh_used = True
 
         try:
             self._ensure_token(
@@ -446,6 +477,8 @@ class GlovisTransport:
                 deadline,
                 capture_response,
                 clear_response,
+                allow_auth_refresh,
+                mark_auth_refresh,
             )
         except requests.Timeout:
             error = GlovisUpstreamTimeoutError(egress=slot.egress)
@@ -460,16 +493,23 @@ class GlovisTransport:
             error.egress = slot.egress
             if response is not None and error.status_code is None:
                 error.status_code = int(response.status_code)
-        outcome = _AttemptOutcome(response=response, value=value, error=error)
+        outcome = _AttemptOutcome(
+            response=response,
+            value=value,
+            error=error,
+            auth_refresh_used=auth_refresh_used,
+        )
 
         close_session = False
         try:
-            with self._state_lock:
+            with self._availability:
                 if self._closing.is_set():
                     close_session = True
                 else:
                     try:
                         self._slots.put_nowait(slot)
+                        self._availability_generation += 1
+                        self._availability.notify_all()
                     except Full:
                         close_session = True
             if close_session:
@@ -478,25 +518,51 @@ class GlovisTransport:
             limiter.release()
             outcomes.put(outcome)
 
-    def _lease_slot(self, deadline: float) -> _SessionSlot:
-        if self._closing.is_set():
-            raise GlovisUpstreamUnavailableError()
-        remaining = deadline - self._clock()
-        if remaining <= 0:
-            raise GlovisUpstreamTimeoutError()
-        try:
-            slot = self._slots.get(timeout=remaining)
-        except Empty as error:
-            raise GlovisUpstreamTimeoutError() from error
-
-        close_session = False
-        with self._state_lock:
+    def _lease_slot(
+        self,
+        deadline: float,
+        attempted_egresses: set[str],
+    ) -> _SessionSlot:
+        skipped = 0
+        while True:
             if self._closing.is_set():
-                close_session = True
-        if close_session:
-            self._close_session(slot.session)
-            raise GlovisUpstreamUnavailableError()
-        return slot
+                raise GlovisUpstreamUnavailableError()
+            remaining = deadline - self._clock()
+            if remaining <= 0:
+                raise GlovisUpstreamTimeoutError()
+            try:
+                slot = self._slots.get(timeout=remaining)
+            except Empty as error:
+                raise GlovisUpstreamTimeoutError() from error
+
+            close_session = False
+            with self._availability:
+                if self._closing.is_set():
+                    close_session = True
+                elif slot.egress not in attempted_egresses:
+                    return slot
+                else:
+                    observed_generation = self._availability_generation
+                    self._slots.put_nowait(slot)
+                    skipped += 1
+                    if skipped >= self._slots.qsize():
+                        wait_remaining = deadline - self._clock()
+                        if wait_remaining <= 0:
+                            raise GlovisUpstreamTimeoutError()
+                        changed = self._availability.wait_for(
+                            lambda: (
+                                self._closing.is_set()
+                                or self._availability_generation
+                                != observed_generation
+                            ),
+                            timeout=wait_remaining,
+                        )
+                        if not changed:
+                            raise GlovisUpstreamTimeoutError()
+                        skipped = 0
+            if close_session:
+                self._close_session(slot.session)
+                raise GlovisUpstreamUnavailableError()
 
     def get_json(
         self,
@@ -509,6 +575,18 @@ class GlovisTransport:
 
         if self._closing.is_set():
             raise GlovisUpstreamUnavailableError()
+        if path not in _ALLOWED_API_PATHS:
+            raise ValueError("path must be an approved DB Auto Glovis endpoint")
+        try:
+            parameter_pairs = list(params)
+            normalized_params = [
+                (key, value)
+                for key, value in parameter_pairs
+                if key != "lang"
+            ]
+        except (TypeError, ValueError):
+            raise ValueError("params must be an iterable of key/value pairs") from None
+        normalized_params.append(("lang", "en"))
         started_at = self._clock()
         deadline = started_at + self._deadline_seconds
         if deadline_at is not None:
@@ -520,12 +598,15 @@ class GlovisTransport:
             operation if _SAFE_OPERATION.fullmatch(operation or "") else "unknown"
         )
         failures: list[GlovisUpstreamError] = []
+        attempted_egresses: set[str] = set()
+        auth_refresh_used = False
 
-        for _ in self._all_slots:
+        egress_count = len({slot.egress for slot in self._all_slots})
+        for _ in range(egress_count):
             if deadline - self._clock() <= 0:
                 failures.append(GlovisUpstreamTimeoutError())
                 break
-            slot = self._lease_slot(deadline)
+            slot = self._lease_slot(deadline, attempted_egresses)
             attempt_started = self._clock()
 
             limiter = _OUTBOUND_LIMIT
@@ -552,10 +633,11 @@ class GlovisTransport:
                     kwargs={
                         "slot": slot,
                         "path": path,
-                        "params": params,
+                        "params": normalized_params,
                         "deadline": deadline,
                         "outcomes": outcomes,
                         "limiter": limiter,
+                        "allow_auth_refresh": not auth_refresh_used,
                     },
                     name="glovis-attempt",
                     daemon=True,
@@ -606,10 +688,12 @@ class GlovisTransport:
                     elapsed_ms=int((self._clock() - attempt_started) * 1000),
                     error=failure,
                 )
+                attempted_egresses.add(slot.egress)
                 failures.append(failure)
                 continue
 
             elapsed_ms = int((self._clock() - attempt_started) * 1000)
+            auth_refresh_used = auth_refresh_used or outcome.auth_refresh_used
             if outcome.error is not None:
                 self._log_attempt(
                     operation=operation_label,
@@ -618,7 +702,13 @@ class GlovisTransport:
                     elapsed_ms=elapsed_ms,
                     error=outcome.error,
                 )
+                attempted_egresses.add(slot.egress)
                 failures.append(outcome.error)
+                if (
+                    isinstance(outcome.error, GlovisUpstreamAuthError)
+                    and auth_refresh_used
+                ):
+                    raise outcome.error
                 continue
             if outcome.response is None or outcome.value is None:
                 failure = GlovisUpstreamInvalidResponseError(egress=slot.egress)
@@ -629,6 +719,7 @@ class GlovisTransport:
                     elapsed_ms=elapsed_ms,
                     error=failure,
                 )
+                attempted_egresses.add(slot.egress)
                 failures.append(failure)
                 continue
             if self._clock() > deadline:
@@ -662,10 +753,12 @@ class GlovisTransport:
         """Close idle sessions now and in-flight sessions after worker exit."""
 
         idle: list[_SessionSlot] = []
-        with self._state_lock:
+        with self._availability:
             if self._closing.is_set():
                 return
             self._closing.set()
+            self._availability_generation += 1
+            self._availability.notify_all()
             while True:
                 try:
                     idle.append(self._slots.get_nowait())
