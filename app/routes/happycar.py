@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import datetime
 from loguru import logger
 import asyncio
+import threading
 
 from app.models.happycar import (
     HappyCarResponse, HappyCarDetailResponse, HappyCarHealthResponse,
@@ -15,12 +16,18 @@ happycar_logger = get_logger("happycar_routes")
 
 router = APIRouter(tags=["HappyCar Insurance Auction"])
 
-# Global service instance
-happycar_service = HappyCarService()
+# Global service instance, created only when a HappyCar operation needs it.
+happycar_service: HappyCarService | None = None
+_happycar_service_lock = threading.Lock()
 
 
 def get_happycar_service() -> HappyCarService:
     """Dependency to get HappyCarService instance"""
+    global happycar_service
+    if happycar_service is None:
+        with _happycar_service_lock:
+            if happycar_service is None:
+                happycar_service = HappyCarService()
     return happycar_service
 
 

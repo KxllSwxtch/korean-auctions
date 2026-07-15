@@ -12,21 +12,32 @@ Endpoints:
 """
 
 import aiohttp
+import threading
 
 from fastapi import APIRouter, Query
 from fastapi.responses import ORJSONResponse
 from starlette.responses import Response
 
-from app.core.proxy_config import get_proxy_pool
+from app.core.proxy_config import ProxyPool, get_proxy_pool
 from app.core.logging import get_logger
 
 logger = get_logger("encar_proxy")
 
 router = APIRouter()
 
-# Dedicated proxy pool for Encar API requests. Always enabled regardless
-# of the USE_PROXY env gate used by other services.
-_pool = get_proxy_pool()
+# Dedicated proxy pool for Encar API requests, created on first use so an
+# absent shared proxy does not prevent unrelated routes from importing.
+_pool: ProxyPool | None = None
+_pool_lock = threading.Lock()
+
+
+def _get_pool() -> ProxyPool:
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = get_proxy_pool()
+    return _pool
 
 _ENCAR_HEADERS = {
     "accept": "application/json, text/plain, */*",
@@ -45,7 +56,7 @@ ENCAR_API = "http://api.encar.com"
 
 async def _proxy_get(url: str) -> tuple[str, int]:
     """Issue a GET through the rotating proxy pool and return (body, status)."""
-    entry, proxy_url = _pool.advance()
+    entry, proxy_url = _get_pool().advance()
     logger.debug(f"Using proxy {entry.name}")
 
     timeout = aiohttp.ClientTimeout(total=30)

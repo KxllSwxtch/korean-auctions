@@ -464,30 +464,163 @@ def test_main_registers_every_canonical_glovis_route():
     }.issubset(paths)
 
 
-def test_shared_cache_endpoints_include_and_clear_glovis(monkeypatch):
+def test_shared_cache_stats_include_an_existing_glovis_service(monkeypatch):
     service = StubGlovisService()
     monkeypatch.setattr(glovis, "glovis_service", service)
     client = TestClient(main.app)
 
     stats_response = client.get("/api/v1/cache/stats")
-    clear_response = client.post("/api/v1/cache/clear")
 
     assert stats_response.status_code == 200
     assert service.get_cache_stats() in stats_response.json()["services"]
-    assert clear_response.status_code == 200
-    assert "Glovis" in clear_response.json()["cleared"]
-    assert service.clear_calls == 1
 
 
-def test_lifespan_initializes_glovis_before_scheduler_and_closes_after_stop(
+def test_public_cache_clear_cannot_evict_glovis(monkeypatch):
+    service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+
+    response = TestClient(main.app).post("/api/v1/cache/clear")
+
+    assert response.status_code == 200
+    assert "Glovis" not in response.json()["cleared"]
+    assert service.clear_calls == 0
+
+
+def test_internal_glovis_cache_clear_requires_configured_admin_token(
     monkeypatch,
 ):
     service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.delenv("GLOVIS_CACHE_ADMIN_TOKEN", raising=False)
+
+    response = TestClient(main.app).post(
+        "/api/v1/internal/glovis/cache/clear",
+        headers={"X-Admin-Token": "untrusted-value"},
+    )
+
+    assert response.status_code == 503
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"]["code"] == "admin_unavailable"
+    assert "untrusted-value" not in response.text
+    assert service.clear_calls == 0
+
+
+@pytest.mark.parametrize("provided", [None, "wrong-value"])
+def test_internal_glovis_cache_clear_rejects_missing_or_wrong_token(
+    monkeypatch,
+    provided,
+):
+    service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.setenv("GLOVIS_CACHE_ADMIN_TOKEN", "managed-admin-secret")
+    headers = {} if provided is None else {"X-Admin-Token": provided}
+
+    response = TestClient(main.app).post(
+        "/api/v1/internal/glovis/cache/clear",
+        headers=headers,
+    )
+
+    assert response.status_code == 403
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"]["code"] == "forbidden"
+    assert "managed-admin-secret" not in response.text
+    if provided:
+        assert provided not in response.text
+    assert service.clear_calls == 0
+
+
+def test_internal_glovis_cache_clear_uses_constant_time_compare(monkeypatch):
+    service = StubGlovisService()
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.setenv("GLOVIS_CACHE_ADMIN_TOKEN", "managed-admin-secret")
+    secrets_module = getattr(main, "secrets", None)
+    assert secrets_module is not None
+    real_compare = secrets_module.compare_digest
+
+    def capture_compare(provided: str, expected: str) -> bool:
+        calls.append((provided, expected))
+        return real_compare(provided, expected)
+
+    monkeypatch.setattr(secrets_module, "compare_digest", capture_compare)
+
+    response = TestClient(main.app).post(
+        "/api/v1/internal/glovis/cache/clear",
+        headers={"X-Admin-Token": "wrong-value"},
+    )
+
+    assert response.status_code == 403
+    assert calls == [("wrong-value", "managed-admin-secret")]
+
+
+def test_authorized_internal_caller_can_clear_existing_glovis_cache(monkeypatch):
+    service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.setenv("GLOVIS_CACHE_ADMIN_TOKEN", "managed-admin-secret")
+
+    response = TestClient(main.app).post(
+        "/api/v1/internal/glovis/cache/clear",
+        headers={"X-Admin-Token": "managed-admin-secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json() == {"cleared": True, "service": "Glovis"}
+    assert service.clear_calls == 1
+
+
+def test_missing_proxy_config_returns_stable_proxy_unavailable_without_session(
+    monkeypatch,
+):
+    for name in (
+        "GLOVIS_PROXY_HOST",
+        "GLOVIS_PROXY_USERNAME",
+        "GLOVIS_PROXY_PASSWORD",
+        "GLOVIS_PROXY_COUNTRY",
+        "GLOVIS_PROXY_EGRESS_LABEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(glovis, "glovis_service", None)
+
+    response = TestClient(main.app).get("/api/v1/glovis/auctions")
+
+    assert_stable_error(
+        response,
+        status=503,
+        code="proxy_unavailable",
+        retryable=True,
+    )
+    assert glovis.glovis_service is None
+
+
+def test_lifespan_does_not_initialize_glovis_without_a_request(
+    monkeypatch,
+):
     events: list[str] = []
 
-    def get_service():
-        events.append("glovis.init")
-        return service
+    async def start_scheduler():
+        events.append("scheduler.start")
+
+    async def stop_scheduler():
+        events.append("scheduler.stop")
+
+    monkeypatch.setattr(glovis, "glovis_service", None)
+    monkeypatch.setattr(main, "start_scheduler", start_scheduler)
+    monkeypatch.setattr(main, "stop_scheduler", stop_scheduler)
+
+    async def exercise_lifespan() -> None:
+        async with main.lifespan(main.app):
+            events.append("app.running")
+
+    asyncio.run(exercise_lifespan())
+
+    assert events == ["scheduler.start", "app.running", "scheduler.stop"]
+    assert glovis.glovis_service is None
+
+
+def test_lifespan_closes_a_successfully_created_glovis_service(monkeypatch):
+    service = StubGlovisService()
+    events: list[str] = []
 
     async def start_scheduler():
         events.append("scheduler.start")
@@ -499,7 +632,7 @@ def test_lifespan_initializes_glovis_before_scheduler_and_closes_after_stop(
         events.append("glovis.close")
         service.close_calls += 1
 
-    monkeypatch.setattr(glovis, "get_glovis_service", get_service)
+    monkeypatch.setattr(glovis, "glovis_service", service)
     monkeypatch.setattr(main, "start_scheduler", start_scheduler)
     monkeypatch.setattr(main, "stop_scheduler", stop_scheduler)
     monkeypatch.setattr(service, "close", close)
@@ -511,10 +644,10 @@ def test_lifespan_initializes_glovis_before_scheduler_and_closes_after_stop(
     asyncio.run(exercise_lifespan())
 
     assert events == [
-        "glovis.init",
         "scheduler.start",
         "app.running",
         "scheduler.stop",
         "glovis.close",
     ]
     assert service.close_calls == 1
+    assert glovis.glovis_service is None

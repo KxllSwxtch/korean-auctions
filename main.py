@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
+import os
+import secrets
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
+from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
 
@@ -46,13 +48,11 @@ async def lifespan(app: FastAPI):
     # doesn't pay the initialisation cost.
     from app.routes.lotte import get_lotte_service
     from app.routes.lotte_filters import get_filter_service
-    from app.routes.glovis import get_glovis_service
+    from app.routes.glovis import close_glovis_service
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
     # /filters request reuses the proven authenticated session.
     get_filter_service(main_service)
-    glovis_service = get_glovis_service()
-
     try:
         # Start background cache warming scheduler
         await start_scheduler()
@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
         try:
             await stop_scheduler()
         finally:
-            glovis_service.close()
+            close_glovis_service()
 
 
 # Создание FastAPI приложения
@@ -199,9 +199,10 @@ async def cache_stats():
         pass
 
     try:
-        from app.routes.glovis import get_glovis_service
-        svc = get_glovis_service()
-        stats.append(svc.get_cache_stats())
+        from app.routes.glovis import get_existing_glovis_service
+        svc = get_existing_glovis_service()
+        if svc is not None:
+            stats.append(svc.get_cache_stats())
     except Exception:
         pass
 
@@ -279,14 +280,6 @@ async def clear_cache():
         pass
 
     try:
-        from app.routes.glovis import get_glovis_service
-        svc = get_glovis_service()
-        svc.clear_cache()
-        cleared.append("Glovis")
-    except Exception:
-        pass
-
-    try:
         from app.routes.autohub import get_autohub_service
         svc = get_autohub_service()
         if svc and hasattr(svc, '_cache'):
@@ -309,6 +302,55 @@ async def clear_cache():
         pass
 
     return {"cleared": cleared, "message": f"Cleared cache for {len(cleared)} services"}
+
+
+def _glovis_admin_error(
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "detail": {
+                "code": code,
+                "message": message,
+                "retryable": False,
+            }
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/api/v1/internal/glovis/cache/clear", tags=["Internal Cache"])
+async def clear_glovis_cache_internal(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+):
+    """Clear only Glovis cache after secret-managed admin authorization."""
+    expected = os.getenv("GLOVIS_CACHE_ADMIN_TOKEN", "")
+    if not expected:
+        return _glovis_admin_error(
+            status_code=503,
+            code="admin_unavailable",
+            message="Glovis cache administration is not configured",
+        )
+    if not secrets.compare_digest(x_admin_token or "", expected):
+        return _glovis_admin_error(
+            status_code=403,
+            code="forbidden",
+            message="Forbidden",
+        )
+
+    from app.routes.glovis import get_existing_glovis_service
+
+    service = get_existing_glovis_service()
+    if service is not None:
+        service.clear_cache()
+    return JSONResponse(
+        content={"cleared": service is not None, "service": "Glovis"},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 if __name__ == "__main__":

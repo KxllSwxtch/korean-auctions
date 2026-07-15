@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Any, Callable, NoReturn, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -97,6 +98,13 @@ class _StableErrorRoute(APIRoute):
                 )
             except HTTPException:
                 raise
+            except GlovisUpstreamError as error:
+                return _error_response(
+                    status_code=ERROR_STATUS[error.code],
+                    code=error.code,
+                    message="Glovis provider is temporarily unavailable",
+                    retryable=True,
+                )
             except Exception:
                 return _error_response(
                     status_code=500,
@@ -114,12 +122,33 @@ router = APIRouter(
     route_class=_StableErrorRoute,
 )
 
-glovis_service = GlovisService()
+glovis_service: GlovisService | None = None
+_glovis_service_lock = threading.Lock()
 
 
 def get_glovis_service() -> GlovisService:
-    """Return the process-wide Glovis service for dependency overrides."""
+    """Lazily create the process-wide Glovis service."""
+    global glovis_service
+    if glovis_service is None:
+        with _glovis_service_lock:
+            if glovis_service is None:
+                glovis_service = GlovisService()
     return glovis_service
+
+
+def get_existing_glovis_service() -> GlovisService | None:
+    """Return an existing service without triggering proxy configuration."""
+    return glovis_service
+
+
+def close_glovis_service() -> None:
+    """Close and discard the singleton if a request successfully created it."""
+    global glovis_service
+    with _glovis_service_lock:
+        service = glovis_service
+        glovis_service = None
+    if service is not None:
+        service.close()
 
 
 def raise_upstream(error: GlovisUpstreamError) -> NoReturn:

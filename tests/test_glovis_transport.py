@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import hashlib
 import threading
 import time
-from types import SimpleNamespace
 from typing import Any
 
 from loguru import logger
@@ -97,8 +96,14 @@ def make_transport(
     overall_deadline_seconds: float = 24.0,
 ) -> GlovisTransport:
     queue = list(sessions)
+    candidate_type = getattr(transport_module, "GlovisProxyCandidate", None)
+    assert candidate_type is not None
     candidates = [
-        (f"kr-{index}", f"http://proxy-{index}.invalid:8080")
+        candidate_type(
+            country="KR",
+            egress=f"kr-{index}",
+            proxy_url=f"http://user-{index}:pass-{index}@proxy-{index}.invalid:8080",
+        )
         for index in range(1, len(sessions) + 1)
     ]
     return GlovisTransport(
@@ -116,6 +121,169 @@ def test_missing_proxy_pool_fails_closed_without_creating_direct_session() -> No
             proxy_candidates=[],
             session_factory=lambda: created.append(StubSession()) or created[-1],
         )
+    assert created == []
+
+
+def test_glovis_proxy_configuration_is_loaded_only_from_dedicated_environment() -> None:
+    loader = getattr(transport_module, "load_glovis_proxy_candidates", None)
+    assert loader is not None
+
+    candidates = loader(
+        {
+            "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+            "GLOVIS_PROXY_USERNAME": "service-account",
+            "GLOVIS_PROXY_PASSWORD": "managed-secret",
+            "GLOVIS_PROXY_COUNTRY": "kr",
+            "GLOVIS_PROXY_EGRESS_LABEL": " KR-Primary ",
+        }
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].country == "KR"
+    assert candidates[0].egress == "kr-primary"
+    assert candidates[0].proxy_url.startswith("http://")
+    assert candidates[0].identity
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {},
+        {
+            "GLOVIS_PROXY_USERNAME": "service-account",
+            "GLOVIS_PROXY_PASSWORD": "managed-secret",
+            "GLOVIS_PROXY_COUNTRY": "KR",
+            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+        },
+        {
+            "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+            "GLOVIS_PROXY_PASSWORD": "managed-secret",
+            "GLOVIS_PROXY_COUNTRY": "KR",
+            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+        },
+        {
+            "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+            "GLOVIS_PROXY_USERNAME": "service-account",
+            "GLOVIS_PROXY_COUNTRY": "KR",
+            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+        },
+    ],
+)
+def test_incomplete_glovis_proxy_environment_fails_closed(environment) -> None:
+    loader = getattr(transport_module, "load_glovis_proxy_candidates", None)
+    assert loader is not None
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        loader(environment)
+
+
+def _candidate(*, country: str, egress: str, proxy_url: str):
+    candidate_type = getattr(transport_module, "GlovisProxyCandidate", None)
+    assert candidate_type is not None
+    return candidate_type(country=country, egress=egress, proxy_url=proxy_url)
+
+
+@pytest.mark.parametrize("country", ["", "US", "KOREA", "KR-US"])
+def test_non_korean_proxy_candidates_are_rejected_before_session_creation(
+    country: str,
+) -> None:
+    created: list[StubSession] = []
+    candidate = _candidate(
+        country=country,
+        egress="kr-primary",
+        proxy_url="http://service:managed@proxy.example.invalid:8443",
+    )
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        GlovisTransport(
+            proxy_candidates=[candidate],
+            session_factory=lambda: created.append(StubSession()) or created[-1],
+        )
+
+    assert created == []
+
+
+@pytest.mark.parametrize(
+    "proxy_url",
+    [
+        "",
+        "proxy.example.invalid:8443",
+        "ftp://service:managed@proxy.example.invalid:8443",
+        "http://proxy.example.invalid:8443",
+        "http://:managed@proxy.example.invalid:8443",
+        "http://service:@proxy.example.invalid:8443",
+        "http://service:managed@proxy.example.invalid",
+        "http://service:managed@proxy.example.invalid:8443/path",
+        "http://service:managed@proxy.example.invalid:8443?region=kr",
+    ],
+)
+def test_blank_or_malformed_proxy_urls_are_rejected_before_session_creation(
+    proxy_url: str,
+) -> None:
+    created: list[StubSession] = []
+    candidate = _candidate(country="KR", egress="kr-primary", proxy_url=proxy_url)
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        GlovisTransport(
+            proxy_candidates=[candidate],
+            session_factory=lambda: created.append(StubSession()) or created[-1],
+        )
+
+    assert created == []
+
+
+@pytest.mark.parametrize(
+    "egress",
+    [
+        "",
+        "primary",
+        "http://proxy.example.invalid:8443",
+        "kr-proxy.example.invalid",
+        "kr-service-account",
+        "kr-managed-secret",
+        "kr-primary@proxy",
+    ],
+)
+def test_unsafe_or_secret_bearing_egress_labels_are_rejected(
+    egress: str,
+) -> None:
+    created: list[StubSession] = []
+    candidate = _candidate(
+        country="KR",
+        egress=egress,
+        proxy_url=(
+            "http://service-account:managed-secret@proxy.example.invalid:8443"
+        ),
+    )
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        GlovisTransport(
+            proxy_candidates=[candidate],
+            session_factory=lambda: created.append(StubSession()) or created[-1],
+        )
+
+    assert created == []
+
+
+def test_duplicate_proxy_candidate_identity_is_rejected_before_sessions() -> None:
+    created: list[StubSession] = []
+    first = _candidate(
+        country="KR",
+        egress="kr-primary",
+        proxy_url="http://service:managed@proxy.example.invalid:8443",
+    )
+    duplicate = _candidate(
+        country="kr",
+        egress="kr-secondary",
+        proxy_url="http://service:changed@proxy.example.invalid:8443",
+    )
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        GlovisTransport(
+            proxy_candidates=[first, duplicate],
+            session_factory=lambda: created.append(StubSession()) or created[-1],
+        )
+
     assert created == []
 
 
@@ -172,7 +340,13 @@ def test_token_and_api_use_same_proxy_session_and_matching_fingerprint() -> None
         ]
     )
     transport = GlovisTransport(
-        proxy_candidates=[("kr-primary", "http://redacted.invalid:8080")],
+        proxy_candidates=[
+            _candidate(
+                country="KR",
+                egress="kr-primary",
+                proxy_url="http://user:pass@redacted.invalid:8080",
+            )
+        ],
         session_factory=lambda: session,
         fingerprint_factory=lambda: "fingerprint-a",
     )
@@ -190,34 +364,36 @@ def test_token_and_api_use_same_proxy_session_and_matching_fingerprint() -> None
     ]
     assert session.calls[0]["json"] == {"fingerprint": "fingerprint-a"}
     assert session.calls[1]["headers"]["X-Fingerprint"] == "fingerprint-a"
-    assert session.proxies["https"] == "http://redacted.invalid:8080"
+    assert session.proxies["https"] == "http://user:pass@redacted.invalid:8080"
     assert session.trust_env is False
     assert "X-Fingerprint" not in session.headers
     assert not any(key.lower().startswith("sec-ch-") for key in session.headers)
     assert all(call["allow_redirects"] is False for call in session.calls)
 
 
-def test_proxy_pool_candidates_are_korean_only_and_capped_at_four(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_validated_proxy_candidates_are_capped_at_four() -> None:
+    sessions = [StubSession() for _ in range(4)]
+    available = list(sessions)
     candidates = [
-        (
-            SimpleNamespace(name=f"kr-{index}"),
-            f"http://pool-proxy-{index}.invalid:8080",
+        _candidate(
+            country="KR",
+            egress=f"kr-{index}",
+            proxy_url=(
+                f"http://user-{index}:pass-{index}@pool-proxy-{index}.invalid:8080"
+            ),
         )
         for index in range(1, 6)
     ]
-    pool = StubProxyPool(candidates)
-    sessions = [StubSession() for _ in range(4)]
-    available = list(sessions)
-    monkeypatch.setattr(transport_module, "get_proxy_pool", lambda: pool)
 
-    transport = GlovisTransport(session_factory=lambda: available.pop(0))
+    transport = GlovisTransport(
+        proxy_candidates=candidates,
+        session_factory=lambda: available.pop(0),
+    )
 
     assert len(sessions) == 4
-    assert pool.index == 3
     assert [session.proxies["https"] for session in sessions] == [
-        f"http://pool-proxy-{index}.invalid:8080" for index in range(1, 5)
+        f"http://user-{index}:pass-{index}@pool-proxy-{index}.invalid:8080"
+        for index in range(1, 5)
     ]
     assert all(session.trust_env is False for session in sessions)
     transport.close()
@@ -305,7 +481,13 @@ def test_token_is_reused_at_109_seconds_and_refreshed_at_110_seconds() -> None:
         ]
     )
     transport = GlovisTransport(
-        proxy_candidates=[("kr-1", "http://proxy-1.invalid:8080")],
+        proxy_candidates=[
+            _candidate(
+                country="KR",
+                egress="kr-1",
+                proxy_url="http://user:pass@proxy-1.invalid:8080",
+            )
+        ],
         session_factory=lambda: session,
         fingerprint_factory=lambda: "fingerprint-a",
         clock=lambda: now[0],
@@ -417,7 +599,13 @@ def test_expired_shared_deadline_stops_before_session_request() -> None:
     now = [50.0]
     session = StubSession([token_response("unused")])
     transport = GlovisTransport(
-        proxy_candidates=[("kr-1", "http://proxy-1.invalid:8080")],
+        proxy_candidates=[
+            _candidate(
+                country="KR",
+                egress="kr-1",
+                proxy_url="http://user:pass@proxy-1.invalid:8080",
+            )
+        ],
         session_factory=lambda: session,
         fingerprint_factory=lambda: "fingerprint-a",
         clock=lambda: now[0],
@@ -664,8 +852,16 @@ def test_reviewer_constructor_closes_prior_sessions_when_factory_fails() -> None
     with pytest.raises(RuntimeError, match="synthetic factory failure"):
         GlovisTransport(
             proxy_candidates=[
-                ("kr-1", "http://proxy-1.invalid:8080"),
-                ("kr-2", "http://proxy-2.invalid:8080"),
+                _candidate(
+                    country="KR",
+                    egress="kr-1",
+                    proxy_url="http://user-1:pass-1@proxy-1.invalid:8080",
+                ),
+                _candidate(
+                    country="KR",
+                    egress="kr-2",
+                    proxy_url="http://user-2:pass-2@proxy-2.invalid:8080",
+                ),
             ],
             session_factory=session_factory,
             fingerprint_factory=lambda: "fingerprint-a",
@@ -690,8 +886,16 @@ def test_reviewer_constructor_closes_all_sessions_when_fingerprint_fails() -> No
     with pytest.raises(RuntimeError, match="synthetic fingerprint failure"):
         GlovisTransport(
             proxy_candidates=[
-                ("kr-1", "http://proxy-1.invalid:8080"),
-                ("kr-2", "http://proxy-2.invalid:8080"),
+                _candidate(
+                    country="KR",
+                    egress="kr-1",
+                    proxy_url="http://user-1:pass-1@proxy-1.invalid:8080",
+                ),
+                _candidate(
+                    country="KR",
+                    egress="kr-2",
+                    proxy_url="http://user-2:pass-2@proxy-2.invalid:8080",
+                ),
             ],
             session_factory=lambda: sessions.pop(0),
             fingerprint_factory=fingerprint_factory,

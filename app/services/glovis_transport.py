@@ -9,19 +9,18 @@ from __future__ import annotations
 
 import hashlib
 import math
+import os
 from queue import Empty, Full, Queue
 import re
 import secrets
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, Mapping, TypeVar
+from urllib.parse import quote, unquote, urlsplit
 
 from loguru import logger
 import requests
-
-from app.core.proxy_config import get_proxy_pool
-
 
 T = TypeVar("T")
 JsonValue = dict[str, Any] | list[Any]
@@ -36,6 +35,10 @@ MAX_SESSIONS = 4
 
 _OUTBOUND_LIMIT = threading.BoundedSemaphore(MAX_SESSIONS)
 _SAFE_OPERATION = re.compile(r"[a-z][a-z0-9_.-]{0,31}")
+_SAFE_EGRESS = re.compile(
+    r"kr-[a-z0-9]{1,12}(?:-[a-z0-9]{1,12}){0,2}",
+    re.ASCII,
+)
 _ALLOWED_API_PATHS = frozenset(
     {
         "/api/auctions/glovis/auctions",
@@ -86,6 +89,118 @@ class GlovisProxyUnavailableError(GlovisUpstreamError):
     code = "proxy_unavailable"
 
 
+@dataclass(frozen=True)
+class GlovisProxyCandidate:
+    """Explicit Korean egress candidate with a safe diagnostics label."""
+
+    country: str
+    egress: str
+    proxy_url: str
+
+    @property
+    def identity(self) -> str:
+        parsed = urlsplit(self.proxy_url)
+        try:
+            port = parsed.port
+        except ValueError:
+            port = None
+        canonical = (
+            f"{parsed.scheme.lower()}|{unquote(parsed.username or '').lower()}|"
+            f"{(parsed.hostname or '').lower()}|{port or ''}"
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+
+
+def _normalize_proxy_candidate(
+    candidate: GlovisProxyCandidate,
+) -> GlovisProxyCandidate:
+    try:
+        country = candidate.country.strip().upper()
+        egress = candidate.egress.strip().lower()
+        proxy_url = candidate.proxy_url.strip()
+    except (AttributeError, TypeError):
+        raise GlovisProxyUnavailableError() from None
+
+    if country != "KR" or not _SAFE_EGRESS.fullmatch(egress):
+        raise GlovisProxyUnavailableError()
+
+    try:
+        parsed = urlsplit(proxy_url)
+        port = parsed.port
+    except ValueError:
+        raise GlovisProxyUnavailableError() from None
+    username = unquote(parsed.username or "").strip()
+    password = unquote(parsed.password or "").strip()
+    hostname = (parsed.hostname or "").strip().lower()
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not hostname
+        or port is None
+        or not username
+        or not password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise GlovisProxyUnavailableError()
+
+    for sensitive in (username, password, hostname):
+        normalized_sensitive = sensitive.strip().lower()
+        if len(normalized_sensitive) >= 3 and normalized_sensitive in egress:
+            raise GlovisProxyUnavailableError()
+
+    return GlovisProxyCandidate(
+        country=country,
+        egress=egress,
+        proxy_url=proxy_url,
+    )
+
+
+def load_glovis_proxy_candidates(
+    environment: Mapping[str, str] | None = None,
+) -> list[GlovisProxyCandidate]:
+    """Load the required Glovis proxy exclusively from secret-managed env."""
+    values = os.environ if environment is None else environment
+    host = values.get("GLOVIS_PROXY_HOST", "").strip()
+    username = values.get("GLOVIS_PROXY_USERNAME", "").strip()
+    password = values.get("GLOVIS_PROXY_PASSWORD", "").strip()
+    country = values.get("GLOVIS_PROXY_COUNTRY", "").strip()
+    egress = values.get("GLOVIS_PROXY_EGRESS_LABEL", "").strip()
+    if not host or not username or not password or not country or not egress:
+        raise GlovisProxyUnavailableError()
+    if any(character in host for character in ("/", "@", "?", "#")):
+        raise GlovisProxyUnavailableError()
+
+    proxy_url = (
+        f"http://{quote(username, safe='')}:{quote(password, safe='')}@{host}"
+    )
+    return [
+        _normalize_proxy_candidate(
+            GlovisProxyCandidate(
+                country=country,
+                egress=egress,
+                proxy_url=proxy_url,
+            )
+        )
+    ]
+
+
+def _validated_proxy_candidates(
+    candidates: list[GlovisProxyCandidate],
+) -> list[GlovisProxyCandidate]:
+    normalized: list[GlovisProxyCandidate] = []
+    identities: set[str] = set()
+    for candidate in candidates:
+        safe_candidate = _normalize_proxy_candidate(candidate)
+        if safe_candidate.identity in identities:
+            raise GlovisProxyUnavailableError()
+        identities.add(safe_candidate.identity)
+        normalized.append(safe_candidate)
+    if not normalized:
+        raise GlovisProxyUnavailableError()
+    return normalized
+
+
 @dataclass
 class _SessionSlot:
     egress: str
@@ -116,19 +231,17 @@ class GlovisTransport:
     def __init__(
         self,
         *,
-        proxy_candidates: list[tuple[str, str]] | None = None,
+        proxy_candidates: list[GlovisProxyCandidate] | None = None,
         session_factory: Callable[[], requests.Session] = requests.Session,
         fingerprint_factory: Callable[[], str] | None = None,
         clock: Callable[[], float] = time.monotonic,
         overall_deadline_seconds: float = OVERALL_DEADLINE_SECONDS,
     ) -> None:
-        candidates = (
-            self._proxy_candidates_from_pool()
+        candidates = _validated_proxy_candidates(
+            load_glovis_proxy_candidates()
             if proxy_candidates is None
             else proxy_candidates
         )
-        if not candidates:
-            raise GlovisProxyUnavailableError()
         if (
             not math.isfinite(overall_deadline_seconds)
             or overall_deadline_seconds <= 0
@@ -147,12 +260,17 @@ class GlovisTransport:
         slots: list[_SessionSlot] = []
         make_fingerprint = fingerprint_factory or self._new_fingerprint
         try:
-            for egress, proxy_url in selected:
+            for candidate in selected:
                 session: requests.Session | None = None
                 try:
                     session = session_factory()
                     session.trust_env = False
-                    session.proxies.update({"http": proxy_url, "https": proxy_url})
+                    session.proxies.update(
+                        {
+                            "http": candidate.proxy_url,
+                            "https": candidate.proxy_url,
+                        }
+                    )
                     session.headers.update(self._base_headers())
                     fingerprint = make_fingerprint()
                 except Exception:
@@ -160,7 +278,7 @@ class GlovisTransport:
                         self._close_session(session)
                     raise
                 slot = _SessionSlot(
-                    egress=egress,
+                    egress=candidate.egress,
                     session=session,
                     fingerprint=fingerprint,
                 )
@@ -188,18 +306,6 @@ class GlovisTransport:
     @staticmethod
     def _new_fingerprint() -> str:
         return hashlib.sha256(secrets.token_bytes(32)).hexdigest()
-
-    @staticmethod
-    def _proxy_candidates_from_pool() -> list[tuple[str, str]]:
-        pool = get_proxy_pool()
-        count = min(len(pool), MAX_SESSIONS)
-        candidates: list[tuple[str, str]] = []
-        for index in range(count):
-            entry, proxy_url = pool.current() if index == 0 else pool.advance()
-            candidate = (entry.name, proxy_url)
-            if candidate not in candidates:
-                candidates.append(candidate)
-        return candidates
 
     @staticmethod
     def _has_token_cookie(session: requests.Session) -> bool:
