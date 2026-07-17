@@ -318,6 +318,34 @@ def test_filter_options_maps_all_search_form_fields_and_exact_params():
     ]
 
 
+def test_filter_options_accepts_live_provider_fuel_types_field():
+    payload = valid_search_form()
+    payload["fuel_types"] = payload.pop("fuels")
+    service = GlovisService(
+        transport=StubTransport({SEARCH_FORM_PATH: payload})
+    )
+
+    result = service.get_filter_options(atn="1102", acc="20")
+
+    assert result.filters.fuels[0].model_dump() == {
+        "value": "Gasoline",
+        "label": "Gasoline",
+        "count": 1,
+    }
+
+
+def test_filter_options_normalizes_live_null_counts_to_zero():
+    payload = valid_search_form()
+    payload["colors"][0]["count"] = None
+    service = GlovisService(
+        transport=StubTransport({SEARCH_FORM_PATH: payload})
+    )
+
+    result = service.get_filter_options(atn="1102", acc="20")
+
+    assert result.filters.colors[0].count == 0
+
+
 def test_filter_options_rejects_missing_or_wrong_shape_fields():
     missing = valid_search_form()
     missing.pop("colors")

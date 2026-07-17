@@ -22,6 +22,14 @@ def test_live_auctions_list_and_detail_are_semantically_valid():
             if not auctions:
                 pytest.fail("live Glovis auction list was empty", pytrace=False)
             auction = auctions[0]
+            filters = service.get_filter_options(
+                atn=auction.number,
+                acc=auction.acc,
+            ).filters
+            if not filters.fuels:
+                pytest.fail("live Glovis fuel filters were empty", pytrace=False)
+            if not filters.sort_orders:
+                pytest.fail("live Glovis sort filters were empty", pytrace=False)
             cars = service.get_cars(
                 GlovisCarsQuery(
                     atn=auction.number,

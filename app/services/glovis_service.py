@@ -77,6 +77,9 @@ _SEARCH_FORM_FIELDS = (
     "rooms",
     "bid_statuses",
 )
+_SEARCH_FORM_ALIASES = {
+    "fuels": "fuel_types",
+}
 _DETAIL_MAPPING_FIELDS = (
     "properties",
     "performance",
@@ -484,6 +487,8 @@ class GlovisService:
             value = _require_nonempty_string(item.get("value"))
             label = _require_nonempty_string(item.get("label"))
             count = item.get("count", 0)
+            if count is None:
+                count = 0
             if type(count) is not int or count < 0 or value in seen:
                 raise _invalid_response()
             seen.add(value)
@@ -597,9 +602,14 @@ class GlovisService:
         payload = _require_mapping(result.value)
         normalized: dict[str, list[GlovisOption]] = {}
         for name in _SEARCH_FORM_FIELDS:
-            if name not in payload:
+            provider_name = (
+                name
+                if name in payload
+                else _SEARCH_FORM_ALIASES.get(name)
+            )
+            if provider_name is None or provider_name not in payload:
                 raise _invalid_response()
-            normalized[name] = self._normalize_options(payload[name])
+            normalized[name] = self._normalize_options(payload[provider_name])
         return (
             GlovisFilterOptionsResponse(filters=GlovisSearchForm(**normalized)),
             result.egress,
