@@ -28,6 +28,38 @@ services:
       # Set in the Render dashboard (sync: false in YAML to avoid logging the secret).
       - key: AUTOHUB_SNAPSHOT_ADMIN_TOKEN
         sync: false
+      # Shared auction proxy. Encar is proxy-OPTIONAL (api.encar.com answers
+      # non-Korean IPs); HappyCar is proxy-REQUIRED and fails closed without
+      # these. Secrets: set in the Render dashboard. sync:false keeps the
+      # value dashboard-managed and out of the blueprint and build logs.
+      - key: AUCTION_PROXY_HOST
+        sync: false
+      - key: AUCTION_PROXY_USERNAME
+        sync: false
+      - key: AUCTION_PROXY_PASSWORD
+        sync: false
+      # Egress gate for AsyncHttpClient consumers (Encar catalog, /api/catalog,
+      # /api/nav, Encar trucks, Green equipment). Direct egress is the
+      # verified-good default and avoids spending metered proxy bandwidth on
+      # high-volume catalog traffic. Flip to "true" only if Encar begins
+      # blocking Render addresses — no code change or redeploy required.
+      # Note this does NOT disable HappyCar's proxy: happycar_service.py calls
+      # get_proxy_pool() directly and never consults USE_PROXY.
+      - key: USE_PROXY
+        value: "false"
+      # Dedicated Korean egress for DB Auto Glovis. Currently set in the
+      # dashboard but previously undeclared here — the same latent gap that
+      # caused the AUCTION_PROXY_* outage. See docs/glovis-dbauto-deployment.md.
+      - key: GLOVIS_PROXY_HOST
+        sync: false
+      - key: GLOVIS_PROXY_USERNAME
+        sync: false
+      - key: GLOVIS_PROXY_PASSWORD
+        sync: false
+      - key: GLOVIS_PROXY_COUNTRY
+        sync: false
+      - key: GLOVIS_PROXY_EGRESS_LABEL
+        sync: false
     healthCheckPath: /health
     disk:
       name: autohub-cache

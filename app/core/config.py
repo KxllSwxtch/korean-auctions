@@ -52,6 +52,21 @@ class Settings(BaseSettings):
     glovis_proxy_country: Optional[str] = None
     glovis_proxy_egress_label: Optional[str] = None
 
+    # Shared auction proxy for Encar (optional) and HappyCar (required).
+    # Values stay secret-managed; declaring them lets Pydantic accept the
+    # deployment environment and lets startup validation report which names
+    # are missing. app/core/proxy_config.py deliberately keeps reading
+    # os.getenv directly — get_settings() is lru_cache'd with a module-level
+    # instance built at import, so routing it through Settings would freeze
+    # the configuration at import time. These declarations are for validation
+    # and reporting only.
+    use_proxy: bool = False
+    auction_proxy_host: Optional[str] = None
+    auction_proxy_username: Optional[str] = None
+    auction_proxy_password: Optional[str] = None
+    auction_proxy_name: str = "auction-proxy"
+    auction_proxy_supports_sticky: bool = False
+
     # User Agent для запросов
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
