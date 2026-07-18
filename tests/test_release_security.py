@@ -23,6 +23,8 @@ LEGACY_PROVIDER_FIELDS = {
     "happycar_password",
     "kcar_username",
     "kcar_password",
+    "auction_proxy_username",
+    "auction_proxy_password",
 }
 LEGACY_PROVIDER_ENV = {name.upper() for name in LEGACY_PROVIDER_FIELDS}
 

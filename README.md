@@ -167,6 +167,23 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `HAPPYCAR_USERNAME`, `HAPPYCAR_PASSWORD`
 - `KCAR_USERNAME`, `KCAR_PASSWORD`
 
+### Прокси-доступ (egress)
+
+- `AUCTION_PROXY_HOST`, `AUCTION_PROXY_USERNAME`, `AUCTION_PROXY_PASSWORD` —
+  общий пул прокси. **Обязателен для HappyCar** (сайт требует корейского IP и
+  входа в систему): без него провайдер отключается. **Опционален для Encar** —
+  `api.encar.com` отвечает на запросы с любых IP, поэтому `/api/catalog`,
+  `/api/nav` и `/api/v1/encar/*` работают напрямую.
+- `USE_PROXY` (по умолчанию `false`) — переключатель egress для потребителей
+  `AsyncHttpClient`. При `false` трафик Encar идёт напрямую, что экономит
+  платный трафик прокси. Установите `true`, только если Encar начнёт блокировать
+  IP-адреса Render — перевыкладка не требуется.
+- `GLOVIS_PROXY_*` — отдельный корейский egress для DB Auto Glovis, всегда
+  обязателен.
+
+Проверить, какие переменные отсутствуют, можно без раскрытия значений:
+`GET /api/v1/diagnostics/egress`. Те же данные пишутся в лог при старте.
+
 Полный контракт переменных, порядок развёртывания и поведение при отсутствии
 секретов описаны в `docs/glovis-dbauto-deployment.md`.
 
