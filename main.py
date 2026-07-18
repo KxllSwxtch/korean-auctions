@@ -29,6 +29,7 @@ from app.routes import (
     green_equipment,
     happycar,
     exchange_rate,
+    diagnostics,
 )
 from app.core.config import get_settings
 from app.core.logging import setup_logging
@@ -46,9 +47,15 @@ async def lifespan(app: FastAPI):
     """Application lifespan: eagerly init services, start background warming."""
     # Eagerly initialise service singletons so the first user request
     # doesn't pay the initialisation cost.
+    from app.core.startup_checks import log_egress_configuration
     from app.routes.lotte import get_lotte_service
     from app.routes.lotte_filters import get_filter_service
     from app.routes.glovis import close_glovis_service
+    from app.routes.encar_proxy import close_encar_proxy_client
+
+    # Report missing egress variables before any route can 502 over them.
+    log_egress_configuration()
+
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
     # /filters request reuses the proven authenticated session.
@@ -62,6 +69,7 @@ async def lifespan(app: FastAPI):
         try:
             await stop_scheduler()
         finally:
+            await close_encar_proxy_client()
             close_glovis_service()
 
 
@@ -142,6 +150,9 @@ app.include_router(happycar.router, prefix="/api/v1/happycar", tags=["HappyCar I
 
 # SMMotors routes - Live USD/KRW and EUR/KRW from Naver
 app.include_router(exchange_rate.router, prefix="/api/v1/smmotors", tags=["SMMotors"])
+
+# Read-only deployment diagnostics - egress readiness by provider
+app.include_router(diagnostics.router, prefix="/api/v1/diagnostics", tags=["Diagnostics"])
 
 
 @app.get("/")

@@ -4,12 +4,13 @@
 
 import asyncio
 import os
+import warnings
 import aiohttp
 from typing import Optional, Dict, Any, Union
 from urllib.parse import urljoin
 
 from app.core.logging import get_logger
-from app.core.proxy_config import ProxyPool, get_proxy_pool
+from app.core.proxy_config import ProxyConfigurationError, ProxyPool, get_proxy_pool
 
 logger = get_logger("async_http_client")
 
@@ -41,27 +42,69 @@ class AsyncHttpResponse:
 class AsyncHttpClient:
     """Асинхронный HTTP клиент с поддержкой прокси"""
 
-    def __init__(self, timeout: int = 30, use_proxy: bool = False):
+    def __init__(
+        self,
+        timeout: int = 30,
+        use_proxy: bool = False,
+        proxy_required: bool = False,
+        verify_ssl: bool = True,
+    ):
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: Optional[aiohttp.ClientSession] = None
         self.use_proxy = use_proxy
+        self.proxy_required = proxy_required
+        self.verify_ssl = verify_ssl
         self._pool: Optional[ProxyPool] = None
 
         # Preserve the legacy USE_PROXY env gate: callers pass use_proxy=True,
         # but the pool is only built if USE_PROXY=true is also set.
-        if use_proxy and os.getenv("USE_PROXY", "false").lower() == "true":
+        if not use_proxy or os.getenv("USE_PROXY", "false").lower() != "true":
+            if use_proxy:
+                logger.info("AsyncHttpClient egress=direct (USE_PROXY gate off)")
+            return
+
+        # Proxy-optional callers must degrade to direct egress instead of
+        # failing closed. get_proxy_pool() runs at module import for several
+        # service singletons, and start.sh uses `gunicorn --preload`, so an
+        # unhandled raise here kills the whole service before it forks.
+        try:
             self._pool = get_proxy_pool()
-            logger.info(
-                f"🔐 AsyncHttpClient pool: {self._pool.names} "
-                f"(round-robin per request)"
+        except ProxyConfigurationError:
+            if proxy_required:
+                logger.error(
+                    "AsyncHttpClient proxy is REQUIRED but unconfigured; set "
+                    "AUCTION_PROXY_HOST, AUCTION_PROXY_USERNAME and "
+                    "AUCTION_PROXY_PASSWORD in the deployment environment"
+                )
+                raise
+            logger.warning(
+                "AsyncHttpClient egress=direct: USE_PROXY=true but the auction "
+                "proxy is unconfigured (missing AUCTION_PROXY_HOST, "
+                "AUCTION_PROXY_USERNAME or AUCTION_PROXY_PASSWORD). This client "
+                "is proxy-optional, so requests continue without a proxy."
             )
+            return
+
+        logger.info(
+            f"🔐 AsyncHttpClient pool: {self._pool.names} "
+            f"(round-robin per request)"
+        )
+
+    @property
+    def egress_mode(self) -> str:
+        """Report 'proxy' or 'direct' for diagnostics. Never exposes values."""
+        return "proxy" if self._pool is not None else "direct"
 
     @property
     async def session(self) -> aiohttp.ClientSession:
         """Получение или создание сессии"""
         if self._session is None or self._session.closed:
             connector = aiohttp.TCPConnector(
-                ssl=False, limit=100, limit_per_host=30  # Отключаем проверку SSL
+                ssl=self.verify_ssl,
+                limit=100,
+                limit_per_host=30,
+                ttl_dns_cache=300,
+                enable_cleanup_closed=True,
             )
             self._session = aiohttp.ClientSession(
                 connector=connector, timeout=self.timeout
@@ -222,8 +265,14 @@ class AsyncHttpClient:
 
     def __del__(self):
         """Деструктор"""
-        if hasattr(self, "_session") and self._session and not self._session.closed:
-            try:
-                asyncio.create_task(self.close())
-            except:
-                pass
+        # asyncio.create_task() raises when no loop is running, which is the
+        # normal case during interpreter teardown. Warn instead of scheduling
+        # work that cannot run: the owning service must await close().
+        session = getattr(self, "_session", None)
+        if session is not None and not session.closed:
+            warnings.warn(
+                "AsyncHttpClient was garbage-collected with an open session; "
+                "the owning service should await close() during shutdown",
+                ResourceWarning,
+                stacklevel=2,
+            )
