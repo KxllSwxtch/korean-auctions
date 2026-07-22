@@ -25,8 +25,20 @@ from app.services.heydealer_service import HeyDealerService
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
 from app.services.heydealer_client_filter import client_filter
+from app.core.proxy_config import get_heydealer_proxies
 
 logger = logging.getLogger(__name__)
+
+
+def _hd_get(url, **kwargs):
+    """requests.get через выделенный корейский прокси HeyDealer (анти-throttle).
+
+    Внутри вызывает requests.request, чтобы глобальная замена
+    `requests.get -> _hd_get` не приводила к рекурсии. При неконфигурированном
+    прокси get_heydealer_proxies() вернёт None и запрос пойдёт напрямую.
+    """
+    kwargs.setdefault("proxies", get_heydealer_proxies())
+    return requests.request("GET", url, **kwargs)
 
 
 def is_valid_hash_id(value: str) -> bool:
@@ -204,7 +216,7 @@ async def get_heydealer_cars(
                 gen_params.pop("brand", None)
                 
                 logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = requests.get(
+                gen_response = _hd_get(
                     "https://api.heydealer.com/v2/dealers/web/cars/",
                     params=gen_params,
                     headers=headers,
@@ -236,7 +248,7 @@ async def get_heydealer_cars(
             full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
             logger.info(f"🔍 Полный URL запроса: {full_url}")
             
-            response = requests.get(
+            response = _hd_get(
                 "https://api.heydealer.com/v2/dealers/web/cars/",
                 params=params,
                 headers=headers,
@@ -411,7 +423,7 @@ async def get_normalized_heydealer_cars(
         }
 
         # Выполняем запрос
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             headers=headers,
@@ -487,7 +499,7 @@ async def get_heydealer_status(
             }
 
         # Проверяем доступность API
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params={"page": 1, "type": "auction", "is_subscribed": "false"},
             headers=headers,
@@ -679,7 +691,7 @@ async def get_filtered_cars(
                 gen_params.pop("brand", None)
                 
                 logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = requests.get(
+                gen_response = _hd_get(
                     "https://api.heydealer.com/v2/dealers/web/cars/",
                     params=gen_params,
                     headers=headers,
@@ -696,7 +708,7 @@ async def get_filtered_cars(
             logger.info(f"Model group expansion для {model_group}: получено {len(cars_data)} автомобилей из {len(generation_ids)} поколений")
         else:
             # Обычный запрос
-            response = requests.get(
+            response = _hd_get(
                 "https://api.heydealer.com/v2/dealers/web/cars/",
                 params=params,
                 headers=headers,
@@ -948,7 +960,7 @@ async def get_heydealer_car_detail_with_tech_sheet(
         def _fetch_json(url, params=None):
             """Блокирующий GET, разбирающий тело только при 200 и валидном JSON."""
             try:
-                response = requests.get(
+                response = _hd_get(
                     url,
                     params=params,
                     headers=headers,
@@ -1171,7 +1183,7 @@ async def get_heydealer_car_detail_basic(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1315,7 +1327,7 @@ async def get_heydealer_car_detail_direct(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1386,7 +1398,7 @@ async def get_heydealer_car_raw(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1462,7 +1474,7 @@ async def get_heydealer_car_simple(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1548,7 +1560,7 @@ async def debug_heydealer_car(
             }
 
         # Прямой запрос к API
-        response = requests.get(
+        response = _hd_get(
             f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/",
             headers=headers,
             cookies=cookies,
@@ -1609,7 +1621,7 @@ async def get_heydealer_car_detail_direct_json(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1675,7 +1687,7 @@ async def get_heydealer_car_debug_json(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = requests.get(detail_url, headers=headers, cookies=cookies)
+        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1914,7 +1926,7 @@ async def get_brands_direct():
             "is_previously_bid": "false",
         }
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/car_meta/brands/",
             params=params,
             cookies=cookies,
@@ -1984,7 +1996,7 @@ async def get_brand_models_direct(brand_hash_id: str):
             "is_previously_bid": "false",
         }
 
-        response = requests.get(
+        response = _hd_get(
             f"https://api.heydealer.com/v2/dealers/web/car_meta/brands/{brand_hash_id}/",
             params=params,
             cookies=cookies,
@@ -2068,7 +2080,7 @@ async def get_filtered_cars_direct(
         if grade:
             params["grade"] = grade
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             cookies=cookies,
@@ -2733,7 +2745,7 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         }
         
         # Выполняем запрос
-        response = requests.get(
+        response = _hd_get(
             diagram_url,
             params=params,
             headers=headers,
@@ -2758,7 +2770,7 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         try:
             logger.info(f"Fetching car details for actual damage data")
             detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-            detail_response = requests.get(detail_url, headers=headers, cookies=cookies, timeout=30)
+            detail_response = _hd_get(detail_url, headers=headers, cookies=cookies, timeout=30)
             
             if detail_response.status_code == 200:
                 car_details = detail_response.json()

@@ -38,6 +38,19 @@ services:
         sync: false
       - key: AUCTION_PROXY_PASSWORD
         sync: false
+      # Dedicated Korean residential proxy for HeyDealer (anti-throttle on the
+      # single shared dealer account/IP). Sticky-session provider: keep the
+      # session-<id> inside the username so every request reuses one exit IP —
+      # HeyDealer binds its session cookie to the login IP. Secrets: set in the
+      # Render dashboard (sync:false). Unset -> HeyDealer uses direct egress.
+      - key: HEYDEALER_PROXY_HOST
+        sync: false
+      - key: HEYDEALER_PROXY_PORT
+        sync: false
+      - key: HEYDEALER_PROXY_USERNAME
+        sync: false
+      - key: HEYDEALER_PROXY_PASSWORD
+        sync: false
       # Egress gate for AsyncHttpClient consumers (Encar catalog, /api/catalog,
       # /api/nav, Encar trucks, Green equipment). Direct egress is the
       # verified-good default and avoids spending metered proxy bandwidth on

@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from loguru import logger
 
+from app.core.proxy_config import get_heydealer_proxies
+
 
 class HeyDealerAuthService:
     """Сервис для управления авторизацией в HeyDealer"""
@@ -54,6 +56,13 @@ class HeyDealerAuthService:
         """Создает requests.Session с базовыми headers для автоматического управления cookies."""
         session = requests.Session()
         session.headers.update(self.base_headers)
+        # Весь HeyDealer-трафик идёт через выделенный корейский проксирующий
+        # egress (анти-throttle на единственном аккаунте/IP). Sticky-сессия в
+        # username гарантирует один exit IP на всю сессию, иначе cookie логина,
+        # привязанный к IP, будет отклонён при ротации.
+        proxies = get_heydealer_proxies()
+        if proxies:
+            session.proxies.update(proxies)
         return session
 
     def get_csrf_token(self) -> Optional[str]:
@@ -216,7 +225,11 @@ class HeyDealerAuthService:
             user_url = f"https://api.heydealer.com/v2/dealers/web/users/{user_hash_id}/"
 
             response = requests.get(
-                user_url, cookies=cookies, headers=headers, timeout=30
+                user_url,
+                cookies=cookies,
+                headers=headers,
+                timeout=30,
+                proxies=get_heydealer_proxies(),
             )
 
             if response.status_code == 200:

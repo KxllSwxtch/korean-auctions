@@ -130,3 +130,26 @@ def get_proxy_config() -> Optional[Dict[str, str]]:
     if not use_proxy:
         return None
     return get_proxy_pool().current_dict()
+
+
+def get_heydealer_proxies() -> Optional[Dict[str, str]]:
+    """Dedicated Korean proxy for HeyDealer upstream traffic (anti-throttle).
+
+    Independent of the shared AUCTION_PROXY pool. Reads env directly (like the
+    rest of this module) so the configuration is never frozen at import time.
+    Returns a requests-style ``{"http": url, "https": url}`` mapping, or ``None``
+    when unconfigured (callers then fall back to direct egress).
+
+    The provider embeds a fixed ``session-<id>`` in the username, so every
+    request reuses one sticky exit IP — required because HeyDealer ties its
+    session cookies to the login IP, and a rotating IP would 401 mid-session.
+    """
+    host = os.getenv("HEYDEALER_PROXY_HOST", "").strip()
+    port = os.getenv("HEYDEALER_PROXY_PORT", "").strip()
+    user = os.getenv("HEYDEALER_PROXY_USERNAME", "").strip()
+    password = os.getenv("HEYDEALER_PROXY_PASSWORD", "").strip()
+    if not host or not user or not password:
+        return None
+    hostport = f"{host}:{port}" if port else host
+    url = f"http://{quote(user, safe='')}:{quote(password, safe='')}@{hostport}"
+    return {"http": url, "https": url}

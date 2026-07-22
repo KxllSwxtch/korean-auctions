@@ -18,12 +18,22 @@ from app.models.heydealer import (
 )
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
+from app.core.proxy_config import get_heydealer_proxies
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 parser = HeyDealerParser()
+
+
+def _hd_get(url, **kwargs):
+    """requests.get через выделенный корейский прокси HeyDealer (анти-throttle).
+
+    Через requests.request, чтобы замена `requests.get -> _hd_get` не рекурсила.
+    """
+    kwargs.setdefault("proxies", get_heydealer_proxies())
+    return requests.request("GET", url, **kwargs)
 
 # Removed hardcoded headers and cookies - using auth service instead
 
@@ -49,7 +59,7 @@ async def get_brands():
             "is_previously_bid": "false",
         }
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/car_meta/brands/",
             params=params,
             headers=headers,
@@ -105,7 +115,7 @@ async def get_brand_models(brand_hash_id: str):
             "is_previously_bid": "false",
         }
 
-        response = requests.get(
+        response = _hd_get(
             f"https://api.heydealer.com/v2/dealers/web/car_meta/brands/{brand_hash_id}/",
             params=params,
             headers=headers,
@@ -168,7 +178,7 @@ async def get_model_generations(model_group_hash_id: str):
         logger.info(f"📡 Отправка запроса к HeyDealer: {url}")
         logger.info(f"📋 Параметры: {params}")
 
-        response = requests.get(
+        response = _hd_get(
             url,
             params=params,
             headers=headers,
@@ -221,7 +231,7 @@ async def get_model_configurations(model_hash_id: str):
             "model": model_hash_id,
         }
 
-        response = requests.get(
+        response = _hd_get(
             f"https://api.heydealer.com/v2/dealers/web/car_meta/models/{model_hash_id}/",
             params=params,
             headers=headers,
@@ -279,7 +289,7 @@ async def search_cars(
             params["grade"] = grade
             logger.info(f"🔍 Поиск автомобилей с grade={grade}")
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             headers=headers,
@@ -314,7 +324,7 @@ async def get_available_filters():
                 detail="Ошибка авторизации HeyDealer"
             )
         
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/auction_filter/",
             headers=headers,
             cookies=cookies,
@@ -356,7 +366,7 @@ async def advanced_search_cars(filters: HeyDealerAdvancedFilterParams):
             if isinstance(value, list):
                 params[key] = value  # requests автоматически обработает списки
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             headers=headers,
@@ -490,7 +500,7 @@ async def advanced_search_cars_get(
                 # Разделяем по запятой и добавляем как список
                 params[key] = [item.strip() for item in value.split(",")]
 
-        response = requests.get(
+        response = _hd_get(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             headers=headers,

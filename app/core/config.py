@@ -52,6 +52,16 @@ class Settings(BaseSettings):
     glovis_proxy_country: Optional[str] = None
     glovis_proxy_egress_label: Optional[str] = None
 
+    # Dedicated Korean residential proxy for HeyDealer (anti-throttle on the
+    # single shared dealer account/IP). Values stay secret-managed in the Render
+    # dashboard; declaring them lets Pydantic accept the environment. The proxy
+    # itself is read via app/core/proxy_config.get_heydealer_proxies() (os.getenv
+    # directly) so it is never frozen at import time. Unset -> direct egress.
+    heydealer_proxy_host: Optional[str] = None
+    heydealer_proxy_port: Optional[str] = None
+    heydealer_proxy_username: Optional[str] = None
+    heydealer_proxy_password: Optional[str] = None
+
     # Shared auction proxy for Encar (optional) and HappyCar (required).
     # Values stay secret-managed; declaring them lets Pydantic accept the
     # deployment environment and lets startup validation report which names
