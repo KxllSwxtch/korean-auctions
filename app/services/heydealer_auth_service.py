@@ -7,6 +7,7 @@ import json
 import os
 import secrets
 import string
+import threading
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from loguru import logger
@@ -39,6 +40,15 @@ class HeyDealerAuthService:
 
         # Создаем директорию для кэша если не существует
         os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
+
+        # In-process single-flight + короткий кэш валидации, чтобы под нагрузкой
+        # параллельные запросы не устраивали login-storm и не делали живой
+        # validate_session round-trip на КАЖДЫЙ запрос (это и приводит к тому,
+        # что часть пользователей видит пустой список).
+        self._login_lock = threading.Lock()
+        self._cached_session: Optional[Dict] = None
+        self._validated_until: Optional[datetime] = None
+        self._validation_ttl = timedelta(seconds=60)
 
     def _create_session(self) -> requests.Session:
         """Создает requests.Session с базовыми headers для автоматического управления cookies."""
@@ -244,11 +254,24 @@ class HeyDealerAuthService:
             return None
 
     def save_session(self, session_data: Dict):
-        """Сохраняет данные сессии"""
+        """Атомарно сохраняет данные сессии.
+
+        Пишем во временный файл и делаем os.replace: параллельные воркеры,
+        читающие session_file, никогда не увидят усечённый JSON (частичная
+        запись раньше приводила к json.load -> None -> лишний повторный логин).
+        """
         try:
-            with open(self.session_file, "w", encoding="utf-8") as f:
+            os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
+            tmp_path = f"{self.session_file}.{os.getpid()}.tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(session_data, f, ensure_ascii=False, indent=2)
-            logger.info("Сессия сохранена")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.session_file)
+            # Обновляем in-memory кэш и помечаем сессию как только что валидную.
+            self._cached_session = session_data
+            self._validated_until = datetime.now() + self._validation_ttl
+            logger.info("Сессия сохранена (атомарно)")
         except Exception as e:
             logger.error(f"Ошибка сохранения сессии: {e}")
 
@@ -260,28 +283,63 @@ class HeyDealerAuthService:
             Tuple[cookies, headers] или (None, None) при ошибке
         """
         try:
-            # Пытаемся загрузить сохраненную сессию
+            # Быстрый путь: недавно провалидированная сессия из памяти — без сети.
+            if (
+                self._cached_session
+                and self._validated_until
+                and datetime.now() < self._validated_until
+            ):
+                return (
+                    self._cached_session.get("cookies"),
+                    self._cached_session.get("headers"),
+                )
+
+            # Пытаемся загрузить сохраненную сессию (с диска — свежая межпроцессно)
             session_data = self.load_session()
 
             # Если сессия есть, проверяем её валидность
             if session_data and self.validate_session(session_data):
                 logger.info("Используем сохраненную валидную сессию")
+                self._cached_session = session_data
+                self._validated_until = datetime.now() + self._validation_ttl
                 return session_data.get("cookies"), session_data.get("headers")
 
-            # Если сессии нет или она невалидна, создаем новую
-            logger.info("Создаю новую сессию...")
-            session_data = self.login()
+            # Сессии нет или она невалидна — логинимся под single-flight локом,
+            # чтобы параллельные запросы не устраивали login-storm и не ротировали
+            # cookie друг у друга.
+            with self._login_lock:
+                # Пока ждали лок, другой поток мог уже создать валидную сессию.
+                session_data = self.load_session()
+                if session_data and self.validate_session(session_data):
+                    self._cached_session = session_data
+                    self._validated_until = datetime.now() + self._validation_ttl
+                    return session_data.get("cookies"), session_data.get("headers")
+
+                logger.info("Создаю новую сессию...")
+                session_data = self.login()  # save_session внутри обновит кэш
 
             if session_data:
                 logger.info("✅ Новая сессия создана успешно")
                 return session_data.get("cookies"), session_data.get("headers")
-            else:
-                logger.error("❌ Не удалось создать новую сессию")
-                return None, None
+
+            logger.error("❌ Не удалось создать новую сессию")
+            return None, None
 
         except Exception as e:
             logger.error(f"Ошибка получения валидной сессии: {e}")
             return None, None
+
+    def get_headers_and_cookies(
+        self,
+    ) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """Как get_valid_session, но в порядке (headers, cookies).
+
+        Именно так его ожидают вызовы в HeyDealerService (например, при запросе
+        технического листа). Раньше метод отсутствовал — вызов падал с
+        AttributeError, из-за чего технический лист через сервис всегда 404'ил.
+        """
+        cookies, headers = self.get_valid_session()
+        return headers, cookies
 
 
 # Глобальный экземпляр сервиса

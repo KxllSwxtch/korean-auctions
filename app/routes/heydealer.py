@@ -252,22 +252,35 @@ async def get_heydealer_cars(
 
             if response.status_code == 200:
                 cars_data = response.json()
-                
+
                 # Извлекаем информацию о пагинации из заголовков
-                total_count = int(response.headers.get("X-Pagination-Count", 0))
-                page_size = int(response.headers.get("X-Pagination-Page-Size", 20))
+                x_pagination_count = int(
+                    response.headers.get("X-Pagination-Count", 0) or 0
+                )
+                page_size = (
+                    int(response.headers.get("X-Pagination-Page-Size", 20) or 20)
+                    or 20
+                )
 
-                # Если total_count = 0, это означает бесконечную прокрутку
-                if total_count == 0:
-                    link_header = response.headers.get("Link", "")
-                    has_next_page = 'rel="next"' in link_header
+                # Лента аукциона HeyDealer работает как бесконечная прокрутка и
+                # часто не отдаёт реальный total. Определяем «есть ли следующая
+                # страница» устойчиво: доверяем заголовку Link, но полную страницу
+                # тоже считаем признаком «скорее всего есть ещё», чтобы
+                # отсутствующий/срезанный Link никогда не схлопывал весь список до
+                # одной страницы (иначе пропадают авто, которые есть в upstream).
+                link_header = response.headers.get("Link", "")
+                has_next_page = (
+                    'rel="next"' in link_header or len(cars_data) == page_size
+                )
 
-                    if has_next_page:
-                        estimated_total = len(cars_data) + (page * page_size)
-                    else:
-                        estimated_total = len(cars_data) + ((page - 1) * page_size)
-
-                    total_count = estimated_total
+                if x_pagination_count > 0:
+                    total_count = x_pagination_count
+                elif has_next_page:
+                    # Держим пагинацию открытой: гарантируем total_pages > page.
+                    total_count = page * page_size + 1
+                else:
+                    # Настоящая последняя страница — отдаём накопленный итог.
+                    total_count = (page - 1) * page_size + len(cars_data)
             else:
                 logger.error(
                     f"Ошибка получения автомобилей HeyDealer: {response.status_code} - {response.text}"
@@ -715,8 +728,20 @@ async def get_filtered_cars(
         normalized_cars = []
         for car_data in cars_data:
             try:
-                # Создаем Pydantic объект
-                pydantic_car = HeyDealerCar(**car_data)
+                # Пытаемся строго распарсить; при несоответствии схемы (частичные
+                # данные у импортных/завершённых лотов) откатываемся к устойчивому
+                # парсеру из /cars, чтобы не терять авто, которые есть в upstream.
+                try:
+                    pydantic_car = HeyDealerCar(**car_data)
+                except Exception:
+                    pydantic_car = parser._parse_single_car(car_data)
+                    if not pydantic_car:
+                        logger.warning(
+                            "Пропущен автомобиль "
+                            f"{car_data.get('hash_id', 'unknown')}: не удалось "
+                            "распарсить ни строго, ни устойчиво"
+                        )
+                        continue
 
                 # Нормализуем данные через парсер
                 normalized_car = parser.normalize_car_data(pydantic_car)
@@ -809,15 +834,40 @@ async def get_filtered_cars(
                 logger.error(f"Ошибка обработки автомобиля: {e}")
                 continue
 
-        # Применяем пагинацию если нужно
-        total_count = len(normalized_cars)
+        # Пагинация
         page_size = 20
-        
-        # Если это расширение model_group, применяем пагинацию к объединенным результатам
+
         if needs_model_group_expansion:
+            # Объединённые результаты по всем поколениям: общий счётчик реальный,
+            # затем нарезаем по объединённому списку.
+            total_count = len(normalized_cars)
             start_index = (page - 1) * page_size
             end_index = start_index + page_size
             normalized_cars = normalized_cars[start_index:end_index]
+            has_next = end_index < total_count
+        else:
+            # Обычный фильтр: одна upstream-страница. has_next считаем по СЫРОМУ
+            # числу карточек (до валидации) и заголовку Link, иначе отброшенные
+            # валидацией авто ложно «закрывают» пагинацию. total_count держим так,
+            # чтобы фронт (total_pages = ceil(total_count/20)) не схлопывал список
+            # до одной страницы, пока в upstream есть ещё авто.
+            x_pagination_count = int(
+                response.headers.get("X-Pagination-Count", 0) or 0
+            )
+            page_size = (
+                int(response.headers.get("X-Pagination-Page-Size", page_size) or page_size)
+                or page_size
+            )
+            link_header = response.headers.get("Link", "")
+            has_next = (
+                'rel="next"' in link_header or len(cars_data) == page_size
+            )
+            if x_pagination_count > 0:
+                total_count = x_pagination_count
+            elif has_next:
+                total_count = page * page_size + 1
+            else:
+                total_count = (page - 1) * page_size + len(normalized_cars)
 
         # Возвращаем структуру, совместимую с /cars endpoint
         return {
@@ -834,7 +884,7 @@ async def get_filtered_cars(
                 "current_page": page,
                 "total_count": total_count,
                 "page_size": page_size,
-                "has_next": len(normalized_cars) == page_size,
+                "has_next": has_next,
             },
         }
 
@@ -885,41 +935,46 @@ async def get_heydealer_car_detail_with_tech_sheet(
                 accident_repairs_request_success=False,
             )
 
-        # Выполняем два запроса параллельно
+        # Два upstream-запроса: детальная карточка + технический лист (accident repairs).
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        accident_repairs_url = f"https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/{car_hash_id}/"
+        # Технический лист запрашивается query-style (?car=<hash>), как в
+        # HeyDealerService.get_accident_repairs — path-style форма отдаёт 404.
+        accident_repairs_url = (
+            "https://api.heydealer.com/v2/dealers/web/accident_repairs_for_auction/"
+        )
 
-        # Параллельные запросы для лучшей производительности
         import asyncio
-        import aiohttp
 
-        async def fetch_car_details():
+        def _fetch_json(url, params=None):
+            """Блокирующий GET, разбирающий тело только при 200 и валидном JSON."""
             try:
                 response = requests.get(
-                    detail_url, headers=headers, cookies=cookies, timeout=30
+                    url,
+                    params=params,
+                    headers=headers,
+                    cookies=cookies,
+                    timeout=30,
                 )
-                return response.status_code, (
-                    response.json() if response.status_code == 200 else None
-                )
+                if response.status_code != 200:
+                    return response.status_code, None
+                try:
+                    return 200, response.json()
+                except ValueError:
+                    # 200, но тело не JSON (например, страница WAF/челленджа).
+                    logger.warning(
+                        f"HeyDealer вернул 200 с не-JSON телом: {url}"
+                    )
+                    return 502, None
             except Exception as e:
-                logger.error(f"Ошибка получения данных автомобиля: {e}")
+                logger.error(f"Ошибка запроса HeyDealer {url}: {e}")
                 return 500, None
 
-        async def fetch_accident_repairs():
-            try:
-                response = requests.get(
-                    accident_repairs_url, headers=headers, cookies=cookies, timeout=30
-                )
-                return response.status_code, (
-                    response.json() if response.status_code == 200 else None
-                )
-            except Exception as e:
-                logger.error(f"Ошибка получения технического листа: {e}")
-                return 500, None
-
-        # Выполняем запросы параллельно
-        car_status, car_data = await fetch_car_details()
-        repairs_status, repairs_data = await fetch_accident_repairs()
+        # Реально параллельно: два блокирующих запроса в отдельных потоках, чтобы
+        # детальная страница не ждала их последовательно (иначе до ~60 c).
+        (car_status, car_data), (repairs_status, repairs_data) = await asyncio.gather(
+            asyncio.to_thread(_fetch_json, detail_url),
+            asyncio.to_thread(_fetch_json, accident_repairs_url, {"car": car_hash_id}),
+        )
 
         # Проверяем успешность основного запроса
         if car_status != 200 or not car_data:
@@ -966,10 +1021,14 @@ async def get_heydealer_car_detail_with_tech_sheet(
 
         # Создаем объединенный объект данных
         combined_car_data = HeyDealerCarWithTechSheet(
-            # Основные данные автомобиля
-            hash_id=car_data.get("hash_id"),
-            status=car_data.get("status"),
-            status_display=car_data.get("status_display"),
+            # Основные данные автомобиля.
+            # Обязательные поля модели: подставляем безопасные значения по
+            # умолчанию, чтобы редкие/нестандартные карточки (импорт, завершённые
+            # лоты) не падали с ValidationError и не превращались в ложное
+            # «авто не найдено». hash_id гарантированно берём из пути запроса.
+            hash_id=car_data.get("hash_id") or car_hash_id,
+            status=car_data.get("status") or "",
+            status_display=car_data.get("status_display") or "",
             # Основная информация об автомобиле
             full_name=detail_section.get("full_name"),
             model_part_name=detail_section.get("model_part_name"),
