@@ -243,6 +243,32 @@ def test_cars_rejects_dependent_and_range_violations_before_service(params):
     assert service.calls == []
 
 
+def test_cars_forwards_lot_number_to_the_service():
+    service = StubGlovisService()
+    response = make_client(service).get(
+        "/api/v1/glovis/cars?atn=1102&acc=20&lot_number=1004"
+    )
+
+    assert response.status_code == 200
+    assert service.calls[0][1].lot_number == "1004"
+
+
+@pytest.mark.parametrize("value", ["abc", "12a4", "1234567"])
+def test_malformed_lot_number_is_a_stable_422(value):
+    service = StubGlovisService()
+    response = make_client(service).get(
+        f"/api/v1/glovis/cars?atn=1102&acc=20&lot_number={value}"
+    )
+
+    assert_stable_error(
+        response,
+        status=422,
+        code="invalid_request",
+        retryable=False,
+    )
+    assert service.calls == []
+
+
 def test_page_size_above_contract_limit_is_a_stable_422():
     service = StubGlovisService()
     response = make_client(service).get(

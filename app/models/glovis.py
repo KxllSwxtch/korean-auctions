@@ -108,6 +108,7 @@ class GlovisCarsQuery(BaseModel):
     room: str | None = None
     lane: str | None = None
     bid_status: str | None = None
+    lot_number: str | None = Field(default=None, pattern=r"^[0-9]{1,6}$")
     sort_order: str = "01"
 
     @model_validator(mode="after")

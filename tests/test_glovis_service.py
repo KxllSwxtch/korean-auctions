@@ -20,6 +20,8 @@ from app.services.glovis_service import (
     DETAIL_HEALTH_TTL,
     DETAIL_TTL,
     HEALTH_TTL,
+    LOT_SEARCH_PAGE_SIZE,
+    LOT_SEARCH_SORT_ORDER,
     METADATA_TTL,
     MODELS_PATH,
     SEARCH_FORM_PATH,
@@ -36,6 +38,7 @@ from app.services.glovis_transport import (
 )
 from tests.glovis_fixtures import (
     GN_RAW,
+    lot_scan_page,
     placeholder_detail,
     raw_auctions,
     valid_detail,
@@ -228,6 +231,120 @@ def test_cars_reject_semantically_invalid_payloads(mutate):
     service = GlovisService(transport=StubTransport({CARS_PATH: payload}))
 
     assert_invalid_response(lambda: service.get_cars(base_query()))
+
+
+def lot_scan_calls(transport: StubTransport) -> list[RecordedCall]:
+    return [call for call in transport.calls if call.path == CARS_PATH]
+
+
+def scan_pages(transport: StubTransport) -> list[str]:
+    return [
+        value
+        for call in lot_scan_calls(transport)
+        for name, value in call.params
+        if name == "page"
+    ]
+
+
+def test_lot_search_matches_on_first_page_without_forwarding_lot_upstream():
+    transport = StubTransport({
+        CARS_PATH: lot_scan_page([1001, 1002, 1003], total=3)
+    })
+    service = GlovisService(transport=transport)
+
+    result = service.get_cars(base_query(lot_number="1002"))
+
+    assert result.total == 1
+    assert [car.lot_number for car in result.items] == ["1002"]
+    assert result.page == 1
+    assert result.page_size == 15
+    assert result.has_next_page is False
+    scan_params = lot_scan_calls(transport)[0].params
+    assert not any(name == "lot_number" for name, _ in scan_params)
+    assert ("page_size", str(LOT_SEARCH_PAGE_SIZE)) in scan_params
+    assert ("sort_order", LOT_SEARCH_SORT_ORDER) in scan_params
+
+
+def test_lot_search_binary_searches_lot_sorted_pages():
+    first = list(range(1001, 1061))
+    second = list(range(1061, 1121))
+    third = list(range(1121, 1181))
+    transport = StubTransport({
+        CARS_PATH: deque([
+            lot_scan_page(first, total=180),
+            lot_scan_page(second, total=180),
+            lot_scan_page(third, total=180),
+        ])
+    })
+    service = GlovisService(transport=transport)
+
+    result = service.get_cars(base_query(lot_number="1150"))
+
+    assert scan_pages(transport) == ["1", "2", "3"]
+    assert result.total == 1
+    assert result.items[0].lot_number == "1150"
+
+
+def test_lot_search_below_first_page_stops_after_one_fetch():
+    transport = StubTransport({
+        CARS_PATH: lot_scan_page(list(range(1001, 1061)), total=180)
+    })
+    service = GlovisService(transport=transport)
+
+    result = service.get_cars(base_query(lot_number="900"))
+
+    assert result.total == 0
+    assert result.items == []
+    assert transport.call_count(CARS_PATH) == 1
+
+
+def test_lot_search_inside_page_range_but_absent_returns_empty():
+    transport = StubTransport({
+        CARS_PATH: lot_scan_page([1001, 1002, 1004], total=3)
+    })
+    service = GlovisService(transport=transport)
+
+    result = service.get_cars(base_query(lot_number="1003"))
+
+    assert result.total == 0
+    assert result.items == []
+
+
+def test_lot_search_matches_normalized_digits():
+    transport = StubTransport({CARS_PATH: lot_scan_page([123], total=1)})
+    service = GlovisService(transport=transport)
+
+    result = service.get_cars(base_query(lot_number="0123"))
+
+    assert result.total == 1
+    assert result.items[0].lot_number == "123"
+
+
+def test_lot_search_result_is_cached_until_ttl_expires():
+    clock = FakeClock()
+    transport = StubTransport({CARS_PATH: lot_scan_page([1001], total=1)})
+    service = GlovisService(transport=transport, clock=clock)
+    query = base_query(lot_number="1001")
+
+    assert service.get_cars(query).total == 1
+    assert transport.call_count(CARS_PATH) == 1
+
+    assert service.get_cars(query).total == 1
+    assert transport.call_count(CARS_PATH) == 1
+
+    clock.advance(CARS_TTL)
+    assert service.get_cars(query).total == 1
+    assert transport.call_count(CARS_PATH) == 2
+
+
+def test_lot_search_propagates_upstream_failures():
+    transport = StubTransport({
+        CARS_PATH: deque([GlovisUpstreamUnavailableError()])
+    })
+    service = GlovisService(transport=transport)
+
+    with pytest.raises(GlovisUpstreamUnavailableError):
+        service.get_cars(base_query(lot_number="1001"))
 
 
 @pytest.mark.parametrize(

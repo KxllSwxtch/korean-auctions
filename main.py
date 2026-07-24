@@ -1,14 +1,24 @@
 from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 import secrets
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
 
-from app.routes import (
+# Hydrate os.environ from the repo-local .env BEFORE any app.* import: modules
+# such as app.services.glovis_transport read secret-managed variables straight
+# from os.environ, and pydantic-settings' env_file fills only the Settings
+# object — it never exports to os.environ. override=False keeps real
+# environment variables (Render dashboard) authoritative; when no .env file is
+# deployed (production) this call is a no-op.
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=False)
+
+from app.routes import (  # noqa: E402 — env hydration must precede app imports
     autohub,
     autohub_demo,
     lotte,
@@ -31,9 +41,9 @@ from app.routes import (
     exchange_rate,
     diagnostics,
 )
-from app.core.config import get_settings
-from app.core.logging import setup_logging
-from app.core.scheduler import start_scheduler, stop_scheduler
+from app.core.config import get_settings  # noqa: E402
+from app.core.logging import setup_logging  # noqa: E402
+from app.core.scheduler import start_scheduler, stop_scheduler  # noqa: E402
 
 # Настройка логирования
 setup_logging()

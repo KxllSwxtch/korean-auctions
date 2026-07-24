@@ -39,6 +39,26 @@ def test_query_serializes_repeated_filters_without_losing_order():
     ]
 
 
+@pytest.mark.parametrize("value", ["12a4", "", "1234567", " 1234", "-1"])
+def test_query_rejects_malformed_lot_numbers(value):
+    with pytest.raises(ValidationError):
+        GlovisCarsQuery(atn="1102", acc="20", lot_number=value)
+
+
+def test_lot_number_is_never_forwarded_upstream():
+    query = GlovisCarsQuery(atn="1102", acc="20", lot_number="1004")
+
+    assert query.lot_number == "1004"
+    assert query.upstream_params() == [
+        ("atn", "1102"),
+        ("acc", "20"),
+        ("page", "1"),
+        ("page_size", "15"),
+        ("lang", "en"),
+        ("sort_order", "01"),
+    ]
+
+
 def test_list_response_uses_exact_provider_total_for_next_page():
     response = GlovisCarsResponse(
         total=31,

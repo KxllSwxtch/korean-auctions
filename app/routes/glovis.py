@@ -244,6 +244,7 @@ async def get_cars(
     room: str | None = Query(None),
     lane: str | None = Query(None),
     bid_status: str | None = Query(None),
+    lot_number: str | None = Query(None, pattern=r"^[0-9]{1,6}$"),
     sort_order: str = Query("01"),
     service: GlovisService = Depends(get_glovis_service),
 ) -> GlovisCarsResponse:
@@ -272,6 +273,7 @@ async def get_cars(
             room=room,
             lane=lane,
             bid_status=bid_status,
+            lot_number=lot_number,
             sort_order=sort_order,
         )
     except ValueError:

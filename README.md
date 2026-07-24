@@ -45,6 +45,11 @@ pip install -r requirements.txt
 python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+При старте `main.py` сам загружает локальный `.env` из корня репозитория в
+переменные окружения процесса (`override=False`): реальные переменные окружения
+всегда имеют приоритет, а в продакшен `.env` не деплоится, поэтому там вызов
+не имеет эффекта.
+
 ## 📖 API Документация
 
 После запуска сервера документация доступна по адресам:
@@ -283,6 +288,15 @@ app/
 ```env
 LOG_LEVEL=INFO
 DEBUG=True
+
+# Обязательный корейский прокси для Glovis (DB Auto): без этих переменных
+# все Glovis-эндпоинты отвечают 503 proxy_unavailable (fail-closed).
+# Значения задаются только локально или в секрет-менеджере — никогда в репозитории.
+GLOVIS_PROXY_HOST=
+GLOVIS_PROXY_USERNAME=
+GLOVIS_PROXY_PASSWORD=
+GLOVIS_PROXY_COUNTRY=
+GLOVIS_PROXY_EGRESS_LABEL=
 ```
 
 ## 🐛 Troubleshooting

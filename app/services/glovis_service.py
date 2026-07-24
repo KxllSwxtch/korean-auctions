@@ -54,6 +54,11 @@ HEALTH_TTL = 30.0
 DETAIL_HEALTH_TTL = 300.0
 CACHE_MAX_ENTRIES = 512
 
+LOT_SEARCH_PAGE_SIZE = 60
+LOT_SEARCH_SORT_ORDER = "01"
+LOT_SEARCH_MAX_FETCHES = 12
+_LOT_DIGITS_RE = re.compile(r"[^0-9]", re.ASCII)
+
 PROVIDER_ID_RE = re.compile(r"^[0-9]{1,12}$", re.ASCII)
 _ISO_DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$", re.ASCII)
 _INTERNAL_EGRESS_RE = re.compile(
@@ -467,8 +472,124 @@ class GlovisService:
         )
         return response, result.egress
 
+    @staticmethod
+    def _lot_as_int(value: str | None) -> int | None:
+        digits = _LOT_DIGITS_RE.sub("", value or "")
+        return int(digits) if digits else None
+
+    def _cars_page(
+        self,
+        scan_query: GlovisCarsQuery,
+        page: int,
+        deadline_at: float,
+    ) -> GlovisCarsResponse:
+        page_query = scan_query.model_copy(update={"page": page})
+        params = page_query.upstream_params()
+        value, _ = self._cached(
+            ("cars", *params),
+            CARS_TTL,
+            lambda: self._load_cars(page_query, deadline_at),
+        )
+        return value
+
+    def _find_lot_matches(
+        self,
+        query: GlovisCarsQuery,
+        target: int,
+        deadline_at: float,
+    ) -> list[GlovisCar]:
+        """Locate cars by lot number.
+
+        The upstream provider has no lot filter, so the auction is scanned with
+        the lot-number sort order and a binary search over page bounds.
+        """
+        scan_query = query.model_copy(
+            update={
+                "lot_number": None,
+                "page": 1,
+                "page_size": LOT_SEARCH_PAGE_SIZE,
+                "sort_order": LOT_SEARCH_SORT_ORDER,
+            }
+        )
+        fetches = 0
+
+        def fetch(page: int) -> GlovisCarsResponse:
+            nonlocal fetches
+            fetches += 1
+            return self._cars_page(scan_query, page, deadline_at)
+
+        def matches_in(response: GlovisCarsResponse) -> list[GlovisCar]:
+            return [
+                car
+                for car in response.items
+                if self._lot_as_int(car.lot_number) == target
+            ]
+
+        def bounds_of(response: GlovisCarsResponse) -> tuple[int, int] | None:
+            lots = [
+                lot
+                for lot in (
+                    self._lot_as_int(car.lot_number) for car in response.items
+                )
+                if lot is not None
+            ]
+            return (min(lots), max(lots)) if lots else None
+
+        first = fetch(1)
+        if first.total == 0 or not first.items:
+            return []
+        found = matches_in(first)
+        if found:
+            return found
+        bounds = bounds_of(first)
+        if bounds is None or target <= bounds[1]:
+            return []
+        total_pages = -(-first.total // LOT_SEARCH_PAGE_SIZE)
+
+        low, high = 2, total_pages
+        while low <= high and fetches < LOT_SEARCH_MAX_FETCHES:
+            middle = (low + high) // 2
+            response = fetch(middle)
+            found = matches_in(response)
+            if found:
+                return found
+            bounds = bounds_of(response)
+            if bounds is None:
+                return []
+            if target < bounds[0]:
+                high = middle - 1
+            elif target > bounds[1]:
+                low = middle + 1
+            else:
+                return []
+        return []
+
+    def _load_cars_by_lot(self, query: GlovisCarsQuery) -> GlovisCarsResponse:
+        deadline_at = self._clock() + OVERALL_DEADLINE_SECONDS
+        target = self._lot_as_int(query.lot_number)
+        matches = (
+            self._find_lot_matches(query, target, deadline_at)
+            if target is not None
+            else []
+        )
+        start = (query.page - 1) * query.page_size
+        return GlovisCarsResponse(
+            total=len(matches),
+            items=matches[start:start + query.page_size],
+            page=query.page,
+            page_size=query.page_size,
+            atn=query.atn,
+            acc=query.acc,
+        )
+
     def get_cars(self, query: GlovisCarsQuery) -> GlovisCarsResponse:
         self._validate_query_ids(query)
+        if query.lot_number:
+            return self._cached(
+                ("cars_lot", query.lot_number, *query.upstream_params()),
+                CARS_TTL,
+                lambda: self._load_cars_by_lot(query),
+            )
         params = query.upstream_params()
         value, _ = self._cached(
             ("cars", *params),

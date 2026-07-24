@@ -169,6 +169,58 @@ def test_settings_accept_secret_managed_glovis_proxy_fields(tmp_path: Path) -> N
         )
 
 
+def _is_load_dotenv_call(node: ast.stmt) -> bool:
+    if not (isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)):
+        return False
+    func = node.value.func
+    if isinstance(func, ast.Name):
+        return func.id == "load_dotenv"
+    return isinstance(func, ast.Attribute) and func.attr == "load_dotenv"
+
+
+def test_main_hydrates_local_env_before_app_imports() -> None:
+    main_path = ROOT / "main.py"
+    tree = ast.parse(main_path.read_text(encoding="utf-8"))
+
+    hydration_index = None
+    hydration_call = None
+    first_app_import_index = None
+    first_app_import_line = None
+    for index, node in enumerate(tree.body):
+        if hydration_index is None and _is_load_dotenv_call(node):
+            hydration_index = index
+            hydration_call = node.value
+        if first_app_import_index is None and (
+            isinstance(node, ast.ImportFrom)
+            and node.module is not None
+            and (node.module == "app" or node.module.startswith("app."))
+        ):
+            first_app_import_index = index
+            first_app_import_line = node.lineno
+
+    if hydration_index is None:
+        _fail(main_path, 1, "load_dotenv hydration call is missing")
+    if first_app_import_index is None:
+        _fail(main_path, 1, "no app.* imports found; entrypoint layout changed")
+    if hydration_index > first_app_import_index:
+        _fail(
+            main_path,
+            first_app_import_line,
+            "app modules are imported before load_dotenv hydration",
+        )
+    for keyword in hydration_call.keywords:
+        if (
+            keyword.arg == "override"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value is True
+        ):
+            _fail(
+                main_path,
+                hydration_call.lineno,
+                "load_dotenv must not override the real environment",
+            )
+
+
 def test_internal_glovis_cache_clear_rejects_non_ascii_token(monkeypatch) -> None:
     import main
 

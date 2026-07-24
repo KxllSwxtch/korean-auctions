@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from base64 import b64encode
 from copy import deepcopy
 
 GN_RAW = "mJDbMQgcohK+3EAebGNDAg=="
@@ -46,6 +47,19 @@ def valid_list_car() -> dict[str, object]:
 
 def valid_list(total: int = 1) -> dict[str, object]:
     return {"total": total, "items": [valid_list_car()] if total else []}
+
+
+def lot_scan_page(lots: list[int], total: int) -> dict[str, object]:
+    """Build a cars page whose items carry the given lot numbers."""
+    items: list[dict[str, object]] = []
+    for lot in lots:
+        car = valid_list_car()
+        car["gn"] = b64encode(f"glovis-lot-{lot:08d}".encode()).decode("ascii")
+        car["rc"] = str(3000 + lot)
+        car["lot_number"] = str(lot)
+        car["plate_number"] = f"TEST-{lot}"
+        items.append(car)
+    return {"total": total, "items": items}
 
 
 def valid_filter_items() -> list[dict[str, object]]:
