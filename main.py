@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
     from app.routes.lotte_filters import get_filter_service
     from app.routes.glovis import close_glovis_service
     from app.routes.encar_proxy import close_encar_proxy_client
+    from app.services.bikemart_service import bikemart_service
 
     # Report missing egress variables before any route can 502 over them.
     log_egress_configuration()
@@ -81,6 +82,7 @@ async def lifespan(app: FastAPI):
         finally:
             await close_encar_proxy_client()
             close_glovis_service()
+            await bikemart_service.close()
 
 
 # Создание FastAPI приложения

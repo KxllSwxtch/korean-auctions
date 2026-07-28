@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 
 from app.core.logging import get_logger
 from app.core.proxy_config import ProxyConfigurationError, ProxyPool, get_proxy_pool
+from app.core.tls import SHARED_SSL_CONTEXT
 
 logger = get_logger("async_http_client")
 
@@ -99,12 +100,14 @@ class AsyncHttpClient:
     async def session(self) -> aiohttp.ClientSession:
         """Получение или создание сессии"""
         if self._session is None or self._session.closed:
+            # Pass the shared context rather than ssl=True: aiohttp's own default
+            # context reads OpenSSL's compiled-in CA paths, which are empty on
+            # python.org macOS builds. See app/core/tls.py.
             connector = aiohttp.TCPConnector(
-                ssl=self.verify_ssl,
+                ssl=SHARED_SSL_CONTEXT if self.verify_ssl else False,
                 limit=100,
                 limit_per_host=30,
                 ttl_dns_cache=300,
-                enable_cleanup_closed=True,
             )
             self._session = aiohttp.ClientSession(
                 connector=connector, timeout=self.timeout

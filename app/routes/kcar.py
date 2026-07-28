@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import List, Optional, Dict, Any
+from typing import List, NoReturn, Optional, Dict, Any
 from loguru import logger
 import asyncio
 
@@ -23,6 +23,60 @@ router = APIRouter(prefix="/api/v1/kcar", tags=["KCar"])
 # Создаем глобальный экземпляр сервиса
 kcar_service = KCarService()
 _kcar_flight = SingleFlight()
+
+
+# Typed failure contract for live KCar listings, mirroring the Glovis contract
+# in app/routes/glovis.py (ERROR_STATUS / {code, message, retryable} + no-store).
+#
+# `GET /cars` used to answer ANY failure with HTTP 200 plus generated demo rows.
+# That made an outage indistinguishable from real inventory: the storefront
+# rendered fabricated cars with fixture image URLs, and the CDN happily cached
+# the 200. Synthetic data is now reachable only through the explicit
+# /cars/demo and /cars/test endpoints.
+ERROR_STATUS = {
+    "provider_unconfigured": 503,
+    "upstream_auth": 502,
+    "upstream_timeout": 504,
+    "upstream_invalid_response": 502,
+    "upstream_unavailable": 502,
+}
+
+# Substring signatures mapping kcar_service's stringly-typed failures onto the
+# contract above. Deliberately a bridge, not a destination: the service should
+# raise typed errors eventually. An unrecognised message degrades to
+# upstream_unavailable (502) — never back to a 200.
+_FAILURE_SIGNATURES = (
+    (("авториз", "login", "user_pw", "successyn"), "upstream_auth"),
+    (("timeout", "timed out", "readtimeout"), "upstream_timeout"),
+    (("jsondecode", "expecting value"), "upstream_invalid_response"),
+)
+
+
+def _raise_cars_unavailable(message: Optional[str]) -> NoReturn:
+    """Fail closed with a typed error instead of substituting demo data."""
+    # Checked first and structurally: missing credentials are the confirmed
+    # production risk and the one cause we can detect without string sniffing.
+    if not kcar_service.username or not kcar_service.password:
+        code = "provider_unconfigured"
+    else:
+        haystack = (message or "").lower()
+        code = "upstream_unavailable"
+        for needles, candidate in _FAILURE_SIGNATURES:
+            if any(needle in haystack for needle in needles):
+                code = candidate
+                break
+
+    # The upstream message can carry internals, so it is logged, not returned.
+    logger.warning(f"KCar cars unavailable ({code}): {message}")
+    raise HTTPException(
+        status_code=ERROR_STATUS[code],
+        detail={
+            "code": code,
+            "message": "KCar provider is temporarily unavailable",
+            "retryable": code != "provider_unconfigured",
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/cars", response_model=KCarResponse)
@@ -100,28 +154,10 @@ async def get_kcar_cars(
         )
 
         if not result.success:
-            # Только если это реальная ошибка (не пустой список), показываем fallback
-            logger.warning(f"⚠️ KCar API вернул ошибку: {result.message}")
-            logger.info("🎭 Переключаюсь на демо данные вместо ошибки")
-
-            # Вместо ошибки возвращаем демо данные
-            demo_result = await asyncio.to_thread(kcar_service.get_test_cars, page_size)
-            if demo_result.success:
-                # Добавляем информацию о том, что это демо данные
-                demo_result.message = f"Произошла ошибка API. Показаны демо данные ({len(demo_result.car_list)} автомобилей)"
-                logger.info("✅ Возвращаю демо данные из-за ошибки API")
-                return demo_result
-            else:
-                # Если даже демо данные не работают, тогда ошибка
-                logger.error("❌ Не удалось получить даже демо данные")
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": "Ошибка получения данных KCar",
-                        "message": result.message,
-                        "suggestion": "Попробуйте позже или используйте /cars/demo для тестовых данных",
-                    },
-                )
+            # Fail CLOSED. Never substitute synthetic inventory here: demo rows
+            # in a live listing are indistinguishable from real cars to the user
+            # and to the CDN. Synthetic data lives at /cars/demo and /cars/test.
+            _raise_cars_unavailable(result.message)
 
         # Успешный ответ (даже если список пустой)
         if len(result.car_list) == 0:
@@ -259,11 +295,9 @@ async def get_kcar_stats(
         cars_result = await asyncio.to_thread(kcar_service.get_cars, params)
 
         if not cars_result.success:
-            # Если не удалось получить реальные данные, используем тестовые
-            logger.warning(
-                "⚠️ Не удалось получить реальные данные, используем тестовые для статистики"
-            )
-            cars_result = await asyncio.to_thread(kcar_service.get_test_cars, 50)
+            # Fail CLOSED, like /cars. Computing "statistics" over 50 generated
+            # rows reports fabricated averages as though they were market data.
+            _raise_cars_unavailable(cars_result.message)
 
         # Рассчитываем статистику
         stats = kcar_service.parser.calculate_stats(cars_result.car_list)
@@ -294,27 +328,20 @@ async def get_kcar_count(
         params = {"AUC_TYPE": auction_type}
         result = await asyncio.to_thread(kcar_service.get_car_count, params)
 
+        # A finished or not-yet-populated auction genuinely has zero cars.
+        # Reporting a hardcoded 150 instead was fabrication: consumers cannot
+        # tell "no lots today" from "the scraper is broken".
         if result.get("count", 0) == 0:
-            logger.info("ℹ️ Торги завершены или не активны, показываю демо значение")
-            return {
-                "count": 150,  # Демо значение
-                "auction_type": auction_type,
-                "message": "Торги завершены. Показано демонстрационное значение.",
-                "demo": True,
-            }
+            logger.info("ℹ️ Торги завершены или не активны — возвращаю 0")
 
-        logger.success(f"✅ Количество автомобилей: {result['count']}")
+        logger.success(f"✅ Количество автомобилей: {result.get('count', 0)}")
         return result
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Ошибка получения количества автомобилей: {e}")
-        # Возвращаем демо данные вместо ошибки
-        return {
-            "count": 150,
-            "auction_type": auction_type or "weekly",
-            "message": f"Ошибка API: {str(e)}. Показано демонстрационное значение.",
-            "demo": True,
-        }
+        _raise_cars_unavailable(str(e))
 
 
 @router.get("/cars/{car_id}/detail", response_model=KCarDetailResponse)

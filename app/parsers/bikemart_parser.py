@@ -3,8 +3,9 @@ from bs4 import BeautifulSoup
 import logging
 
 from app.models.bikemart import (
-    BikemartBike, 
-    BikemartFilter, 
+    BikemartBike,
+    BikemartBikeCard,
+    BikemartFilter,
     BikemartBrand,
     BikemartPaginationInfo,
     BikemartBikeDetail,
@@ -15,92 +16,129 @@ from app.models.bikemart import (
 logger = logging.getLogger(__name__)
 
 
+class BikemartUpstreamError(RuntimeError):
+    """The upstream returned a payload we must not treat as a valid result.
+
+    Raised rather than returned so that callers wrapping these parsers in a
+    cache cannot accidentally memoise an upstream failure as "zero bikes".
+    """
+
+
+def _require_ok(response_data: Dict[str, Any], what: str) -> None:
+    """Reject envelopes the upstream itself marked as failed."""
+    if not response_data.get("ResultCode"):
+        message = response_data.get("ResultMessage") or "ResultCode is False"
+        raise BikemartUpstreamError(f"Bikemart {what} request rejected: {message}")
+
+
 class BikemartParser:
     """Parser for Bikemart API responses"""
-    
+
     @staticmethod
-    def parse_bikes_response(response_data: Dict[str, Any]) -> tuple[List[BikemartBike], Optional[BikemartPaginationInfo]]:
+    def parse_bikes_response(response_data: Dict[str, Any]) -> tuple[List[BikemartBikeCard], Optional[BikemartPaginationInfo]]:
         """
         Parse bikes listing response from Bikemart API
-        
+
+        Only the fields the catalog card renders are projected out; the full
+        record is available from the detail endpoint. Fields are read with
+        ``.get()`` defaults rather than a ``**`` splat so that an upstream
+        rename cannot silently empty the whole page.
+
         Args:
             response_data: Raw JSON response from API
-            
+
         Returns:
-            Tuple of (bikes list, pagination info)
+            Tuple of (bike cards, pagination info)
+
+        Raises:
+            BikemartUpstreamError: the upstream reported a failed request.
         """
-        try:
-            bikes = []
-            
-            # Check if response is successful
-            if not response_data.get("ResultCode"):
-                logger.error("Invalid response: ResultCode is False")
-                return [], None
-            
-            # Extract bikes data
-            bikes_data = response_data.get("data", [])
-            for bike_data in bikes_data:
-                try:
-                    bike = BikemartBike(**bike_data)
-                    bikes.append(bike)
-                except Exception as e:
-                    logger.error(f"Error parsing bike data: {e}")
-                    continue
-            
-            # Extract pagination info if available
-            pagination = None
-            if "pagination" in response_data:
-                try:
-                    pagination = BikemartPaginationInfo(**response_data["pagination"])
-                except Exception as e:
-                    logger.error(f"Error parsing pagination: {e}")
-            
-            return bikes, pagination
-            
-        except Exception as e:
-            logger.error(f"Error parsing bikes response: {e}")
-            return [], None
-    
+        _require_ok(response_data, "bike list")
+
+        bikes: List[BikemartBikeCard] = []
+        bikes_data = response_data.get("data") or []
+        for bike_data in bikes_data:
+            if not isinstance(bike_data, dict):
+                logger.warning(f"Skipping non-object bike entry: {type(bike_data)}")
+                continue
+            seq = bike_data.get("seq")
+            if not seq:
+                logger.warning("Skipping bike entry without a seq")
+                continue
+            bikes.append(
+                BikemartBikeCard(
+                    seq=str(seq),
+                    brand_name=bike_data.get("brand_name") or "",
+                    model=bike_data.get("model") or "",
+                    manufacture_year=bike_data.get("manufacture_year") or "",
+                    mileage=bike_data.get("mileage") or "",
+                    org_price=bike_data.get("org_price") or "",
+                    sale_price=bike_data.get("sale_price") or None,
+                    thumbnail_url=bike_data.get("thumbnail_url") or None,
+                    status=bike_data.get("status") or "",
+                    is_tuning=bike_data.get("is_tuning") or "",
+                )
+            )
+
+        if bikes_data and not bikes:
+            # Every row was unusable: that is a schema break, not an empty page.
+            raise BikemartUpstreamError(
+                f"Bikemart returned {len(bikes_data)} bikes but none could be parsed"
+            )
+
+        # The live API carries no "pagination" key (the count lives in "total"),
+        # but honour it if it ever appears.
+        pagination = None
+        raw_pagination = response_data.get("pagination")
+        if isinstance(raw_pagination, dict):
+            try:
+                pagination = BikemartPaginationInfo(**raw_pagination)
+            except Exception as e:
+                logger.error(f"Error parsing pagination: {e}")
+
+        return bikes, pagination
+
     @staticmethod
     def parse_brands_response(response_data: Dict[str, Any]) -> List[BikemartBrand]:
         """
         Parse brands response from Bikemart API
-        
+
         Args:
             response_data: Raw JSON response from API
-            
+
         Returns:
             List of brands
+
+        Raises:
+            BikemartUpstreamError: the upstream reported a failed request.
         """
-        try:
-            brands = []
-            
-            # Check if response is successful
-            if not response_data.get("ResultCode"):
-                logger.error("Invalid response: ResultCode is False")
-                return []
-            
-            # Extract brands data
-            brands_data = response_data.get("data", [])
-            for brand_data in brands_data:
-                try:
-                    # Transform the data to match our model
-                    brand = BikemartBrand(
-                        brand_seq=brand_data.get("seq", ""),
-                        brand_name=brand_data.get("brand_name", ""),
-                        count=None  # Count is not provided in the API response
-                    )
-                    brands.append(brand)
-                except Exception as e:
-                    logger.error(f"Error parsing brand data: {e}")
-                    continue
-            
-            return brands
-            
-        except Exception as e:
-            logger.error(f"Error parsing brands response: {e}")
-            return []
-    
+        _require_ok(response_data, "brand list")
+
+        brands: List[BikemartBrand] = []
+        brands_data = response_data.get("data") or []
+        for brand_data in brands_data:
+            if not isinstance(brand_data, dict):
+                continue
+            brand_seq = brand_data.get("seq")
+            brand_name = brand_data.get("brand_name")
+            if not brand_seq or not brand_name:
+                # A blank entry would render as an unselectable empty dropdown row.
+                continue
+            brands.append(
+                BikemartBrand(
+                    brand_seq=str(brand_seq),
+                    brand_name=brand_name,
+                    count=None,  # Count is not provided in the API response
+                )
+            )
+
+        if brands_data and not brands:
+            raise BikemartUpstreamError(
+                f"Bikemart returned {len(brands_data)} brands but none could be parsed"
+            )
+
+        return brands
+
     @staticmethod
     def extract_filters_from_page(html_content: str) -> Dict[str, List[BikemartFilter]]:
         """
@@ -217,13 +255,13 @@ class BikemartParser:
             
         Returns:
             BikemartBikeDetail object or None if parsing fails
+
+        Raises:
+            BikemartUpstreamError: the upstream reported a failed request.
         """
+        _require_ok(response_data, "bike detail")
+
         try:
-            # Check if response is successful
-            if not response_data.get("ResultCode"):
-                logger.error("Invalid response: ResultCode is False")
-                return None
-            
             # Extract bike data
             bike_data = response_data.get("data")
             if not bike_data:
@@ -263,27 +301,24 @@ class BikemartParser:
             
         Returns:
             List of models
+
+        Raises:
+            BikemartUpstreamError: the upstream reported a failed request.
         """
-        try:
-            models = []
-            
-            # Check if response is successful
-            if not response_data.get("ResultCode"):
-                logger.error("Invalid response: ResultCode is False")
-                return []
-            
-            # Extract models data
-            models_data = response_data.get("data", [])
-            for model_data in models_data:
-                try:
-                    model = BikemartModel(**model_data)
-                    models.append(model)
-                except Exception as e:
-                    logger.error(f"Error parsing model data: {e}")
-                    continue
-            
-            return models
-            
-        except Exception as e:
-            logger.error(f"Error parsing models response: {e}")
-            return []
+        _require_ok(response_data, "model list")
+
+        models: List[BikemartModel] = []
+        models_data = response_data.get("data") or []
+        for model_data in models_data:
+            try:
+                models.append(BikemartModel(**model_data))
+            except Exception as e:
+                logger.error(f"Error parsing model data: {e}")
+                continue
+
+        if models_data and not models:
+            raise BikemartUpstreamError(
+                f"Bikemart returned {len(models_data)} models but none could be parsed"
+            )
+
+        return models

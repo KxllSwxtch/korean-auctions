@@ -1,6 +1,29 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+
+
+class BikemartBikeCard(BaseModel):
+    """Catalog-card projection of a bike listing.
+
+    The upstream list endpoint returns 57 fields per bike (~52 KB per page of
+    20) while the catalog card renders nine of them. Serving the full record
+    was both wasteful and a privacy problem: it published the seller's phone
+    number, email, originating IP and GPS coordinates to every browser.
+
+    The detail view is unaffected — it fetches ``BikemartBikeDetail`` from
+    ``/bikes/{seq}``, which still carries the full record.
+    """
+
+    seq: str = Field(..., description="Bike listing ID")
+    brand_name: str = Field("", description="Brand name")
+    model: str = Field("", description="Model name")
+    manufacture_year: str = Field("", description="Manufacturing year")
+    mileage: str = Field("", description="Mileage in km")
+    org_price: str = Field("", description="Original price")
+    sale_price: Optional[str] = Field(None, description="Sale price")
+    thumbnail_url: Optional[str] = Field(None, description="Thumbnail image URL")
+    status: str = Field("", description="Status code ('1000' = available)")
+    is_tuning: str = Field("", description="Has tuning flag ('1' = tuned)")
 
 
 class BikemartBike(BaseModel):
@@ -92,9 +115,9 @@ class BikemartPaginationInfo(BaseModel):
 
 class BikemartResponse(BaseModel):
     """Response model for bikes listing"""
-    
+
     success: bool = Field(..., description="Request success status")
-    data: List[BikemartBike] = Field(..., description="List of bikes")
+    data: List[BikemartBikeCard] = Field(..., description="List of bikes")
     pagination: Optional[BikemartPaginationInfo] = Field(None, description="Pagination info")
     message: Optional[str] = Field(None, description="Response message")
 

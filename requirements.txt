@@ -10,6 +10,10 @@ orjson==3.10.12
 httpx==0.28.1
 requests==2.32.3
 aiohttp==3.10.11
+# Trust roots for app/core/tls.py. Floor, not an equality pin: certifi shipped
+# the compromised GLOBALTRUST roots until 2024.07.04 (GHSA-248v-346w-9cwc), so
+# older releases must never be resolved, but the bundle should stay current.
+certifi>=2024.7.4
 
 # Data validation and parsing
 pydantic==2.11.5

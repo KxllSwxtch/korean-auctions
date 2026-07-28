@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 
 from app.core.anti_block import UserAgentRotator, ProxyConfig, DOMAIN_DELAY_PROFILES
 from app.core.logging import logger
+from app.core.tls import SHARED_SSL_CONTEXT
 
 
 @dataclass
@@ -52,9 +53,11 @@ class AsyncSessionManager:
     ) -> aiohttp.ClientSession:
         """Создать новую асинхронную сессию"""
 
-        # SSL контекст
-        ssl_context = None
-        if not self.config.use_ssl:
+        # SSL контекст. Никогда не передаём ssl=None: aiohttp 3.x молча
+        # трактует его как True, а aiohttp 4.0 бросает TypeError.
+        if self.config.use_ssl:
+            ssl_context = SHARED_SSL_CONTEXT
+        else:
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
@@ -66,7 +69,6 @@ class AsyncSessionManager:
             ssl=ssl_context,
             use_dns_cache=True,
             ttl_dns_cache=300,
-            enable_cleanup_closed=True,
         )
 
         # Таймауты

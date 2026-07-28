@@ -17,6 +17,11 @@ from app.models.kcar import (
 )
 
 
+# Any str.format replacement field: "{}", "{0}", "{:04d}", "{name!r}".
+# Used by generate_test_data so demo templates cannot leak a raw format spec.
+_FORMAT_FIELD_RE = re.compile(r"\{[^{}]*\}")
+
+
 class KCarParser:
     """Парсер для обработки JSON ответов от KCar API"""
 
@@ -459,24 +464,45 @@ class KCarParser:
                 template = test_templates[i % len(test_templates)]
                 car_data = {}
 
+                template_args = {
+                    "CAR_ID": (1000 + i,),
+                    "CAR_NM": (2020 + (i % 5),),
+                    "CNO": (10 + (i % 90), 1000 + i),
+                    "AUC_STRT_PRC": (1 + (i % 9),),
+                    "FORM_YR": (0 + (i % 5),),
+                    "MILG": (1 + (i % 9),),
+                    "EXBIT_SEQ": (1000 + i,),
+                }
+
                 for key, value in template.items():
-                    if "{}" in str(value):
-                        if key in ["CAR_ID"]:
-                            car_data[key] = value.format(1000 + i)
-                        elif key in ["CAR_NM"]:
-                            car_data[key] = value.format(2020 + (i % 5))
-                        elif key in ["CNO"]:
-                            car_data[key] = value.format(10 + (i % 90), 1000 + i)
-                        elif key in ["AUC_STRT_PRC"]:
-                            car_data[key] = value.format(1 + (i % 9))
-                        elif key in ["FORM_YR"]:
-                            car_data[key] = value.format(0 + (i % 5))
-                        elif key in ["MILG"]:
-                            car_data[key] = value.format(1 + (i % 9))
-                        elif key in ["EXBIT_SEQ"]:
-                            car_data[key] = value.format(1000 + i)
-                    else:
+                    text = str(value)
+                    # Match ANY replacement field, not just the literal "{}".
+                    # The previous `"{}" in value` check missed format specs, so
+                    # the "KCA2025{:04d}" template was never formatted and every
+                    # demo row shipped a literal CAR_ID of "KCA2025{:04d}".
+                    if not _FORMAT_FIELD_RE.search(text):
                         car_data[key] = value
+                        continue
+
+                    args = template_args.get(key)
+                    if args is None:
+                        # Always assign something: a templated key with no args
+                        # mapping previously fell through both branches and was
+                        # dropped from the row entirely.
+                        logger.warning(
+                            f"Нет аргументов форматирования для шаблона {key}; "
+                            "поле остаётся без подстановки"
+                        )
+                        car_data[key] = text
+                        continue
+
+                    try:
+                        car_data[key] = text.format(*args)
+                    except (IndexError, KeyError, ValueError) as exc:
+                        logger.warning(
+                            f"Не удалось отформатировать шаблон {key}={text!r}: {exc}"
+                        )
+                        car_data[key] = text
 
                 # Добавляем дополнительные поля
                 car_data.update(
