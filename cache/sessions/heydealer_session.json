@@ -1,9 +1,9 @@
 {
   "user_hash_id": "jQdE8874",
   "cookies": {
-    "ga_dsi": "713b9e863a4a4621bd94629ae68d17b5",
-    "sessionid": "xqqbbzlpxirf30gi85f1x9gan3ye55pe",
-    "csrftoken": "AZcGKFco4udnEeb3SvC0J7TbgpC8j2Gu"
+    "ga_dsi": "58b1d1f9463d45da9ac2fb9f80dc7e85",
+    "sessionid": "a9rb0t1flo27mywggzioltiqg5nb9ubi",
+    "csrftoken": "fUIwt8rcGyDkVcDX6hKLfZ8lcyLMK2Wv"
   },
   "headers": {
     "Accept": "*/*",
@@ -16,8 +16,8 @@
     "Referer": "https://dealer.heydealer.com/",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
     "Content-Type": "application/json",
-    "X-CSRFToken": "KI2O0Q8ANNgbnQgBGS4r9DgZSMRURdjj"
+    "X-CSRFToken": "XKUt3smJSKgWu9VJ3VhsklP7nUpYtHVZ"
   },
-  "created_at": "2026-07-28T08:56:27.783356",
-  "expires_at": "2026-07-28T20:56:27.783360"
+  "created_at": "2026-07-29T10:59:25.115734",
+  "expires_at": "2026-07-29T22:59:25.115737"
 }
