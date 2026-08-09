@@ -50,6 +50,11 @@ from app.core.tls import REQUESTS_VERIFY
 class LotteService(BaseAuctionService):
     """Сервис для работы с аукционом Lotte с робастным управлением сессиями"""
 
+    #: Сколько карточек тянуть одновременно. Совпадает с `_OUTBOUND_LIMIT`,
+    #: который и так ограничивает исходящие запросы процесса пятью, поэтому
+    #: большее значение здесь дало бы только ожидание на семафоре.
+    _DETAIL_CONCURRENCY = 5
+
     def __init__(self):
         super().__init__("Lotte Service")
         self.base_url = "https://www.lotteautoauction.net"
@@ -462,7 +467,10 @@ class LotteService(BaseAuctionService):
         )
 
         try:
-            if not self._ensure_session():
+            # _ensure_session may run the full Lotte login (several sequential
+            # blocking POSTs), and _parse_cars is BeautifulSoup work. Both are
+            # synchronous, so they go to a thread rather than onto the loop.
+            if not await asyncio.to_thread(self._ensure_session):
                 raise Exception("Не удалось аутентифицироваться")
 
             # Получаем страницу с автомобилями с пагинацией
@@ -473,7 +481,7 @@ class LotteService(BaseAuctionService):
                 return []
 
             # Парсим автомобили (пагинация уже применена на сервере)
-            cars = self._parse_cars(cars_response.text)
+            cars = await asyncio.to_thread(self._parse_cars, cars_response.text)
             logger.info(
                 f"Найдено {len(cars)} автомобилей на странице (пагинация на сервере)"
             )
@@ -484,6 +492,39 @@ class LotteService(BaseAuctionService):
             logger.error(f"Ошибка при получении автомобилей: {e}")
             raise e
 
+    async def _gather_car_details(
+        self, cars_data: List[Dict[str, Any]]
+    ) -> List[LotteCar]:
+        """Загрузить детали для списка машин параллельно.
+
+        Пределы: `_DETAIL_CONCURRENCY` одновременных запросов. Ошибка по одной
+        машине не должна ронять всю выдачу, поэтому исключения гасятся и такая
+        машина просто пропускается — как и в прежнем последовательном цикле.
+        """
+        semaphore = asyncio.Semaphore(self._DETAIL_CONCURRENCY)
+
+        async def fetch_one(car_data: Dict[str, Any]) -> Optional[LotteCar]:
+            async with semaphore:
+                try:
+                    return await self._get_car_details(car_data)
+                except Exception as e:
+                    logger.error(
+                        f"Ошибка при получении деталей автомобиля "
+                        f"{car_data.get('id', 'unknown')}: {e}"
+                    )
+                    return None
+
+        results = await asyncio.gather(
+            *(fetch_one(car) for car in cars_data), return_exceptions=True
+        )
+
+        detailed = [r for r in results if r is not None and not isinstance(r, BaseException)]
+        if len(detailed) != len(cars_data):
+            logger.warning(
+                f"Детали получены для {len(detailed)} из {len(cars_data)} автомобилей"
+            )
+        return detailed
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=10)
@@ -491,7 +532,19 @@ class LotteService(BaseAuctionService):
     async def _get_car_details(
         self, car_basic_data: Dict[str, Any]
     ) -> Optional[LotteCar]:
-        """Получение детальной информации об автомобиле"""
+        """Детали автомобиля, без блокировки событийного цикла.
+
+        Вся работа (авторизация, HTTP-запрос, разбор HTML) выполняется в
+        отдельном потоке: `requests` и BeautifulSoup синхронны, а этот метод
+        вызывается из `async def`-роутов. Раньше он блокировал event loop, из-за
+        чего gunicorn убивал воркер по --timeout при медленном ответе Lotte.
+        """
+        return await asyncio.to_thread(self._sync_get_car_details, car_basic_data)
+
+    def _sync_get_car_details(
+        self, car_basic_data: Dict[str, Any]
+    ) -> Optional[LotteCar]:
+        """Синхронная реализация. Запускать только через `_get_car_details`."""
         try:
             # Re-check auth on each retry attempt (session may have been invalidated)
             if not self._ensure_session():
@@ -569,22 +622,18 @@ class LotteService(BaseAuctionService):
             cars_data = self.parser.parse_cars_list(cars_response.text)
             logger.info(f"Найдено {len(cars_data)} автомобилей на странице")
 
-            # Получаем детальную информацию для каждого автомобиля
-            detailed_cars = []
-            for car_data in cars_data:
-                try:
-                    detailed_car = await self._get_car_details(car_data)
-                    if detailed_car:
-                        detailed_cars.append(detailed_car)
-
-                    # Небольшая задержка между запросами
-                    await asyncio.sleep(0.5)
-
-                except Exception as e:
-                    logger.error(
-                        f"Ошибка при получении деталей автомобиля {car_data.get('id', 'unknown')}: {e}"
-                    )
-                    continue
+            # Детали грузятся параллельно с ограничением по количеству.
+            #
+            # Раньше здесь был последовательный цикл с `await asyncio.sleep(0.5)`
+            # после каждой машины: при limit=20 это ~20 последовательных
+            # обращений к Корее плюс 10 секунд чистого сна (замерено 20.6 с), а
+            # при limit=100 запрос стабильно превышал --timeout 120 и воркер
+            # уничтожался вместе со всеми параллельными запросами.
+            #
+            # Ограничение совпадает с процессным `_OUTBOUND_LIMIT` (5), поэтому
+            # нагрузка на Lotte не растёт — меняется только то, что ожидание
+            # происходит одновременно, а не по очереди.
+            detailed_cars = await self._gather_car_details(cars_data)
 
             self._save_to_cache(cache_key, detailed_cars)
             return detailed_cars
@@ -831,15 +880,21 @@ class LotteService(BaseAuctionService):
             logger.info(f"Дата аукциона для запроса: {auction_date_str}")
             logger.debug(f"Полный payload запроса: {payload}")
 
-            response = session.post(
-                cars_url,
-                data=payload,
-                timeout=30,
-                verify=REQUESTS_VERIFY,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "X-Requested-With": "XMLHttpRequest",
-                },
+            # to_thread: `requests` is synchronous and this runs inside an
+            # `async def` route. Calling it directly stalled the event loop for
+            # the whole Korea round-trip, which is why one slow Lotte response
+            # delayed every other in-flight request in the worker.
+            response = await asyncio.to_thread(
+                lambda: session.post(
+                    cars_url,
+                    data=payload,
+                    timeout=30,
+                    verify=REQUESTS_VERIFY,
+                    headers={
+                        "Content-Type": "application/x-www-form-urlencoded",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                )
             )
 
             logger.info(f"Статус ответа: {response.status_code}")

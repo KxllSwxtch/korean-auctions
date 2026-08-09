@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, Path
 from typing import Optional, Dict, Any
+import asyncio
 import logging
 import requests
 import json
@@ -30,15 +31,108 @@ from app.core.proxy_config import get_heydealer_proxies
 logger = logging.getLogger(__name__)
 
 
+#: Таймаут по умолчанию (connect, read). Без него запрос через залипший прокси
+#: висит бесконечно и держит воркер до срабатывания gunicorn --timeout.
+_HD_TIMEOUT = (10, 30)
+
+
 def _hd_get(url, **kwargs):
     """requests.get через выделенный корейский прокси HeyDealer (анти-throttle).
 
     Внутри вызывает requests.request, чтобы глобальная замена
     `requests.get -> _hd_get` не приводила к рекурсии. При неконфигурированном
     прокси get_heydealer_proxies() вернёт None и запрос пойдёт напрямую.
+
+    Синхронная функция: из `async def` вызывать только через `_hd_get_async`.
     """
     kwargs.setdefault("proxies", get_heydealer_proxies())
+    kwargs.setdefault("timeout", _HD_TIMEOUT)
     return requests.request("GET", url, **kwargs)
+
+
+async def _hd_get_async(url, **kwargs):
+    """`_hd_get` в отдельном потоке.
+
+    Все роуты здесь объявлены `async def`, а `requests` синхронен, поэтому
+    прямой вызов блокировал событийный цикл на всё время обращения к Корее
+    (замерено 15.8 с на /cars). Пока цикл заблокирован, воркер не отвечает ни
+    на один другой запрос и не шлёт heartbeat, из-за чего gunicorn убивал его
+    по --timeout 120 вместе со всеми параллельными запросами.
+    """
+    return await asyncio.to_thread(lambda: _hd_get(url, **kwargs))
+
+
+#: Сколько поколений опрашивать одновременно при раскрытии model_group.
+_GENERATION_CONCURRENCY = 5
+
+
+async def _fetch_cars_for_generations(generation_ids, params, headers, cookies):
+    """Собрать машины по списку поколений параллельно.
+
+    Раньше это был последовательный цикл: при раскрытии model_group в 10-15
+    поколений он давал столько же последовательных обращений к Корее подряд,
+    что и составляло основную часть 15.8 с ответа /cars.
+
+    Неуспешные поколения раньше молча пропускались (`if status == 200` без
+    `else`), из-за чего частичная выдача выглядела как полная. Теперь такие
+    случаи логируются и возвращаются отдельно, чтобы вызывающий код мог решить,
+    что с ними делать.
+    """
+    semaphore = asyncio.Semaphore(_GENERATION_CONCURRENCY)
+
+    async def fetch_one(gen_id):
+        gen_params = params.copy()
+        gen_params["model"] = gen_id
+        # brand убираем: generation ID уже подразумевает конкретный бренд.
+        gen_params.pop("brand", None)
+
+        async with semaphore:
+            try:
+                response = await _hd_get_async(
+                    "https://api.heydealer.com/v2/dealers/web/cars/",
+                    params=gen_params,
+                    headers=headers,
+                    cookies=cookies,
+                    timeout=30,
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Поколение {gen_id}: запрос не выполнен ({type(e).__name__})"
+                )
+                return gen_id, None
+
+            if response.status_code != 200:
+                logger.warning(
+                    f"Поколение {gen_id}: HeyDealer вернул {response.status_code}"
+                )
+                return gen_id, None
+            try:
+                return gen_id, response.json()
+            except ValueError:
+                logger.warning(f"Поколение {gen_id}: 200, но тело не JSON")
+                return gen_id, None
+
+    results = await asyncio.gather(
+        *(fetch_one(g) for g in generation_ids), return_exceptions=True
+    )
+
+    all_cars = []
+    failed = []
+    for item in results:
+        if isinstance(item, BaseException):
+            failed.append("unknown")
+            continue
+        gen_id, cars = item
+        if cars is None:
+            failed.append(gen_id)
+        else:
+            all_cars.extend(cars)
+
+    if failed:
+        logger.warning(
+            f"Поколения без данных ({len(failed)} из {len(generation_ids)}): {failed}"
+        )
+    return all_cars, failed
 
 
 def is_valid_hash_id(value: str) -> bool:
@@ -207,27 +301,10 @@ async def get_heydealer_cars(
                     current_page=page,
                 )
             
-            # Делаем запросы для каждого generation
-            all_cars = []
-            for gen_id in generation_ids:
-                gen_params = params.copy()
-                gen_params["model"] = gen_id
-                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
-                gen_params.pop("brand", None)
-                
-                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = _hd_get(
-                    "https://api.heydealer.com/v2/dealers/web/cars/",
-                    params=gen_params,
-                    headers=headers,
-                    cookies=cookies,
-                    timeout=30,
-                )
-                
-                if gen_response.status_code == 200:
-                    gen_cars = gen_response.json()
-                    all_cars.extend(gen_cars)
-                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
+            # Поколения опрашиваются параллельно (см. _fetch_cars_for_generations).
+            all_cars, _failed_generations = await _fetch_cars_for_generations(
+                generation_ids, params, headers, cookies
+            )
             
             cars_data = all_cars
             total_count = len(cars_data)
@@ -248,7 +325,7 @@ async def get_heydealer_cars(
             full_url = f"https://api.heydealer.com/v2/dealers/web/cars/?{urlencode(params)}"
             logger.info(f"🔍 Полный URL запроса: {full_url}")
             
-            response = _hd_get(
+            response = await _hd_get_async(
                 "https://api.heydealer.com/v2/dealers/web/cars/",
                 params=params,
                 headers=headers,
@@ -423,7 +500,7 @@ async def get_normalized_heydealer_cars(
         }
 
         # Выполняем запрос
-        response = _hd_get(
+        response = await _hd_get_async(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             headers=headers,
@@ -499,7 +576,7 @@ async def get_heydealer_status(
             }
 
         # Проверяем доступность API
-        response = _hd_get(
+        response = await _hd_get_async(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params={"page": 1, "type": "auction", "is_subscribed": "false"},
             headers=headers,
@@ -682,33 +759,16 @@ async def get_filtered_cars(
                     "current_page": page,
                 }
             
-            # Делаем запросы для каждого generation
-            all_cars = []
-            for gen_id in generation_ids:
-                gen_params = params.copy()
-                gen_params["model"] = gen_id
-                # Удаляем brand, так как generation ID уже подразумевает конкретный бренд
-                gen_params.pop("brand", None)
-                
-                logger.info(f"Запрос для generation {gen_id} с параметрами: {gen_params}")
-                gen_response = _hd_get(
-                    "https://api.heydealer.com/v2/dealers/web/cars/",
-                    params=gen_params,
-                    headers=headers,
-                    cookies=cookies,
-                    timeout=30,
-                )
-                
-                if gen_response.status_code == 200:
-                    gen_cars = gen_response.json()
-                    all_cars.extend(gen_cars)
-                    logger.info(f"Получено {len(gen_cars)} автомобилей для generation {gen_id}")
+            # Поколения опрашиваются параллельно (см. _fetch_cars_for_generations).
+            all_cars, _failed_generations = await _fetch_cars_for_generations(
+                generation_ids, params, headers, cookies
+            )
             
             cars_data = all_cars
             logger.info(f"Model group expansion для {model_group}: получено {len(cars_data)} автомобилей из {len(generation_ids)} поколений")
         else:
             # Обычный запрос
-            response = _hd_get(
+            response = await _hd_get_async(
                 "https://api.heydealer.com/v2/dealers/web/cars/",
                 params=params,
                 headers=headers,
@@ -958,7 +1018,11 @@ async def get_heydealer_car_detail_with_tech_sheet(
         import asyncio
 
         def _fetch_json(url, params=None):
-            """Блокирующий GET, разбирающий тело только при 200 и валидном JSON."""
+            """Блокирующий GET, разбирающий тело только при 200 и валидном JSON.
+
+            Синхронная по замыслу: вызывающий код запускает её через
+            asyncio.to_thread, поэтому здесь нужен именно блокирующий _hd_get.
+            """
             try:
                 response = _hd_get(
                     url,
@@ -1183,7 +1247,7 @@ async def get_heydealer_car_detail_basic(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1327,7 +1391,7 @@ async def get_heydealer_car_detail_direct(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1398,7 +1462,7 @@ async def get_heydealer_car_raw(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1474,7 +1538,7 @@ async def get_heydealer_car_simple(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1560,7 +1624,7 @@ async def debug_heydealer_car(
             }
 
         # Прямой запрос к API
-        response = _hd_get(
+        response = await _hd_get_async(
             f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/",
             headers=headers,
             cookies=cookies,
@@ -1621,7 +1685,7 @@ async def get_heydealer_car_detail_direct_json(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1687,7 +1751,7 @@ async def get_heydealer_car_debug_json(
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-        detail_response = _hd_get(detail_url, headers=headers, cookies=cookies)
+        detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies)
 
         if detail_response.status_code == 200:
             detail_data = detail_response.json()
@@ -1926,7 +1990,7 @@ async def get_brands_direct():
             "is_previously_bid": "false",
         }
 
-        response = _hd_get(
+        response = await _hd_get_async(
             "https://api.heydealer.com/v2/dealers/web/car_meta/brands/",
             params=params,
             cookies=cookies,
@@ -1996,7 +2060,7 @@ async def get_brand_models_direct(brand_hash_id: str):
             "is_previously_bid": "false",
         }
 
-        response = _hd_get(
+        response = await _hd_get_async(
             f"https://api.heydealer.com/v2/dealers/web/car_meta/brands/{brand_hash_id}/",
             params=params,
             cookies=cookies,
@@ -2080,7 +2144,7 @@ async def get_filtered_cars_direct(
         if grade:
             params["grade"] = grade
 
-        response = _hd_get(
+        response = await _hd_get_async(
             "https://api.heydealer.com/v2/dealers/web/cars/",
             params=params,
             cookies=cookies,
@@ -2745,7 +2809,7 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         }
         
         # Выполняем запрос
-        response = _hd_get(
+        response = await _hd_get_async(
             diagram_url,
             params=params,
             headers=headers,
@@ -2770,7 +2834,7 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         try:
             logger.info(f"Fetching car details for actual damage data")
             detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
-            detail_response = _hd_get(detail_url, headers=headers, cookies=cookies, timeout=30)
+            detail_response = await _hd_get_async(detail_url, headers=headers, cookies=cookies, timeout=30)
             
             if detail_response.status_code == 200:
                 car_details = detail_response.json()
