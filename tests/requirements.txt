@@ -1,2 +1,9 @@
+# Test-only dependencies. Kept out of the production requirements.txt so the
+# Render image stays lean.
+#
+# pytest was previously undeclared and not installed in venv/, so
+# tests/run_glovis_tests.sh failed with "No module named pytest" and the whole
+# suite was effectively unrunnable.
+pytest>=8.0
 requests>=2.31.0
 colorama>=0.4.6

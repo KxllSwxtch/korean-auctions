@@ -12,6 +12,24 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
+    # Comma-separated list of origins allowed to call this API.
+    # Replaces the previous allow_origins=["*"] + allow_credentials=True
+    # combination, which made Starlette echo *any* Origin back with
+    # Access-Control-Allow-Credentials: true — letting any website make
+    # credentialed cross-origin calls to every endpoint.
+    cors_allowed_origins: str = (
+        "https://www.autobaza.vip,https://autobaza.vip,http://localhost:3000"
+    )
+
+    # Serve /docs, /redoc and /openapi.json. Off by default: they publish the
+    # full route surface, including admin and debug endpoints.
+    enable_api_docs: bool = False
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        """cors_allowed_origins parsed into a list, blanks dropped."""
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
     # Настройки для парсинга
     request_timeout: int = 30
     max_retries: int = 3
@@ -42,6 +60,31 @@ class Settings(BaseSettings):
     # KCar credentials are provisioned only through the deployment environment.
     kcar_username: Optional[str] = None
     kcar_password: Optional[str] = None
+
+    # SK Auction credentials. Previously hardcoded in
+    # app/services/sk_auction_service.py — moved here so the value is
+    # secret-managed and can be rotated without a code change.
+    sk_auction_username: Optional[str] = None
+    sk_auction_password: Optional[str] = None
+
+    # HeyDealer dealer-account credentials. Previously hardcoded in
+    # app/services/heydealer_auth_service.py.
+    heydealer_username: Optional[str] = None
+    heydealer_password: Optional[str] = None
+
+    # Second Lotte account used by the /api/v2/lotte (enhanced) service.
+    # Previously hardcoded in app/services/enhanced_lotte_service.py.
+    # Falls back to lotte_username/lotte_password when unset.
+    enhanced_lotte_username: Optional[str] = None
+    enhanced_lotte_password: Optional[str] = None
+
+    # On-disk store for HeyDealer model/generation mappings.
+    # This field was read by app/core/heydealer_data_store.py and
+    # app/services/heydealer_sync_service.py but never declared, so importing
+    # either module raised AttributeError. The failure was swallowed by
+    # heydealer_model_mapper, which made every model_group filter silently
+    # return zero cars while still reporting success.
+    heydealer_data_dir: str = "cache/heydealer"
 
     # Dedicated Korean proxy for DB Auto Glovis. Values remain secret-managed;
     # declaring them lets Pydantic accept the same environment used by the

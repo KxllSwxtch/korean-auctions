@@ -1,4 +1,5 @@
 import asyncio
+import secrets
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -24,6 +25,7 @@ from app.models.autohub_filters import (
 )
 from app.services.autohub_service import autohub_service, AutohubService
 from app.core.logging import get_logger
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("autohub_routes")
 
@@ -173,8 +175,7 @@ class SetTokenRequest(BaseModel):
 
 @router.post(
     "/auth/set-token",
-    summary="Set JWT token",
-)
+    summary="Set JWT token", dependencies=[Depends(require_admin_token)])
 async def set_token(
     request: SetTokenRequest,
     service: AutohubService = Depends(get_autohub_service),
@@ -263,7 +264,11 @@ async def snapshot_run(
     expected = settings.autohub_snapshot_admin_token
     if not expected:
         raise HTTPException(status_code=503, detail="Admin trigger not configured")
-    if not x_admin_token or x_admin_token != expected:
+    # compare_digest, not !=, so the comparison does not leak the token prefix
+    # through response timing.
+    if not secrets.compare_digest(
+        (x_admin_token or "").encode("utf-8"), expected.encode("utf-8")
+    ):
         raise HTTPException(status_code=403, detail="Forbidden")
 
     from app.services.autohub_snapshot_job import run_snapshot_job, _run_lock_path

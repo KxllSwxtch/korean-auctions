@@ -13,6 +13,7 @@ from app.models.encar_truck import (
 )
 from app.services.encar_truck_service import encar_truck_service, EncarTruckService
 from app.core.logging import get_logger
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("encar_truck_routes")
 
@@ -212,8 +213,7 @@ async def get_truck_details(
         200: {
             "description": "Cache cleared successfully",
         }
-    }
-)
+    }, dependencies=[Depends(require_admin_token)])
 async def clear_truck_cache(
     service: EncarTruckService = Depends(get_truck_service)
 ):

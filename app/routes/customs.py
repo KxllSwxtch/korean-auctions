@@ -13,6 +13,7 @@ from app.models.customs import (
     CustomsCalculationResponse,
 )
 from app.services.customs_service import CustomsService, customs_service
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("customs_routes")
 
@@ -51,8 +52,7 @@ async def calculate(
 @router.post(
     "/cache/clear",
     summary="Clear customs calculator cache",
-    status_code=status.HTTP_200_OK,
-)
+    status_code=status.HTTP_200_OK, dependencies=[Depends(require_admin_token)])
 async def clear_cache(
     service: CustomsService = Depends(get_customs_service),
 ):

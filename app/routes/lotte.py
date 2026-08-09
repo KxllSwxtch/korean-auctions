@@ -16,6 +16,8 @@ from app.models.lotte import (
 from app.services.lotte_service import LotteService
 from app.core.logging import logger
 from app.core.single_flight import SingleFlight
+from app.core.admin_auth import require_admin_token
+from app.core.tls import REQUESTS_VERIFY
 
 router = APIRouter(prefix="/api/v1/lotte", tags=["Lotte Auction"])
 _lotte_flight = SingleFlight()
@@ -507,7 +509,7 @@ async def get_cars_stats(service: LotteService = Depends(get_lotte_service)):
         }
 
 
-@router.post("/cache/clear", response_model=Dict[str, Any])
+@router.post("/cache/clear", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def clear_cache(service: LotteService = Depends(get_lotte_service)):
     """Очистка кеша"""
     try:
@@ -522,7 +524,7 @@ async def clear_cache(service: LotteService = Depends(get_lotte_service)):
         raise HTTPException(status_code=500, detail=f"Ошибка при очистке кеша: {e}")
 
 
-@router.post("/auth/reset", response_model=Dict[str, Any])
+@router.post("/auth/reset", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def reset_authentication(service: LotteService = Depends(get_lotte_service)):
     """Сброс аутентификации"""
     try:
@@ -540,7 +542,7 @@ async def reset_authentication(service: LotteService = Depends(get_lotte_service
         )
 
 
-@router.get("/debug/auth", response_model=Dict[str, Any])
+@router.get("/debug/auth", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_authentication(service: LotteService = Depends(get_lotte_service)):
     """Отладочный endpoint для тестирования аутентификации"""
     try:
@@ -572,7 +574,7 @@ async def debug_authentication(service: LotteService = Depends(get_lotte_service
         }
 
 
-@router.get("/debug/urls", response_model=Dict[str, Any])
+@router.get("/debug/urls", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_urls(service: LotteService = Depends(get_lotte_service)):
     """Отладочный endpoint для тестирования доступных URL'ов"""
     try:
@@ -606,7 +608,7 @@ async def debug_urls(service: LotteService = Depends(get_lotte_service)):
                 full_url = service.base_url + url_path
                 logger.info(f"Тестируем URL: {full_url}")
 
-                response = session.get(full_url, timeout=10, verify=False)
+                response = session.get(full_url, timeout=10, verify=REQUESTS_VERIFY)
 
                 results[url_path] = {
                     "status_code": response.status_code,
@@ -645,7 +647,7 @@ async def debug_urls(service: LotteService = Depends(get_lotte_service)):
         }
 
 
-@router.get("/debug/page-content", response_model=Dict[str, Any])
+@router.get("/debug/page-content", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_page_content(service: LotteService = Depends(get_lotte_service)):
     """Отладочный endpoint для просмотра содержимого страницы с датой аукциона"""
     try:
@@ -661,7 +663,7 @@ async def debug_page_content(service: LotteService = Depends(get_lotte_service))
 
         # Получаем страницу с датой аукциона
         home_url = service.base_url + service.urls["home"]
-        response = session.get(home_url, timeout=30, verify=False)
+        response = session.get(home_url, timeout=30, verify=REQUESTS_VERIFY)
 
         if response.status_code != 200:
             return {
@@ -713,7 +715,7 @@ async def debug_page_content(service: LotteService = Depends(get_lotte_service))
         }
 
 
-@router.get("/debug/auction-date-direct", response_model=Dict[str, Any])
+@router.get("/debug/auction-date-direct", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_auction_date_direct(service: LotteService = Depends(get_lotte_service)):
     """Прямой вызов метода get_auction_date для отладки"""
     try:
@@ -746,7 +748,7 @@ async def debug_auction_date_direct(service: LotteService = Depends(get_lotte_se
         }
 
 
-@router.get("/debug/auction-date-verbose", response_model=Dict[str, Any])
+@router.get("/debug/auction-date-verbose", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_auction_date_verbose(
     service: LotteService = Depends(get_lotte_service),
 ):
@@ -781,7 +783,7 @@ async def debug_auction_date_verbose(
         home_url = urljoin(service.base_url, service.urls["home"])
 
         try:
-            response = session.get(home_url, timeout=30, verify=False)
+            response = session.get(home_url, timeout=30, verify=REQUESTS_VERIFY)
         except Exception as e:
             return {
                 "step": "http_request_failed",
@@ -840,7 +842,7 @@ async def debug_auction_date_verbose(
         }
 
 
-@router.get("/debug/pagination", response_model=Dict[str, Any])
+@router.get("/debug/pagination", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def debug_pagination(
     limit: int = Query(5, ge=1, le=50, description="Размер страницы"),
     offset: int = Query(0, ge=0, description="Смещение"),

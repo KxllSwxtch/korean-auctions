@@ -22,6 +22,7 @@ from app.models.lotte_filters import (
     LotteCarResult,
 )
 from app.parsers.lotte_filter_parser import LotteFilterParser
+from app.core.tls import REQUESTS_VERIFY
 
 if TYPE_CHECKING:
     from app.services.lotte_service import LotteService
@@ -154,7 +155,7 @@ class LotteFilterService:
 
         def _post() -> requests.Response:
             return self._init_session().post(
-                url, data=data, headers=self.headers, timeout=30, verify=False
+                url, data=data, headers=self.headers, timeout=30, verify=REQUESTS_VERIFY
             )
 
         try:
@@ -524,7 +525,7 @@ class LotteFilterService:
                 data=search_data,
                 headers=search_headers,
                 timeout=30,
-                verify=False,
+                verify=REQUESTS_VERIFY,
             )
 
             if response.status_code == 200:
@@ -649,7 +650,7 @@ class LotteFilterService:
                     data=search_data,
                     headers=search_headers,
                     timeout=30,
-                    verify=False,
+                    verify=REQUESTS_VERIFY,
                 )
 
             response = _do_post()

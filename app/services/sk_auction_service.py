@@ -43,6 +43,7 @@ from app.models.sk_auction import (
 from app.parsers.sk_auction_parser import SKAuctionParser
 from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.core.tls import REQUESTS_VERIFY
 
 
 class SKAuctionService:
@@ -75,9 +76,16 @@ class SKAuctionService:
         self._session_created_at: Optional[datetime] = None
         self._last_auth_check: Optional[datetime] = None
 
-        # Credentials from config
-        self._username = "094200"
-        self._password = "baza9851@@"
+        # Credentials from config. Previously hardcoded here; moved to
+        # settings so they are secret-managed and rotatable without a deploy.
+        self._username = self.settings.sk_auction_username
+        self._password = self.settings.sk_auction_password
+        if not self._username or not self._password:
+            logger.error(
+                "SK Auction credentials are not configured "
+                "(set SK_AUCTION_USERNAME / SK_AUCTION_PASSWORD). "
+                "Authentication will fail until they are provided."
+            )
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
@@ -201,7 +209,7 @@ class SKAuctionService:
         session.cookies.set("selectedLanguage", "en", domain="auction.skcarrental.com")
 
         # Disable SSL verification (some corporate sites have issues)
-        session.verify = False
+        session.verify = REQUESTS_VERIFY
 
         # Gate session.get/post with the process-wide outbound semaphore.
         # Idempotency guard prevents compound wrapping on re-init.

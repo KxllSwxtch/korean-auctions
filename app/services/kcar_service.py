@@ -33,6 +33,7 @@ from app.models.kcar import (
     KCarManufacturer,
 )
 from app.parsers.kcar_parser import KCarParser
+from app.core.tls import REQUESTS_VERIFY
 
 # Отключаем предупреждения SSL
 disable_warnings(InsecureRequestWarning)
@@ -77,7 +78,7 @@ class KCarService:
         """Инициализация HTTP сессии"""
         try:
             # Настройка сессии
-            self.session.verify = False  # Отключаем проверку SSL
+            self.session.verify = REQUESTS_VERIFY  # Отключаем проверку SSL
             self.session.timeout = 30
 
             # Configure outbound HTTP behavior to mirror the Autohub Phase 1
@@ -2123,7 +2124,7 @@ class KCarService:
                 data = {**base_data, "LANE_TYPE": lane_type}
                 try:
                     response = self.session.post(
-                        url, data=data, headers=headers, timeout=10, verify=False
+                        url, data=data, headers=headers, timeout=10, verify=REQUESTS_VERIFY
                     )
                     if response.status_code == 200:
                         result = response.json()

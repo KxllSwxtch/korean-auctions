@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from loguru import logger
 
+from app.core.config import get_settings
 from app.core.proxy_config import get_heydealer_proxies
 
 
@@ -23,9 +24,17 @@ class HeyDealerAuthService:
         self.login_url = "https://api.heydealer.com/v2/dealers/web/login/"
         self.test_url = "https://api.heydealer.com/v2/dealers/web/cars/"
 
-        # Данные для авторизации из auctions-auth.txt
-        self.username = "arman97"
-        self.password = "for1657721@"
+        # Учётные данные берутся из настроек (secret-managed), а не из кода.
+        # Ранее были захардкожены здесь и продублированы в auctions-auth.txt.
+        _settings = get_settings()
+        self.username = _settings.heydealer_username
+        self.password = _settings.heydealer_password
+        if not self.username or not self.password:
+            logger.error(
+                "HeyDealer credentials are not configured "
+                "(set HEYDEALER_USERNAME / HEYDEALER_PASSWORD). "
+                "Authentication will fail until they are provided."
+            )
 
         # Базовые headers для запросов к HeyDealer API
         self.base_headers = {

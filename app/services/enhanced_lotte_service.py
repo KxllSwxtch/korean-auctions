@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 import json
 
 from app.core.base_service import BaseAuctionService, AuthenticationError, ParsingError
+from app.core.config import get_settings
 from app.core.logging import logger
 from app.models.lotte import (
     LotteCar,
@@ -33,8 +34,21 @@ class EnhancedLotteService(BaseAuctionService):
     """
 
     def __init__(self, use_async: bool = False, proxy_list: Optional[List] = None):
-        # Учетные данные из конфигурации
-        credentials = {"username": "119102", "password": "for1234@"}
+        # Учетные данные из конфигурации (secret-managed), ранее захардкожены.
+        # Этот сервис использует отдельный аккаунт Lotte; если он не задан,
+        # откатываемся на основные учётные данные Lotte.
+        _settings = get_settings()
+        credentials = {
+            "username": _settings.enhanced_lotte_username or _settings.lotte_username,
+            "password": _settings.enhanced_lotte_password or _settings.lotte_password,
+        }
+        if not credentials["username"] or not credentials["password"]:
+            logger.error(
+                "Enhanced Lotte credentials are not configured "
+                "(set ENHANCED_LOTTE_USERNAME / ENHANCED_LOTTE_PASSWORD, "
+                "or LOTTE_USERNAME / LOTTE_PASSWORD). "
+                "Authentication will fail until they are provided."
+            )
 
         super().__init__(
             auction_name="lotte",

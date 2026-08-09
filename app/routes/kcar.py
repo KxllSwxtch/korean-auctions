@@ -17,6 +17,7 @@ from app.models.kcar import (
 )
 from app.services.kcar_service import KCarService
 from app.core.single_flight import SingleFlight
+from app.core.admin_auth import require_admin_token
 
 router = APIRouter(prefix="/api/v1/kcar", tags=["KCar"])
 
@@ -807,7 +808,7 @@ async def get_search_filters_info():
         )
 
 
-@router.get("/debug/filters")
+@router.get("/debug/filters", dependencies=[Depends(require_admin_token)])
 async def debug_kcar_filters(
     manufacturer: Optional[str] = Query(
         None, description="Код производителя для отладки"
