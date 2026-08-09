@@ -61,6 +61,16 @@ class HeyDealerAuthService:
         self._validated_until: Optional[datetime] = None
         self._validation_ttl = timedelta(seconds=60)
 
+        # Негативное кэширование неудачной авторизации.
+        #
+        # Без него каждый запрос при нерабочих учётных данных заново ходил в
+        # HeyDealer: валидация + попытка логина, ~5.8 с на запрос. Фронтенд
+        # опрашивает /heydealer/health каждые 30 с в каждой открытой вкладке,
+        # поэтому это превращалось в поток неудачных логинов под общим
+        # дилерским аккаунтом — прямой путь к блокировке аккаунта.
+        self._auth_failed_until: Optional[datetime] = None
+        self._auth_failure_ttl = timedelta(seconds=60)
+
     def _create_session(self) -> requests.Session:
         """Создает requests.Session с базовыми headers для автоматического управления cookies."""
         session = requests.Session()
@@ -293,6 +303,7 @@ class HeyDealerAuthService:
             # Обновляем in-memory кэш и помечаем сессию как только что валидную.
             self._cached_session = session_data
             self._validated_until = datetime.now() + self._validation_ttl
+            self._auth_failed_until = None
             logger.info("Сессия сохранена (атомарно)")
         except Exception as e:
             logger.error(f"Ошибка сохранения сессии: {e}")
@@ -305,6 +316,14 @@ class HeyDealerAuthService:
             Tuple[cookies, headers] или (None, None) при ошибке
         """
         try:
+            # Недавняя неудача — не ходим в сеть до истечения backoff.
+            if self._auth_failed_until and datetime.now() < self._auth_failed_until:
+                logger.debug(
+                    "HeyDealer: авторизация недавно не удалась, "
+                    f"повтор после {self._auth_failed_until:%H:%M:%S}"
+                )
+                return None, None
+
             # Быстрый путь: недавно провалидированная сессия из памяти — без сети.
             if (
                 self._cached_session
@@ -345,10 +364,12 @@ class HeyDealerAuthService:
                 return session_data.get("cookies"), session_data.get("headers")
 
             logger.error("❌ Не удалось создать новую сессию")
+            self._auth_failed_until = datetime.now() + self._auth_failure_ttl
             return None, None
 
         except Exception as e:
             logger.error(f"Ошибка получения валидной сессии: {e}")
+            self._auth_failed_until = datetime.now() + self._auth_failure_ttl
             return None, None
 
     def get_headers_and_cookies(
