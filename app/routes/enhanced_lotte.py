@@ -12,6 +12,7 @@ from app.services.enhanced_lotte_service import EnhancedLotteService
 from app.models.lotte import LotteResponse, LotteCar, LotteError, LotteAuctionDate
 from app.core.logging import logger
 from app.core.anti_block import ProxyConfig
+from app.core.admin_auth import require_admin_token
 
 router = APIRouter(prefix="/api/v2/lotte", tags=["Enhanced Lotte Auction"])
 
@@ -404,7 +405,7 @@ async def health_check(
         }
 
 
-@router.post("/admin/clear-cache", response_model=Dict[str, Any])
+@router.post("/admin/clear-cache", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def clear_cache(
     service_type: str = Query(
         "both", regex="^(sync|async|both)$", description="Тип сервиса"
@@ -437,7 +438,7 @@ async def clear_cache(
         raise HTTPException(status_code=500, detail=f"Ошибка очистки кэша: {str(e)}")
 
 
-@router.post("/admin/reset-auth", response_model=Dict[str, Any])
+@router.post("/admin/reset-auth", response_model=Dict[str, Any], dependencies=[Depends(require_admin_token)])
 async def reset_authentication(
     service_type: str = Query(
         "both", regex="^(sync|async|both)$", description="Тип сервиса"

@@ -12,6 +12,7 @@ from app.models.pan_auto import (
 )
 from app.services.pan_auto_service import pan_auto_service, PanAutoService
 from app.core.logging import get_logger
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("pan_auto_routes")
 
@@ -105,8 +106,7 @@ async def get_car_detail(
         200: {
             "description": "Cache cleared successfully",
         }
-    }
-)
+    }, dependencies=[Depends(require_admin_token)])
 async def clear_cache(
     service: PanAutoService = Depends(get_pan_auto_service)
 ):

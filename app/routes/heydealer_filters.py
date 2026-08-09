@@ -27,13 +27,32 @@ router = APIRouter()
 parser = HeyDealerParser()
 
 
+#: Fallback timeout for every outbound HeyDealer call. Without a default the
+#: request can hang indefinitely, holding a worker until gunicorn's --timeout
+#: kills it.
+_HD_TIMEOUT = (10, 30)  # (connect, read)
+
+
 def _hd_get(url, **kwargs):
     """requests.get через выделенный корейский прокси HeyDealer (анти-throttle).
 
     Через requests.request, чтобы замена `requests.get -> _hd_get` не рекурсила.
     """
     kwargs.setdefault("proxies", get_heydealer_proxies())
+    kwargs.setdefault("timeout", _HD_TIMEOUT)
     return requests.request("GET", url, **kwargs)
+
+
+def _safe_reason(exc: BaseException) -> str:
+    """Class name only — never echo exception text to a client.
+
+    _hd_get injects proxies=get_heydealer_proxies(), whose URLs are of the form
+    http://<user>:<pass>@<host>. requests' ProxyError/InvalidProxyURL messages
+    embed that URL verbatim, so returning str(exc) would leak
+    HEYDEALER_PROXY_PASSWORD to an unauthenticated caller.
+    The full exception is logged server-side instead.
+    """
+    return type(exc).__name__
 
 # Removed hardcoded headers and cookies - using auth service instead
 
@@ -86,10 +105,20 @@ async def get_brands():
         
         return parser.parse_brands(data)
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer upstream request failed")
+        raise HTTPException(
+            status_code=502, detail=f"Upstream request failed: {_safe_reason(e)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
+        logger.exception("HeyDealer response parsing failed")
+        raise HTTPException(
+            status_code=500, detail=f"Parsing failed: {_safe_reason(e)}"
+        )
 
 
 @router.get(
@@ -132,10 +161,20 @@ async def get_brand_models(brand_hash_id: str):
         response_data = response.json()
         return parser.parse_brand_detail(response_data)
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer upstream request failed")
+        raise HTTPException(
+            status_code=502, detail=f"Upstream request failed: {_safe_reason(e)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
+        logger.exception("HeyDealer response parsing failed")
+        raise HTTPException(
+            status_code=500, detail=f"Parsing failed: {_safe_reason(e)}"
+        )
 
 
 @router.get(
@@ -200,10 +239,20 @@ async def get_model_generations(model_group_hash_id: str):
         
         return parser.parse_model_detail(response_data)
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer upstream request failed")
+        raise HTTPException(
+            status_code=502, detail=f"Upstream request failed: {_safe_reason(e)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
+        logger.exception("HeyDealer response parsing failed")
+        raise HTTPException(
+            status_code=500, detail=f"Parsing failed: {_safe_reason(e)}"
+        )
 
 
 @router.get(
@@ -248,10 +297,20 @@ async def get_model_configurations(model_hash_id: str):
         response_data = response.json()
         return parser.parse_grade_detail(response_data)
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer upstream request failed")
+        raise HTTPException(
+            status_code=502, detail=f"Upstream request failed: {_safe_reason(e)}"
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parsing failed: {str(e)}")
+        logger.exception("HeyDealer response parsing failed")
+        raise HTTPException(
+            status_code=500, detail=f"Parsing failed: {_safe_reason(e)}"
+        )
 
 
 @router.get("/cars/search", response_model=HeyDealerListResponse)
@@ -306,8 +365,15 @@ async def search_cars(
                 detail=f"API request failed: {response.text}",
             )
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer request failed")
+        raise HTTPException(
+            status_code=500, detail=f"Request failed: {_safe_reason(e)}"
+        )
 
 
 @router.get("/", response_model=HeyDealerFiltersResponse)
@@ -340,8 +406,15 @@ async def get_available_filters():
                 detail=f"API request failed: {response.text}",
             )
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer request failed")
+        raise HTTPException(
+            status_code=500, detail=f"Request failed: {_safe_reason(e)}"
+        )
 
 
 @router.post("/cars/advanced-search", response_model=HeyDealerListResponse)
@@ -383,8 +456,15 @@ async def advanced_search_cars(filters: HeyDealerAdvancedFilterParams):
                 detail=f"API request failed: {response.text}",
             )
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer request failed")
+        raise HTTPException(
+            status_code=500, detail=f"Request failed: {_safe_reason(e)}"
+        )
 
 
 @router.get("/cars/advanced-search", response_model=HeyDealerListResponse)
@@ -517,5 +597,12 @@ async def advanced_search_cars_get(
                 detail=f"API request failed: {response.text}",
             )
 
+    except HTTPException:
+        # Must precede the catch-all: HTTPException subclasses Exception, so
+        # without this every 401/404/429 raised above was rewritten to a 500.
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        logger.exception("HeyDealer request failed")
+        raise HTTPException(
+            status_code=500, detail=f"Request failed: {_safe_reason(e)}"
+        )

@@ -15,6 +15,7 @@ from app.models.green_equipment import (
 )
 from app.services.green_equipment_service import green_equipment_service, GreenEquipmentService
 from app.core.logging import get_logger
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("green_equipment_routes")
 
@@ -288,8 +289,7 @@ async def get_categories(
         200: {
             "description": "Cache cleared successfully",
         }
-    }
-)
+    }, dependencies=[Depends(require_admin_token)])
 async def clear_equipment_cache(
     service: GreenEquipmentService = Depends(get_equipment_service)
 ):

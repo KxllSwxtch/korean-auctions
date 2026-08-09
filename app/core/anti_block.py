@@ -21,6 +21,7 @@ from tenacity import (
 import logging
 
 from app.core.logging import logger
+from app.core.tls import REQUESTS_VERIFY
 
 
 @dataclass
@@ -335,7 +336,7 @@ class AntiBlockClient:
             kwargs["headers"]["Referer"] = f"{parsed.scheme}://{parsed.netloc}/"
 
         try:
-            response = session.request(method, url, verify=False, **kwargs)
+            response = session.request(method, url, verify=REQUESTS_VERIFY, **kwargs)
 
             # Проверяем на признаки блокировки
             if self._is_blocked(response):

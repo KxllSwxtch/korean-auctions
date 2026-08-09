@@ -17,8 +17,9 @@ from app.models.happycar import (
 from app.parsers.happycar_parser import HappyCarParser
 from app.core.config import get_settings
 from app.core.proxy_config import get_proxy_pool
+from app.core.tls import REQUESTS_VERIFY
 
-# Suppress InsecureRequestWarning for verify=False
+# Suppress InsecureRequestWarning for verify=REQUESTS_VERIFY
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 settings = get_settings()
@@ -154,7 +155,7 @@ class HappyCarService:
         session.proxies = self._proxy_pool.current_dict()
 
         # SSL verification disabled (required for some Korean sites behind proxies)
-        session.verify = False
+        session.verify = REQUESTS_VERIFY
 
         return session
 

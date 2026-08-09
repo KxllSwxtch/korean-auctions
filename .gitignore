@@ -48,11 +48,13 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Test files
-test_*.py
-*_test.py
-!tests/test_ssancar_routes.py
-!tests/test_ssancar_transport.py
+# Scratch test scripts at the repo root only.
+# These patterns used to be unanchored, so they also matched everything under
+# tests/ — any newly added test file was silently untracked, and the existing
+# suite survived only because it predated the rule. Anchoring to the root keeps
+# the original intent (ignore one-off probe scripts) without hiding real tests.
+/test_*.py
+/*_test.py
 
 # Temporary files
 *.tmp

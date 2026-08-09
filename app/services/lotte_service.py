@@ -44,6 +44,7 @@ from app.parsers.lotte_parser import (
 )
 from app.core.session_manager import SessionManager
 from app.services.base_auction_service import BaseAuctionService
+from app.core.tls import REQUESTS_VERIFY
 
 
 class LotteService(BaseAuctionService):
@@ -168,7 +169,7 @@ class LotteService(BaseAuctionService):
 
         # Step 1: Get login page for cookies/session
         login_page_url = urljoin(self.base_url, self.urls["login"])
-        response = session.get(login_page_url, timeout=30, verify=False)
+        response = session.get(login_page_url, timeout=30, verify=REQUESTS_VERIFY)
 
         if response.status_code != 200:
             logger.error(f"Не удалось получить страницу логина: {response.status_code}")
@@ -195,7 +196,7 @@ class LotteService(BaseAuctionService):
         )
 
         check_response = session.post(
-            login_check_url, data=login_check_data, timeout=30, verify=False
+            login_check_url, data=login_check_data, timeout=30, verify=REQUESTS_VERIFY
         )
 
         if check_response.status_code != 200:
@@ -253,7 +254,7 @@ class LotteService(BaseAuctionService):
             login_action_url,
             data=final_login_data,
             timeout=30,
-            verify=False,
+            verify=REQUESTS_VERIFY,
             allow_redirects=False,
         )
 
@@ -277,7 +278,7 @@ class LotteService(BaseAuctionService):
 
             # Follow redirect manually to capture cookies properly
             redirect_url = urljoin(self.base_url, location)
-            session.get(redirect_url, timeout=15, verify=False)
+            session.get(redirect_url, timeout=15, verify=REQUESTS_VERIFY)
 
         elif final_response.status_code == 200:
             # Direct 200 — check if it's actually the login page
@@ -336,7 +337,7 @@ class LotteService(BaseAuctionService):
         try:
             session = self._init_session()
             test_url = urljoin(self.base_url, self.urls["home"])
-            response = session.get(test_url, timeout=15, verify=False)
+            response = session.get(test_url, timeout=15, verify=REQUESTS_VERIFY)
             logger.debug(f"Session validation status: {response.status_code}")
             if response.status_code != 200:
                 logger.warning(f"Session validation: unexpected status {response.status_code}")
@@ -401,7 +402,7 @@ class LotteService(BaseAuctionService):
 
             # Получаем главную страницу с датой аукциона
             home_url = urljoin(self.base_url, self.urls["home"])
-            response = session.get(home_url, timeout=30, verify=False)
+            response = session.get(home_url, timeout=30, verify=REQUESTS_VERIFY)
 
             if response.status_code != 200:
                 logger.error(
@@ -507,7 +508,7 @@ class LotteService(BaseAuctionService):
                 "searchExhiRegiSeq": car_basic_data["searchExhiRegiSeq"],
             }
 
-            response = session.get(details_url, params=params, timeout=30, verify=False)
+            response = session.get(details_url, params=params, timeout=30, verify=REQUESTS_VERIFY)
 
             if response.status_code != 200:
                 logger.warning(
@@ -686,7 +687,7 @@ class LotteService(BaseAuctionService):
 
             session = self._init_session()
             home_url = urljoin(self.base_url, self.urls["home"])
-            response = session.get(home_url, timeout=30, verify=False)
+            response = session.get(home_url, timeout=30, verify=REQUESTS_VERIFY)
 
             if response.status_code != 200:
                 logger.error(f"Failed to fetch home page for total count: {response.status_code}")
@@ -834,7 +835,7 @@ class LotteService(BaseAuctionService):
                 cars_url,
                 data=payload,
                 timeout=30,
-                verify=False,
+                verify=REQUESTS_VERIFY,
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
                     "X-Requested-With": "XMLHttpRequest",
@@ -1157,7 +1158,7 @@ class LotteService(BaseAuctionService):
                 data=data,
                 headers=headers,
                 timeout=30,
-                verify=False
+                verify=REQUESTS_VERIFY
             )
             
             logger.info(f"Статус ответа истории: {response.status_code}")

@@ -501,14 +501,50 @@ def test_shared_cache_stats_include_an_existing_glovis_service(monkeypatch):
     assert service.get_cache_stats() in stats_response.json()["services"]
 
 
-def test_public_cache_clear_cannot_evict_glovis(monkeypatch):
+def test_shared_cache_clear_cannot_evict_glovis(monkeypatch):
+    """The shared cache-clear must never touch Glovis, even when authorized."""
     service = StubGlovisService()
     monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.setenv("ADMIN_API_TOKEN", "managed-admin-secret")
 
-    response = TestClient(main.app).post("/api/v1/cache/clear")
+    response = TestClient(main.app).post(
+        "/api/v1/cache/clear",
+        headers={"X-Admin-Token": "managed-admin-secret"},
+    )
 
     assert response.status_code == 200
     assert "Glovis" not in response.json()["cleared"]
+    assert service.clear_calls == 0
+
+
+@pytest.mark.parametrize("provided", [None, "wrong-value"])
+def test_shared_cache_clear_rejects_missing_or_wrong_token(monkeypatch, provided):
+    """Anonymous callers must not be able to force an upstream stampede.
+
+    Left ungated, looping this endpoint flushes every provider cache and drives
+    repeated scrapes against six Korean auction sites, risking an IP ban.
+    """
+    service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.setenv("ADMIN_API_TOKEN", "managed-admin-secret")
+    headers = {} if provided is None else {"X-Admin-Token": provided}
+
+    response = TestClient(main.app).post("/api/v1/cache/clear", headers=headers)
+
+    assert response.status_code == 403
+    assert "managed-admin-secret" not in response.text
+    assert service.clear_calls == 0
+
+
+def test_shared_cache_clear_fails_closed_when_admin_token_unset(monkeypatch):
+    """A missing ADMIN_API_TOKEN must close the endpoint, not reopen it."""
+    service = StubGlovisService()
+    monkeypatch.setattr(glovis, "glovis_service", service)
+    monkeypatch.delenv("ADMIN_API_TOKEN", raising=False)
+
+    response = TestClient(main.app).post("/api/v1/cache/clear")
+
+    assert response.status_code == 503
     assert service.clear_calls == 0
 
 

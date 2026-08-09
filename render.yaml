@@ -10,6 +10,38 @@ services:
         value: 3.12.1
       - key: PORT
         value: 10000
+      # Origins permitted to call this API. Previously the app used
+      # allow_origins=["*"] together with allow_credentials=True, which makes
+      # Starlette echo any caller's Origin back with
+      # Access-Control-Allow-Credentials: true — so any website could issue
+      # credentialed cross-origin requests to every endpoint.
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://www.autobaza.vip,https://autobaza.vip
+      # /docs, /redoc and /openapi.json publish the full route surface,
+      # including admin and debug endpoints. Off in production.
+      - key: ENABLE_API_DOCS
+        value: "false"
+      # Shared token for destructive endpoints (cache clear, auth reset,
+      # Autohub token overwrite). Unset -> those endpoints fail closed with 503.
+      # Secret: set in the Render dashboard.
+      - key: ADMIN_API_TOKEN
+        sync: false
+      # Auction credentials. These were previously hardcoded in tracked source
+      # (sk_auction_service.py, heydealer_auth_service.py,
+      # enhanced_lotte_service.py) and duplicated in auctions-auth.txt, which
+      # is still reachable in git history — ROTATE before setting these.
+      - key: SK_AUCTION_USERNAME
+        sync: false
+      - key: SK_AUCTION_PASSWORD
+        sync: false
+      - key: HEYDEALER_USERNAME
+        sync: false
+      - key: HEYDEALER_PASSWORD
+        sync: false
+      - key: ENHANCED_LOTTE_USERNAME
+        sync: false
+      - key: ENHANCED_LOTTE_PASSWORD
+        sync: false
       # Wednesday-snapshot mode (see plans/wednesday-snapshot-mode.md).
       # Deploy dark first: leave AUTOHUB_SNAPSHOT_ENABLED=false until the
       # first manual run is verified, then flip to true.

@@ -4,7 +4,7 @@ from pathlib import Path
 import secrets
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header
+from fastapi import Depends, FastAPI, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -41,6 +41,7 @@ from app.routes import (  # noqa: E402 — env hydration must precede app import
     exchange_rate,
     diagnostics,
 )
+from app.core.admin_auth import require_admin_token  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
 from app.core.logging import setup_logging  # noqa: E402
 from app.core.scheduler import start_scheduler, stop_scheduler  # noqa: E402
@@ -90,8 +91,11 @@ app = FastAPI(
     title="AutoBaza Parser API",
     description="API для парсинга автомобильных аукционов",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # Docs expose the full route surface (including admin and debug endpoints),
+    # so they are opt-in via ENABLE_API_DOCS rather than always on.
+    docs_url="/docs" if settings.enable_api_docs else None,
+    redoc_url="/redoc" if settings.enable_api_docs else None,
+    openapi_url="/openapi.json" if settings.enable_api_docs else None,
     default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
@@ -99,13 +103,20 @@ app = FastAPI(
 # GZip compression (before CORS to compress all responses)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS middleware
+# CORS middleware.
+# allow_origins=["*"] together with allow_credentials=True makes Starlette
+# reflect the caller's Origin back and set Access-Control-Allow-Credentials,
+# so any website could issue credentialed cross-origin calls to every route
+# (see starlette/middleware/cors.py — allow_all_origins + has_cookie).
+# Origins are therefore explicit, and methods are limited to what the
+# frontend actually uses.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # В продакшене указать конкретные домены
+    allow_origins=settings.cors_origin_list,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    max_age=600,
 )
 
 # Подключение маршрутов
@@ -248,9 +259,17 @@ async def cache_stats():
     return {"services": stats, "total_services": len(stats)}
 
 
-@app.post("/api/v1/cache/clear", tags=["Cache"])
+@app.post(
+    "/api/v1/cache/clear",
+    tags=["Cache"],
+    dependencies=[Depends(require_admin_token)],
+)
 async def clear_cache():
-    """Clear all service caches"""
+    """Clear all service caches. Requires X-Admin-Token.
+
+    Left ungated this let anyone force a stampede of upstream scrapes against
+    six Korean auction sites, which risks an IP or account ban.
+    """
     cleared = []
 
     try:

@@ -23,13 +23,21 @@ class AsyncSessionConfig:
 
     connector_limit: int = 100
     connector_limit_per_host: int = 30
-    timeout_total: int = 300
+    # Must stay below gunicorn's --timeout (120s in start.sh): a request that
+    # outlives the worker timeout can never return, the arbiter SIGKILLs the
+    # worker first and every other in-flight request dies with it.
+    timeout_total: int = 90
     timeout_connect: int = 30
     timeout_sock_read: int = 60
     max_redirects: int = 10
     retry_attempts: int = 3
     retry_delay: float = 1.0
-    use_ssl: bool = False
+    # Verify TLS by default. This previously defaulted to False and
+    # BaseAuctionService never overrode it, so SHARED_SSL_CONTEXT was imported
+    # but never used and auction credentials were POSTed over connections with
+    # certificate validation disabled — through third-party residential
+    # proxies, i.e. exactly the party able to intercept them.
+    use_ssl: bool = True
 
 
 class AsyncSessionManager:

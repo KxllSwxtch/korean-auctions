@@ -105,3 +105,38 @@ def _initialise() -> ssl.SSLContext:
 #: Shared, verifying SSL context. Pass this to every ``TCPConnector`` instead of
 #: ``ssl=True`` so trust resolution is identical across environments.
 SHARED_SSL_CONTEXT: ssl.SSLContext = _initialise()
+
+
+def _resolve_requests_verify() -> bool:
+    """Whether ``requests`` calls should verify TLS certificates.
+
+    Every auction host we talk to (Lotte, KCar, HeyDealer, Autohub, SK, SAA)
+    presents a certificate that validates against certifi, so the historical
+    ``verify=False`` scattered across the services was never required. It was
+    actively harmful: HeyDealer, Glovis and HappyCar traffic is routed through
+    third-party residential proxies, and disabling verification hands the proxy
+    operator the ability to intercept the auction passwords in transit.
+
+    ``TLS_VERIFY=false`` remains as a break-glass switch in case an upstream
+    ships a broken chain, but it should be treated as an incident, not a
+    configuration. ``requests`` uses certifi's bundle directly, so it is
+    unaffected by the empty-system-store problem described above.
+    """
+    return os.getenv("TLS_VERIFY", "true").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+#: Pass as ``verify=`` to every ``requests`` call. True unless TLS_VERIFY says
+#: otherwise.
+REQUESTS_VERIFY: bool = _resolve_requests_verify()
+
+if not REQUESTS_VERIFY:
+    logger.warning(
+        "🔓 TLS_VERIFY is disabled — outbound requests will NOT validate "
+        "certificates. Credentials are exposed to anyone on the path, "
+        "including the proxy operator. Re-enable as soon as possible."
+    )

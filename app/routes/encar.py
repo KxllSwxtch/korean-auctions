@@ -10,6 +10,7 @@ from app.models.encar import (
 from app.services.encar_service import encar_service, EncarService
 from app.core.logging import get_logger
 from app.core.single_flight import SingleFlight
+from app.core.admin_auth import require_admin_token
 
 logger = get_logger("encar_routes")
 
@@ -190,8 +191,7 @@ async def get_filters(
         200: {
             "description": "Cache cleared successfully",
         }
-    }
-)
+    }, dependencies=[Depends(require_admin_token)])
 async def clear_cache(
     service: EncarService = Depends(get_encar_service)
 ):
