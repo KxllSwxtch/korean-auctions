@@ -53,6 +53,16 @@ _OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
 class AutohubService:
     """Service for Autohub JSON API"""
 
+    #: Hard cap on cached entries.
+    #:
+    #: `_cache` only ever evicted a key when that same key was read back after
+    #: expiry, so anything looked up once and never again stayed for the life
+    #: of the worker. Keys are md5(filter params), so the key space grows with
+    #: every distinct filter combination a user tries — it could only grow.
+    #: The cap keeps that bounded; entries hold JSON payloads now that image
+    #: bytes are no longer cached here (see get_image).
+    _CACHE_MAX_ENTRIES = 512
+
     def __init__(self):
         self.settings = get_settings()
         self._session: Optional[requests.Session] = None
@@ -201,7 +211,22 @@ class AutohubService:
         return None
 
     def _save_to_cache(self, key: str, data: Any) -> None:
+        if len(self._cache) >= self._CACHE_MAX_ENTRIES and key not in self._cache:
+            self._evict_oldest()
         self._cache[key] = (data, time.time())
+
+    def _evict_oldest(self) -> None:
+        """Drop the oldest tenth of the cache once it is full.
+
+        Evicting in a batch rather than one key at a time keeps this off the
+        hot path: the scan is O(n) over at most _CACHE_MAX_ENTRIES, and it runs
+        once per ~50 inserts instead of on every insert past the cap.
+        """
+        drop = max(1, self._CACHE_MAX_ENTRIES // 10)
+        oldest = sorted(self._cache.items(), key=lambda kv: kv[1][1])[:drop]
+        for key, _ in oldest:
+            self._cache.pop(key, None)
+        logger.debug(f"Autohub cache full — evicted {len(oldest)} oldest entries")
 
     def _make_cache_key(self, prefix: str, params: Optional[Dict] = None) -> str:
         if params:
@@ -834,12 +859,23 @@ class AutohubService:
         return results
 
     def get_image(self, file_id: str) -> tuple:
-        """Fetch image from Autohub API, returns (bytes, content_type)."""
-        cache_key = self._make_cache_key("image", {"file_id": file_id})
-        cached = self._get_from_cache(cache_key, ttl=86400)
-        if cached:
-            return cached
+        """Fetch image from Autohub API, returns (bytes, content_type).
 
+        Deliberately NOT cached in-process.
+
+        This used to store `(response.content, content_type)` — the raw JPEG —
+        in the shared `_cache` dict with a 24h TTL. That dict is unbounded and
+        keyed by file_id, so the key space grows with the catalogue: paging
+        through galleries at ~200KB an image leaked roughly 200MB per thousand
+        images, per worker, and never released it. On Render's 512MB starter
+        plan that is an OOM restart loop.
+
+        Caching belongs in the HTTP layer here, and already happens there: the
+        route serves these with a long-lived immutable Cache-Control, so the
+        browser and the CDN keep them and this process never sees a repeat
+        request for the same file. An in-process copy only ever helped the
+        first request per worker, which is not worth the memory risk.
+        """
         self._ensure_authenticated()
         url = f"{self.api_base}/file/external/rest/api/v1/image/{file_id}"
         with _OUTBOUND_LIMIT:
@@ -860,9 +896,7 @@ class AutohubService:
         response.raise_for_status()
 
         content_type = response.headers.get("content-type", "image/jpeg")
-        result = (response.content, content_type)
-        self._save_to_cache(cache_key, result)
-        return result
+        return response.content, content_type
 
     def get_auth_status(self) -> Dict[str, Any]:
         """Check JWT token validity and auto-login status."""

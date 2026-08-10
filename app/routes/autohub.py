@@ -123,13 +123,25 @@ async def get_image(
     file_id: str,
     service: AutohubService = Depends(get_autohub_service),
 ) -> Response:
-    """Proxy image from Autohub API with authentication."""
+    """Proxy image from Autohub API with authentication.
+
+    Caching is done entirely here rather than in the service: a file_id
+    addresses one immutable image, so it can be cached hard and forever. This
+    is what replaces the in-process byte cache that get_image used to keep (see
+    its docstring) — the CDN and the browser now absorb the repeat traffic
+    instead of the worker's heap.
+    """
     try:
-        image_bytes, content_type = service.get_image(file_id)
+        image_bytes, content_type = await asyncio.to_thread(
+            service.get_image, file_id
+        )
         return Response(
             content=image_bytes,
             media_type=content_type,
-            headers={"Cache-Control": "public, max-age=86400"},
+            headers={
+                # Immutable content: the bytes behind a file_id never change.
+                "Cache-Control": "public, max-age=31536000, immutable",
+            },
         )
     except Exception as e:
         logger.error(f"Image proxy error for {file_id}: {e}")
