@@ -5,11 +5,12 @@ Service for interacting with SK Car Rental Auction API.
 URL: https://auction.skcarrental.com
 """
 
+import os
 import time
 import json
 import hashlib
 import threading
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 import requests
 from requests.adapters import HTTPAdapter
@@ -69,6 +70,18 @@ class SKAuctionService:
     SESSION_TIMEOUT = 30 * 60  # 30 minutes in seconds
     SESSION_REFRESH_BUFFER = 5 * 60  # Refresh 5 minutes before expiry
 
+    # How long a failed login suppresses the next attempt. Short enough that a
+    # transient upstream blip recovers on the following request, long enough
+    # that a persistently rejected password cannot be retried by every request
+    # against one shared dealer account.
+    _AUTH_FAILURE_BACKOFF_SECONDS = 60
+
+    # Bound on waiting for another thread's login. asyncio.to_thread shares one
+    # default ThreadPoolExecutor across every provider route, so threads parked
+    # here indefinitely would starve Lotte, KCar and Encar as well. Sits above
+    # the 30s login timeouts below and well under gunicorn's --timeout 120.
+    _AUTH_LOCK_TIMEOUT_SECONDS = 35
+
     def __init__(self):
         self.settings = get_settings()
         self.parser = SKAuctionParser()
@@ -77,16 +90,17 @@ class SKAuctionService:
         self._session_created_at: Optional[datetime] = None
         self._last_auth_check: Optional[datetime] = None
 
-        # Credentials from config. Previously hardcoded here; moved to
-        # settings so they are secret-managed and rotatable without a deploy.
-        self._username = self.settings.sk_auction_username
-        self._password = self.settings.sk_auction_password
-        if not self._username or not self._password:
-            logger.error(
-                "SK Auction credentials are not configured "
-                "(set SK_AUCTION_USERNAME / SK_AUCTION_PASSWORD). "
-                "Authentication will fail until they are provided."
-            )
+        # Serialises login. Without it every thread that saw an expired session
+        # raced into _create_session(), producing N simultaneous login POSTs on
+        # one shared account. Matches happycar_service._auth_lock and
+        # heydealer_auth_service._login_lock.
+        self._auth_lock = threading.Lock()
+
+        # Set only by a login attempt that reached the network and failed;
+        # cleared on success. A missing credential deliberately never lands
+        # here — see _raise_if_backing_off.
+        self._last_auth_attempt_at: Optional[datetime] = None
+        self._last_auth_reason: Optional[str] = None
 
         # In-memory cache with tiered TTL
         self._cache: Dict[str, tuple] = {}
@@ -132,11 +146,32 @@ class SKAuctionService:
 
     # ==================== Session Management ====================
 
+    def _credentials(self) -> Tuple[Optional[str], Optional[str]]:
+        """Resolve credentials at call time, environment first.
+
+        __init__ used to snapshot these into instance attributes from an
+        lru_cache'd Settings object built at import — and app/routes/sk_auction
+        constructs this service at import, inside the gunicorn --preload master.
+        The values could therefore never be re-read. This is the rationale
+        app/core/config.py:124-131 already gives for proxy_config.py, and the
+        reason Glovis survives env-hydration ordering: it reads os.environ when
+        it needs a value, not when the module loads.
+        """
+        username = os.getenv("SK_AUCTION_USERNAME", "").strip() or self.settings.sk_auction_username
+        password = os.getenv("SK_AUCTION_PASSWORD", "").strip() or self.settings.sk_auction_password
+        return username, password
+
     @property
     def session(self) -> requests.Session:
-        """Get or create an authenticated session"""
-        if self._session is None or self._needs_session_refresh():
-            self._create_session()
+        """Get an authenticated session, creating one under the auth lock.
+
+        This used to call _create_session() directly, which made it a second
+        unlocked entry point into login. That is doubly unsafe now that a
+        failed login leaves _session_created_at unset: _needs_session_refresh()
+        then returns True, so every attribute access would attempt a fresh
+        login.
+        """
+        self._ensure_authenticated()
         return self._session
 
     def _get_from_cache(self, key: str, ttl: int = 300) -> Optional[Any]:
@@ -175,14 +210,14 @@ class SKAuctionService:
         }
 
     def _create_session(self) -> None:
-        """Create a new authenticated session"""
-        logger.info("🔧 Creating new SK Auction session")
+        """Create and authenticate a new session. Caller must hold _auth_lock.
 
-        if self._session:
-            try:
-                self._session.close()
-            except Exception:
-                pass
+        The outgoing session is deliberately not closed: another thread may
+        still be mid-request on it, and closing shuts its connection pool from
+        under that request. Dropping the reference lets it be collected once
+        nothing holds it.
+        """
+        logger.info("🔧 Creating new SK Auction session")
 
         session = requests.Session()
 
@@ -231,17 +266,40 @@ class SKAuctionService:
             session.post = _gated_post
 
         self._session = session
-        self._session_created_at = datetime.now()
 
-        # Authenticate
-        if self._authenticate():
+        # _session_created_at is stamped ONLY on success, below. It used to be
+        # set here, before the login attempt, which is what turned a failed
+        # login into a 25-minute outage reported under the wrong error class:
+        # the stale timestamp made _needs_session_refresh() answer False, so no
+        # retry was attempted and _ensure_authenticated() raised the generic
+        # "session is not authenticated" instead of the real cause.
+        #
+        # require_credentials() inside _authenticate() raises
+        # AuthConfigurationError before any I/O. That propagates untouched and
+        # deliberately records no attempt — see _raise_if_backing_off.
+        authenticated = self._authenticate()
+
+        if authenticated:
+            self._session_created_at = datetime.now()
+            self._last_auth_attempt_at = None
+            self._last_auth_reason = None
             logger.info("✅ SK Auction session created and authenticated")
         else:
-            logger.warning("⚠️ SK Auction session created but authentication failed")
+            self._session_created_at = None
+            self._last_auth_attempt_at = datetime.now()
+            logger.warning(
+                f"⚠️ SK Auction authentication failed: "
+                f"{self._last_auth_reason or 'no session indicator'}"
+            )
 
     def _needs_session_refresh(self) -> bool:
-        """Check if session needs to be refreshed"""
-        if self._session_created_at is None:
+        """Report whether an authenticated session must be established.
+
+        `_session_created_at` means the age of the *authenticated* session, not
+        the age of the requests.Session object — so a session that exists but
+        never authenticated always needs a refresh.
+        """
+        if self._session is None or self._session_created_at is None:
             return True
 
         elapsed = datetime.now() - self._session_created_at
@@ -263,15 +321,16 @@ class SKAuctionService:
         # __init__ logs a warning when these are missing but construction still
         # succeeds, so without this guard the login POST ran with empty values
         # and reported a credential problem as a rejected password.
+        username, password = self._credentials()
         require_credentials(
             "SK Auction",
             {
-                "SK_AUCTION_USERNAME": self._username,
-                "SK_AUCTION_PASSWORD": self._password,
+                "SK_AUCTION_USERNAME": username,
+                "SK_AUCTION_PASSWORD": password,
             },
         )
         try:
-            logger.info(f"🔐 Authenticating with SK Auction as {self._username}")
+            logger.info(f"🔐 Authenticating with SK Auction as {username}")
 
             # First, visit the login page to get initial SESSION cookie
             login_page_url = f"{self.BASE_URL}/pc/main/selectLoginFormView.do"
@@ -287,8 +346,8 @@ class SKAuctionService:
             # encPwd: password field (form copies userPwd to encPwd before submit)
             data = {
                 "membDiv": "AUCT",
-                "userId": self._username,
-                "encPwd": self._password,
+                "userId": username,
+                "encPwd": password,
             }
 
             # Add headers for proper form submission
@@ -335,37 +394,83 @@ class SKAuctionService:
                     logger.info("✅ SK Auction authentication successful (redirected to main)")
                     return True
 
+                self._last_auth_reason = "login response OK but no session indicator found"
                 logger.warning("⚠️ Login response OK but no session indicator found")
             else:
+                self._last_auth_reason = f"login returned HTTP {response.status_code}"
                 logger.error(f"❌ SK Auction login failed: status={response.status_code}, url={response.url}")
 
             self._authenticated = False
             return False
 
         except requests.exceptions.RequestException as e:
+            # Distinguishes an IP-level block from a rejected password: this
+            # branch means the host never answered, the branches above mean it
+            # did. That distinction is what tells you whether SK needs Korean
+            # egress or a different credential.
+            self._last_auth_reason = f"login request failed: {type(e).__name__}"
             logger.error(f"❌ SK Auction authentication error: {e}")
             self._authenticated = False
             return False
 
+    def _raise_if_backing_off(self) -> None:
+        """Suppress a retry while a recent login failure is still cooling off.
+
+        AuthConfigurationError never reaches here: require_credentials() runs
+        before any I/O, so an unset variable never records an attempt. That is
+        deliberate. Backing it off would re-hide the one error message an
+        operator can act on behind the generic retriable one — the exact
+        failure this whole module was rewritten to prevent — and would delay
+        the first real attempt after the variables are finally set.
+        """
+        if self._last_auth_attempt_at is None:
+            return
+
+        elapsed = (datetime.now() - self._last_auth_attempt_at).total_seconds()
+        remaining = self._AUTH_FAILURE_BACKOFF_SECONDS - elapsed
+        if remaining > 0:
+            raise AuthUnavailableError(
+                "SK Auction",
+                f"{self._last_auth_reason or 'login failed'}; "
+                f"retrying in {remaining:.0f}s",
+            )
+
     def _ensure_authenticated(self) -> bool:
-        """Ensure session is authenticated.
+        """Ensure the session is authenticated, logging in at most once.
 
         Raises:
-            AuthUnavailableError: if the session is not authenticated.
+            AuthConfigurationError: if SK_AUCTION_USERNAME/PASSWORD are unset.
+            AuthUnavailableError: if login failed or is cooling off.
 
         Every caller writes `self._ensure_authenticated()` on its own line and
         discards the bool, so returning False did not stop anything: the request
         went on unauthenticated, the upstream returned a login page, the parser
         honestly found no rows, and the endpoint answered
-        "Successfully parsed 0 cars" with HTTP 200. Verified live in production,
-        where SK_AUCTION_* is unset. Raising is what makes the existing call
-        sites correct without touching all ten of them.
+        "Successfully parsed 0 cars" with HTTP 200. Raising is what makes the
+        existing call sites correct without touching all ten of them.
         """
-        if self._needs_session_refresh():
+        if self._authenticated and not self._needs_session_refresh():
+            return True
+
+        if not self._auth_lock.acquire(timeout=self._AUTH_LOCK_TIMEOUT_SECONDS):
+            raise AuthUnavailableError(
+                "SK Auction", "a login is already in progress; timed out waiting for it"
+            )
+        try:
+            # Another thread may have logged in while we waited for the lock.
+            if self._authenticated and not self._needs_session_refresh():
+                return True
+
+            self._raise_if_backing_off()
             self._create_session()
-        if not self._authenticated:
-            raise AuthUnavailableError("SK Auction", "session is not authenticated")
-        return True
+
+            if not self._authenticated:
+                raise AuthUnavailableError(
+                    "SK Auction", self._last_auth_reason or "login attempt failed"
+                )
+            return True
+        finally:
+            self._auth_lock.release()
 
     # ==================== Auction Date Resolution ====================
 
@@ -467,6 +572,12 @@ class SKAuctionService:
                 is_future=is_future,
                 message=message,
             )
+        except AuthError:
+            # _get_next_auction_date re-raises AuthError on purpose; this bare
+            # except used to swallow it and answer HTTP 200 with today's date,
+            # handing the storefront a fabricated but entirely plausible
+            # auction date in the middle of a total outage.
+            raise
         except Exception as e:
             logger.error(f"❌ Error building auction date response: {e}")
             fallback = datetime.now().strftime("%Y%m%d")
@@ -1167,15 +1278,27 @@ class SKAuctionService:
             # endpoint is what you call to find out why the others are 503ing,
             # so propagating AuthError here would break it exactly when it is
             # needed. _ensure_authenticated now raises, hence the local catch.
+            # Names the cause rather than only the symptom. During the outage
+            # this endpoint answered {"authenticated": false, "session_age":
+            # 650.0} — neither field said why, and the session it aged had
+            # never authenticated. Variable NAMES only, never their values.
+            diagnosis: Optional[Dict[str, Any]] = None
             try:
                 self._ensure_authenticated()
             except AuthError as auth_err:
+                diagnosis = {
+                    "error_code": auth_err.error_code,
+                    "retriable": auth_err.retriable,
+                    "reason": str(auth_err),
+                    "missing": list(getattr(auth_err, "missing", ())),
+                }
                 logger.warning(f"SK Auction health check: not authenticated: {auth_err}")
 
             return {
                 "service": "SK Auction Service",
                 "status": "healthy" if self._authenticated else "degraded",
                 "authenticated": self._authenticated,
+                "auth": diagnosis,
                 "base_url": self.BASE_URL,
                 "session_age": (
                     (datetime.now() - self._session_created_at).total_seconds()

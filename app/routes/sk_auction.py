@@ -548,6 +548,12 @@ async def get_total_count(
         logger.info(f"✅ Total count: {result.total_count}")
         return result
 
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code saying
+        # whether a retry can help). This was the only SK route without the
+        # branch, so an auth failure came back as HTTP 200 with total_count 0 —
+        # an outage rendered as an auction with no cars in it.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction count error: {e}")
         return SKAuctionCountResponse(
