@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from loguru import logger
 
+from app.core.auth_errors import AuthConfigurationError, require_credentials
 from app.core.config import get_settings
 from app.core.proxy_config import get_heydealer_proxies
 
@@ -138,7 +139,21 @@ class HeyDealerAuthService:
         return None
 
     def login(self) -> Optional[Dict]:
-        """Выполняет логин через requests.Session и возвращает данные сессии."""
+        """Выполняет логин через requests.Session и возвращает данные сессии.
+
+        Raises:
+            AuthConfigurationError: если HEYDEALER_USERNAME/PASSWORD не заданы.
+        """
+        # __init__ логирует отсутствие учётных данных, но продолжает работу,
+        # поэтому без этой проверки логин уходил с пустыми значениями и
+        # конфигурационная ошибка возвращалась как отказ авторизации.
+        require_credentials(
+            "HeyDealer",
+            {
+                "HEYDEALER_USERNAME": self.username,
+                "HEYDEALER_PASSWORD": self.password,
+            },
+        )
         try:
             logger.info("Начинаю процесс авторизации HeyDealer...")
 
@@ -367,6 +382,13 @@ class HeyDealerAuthService:
             self._auth_failed_until = datetime.now() + self._auth_failure_ttl
             return None, None
 
+        except AuthConfigurationError:
+            # Не выставляем _auth_failed_until: отсутствие переменной окружения
+            # не является неудачной попыткой входа, а backoff только скрыл бы
+            # причину и задержал первую настоящую попытку после её появления.
+            # Пробрасываем, чтобы маршрут ответил 503 AUTH_MISCONFIGURED,
+            # а не 200 с "Ошибка авторизации".
+            raise
         except Exception as e:
             logger.error(f"Ошибка получения валидной сессии: {e}")
             self._auth_failed_until = datetime.now() + self._auth_failure_ttl

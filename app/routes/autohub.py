@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from typing import Optional
 from pydantic import BaseModel
 
+from app.core.auth_errors import AuthError
 from app.core.config import get_settings
 from app.models.autohub import (
     AutohubResponse,
@@ -64,6 +65,9 @@ async def search_cars(
             f"brands={search_params.car_brands}, bypass_cache={bypass_cache}"
         )
         return service.get_car_list(search_params, bypass_cache=bypass_cache)
+    except AuthError:
+        # 503 via the handler in main.py rather than HTTP 200 + success:false.
+        raise
     except Exception as e:
         logger.error(f"Search error: {e}", exc_info=True)
         return AutohubResponse(
@@ -106,6 +110,8 @@ async def get_car_detail(
     try:
         logger.info(f"Car detail request: car_id={car_id}, perf_id={perf_id}")
         return service.get_car_detail(car_id, perf_id)
+    except AuthError:
+        raise
     except Exception as e:
         logger.error(f"Car detail error: {e}", exc_info=True)
         return AutohubCarDetailResponse(success=False, error=str(e))
@@ -162,6 +168,8 @@ async def get_brands(
     """Get full hierarchical brands data (brand → model → model detail)."""
     try:
         return service.get_brands()
+    except AuthError:
+        raise
     except Exception as e:
         logger.error(f"Brands error: {e}", exc_info=True)
         return AutohubBrandsResponse(success=False, error=str(e))

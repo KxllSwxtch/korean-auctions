@@ -18,6 +18,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 # fanout × N concurrent users from saturating KCar.
 _OUTBOUND_LIMIT = threading.BoundedSemaphore(5)
 
+from app.core.auth_errors import require_credentials
 from app.core.config import get_settings
 from app.models.kcar import (
     KCarCar,
@@ -196,7 +197,16 @@ class KCarService:
 
         Returns:
             bool: True если авторизация успешна
+
+        Raises:
+            AuthConfigurationError: если KCAR_USERNAME/KCAR_PASSWORD не заданы
         """
+        # KCar had no credential guard at all: unset values were posted as-is
+        # and the failure surfaced as a generic login-parse error.
+        require_credentials(
+            "KCar",
+            {"KCAR_USERNAME": self.username, "KCAR_PASSWORD": self.password},
+        )
         try:
             logger.info("🔐 Начинаю авторизацию на KCar...")
 

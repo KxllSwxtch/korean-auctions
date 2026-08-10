@@ -4,7 +4,9 @@ from pathlib import Path
 import secrets
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header
+from datetime import datetime
+
+from fastapi import Depends, FastAPI, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
@@ -40,10 +42,13 @@ from app.routes import (  # noqa: E402 — env hydration must precede app import
     happycar,
     exchange_rate,
     diagnostics,
+    healthz,
 )
 from app.core.admin_auth import require_admin_token  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
-from app.core.logging import setup_logging  # noqa: E402
+from app.core.auth_errors import AuthError  # noqa: E402
+from app.core.logging import logger, setup_logging  # noqa: E402
+from app.core.proxy_config import ProxyConfigurationError  # noqa: E402
 from app.core.scheduler import start_scheduler, stop_scheduler  # noqa: E402
 
 # Настройка логирования
@@ -58,15 +63,16 @@ async def lifespan(app: FastAPI):
     """Application lifespan: eagerly init services, start background warming."""
     # Eagerly initialise service singletons so the first user request
     # doesn't pay the initialisation cost.
-    from app.core.startup_checks import log_egress_configuration
+    from app.core.startup_checks import log_startup_configuration
     from app.routes.lotte import get_lotte_service
     from app.routes.lotte_filters import get_filter_service
     from app.routes.glovis import close_glovis_service
     from app.routes.encar_proxy import close_encar_proxy_client
     from app.services.bikemart_service import bikemart_service
 
-    # Report missing egress variables before any route can 502 over them.
-    log_egress_configuration()
+    # Report missing egress and credential variables before any route can
+    # 502/503 over them. Names only — this never logs a secret value.
+    log_startup_configuration()
 
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
@@ -118,6 +124,72 @@ app.add_middleware(
     allow_headers=["*"],
     max_age=600,
 )
+
+@app.exception_handler(AuthError)
+async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:
+    """Uniform 503 for any provider authentication failure that reaches a route.
+
+    Backstop for every router that does not catch AuthError itself, so a new
+    provider gets correct semantics by raising the right exception rather than
+    by remembering to write an error branch. Routers that need a
+    provider-specific body (app/routes/lotte.py) still handle it locally.
+
+    Retriable failures carry Retry-After; a missing credential does not, since
+    no amount of retrying sets an environment variable. AuthConfigurationError
+    messages name the unset variables and never their values.
+    """
+    if exc.retriable:
+        logger.warning(f"{exc.service} auth unavailable: {exc}")
+        message = f"{exc.service} service temporarily unavailable, please retry"
+        headers = {"Retry-After": "60"}
+    else:
+        logger.error(f"{exc.service} auth misconfigured: {exc}")
+        message = str(exc)
+        headers = {}
+
+    return JSONResponse(
+        status_code=503,
+        content={
+            "success": False,
+            "error_code": exc.error_code,
+            "service": exc.service,
+            "message": message,
+            "timestamp": datetime.now().isoformat(),
+        },
+        headers=headers,
+    )
+
+
+@app.exception_handler(ProxyConfigurationError)
+async def proxy_config_error_handler(
+    request: Request, exc: ProxyConfigurationError
+) -> JSONResponse:
+    """Uniform 503 when the shared proxy pool is not provisioned.
+
+    get_proxy_pool() raises this from inside a FastAPI dependency
+    (app/routes/happycar.py constructs its service there), and an exception
+    escaping a dependency becomes a plain-text 500 "Internal Server Error" —
+    no JSON body, no error code, indistinguishable from a crash. It is the
+    same class as AuthConfigurationError: unset configuration, not retriable,
+    so it gets the same shape and no Retry-After.
+
+    /healthz/ready names the specific AUCTION_PROXY_* variables; the response
+    stays generic because this handler cannot know which pool was requested.
+    """
+    logger.error(f"Proxy configuration unavailable: {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "success": False,
+            "error_code": "PROXY_MISCONFIGURED",
+            "message": (
+                "Upstream proxy is not configured; see /healthz/ready for the "
+                "missing variable names"
+            ),
+            "timestamp": datetime.now().isoformat(),
+        },
+    )
+
 
 # Подключение маршрутов
 app.include_router(autohub.router, prefix="/api/v1/autohub", tags=["Autohub"])
@@ -176,6 +248,10 @@ app.include_router(exchange_rate.router, prefix="/api/v1/smmotors", tags=["SMMot
 
 # Read-only deployment diagnostics - egress readiness by provider
 app.include_router(diagnostics.router, prefix="/api/v1/diagnostics", tags=["Diagnostics"])
+
+# Readiness probe - egress + credentials + admin gates, names only.
+# /health below stays the static liveness probe Render checks.
+app.include_router(healthz.router, prefix="/healthz", tags=["Diagnostics"])
 
 
 @app.get("/")

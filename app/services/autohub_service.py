@@ -40,6 +40,7 @@ from app.parsers.autohub_parser import (
     map_brands,
     extract_entry_prices,
 )
+from app.core.auth_errors import AuthConfigurationError, AuthError, require_credentials
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -75,9 +76,17 @@ class AutohubService:
         self._cache_hits = 0
         self._cache_misses = 0
 
-        # Auto-authenticate if no valid token from env
+        # Auto-authenticate if no valid token from env.
+        # A module-level instance is constructed at import (see bottom of this
+        # file), so a configuration error must not escape here: raising would
+        # abort application import and take every unrelated route down with it.
+        # The service stays unauthenticated and the error resurfaces — with the
+        # same type and message — on the first request that needs it.
         if not self._is_token_valid():
-            self._authenticate()
+            try:
+                self._authenticate()
+            except AuthConfigurationError as e:
+                logger.error(f"Autohub not authenticated at startup: {e}")
 
     # ===== Session Management =====
 
@@ -154,6 +163,16 @@ class AutohubService:
 
     def _authenticate(self) -> bool:
         """Login to Autohub API to obtain JWT access token."""
+        # Without this the signin body carried "pw": null, and the upstream
+        # rejection surfaced as an opaque parse or 500 rather than as the
+        # configuration error it is.
+        require_credentials(
+            "Autohub",
+            {
+                "AUTOHUB_USERNAME": self.settings.autohub_username,
+                "AUTOHUB_PASSWORD": self.settings.autohub_password,
+            },
+        )
         try:
             logger.info("Authenticating with Autohub API...")
             response = self.session.post(
@@ -396,6 +415,12 @@ class AutohubService:
                 current_page=params.page,
                 page_size=params.page_size,
             )
+        except AuthError:
+            # Propagate so the route answers 503 with an error code. Folding an
+            # auth failure into AutohubResponse(success=False) made FastAPI
+            # serialise it as HTTP 200 — a client checking the status code saw
+            # a successful request that happened to contain no cars.
+            raise
         except Exception as e:
             logger.error(f"Error fetching car list: {e}", exc_info=True)
             return AutohubResponse(

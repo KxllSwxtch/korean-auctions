@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from filelock import FileLock, Timeout
 from loguru import logger
 
+from app.core.auth_errors import AuthConfigurationError, require_credentials
+
 if TYPE_CHECKING:
     from app.services.lotte_service import LotteService
 
@@ -78,6 +80,23 @@ def ensure_authenticated(service: "LotteService") -> bool:
     5. Perform actual authentication
     6. Save session and state -> release lock
     """
+    # Configuration is checked before anything else, and deliberately before
+    # the cooldown check and the file lock below. A missing credential is not
+    # a failed attempt: recording it as one burned the shared 30-second
+    # cross-worker cooldown, so every worker then reported "Auth cooldown
+    # active" — hiding the actual cause behind a rate-limit message and
+    # leaving a diagnosis-free failure record in lotte_auth_state.json.
+    # Raises AuthConfigurationError, which the route layer maps to a
+    # non-retriable 503 AUTH_MISCONFIGURED.
+    requirements = getattr(service, "credential_requirements", None)
+    if callable(requirements):
+        # auth_service_name, not the display `name` ("Lotte Service"), so the
+        # message reads identically whichever path raises it.
+        provider = getattr(service, "auth_service_name", None) or getattr(
+            service, "name", "Auction"
+        )
+        require_credentials(provider, requirements())
+
     # Fast path: already authenticated and session not expired
     if service.authenticated and service.session and not service._is_session_expired():
         return True
@@ -134,6 +153,15 @@ def ensure_authenticated(service: "LotteService") -> bool:
 
             try:
                 success = service._do_authenticate()
+            except AuthConfigurationError:
+                # Unreachable via the pre-lock check above, but kept so the
+                # invariant holds for any caller reaching _do_authenticate by
+                # another path: a misconfiguration must never be written as a
+                # failed attempt, or it would suppress the next real attempt
+                # for 30 seconds across every worker.
+                service.authenticated = False
+                service.session = None
+                raise
             except Exception as auth_err:
                 # _do_authenticate raises on retriable failures (network, redirect, etc.)
                 # Write failure state so other workers don't immediately retry

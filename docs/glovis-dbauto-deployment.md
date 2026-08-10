@@ -39,8 +39,24 @@ The remaining authenticated providers read these environment variables:
 - `LOTTE_USERNAME`, `LOTTE_PASSWORD`
 - `HAPPYCAR_USERNAME`, `HAPPYCAR_PASSWORD`
 - `KCAR_USERNAME`, `KCAR_PASSWORD`
+- `SK_AUCTION_USERNAME`, `SK_AUCTION_PASSWORD`
+- `HEYDEALER_USERNAME`, `HEYDEALER_PASSWORD`
+- `ENHANCED_LOTTE_USERNAME`, `ENHANCED_LOTTE_PASSWORD` — second Lotte account
+  for `/api/v2/lotte`; falls back to `LOTTE_*` when unset
 
 No credential-bearing defaults are supplied by the application.
+
+Verify what a deployment is actually missing, without disclosing values:
+
+```
+GET /healthz/ready
+```
+
+It reports every credential and egress group as `configured` or with the list
+of unset variable NAMES. The same lines are written at startup. `/health`
+deliberately stays a static liveness probe — it is Render's `healthCheckPath`,
+and a readiness-driven health check would make a misconfigured deploy
+unrollbackable.
 
 ## Rollout order
 

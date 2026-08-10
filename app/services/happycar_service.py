@@ -15,6 +15,7 @@ from app.models.happycar import (
     HappyCarResponse, HappyCarDetailResponse,
 )
 from app.parsers.happycar_parser import HappyCarParser
+from app.core.auth_errors import require_credentials
 from app.core.config import get_settings
 from app.core.proxy_config import get_proxy_pool
 from app.core.tls import REQUESTS_VERIFY
@@ -317,7 +318,20 @@ class HappyCarService:
             logger.warning(f"[HappyCar] List AJAX warm-up failed (non-critical): {e}")
 
     def _authenticate(self) -> bool:
-        """Login to HappyCar to get a valid PHPSESSID."""
+        """Login to HappyCar to get a valid PHPSESSID.
+
+        Raises:
+            AuthConfigurationError: if HAPPYCAR_USERNAME/HAPPYCAR_PASSWORD are unset.
+        """
+        # The login form previously received member_pwd=None, and the resulting
+        # non-JSON error page surfaced as a 500 on /api/v1/happycar/*.
+        require_credentials(
+            "HappyCar",
+            {
+                "HAPPYCAR_USERNAME": settings.happycar_username,
+                "HAPPYCAR_PASSWORD": settings.happycar_password,
+            },
+        )
         try:
             logger.info("Authenticating with HappyCar...")
 

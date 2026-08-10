@@ -14,6 +14,7 @@ from app.models.lotte import (
     LotteCountResponse,
 )
 from app.services.lotte_service import LotteService
+from app.core.auth_errors import AuthError, AuthUnavailableError
 from app.core.logging import logger
 from app.core.single_flight import SingleFlight
 from app.core.admin_auth import require_admin_token
@@ -21,6 +22,42 @@ from app.core.tls import REQUESTS_VERIFY
 
 router = APIRouter(prefix="/api/v1/lotte", tags=["Lotte Auction"])
 _lotte_flight = SingleFlight()
+
+
+def auth_error_response(error: AuthError) -> JSONResponse:
+    """Render an AuthError as 503, retriable or not.
+
+    Both cases are 503 — the service genuinely cannot serve the request — but
+    they differ in whether retrying helps, and that difference is carried by
+    the error code and by the presence of Retry-After:
+
+    * AUTH_UNAVAILABLE  — transient; Retry-After tells the client to come back.
+    * AUTH_MISCONFIGURED — a credential variable is unset. Retrying cannot fix
+      it, so no Retry-After is sent; previously this returned Retry-After: 60,
+      which had clients politely re-requesting a missing password forever.
+
+    The message names the missing variables for AUTH_MISCONFIGURED. That is
+    safe: AuthConfigurationError carries variable NAMES only, never values.
+    """
+    if error.retriable:
+        logger.warning(f"Lotte auth unavailable: {error}")
+        message = "Lotte auction service temporarily unavailable, please retry"
+        headers = {"Retry-After": "60"}
+    else:
+        logger.error(f"Lotte auth misconfigured: {error}")
+        message = str(error)
+        headers = {}
+
+    payload = LotteError(
+        error_code=error.error_code,
+        message=message,
+        timestamp=datetime.now().isoformat(),
+    )
+    return JSONResponse(
+        status_code=503,
+        content=payload.model_dump(),
+        headers=headers,
+    )
 
 # Глобальный экземпляр сервиса
 _lotte_service = None
@@ -99,23 +136,10 @@ async def get_cars(
         logger.info(f"Успешно получено {len(response.cars)} автомобилей Lotte")
         return response
 
+    except AuthError as e:
+        return auth_error_response(e)
+
     except Exception as e:
-        error_msg = str(e)
-        is_auth_error = "аутентифицироваться" in error_msg or "Authentication" in error_msg or "Session" in error_msg
-
-        if is_auth_error:
-            logger.warning(f"Lotte auth unavailable: {e}")
-            error_response = LotteError(
-                error_code="AUTH_UNAVAILABLE",
-                message="Lotte auction service temporarily unavailable, please retry",
-                timestamp=datetime.now().isoformat(),
-            )
-            return JSONResponse(
-                status_code=503,
-                content=error_response.model_dump(),
-                headers={"Retry-After": "60"},
-            )
-
         logger.error(f"Ошибка при получении автомобилей Lotte: {e}")
         error_response = LotteError(
             error_code="INTERNAL_ERROR",
@@ -236,19 +260,34 @@ async def get_total_count(service: LotteService = Depends(get_lotte_service)):
     try:
         logger.info("Fetching Lotte auction total car count")
         count_response = await service.fetch_total_count()
-        
+
         if not count_response.success:
+            # Returning the model bare made FastAPI serialise a failure as 200.
+            # Combined with the service reporting success=True/total_count=0 on
+            # an auth failure, a logged-out backend advertised "0 cars" as a
+            # normal, cacheable answer.
             logger.warning(f"Failed to fetch Lotte count: {count_response.message}")
-            
+            return JSONResponse(
+                status_code=502,
+                content=count_response.model_dump(mode="json"),
+            )
+
         return count_response
-        
+
+    except AuthError as e:
+        return auth_error_response(e)
+
     except Exception as e:
         logger.error(f"Error fetching Lotte total count: {e}")
-        return LotteCountResponse(
+        error_response = LotteCountResponse(
             success=False,
             total_count=0,
             message=f"Ошибка при получении количества: {str(e)}",
             timestamp=datetime.now()
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_response.model_dump(mode="json"),
         )
 
 
@@ -305,23 +344,10 @@ async def get_upcoming_cars(
         logger.info(f"Возвращено {len(cars)} автомобилей предстоящего аукциона Lotte")
         return response
 
+    except AuthError as e:
+        return auth_error_response(e)
+
     except Exception as e:
-        error_msg = str(e)
-        is_auth_error = "аутентифицироваться" in error_msg or "Authentication" in error_msg or "Session" in error_msg
-
-        if is_auth_error:
-            logger.warning(f"Lotte auth unavailable: {e}")
-            error_response = LotteError(
-                error_code="AUTH_UNAVAILABLE",
-                message="Lotte auction service temporarily unavailable, please retry",
-                timestamp=datetime.now().isoformat(),
-            )
-            return JSONResponse(
-                status_code=503,
-                content=error_response.model_dump(),
-                headers={"Retry-After": "60"},
-            )
-
         logger.error(
             f"Ошибка при получении автомобилей предстоящего аукциона Lotte: {e}"
         )
@@ -958,16 +984,14 @@ async def get_car_detail(
 
         # 🔧 ИСПРАВЛЕНИЕ: Принудительная аутентификация перед получением деталей
         logger.info("Проверка аутентификации перед получением деталей автомобиля...")
+        # 503, not 401. 401 says "your credentials are wrong" to a caller who
+        # never supplies any — this endpoint is unauthenticated, and the login
+        # that failed is ours to the upstream auction. One root cause used to
+        # produce three different status codes across this router.
         auth_result = service._authenticate()
         if not auth_result:
-            logger.error("Не удалось аутентифицироваться в Lotte для получения деталей")
-            return JSONResponse(
-                status_code=401,
-                content={
-                    "success": False,
-                    "message": "Ошибка аутентификации в системе Lotte",
-                    "error": "Authentication failed",
-                },
+            return auth_error_response(
+                AuthUnavailableError("Lotte", "не удалось аутентифицироваться для получения деталей")
             )
 
         logger.info("✅ Аутентификация для деталей автомобиля успешна")

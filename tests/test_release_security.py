@@ -25,6 +25,15 @@ LEGACY_PROVIDER_FIELDS = {
     "kcar_password",
     "auction_proxy_username",
     "auction_proxy_password",
+    # Migrated out of hardcoded source by commit 2ec4540 but never added to
+    # this allow-list, so the README documentation check below never covered
+    # them — the same drift that left LOTTE_* undeclared in render.yaml.
+    "sk_auction_username",
+    "sk_auction_password",
+    "heydealer_username",
+    "heydealer_password",
+    "enhanced_lotte_username",
+    "enhanced_lotte_password",
 }
 LEGACY_PROVIDER_ENV = {name.upper() for name in LEGACY_PROVIDER_FIELDS}
 
@@ -118,27 +127,23 @@ def test_main_app_imports_without_legacy_provider_credentials(tmp_path: Path) ->
 
 
 def test_settings_accept_secret_managed_glovis_proxy_fields(tmp_path: Path) -> None:
-    (tmp_path / ".env").write_text(
-        "\n".join(
-            (
-                "GLOVIS_PROXY_HOST=proxy.example.invalid:8443",
-                "GLOVIS_PROXY_USERNAME=test-account",
-                "GLOVIS_PROXY_PASSWORD=test-secret",
-                "GLOVIS_PROXY_COUNTRY=KR",
-                "GLOVIS_PROXY_EGRESS_LABEL=kr-test",
-            )
-        ),
-        encoding="utf-8",
-    )
+    """The declaration-only proxy fields must be accepted, from any directory.
+
+    Delivery is via real environment variables, which is how Render supplies
+    them. Running from tmp_path also pins the CWD-independence contract below:
+    Settings anchors env_file to the repository root, so a stray .env in the
+    working directory neither supplies nor suppresses configuration.
+    """
     environment = os.environ.copy()
-    for name in (
-        "GLOVIS_PROXY_HOST",
-        "GLOVIS_PROXY_USERNAME",
-        "GLOVIS_PROXY_PASSWORD",
-        "GLOVIS_PROXY_COUNTRY",
-        "GLOVIS_PROXY_EGRESS_LABEL",
-    ):
-        environment.pop(name, None)
+    environment.update(
+        {
+            "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+            "GLOVIS_PROXY_USERNAME": "test-account",
+            "GLOVIS_PROXY_PASSWORD": "test-secret",
+            "GLOVIS_PROXY_COUNTRY": "KR",
+            "GLOVIS_PROXY_EGRESS_LABEL": "kr-test",
+        }
+    )
     environment["PYTHONPATH"] = str(ROOT)
 
     result = subprocess.run(
@@ -167,6 +172,27 @@ def test_settings_accept_secret_managed_glovis_proxy_fields(tmp_path: Path) -> N
             "app/core/config.py: Glovis proxy environment is rejected",
             pytrace=False,
         )
+
+
+def test_settings_env_file_is_anchored_to_repository_root() -> None:
+    """env_file must not resolve against the process working directory.
+
+    It was the bare relative string ".env", so starting the app from anywhere
+    other than the repository root silently loaded no dotenv at all — the
+    Settings half of the same class of gap that left LOTTE_USERNAME unset and
+    turned every /api/v1/lotte/* response into a 503.
+    """
+    from app.core.config import Settings
+
+    env_file = Settings.model_config.get("env_file")
+    assert env_file is not None, "Settings no longer configures an env_file"
+
+    env_path = Path(env_file)
+    assert env_path.is_absolute(), (
+        f"env_file must be absolute, got {env_file!r}; a relative path "
+        "resolves against the CWD and loads nothing outside the repo root"
+    )
+    assert env_path == ROOT / ".env", f"env_file should be {ROOT / '.env'}, got {env_path}"
 
 
 def _is_load_dotenv_call(node: ast.stmt) -> bool:

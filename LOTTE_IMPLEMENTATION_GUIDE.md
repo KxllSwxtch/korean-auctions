@@ -1,5 +1,25 @@
 # Lotte Auction Stability Implementation Guide
 
+## Prerequisites: environment
+
+Lotte is login-gated. Before running or debugging anything below, set these in
+`.env` (template: `env.example`) or the Render dashboard:
+
+| Variable | Used by |
+|---|---|
+| `LOTTE_USERNAME` | `/api/v1/lotte/*` — `app/services/lotte_service.py` |
+| `LOTTE_PASSWORD` | same |
+| `ENHANCED_LOTTE_USERNAME` | `/api/v2/lotte` — falls back to `LOTTE_USERNAME` |
+| `ENHANCED_LOTTE_PASSWORD` | same, falls back to `LOTTE_PASSWORD` |
+
+Unset credentials do not raise at boot. The first request returns
+**503 `AUTH_MISCONFIGURED`** (no `Retry-After` — retrying cannot fix a missing
+password), and `GET /healthz/ready` names the missing variables. Restart after
+editing `.env`: `Settings` is `lru_cache`d and built at import.
+
+Note `LOTTE_BASE_URL` defaults to `https://www.lotteautoauction.net` and only
+needs setting to point at a different host.
+
 ## Status: 30% Complete
 
 ### ✅ Completed

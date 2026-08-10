@@ -22,6 +22,7 @@ from app.models.heydealer import (
     HeyDealerCarWithTechSheetResponse,
     AccidentRepairsResponse,
 )
+from app.core.auth_errors import AuthError, AuthUnavailableError
 from app.services.heydealer_service import HeyDealerService
 from app.parsers.heydealer_parser import HeyDealerParser
 from app.services.heydealer_auth_service import heydealer_auth
@@ -216,14 +217,10 @@ async def get_heydealer_cars(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return HeyDealerResponse(
-                success=False,
-                data=None,
-                message="Ошибка авторизации HeyDealer",
-                total_count=0,
-                current_page=page,
-            )
+            # Раньше здесь возвращалась модель напрямую, и FastAPI отдавал её
+            # с HTTP 200: отказ авторизации выглядел как успешный ответ с
+            # пустым списком. Теперь — 503 AUTH_UNAVAILABLE с Retry-After.
+            raise AuthUnavailableError("HeyDealer", "не удалось получить валидную сессию")
 
         # Подготавливаем параметры
         params = {
@@ -445,6 +442,10 @@ async def get_heydealer_cars(
             "pagination": normalized_data["pagination"],
         }
 
+    except AuthError:
+        # Пробрасываем в обработчик из main.py: 503 с кодом AUTH_UNAVAILABLE
+        # или AUTH_MISCONFIGURED. Иначе отказ авторизации стал бы 500.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при получении автомобилей HeyDealer: {e}")
         raise HTTPException(

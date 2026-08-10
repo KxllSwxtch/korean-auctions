@@ -44,6 +44,7 @@ from app.parsers.lotte_parser import (
 )
 from app.core.session_manager import SessionManager
 from app.services.base_auction_service import BaseAuctionService
+from app.core.auth_errors import AuthError, AuthUnavailableError, require_credentials
 from app.core.tls import REQUESTS_VERIFY
 
 
@@ -154,17 +155,36 @@ class LotteService(BaseAuctionService):
             return True
         return self._authenticate()
 
+    #: Provider name used in authentication errors. Distinct from `name`
+    #: ("Lotte Service"), which is a log/display label.
+    auth_service_name = "Lotte"
+
+    def credential_requirements(self) -> dict:
+        """Environment variable NAMES this service needs, mapped to their values.
+
+        Used by the auth coordinator to detect a misconfiguration before it
+        takes the cross-worker lock, and by _do_authenticate below.
+        """
+        return {
+            "LOTTE_USERNAME": settings.lotte_username,
+            "LOTTE_PASSWORD": settings.lotte_password,
+        }
+
     def _do_authenticate(self) -> bool:
         """Core 3-step Lotte login flow. Called by auth_coordinator under file lock.
 
         Returns True on success, False on non-retriable failure.
-        Raises exceptions on retriable failures (network errors, unexpected responses).
+        Raises AuthConfigurationError when a credential variable is unset, and
+        other exceptions on retriable failures (network errors, unexpected
+        responses).
         """
+        # Raises AuthConfigurationError naming the unset variables. Previously
+        # this logged "Lotte credentials are not configured" — without saying
+        # which two — and returned False, which the coordinator recorded as an
+        # ordinary failure and answered with a 30s retry cooldown.
+        require_credentials("Lotte", self.credential_requirements())
         login = settings.lotte_username
         password = settings.lotte_password
-        if not login or not password:
-            logger.error("Lotte credentials are not configured")
-            return False
 
         # Force fresh session for clean headers/cookies
         self.session = None
@@ -470,8 +490,12 @@ class LotteService(BaseAuctionService):
             # _ensure_session may run the full Lotte login (several sequential
             # blocking POSTs), and _parse_cars is BeautifulSoup work. Both are
             # synchronous, so they go to a thread rather than onto the loop.
+            # Typed rather than Exception("Не удалось аутентифицироваться"):
+            # app/routes/lotte.py used to classify this by substring-matching
+            # that Russian string, so any rewording silently downgraded auth
+            # failures to 500.
             if not await asyncio.to_thread(self._ensure_session):
-                raise Exception("Не удалось аутентифицироваться")
+                raise AuthUnavailableError("Lotte", "не удалось аутентифицироваться")
 
             # Получаем страницу с автомобилями с пагинацией
             cars_response = await self._fetch_cars_page(limit, offset)
@@ -730,9 +754,11 @@ class LotteService(BaseAuctionService):
         The full page contains .total-carnum with the true total (e.g. 1,257).
         """
         try:
+            # Auth failure raises rather than returning 0. Returning 0 made an
+            # unauthenticated service indistinguishable from an empty auction,
+            # and the caller published that 0 as success=True.
             if not self._ensure_session():
-                logger.error("Authentication failed for total count fetch")
-                return 0
+                raise AuthUnavailableError("Lotte", "authentication failed for total count fetch")
 
             session = self._init_session()
             home_url = urljoin(self.base_url, self.urls["home"])
@@ -746,7 +772,7 @@ class LotteService(BaseAuctionService):
                 logger.error("Login page detected - session invalid")
                 self.authenticated = False
                 self.session = None
-                return 0
+                raise AuthUnavailableError("Lotte", "session rejected; login page returned")
 
             total_count = self.parser.parse_total_count(response.text)
             if total_count > 0:
@@ -756,6 +782,11 @@ class LotteService(BaseAuctionService):
                 self._record_success()
             return total_count
 
+        except AuthError:
+            # Propagate so the route can answer 503 with the right code instead
+            # of reporting a count of 0. Strategy 3 in fetch_total_count would
+            # fail for the same reason, so there is nothing to fall back to.
+            raise
         except Exception as e:
             logger.error(f"Error fetching total count from home page: {e}")
             self._record_failure(e)
@@ -800,6 +831,12 @@ class LotteService(BaseAuctionService):
                 timestamp=datetime.now()
             )
 
+        except AuthError:
+            # A count of 0 is a legitimate answer ("auction is empty") and must
+            # stay distinguishable from "we could not log in". Only the former
+            # is reported as success; the latter reaches the route, which turns
+            # it into a 503 carrying the right error code.
+            raise
         except Exception as e:
             logger.error(f"Error fetching Lotte total count: {e}")
             return LotteCountResponse(
@@ -978,9 +1015,10 @@ class LotteService(BaseAuctionService):
     async def get_total_cars_count(self) -> int:
         """Получение общего количества автомобилей на аукционе"""
         try:
+            # See _fetch_total_count_from_home_page: an unauthenticated service
+            # must not be reported as an auction containing zero cars.
             if not self._ensure_session():
-                logger.error("Authentication failed for total cars count")
-                return 0
+                raise AuthUnavailableError("Lotte", "authentication failed for total cars count")
 
             cars_response = await self._fetch_cars_page(limit=1, offset=0)
 
@@ -996,6 +1034,8 @@ class LotteService(BaseAuctionService):
 
             return total_count
 
+        except AuthError:
+            raise
         except Exception as e:
             logger.error(f"Ошибка при получении общего количества автомобилей: {e}")
             return 0

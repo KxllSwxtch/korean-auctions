@@ -1,7 +1,14 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+from pathlib import Path
 from typing import Optional
 import os
+
+
+# Repository root (…/korean-auctions), resolved from this file rather than the
+# process CWD. `env_file=".env"` was relative, so `Settings` silently picked up
+# no dotenv whenever the app was started from anywhere but the repo root.
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class Settings(BaseSettings):
@@ -86,6 +93,15 @@ class Settings(BaseSettings):
     # return zero cars while still reporting success.
     heydealer_data_dir: str = "cache/heydealer"
 
+    # Read by app/services/heydealer_sync_service.py but never declared, so
+    # constructing HeyDealerSyncService raised AttributeError at __init__ —
+    # the same failure mode heydealer_data_dir above was added to fix.
+    # request_delay_ms throttles the shared dealer account (detail requests
+    # pay the full delay, list pages 40% of it, see the service's __init__).
+    heydealer_sync_request_delay_ms: int = 1200
+    heydealer_sync_interval_minutes: int = 1440
+    heydealer_sync_on_startup: bool = False
+
     # Dedicated Korean proxy for DB Auto Glovis. Values remain secret-managed;
     # declaring them lets Pydantic accept the same environment used by the
     # fail-closed Glovis transport.
@@ -120,6 +136,29 @@ class Settings(BaseSettings):
     auction_proxy_name: str = "auction-proxy"
     auction_proxy_supports_sticky: bool = False
 
+    # Declaration-only, same rationale as the proxy block above: each of these
+    # is read through os.getenv at call time by the module that owns it, but
+    # `extra` is "forbid", so an undeclared name in .env would raise
+    # ValidationError at import and take the whole app down. Declaring them
+    # here is what makes them safe to write into a dotenv file.
+    #   admin_api_token           -> app/core/admin_auth.py
+    #   glovis_cache_admin_token  -> main.py (/api/v1/internal/glovis/cache/clear)
+    #   ssancar_proxy_urls        -> app/services/ssancar_transport.py (JSON list)
+    #   tls_verify                -> app/core/tls.py (break-glass switch)
+    #   port                      -> start.sh (gunicorn --bind), Render-provided
+    admin_api_token: Optional[str] = None
+    glovis_cache_admin_token: Optional[str] = None
+    ssancar_proxy_urls: Optional[str] = None
+    tls_verify: Optional[str] = None
+    port: Optional[int] = None
+
+    # CA bundle overrides consumed by app/core/tls.py. Worth declaring rather
+    # than leaving to the process environment: the macOS framework Python this
+    # project runs on locally ships an empty trust store, so pointing one of
+    # these at a bundle in .env is a routine local fix.
+    ssl_cert_file: Optional[str] = None
+    requests_ca_bundle: Optional[str] = None
+
     # User Agent для запросов
     user_agent: str = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -152,9 +191,19 @@ class Settings(BaseSettings):
     autohub_snapshot_admin_token: Optional[str] = None  # gate /snapshot/run endpoint
     autohub_snapshot_alert_webhook: Optional[str] = None  # POSTed to on job failure
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    # `extra` stays at its "forbid" default on purpose: an undeclared key in
+    # .env is almost always a typo, and forbidding it turns that into an
+    # immediate error instead of a setting that silently never applies.
+    # The cost is that every variable written into .env must be declared
+    # above — including the ones read via os.getenv (see the declaration-only
+    # blocks) — because an undeclared key in the dotenv file raises
+    # ValidationError at import and takes the whole app down. Real process
+    # environment variables are unaffected. tests/test_env_example.py holds
+    # env.example to this rule.
+    model_config = SettingsConfigDict(
+        env_file=REPO_ROOT / ".env",
+        env_file_encoding="utf-8",
+    )
 
 
 @lru_cache()

@@ -42,6 +42,38 @@ services:
         sync: false
       - key: ENHANCED_LOTTE_PASSWORD
         sync: false
+      # The remaining four provider accounts. These are already set in the
+      # dashboard — production authenticates fine — but were never declared
+      # here, which is exactly the latent gap the GLOVIS_PROXY_HOST comment
+      # below describes. An undeclared secret is invisible to the blueprint:
+      # nothing tells you it exists, so a rebuild from this file alone yields
+      # a service that boots healthy and 503s on every auction route.
+      # LOTTE_* drives the main /api/v1/lotte/* path; ENHANCED_LOTTE_* above
+      # only covers /api/v2/lotte and falls back to these when unset.
+      - key: LOTTE_USERNAME
+        sync: false
+      - key: LOTTE_PASSWORD
+        sync: false
+      - key: AUTOHUB_USERNAME
+        sync: false
+      - key: AUTOHUB_PASSWORD
+        sync: false
+      # Optional pre-seeded JWT that lets Autohub skip the login round-trip.
+      - key: AUTOHUB_JWT_TOKEN
+        sync: false
+      - key: KCAR_USERNAME
+        sync: false
+      - key: KCAR_PASSWORD
+        sync: false
+      # HappyCar is login-gated AND proxy-required (see AUCTION_PROXY_* below).
+      - key: HAPPYCAR_USERNAME
+        sync: false
+      - key: HAPPYCAR_PASSWORD
+        sync: false
+      # Gates POST /api/v1/internal/glovis/cache/clear. Required by
+      # docs/glovis-dbauto-deployment.md; unset -> that route fails closed.
+      - key: GLOVIS_CACHE_ADMIN_TOKEN
+        sync: false
       # Wednesday-snapshot mode (see plans/wednesday-snapshot-mode.md).
       # Deploy dark first: leave AUTOHUB_SNAPSHOT_ENABLED=false until the
       # first manual run is verified, then flip to true.

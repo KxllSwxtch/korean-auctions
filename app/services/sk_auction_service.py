@@ -41,6 +41,7 @@ from app.models.sk_auction import (
     SKAuctionNextDateResponse,
 )
 from app.parsers.sk_auction_parser import SKAuctionParser
+from app.core.auth_errors import require_credentials
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.tls import REQUESTS_VERIFY
@@ -254,7 +255,21 @@ class SKAuctionService:
         return False
 
     def _authenticate(self) -> bool:
-        """Authenticate with SK Auction"""
+        """Authenticate with SK Auction.
+
+        Raises:
+            AuthConfigurationError: if SK_AUCTION_USERNAME/PASSWORD are unset.
+        """
+        # __init__ logs a warning when these are missing but construction still
+        # succeeds, so without this guard the login POST ran with empty values
+        # and reported a credential problem as a rejected password.
+        require_credentials(
+            "SK Auction",
+            {
+                "SK_AUCTION_USERNAME": self._username,
+                "SK_AUCTION_PASSWORD": self._password,
+            },
+        )
         try:
             logger.info(f"🔐 Authenticating with SK Auction as {self._username}")
 
