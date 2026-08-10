@@ -82,14 +82,32 @@ async def warm_kcar_cars():
 
 
 async def warm_lotte_cars():
-    """Warm the default Lotte car listing."""
+    """Warm both Lotte listing caches.
+
+    Two are needed because the endpoints do not share one: /api/v1/lotte/cars
+    reads `lotte_cars_{limit}_{offset}` (cars WITH details) via
+    get_cars_response_with_date_check, while /api/v1/lotte/cars/upcoming — the
+    endpoint the frontend actually calls — reads `lotte_upcoming_{limit}_{offset}`
+    via get_cars. Warming only the first left the user-facing path cold on
+    every cache expiry.
+
+    The two are warmed independently so a failure in one still warms the other.
+    """
+    from app.routes.lotte import get_lotte_service
+
+    service = get_lotte_service()
+
     try:
-        from app.routes.lotte import get_lotte_service
-        service = get_lotte_service()
         await service.get_cars_response_with_date_check(limit=20, offset=0)
         logger.info("Cache warmer: Lotte cars warmed")
     except Exception as e:
         logger.warning(f"Cache warmer: Lotte cars failed: {e}")
+
+    try:
+        await service.get_cars(limit=20, offset=0)
+        logger.info("Cache warmer: Lotte upcoming cars warmed")
+    except Exception as e:
+        logger.warning(f"Cache warmer: Lotte upcoming cars failed: {e}")
 
 
 async def warm_sessions():

@@ -481,7 +481,23 @@ class LotteService(BaseAuctionService):
             return None
 
     async def get_cars(self, limit: int = 20, offset: int = 0) -> List[LotteCar]:
-        """Получить автомобили из списка предстоящего аукциона (без проверки даты)"""
+        """Получить автомобили из списка предстоящего аукциона (без проверки даты).
+
+        Кэшируется отдельным ключом от `get_cars_with_date_check`: тот хранит
+        машины С деталями (`_gather_car_details`), здесь — только строки списка,
+        так что данные разной формы и общий ключ их бы перепутал.
+
+        До этого метод не читал кэш вообще, хотя планировщик каждые 8 минут
+        прогревал `lotte_cars_20_0`. Тот ключ читает `/api/v1/lotte/cars`, а
+        фронтенд ходит в `/cars/upcoming` — то есть прогрев работал, но не для
+        того эндпоинта, который реально обслуживает страницу.
+        """
+        cache_key = f"lotte_upcoming_{limit}_{offset}"
+        cached = self._get_from_cache(cache_key, ttl=settings.cache_ttl_car_list)
+        if cached:
+            logger.info(f"Кэш: {len(cached)} автомобилей для {cache_key}")
+            return cached
+
         logger.info(
             f"Запрос автомобилей предстоящего аукциона: limit={limit}, offset={offset}"
         )
@@ -510,6 +526,11 @@ class LotteService(BaseAuctionService):
                 f"Найдено {len(cars)} автомобилей на странице (пагинация на сервере)"
             )
 
+            # Пустой результат не кэшируем: сбой разметки или срезанный ответ
+            # иначе закрепил бы «аукцион пуст» на весь TTL. Настоящий пустой
+            # аукцион стоит одного лишнего запроса раз в TTL.
+            if cars:
+                self._save_to_cache(cache_key, cars)
             return cars
 
         except Exception as e:

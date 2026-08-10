@@ -480,15 +480,12 @@ async def get_normalized_heydealer_cars(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "message": "Ошибка авторизации HeyDealer",
-                "cars": [],
-                "total_count": 0,
-                "current_page": page,
-                "auction_name": "HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Подготавливаем параметры
         params = {
@@ -548,6 +545,9 @@ async def get_normalized_heydealer_cars(
                 "auction_name": "HeyDealer",
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при получении нормализованных автомобилей HeyDealer: {e}")
         raise HTTPException(
@@ -568,13 +568,12 @@ async def get_heydealer_status(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "status": "error",
-                "message": "Ошибка авторизации HeyDealer",
-                "auction_name": "HeyDealer",
-                "authenticated": False,
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Проверяем доступность API
         response = await _hd_get_async(
@@ -602,6 +601,9 @@ async def get_heydealer_status(
                 "authenticated": False,
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при проверке статуса HeyDealer: {e}")
         return {
@@ -639,14 +641,12 @@ async def get_filtered_cars(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "data": {"cars": [], "total_count": 0, "page": page},
-                "message": "Ошибка авторизации HeyDealer",
-                "total_count": 0,
-                "current_page": page,
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Подготавливаем параметры
         params = {
@@ -961,6 +961,9 @@ async def get_filtered_cars(
             },
         }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте фильтрации автомобилей: {str(e)}")
         return {
@@ -997,15 +1000,11 @@ async def get_heydealer_car_detail_with_tech_sheet(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return HeyDealerCarWithTechSheetResponse(
-                success=False,
-                data=None,
-                message="Ошибка авторизации HeyDealer",
-                timestamp=datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT"),
-                total_requests=0,
-                car_request_success=False,
-                accident_repairs_request_success=False,
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
             )
 
         # Два upstream-запроса: детальная карточка + технический лист (accident repairs).
@@ -1203,6 +1202,9 @@ async def get_heydealer_car_detail_with_tech_sheet(
             accident_repairs_request_success=accident_repairs_available,
         )
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
@@ -1239,12 +1241,12 @@ async def get_heydealer_car_detail_basic(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "error": "Ошибка авторизации HeyDealer",
-                "detail": "Не удалось получить валидную сессию HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1358,6 +1360,9 @@ async def get_heydealer_car_detail_basic(
                 "detail": detail_response.text,
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении базовой детальной информации об автомобиле {car_hash_id}: {e}"
@@ -1383,12 +1388,12 @@ async def get_heydealer_car_detail_direct(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "data": None,
-                "message": "Ошибка авторизации HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1428,6 +1433,9 @@ async def get_heydealer_car_detail_direct(
                 "message": f"Ошибка получения детальной информации: {detail_response.status_code}",
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
@@ -1454,12 +1462,12 @@ async def get_heydealer_car_raw(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "message": "Ошибка авторизации HeyDealer",
-                "error_text": "Не удалось получить валидную сессию HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1504,6 +1512,9 @@ async def get_heydealer_car_raw(
                 "error_text": detail_response.text[:500],
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении сырых данных об автомобиле {car_hash_id}: {e}"
@@ -1530,12 +1541,12 @@ async def get_heydealer_car_simple(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "message": "Ошибка авторизации HeyDealer",
-                "error_text": "Не удалось получить валидную сессию HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1593,6 +1604,9 @@ async def get_heydealer_car_simple(
                 "error_text": detail_response.text[:500],
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении упрощенных данных об автомобиле {car_hash_id}: {e}"
@@ -1617,12 +1631,12 @@ async def debug_heydealer_car(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "status_code": 500,
-                "error": "Ошибка авторизации HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Прямой запрос к API
         response = await _hd_get_async(
@@ -1659,6 +1673,9 @@ async def debug_heydealer_car(
                 "error": response.text[:500],
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         return {"success": False, "error": f"Exception: {str(e)}"}
 
@@ -1677,12 +1694,12 @@ async def get_heydealer_car_detail_direct_json(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "error": "Ошибка авторизации HeyDealer",
-                "detail": "Не удалось получить валидную сессию HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1720,6 +1737,9 @@ async def get_heydealer_car_detail_direct_json(
                 "detail": detail_response.text,
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
@@ -1743,12 +1763,12 @@ async def get_heydealer_car_debug_json(
         cookies, headers = heydealer_auth.get_valid_session()
 
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            return {
-                "success": False,
-                "error": "Ошибка авторизации HeyDealer",
-                "detail": "Не удалось получить валидную сессию HeyDealer",
-            }
+            # 503 AUTH_UNAVAILABLE via the handler in main.py. Returning a
+            # model/dict here made FastAPI serialise an auth failure as HTTP
+            # 200, so callers could not tell "logged out" from "no data".
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
+            )
 
         # Получаем детальную информацию
         detail_url = f"https://api.heydealer.com/v2/dealers/web/cars/{car_hash_id}/"
@@ -1787,6 +1807,9 @@ async def get_heydealer_car_debug_json(
                 "detail": detail_response.text,
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка при получении детальной информации об автомобиле {car_hash_id}: {e}"
@@ -1812,6 +1835,9 @@ async def get_brands():
                 success=False, data=[], message="Не удалось получить список марок"
             )
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения марок: {str(e)}")
         return HeyDealerBrandsResponse(
@@ -1837,6 +1863,9 @@ async def get_brand_models(brand_hash_id: str):
                 success=False, data={}, message="Не удалось получить список моделей"
             )
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения моделей: {str(e)}")
         return HeyDealerBrandDetailResponse(
@@ -1865,6 +1894,9 @@ async def get_model_generations(model_group_hash_id: str):
                 success=False, data={}, message="Не удалось получить список поколений"
             )
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения поколений: {str(e)}")
         return HeyDealerModelDetailResponse(
@@ -1893,6 +1925,9 @@ async def get_model_configurations(model_hash_id: str):
                 message="Не удалось получить список конфигураций",
             )
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения конфигураций: {str(e)}")
         return HeyDealerGradeDetailResponse(
@@ -1914,6 +1949,9 @@ async def get_brands_raw():
             "message": "Сырые данные марок",
         }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте сырых данных марок: {str(e)}")
         return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
@@ -1940,6 +1978,9 @@ async def get_filtered_cars_raw(
             "message": "Сырые данные отфильтрованных автомобилей",
         }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте сырых данных автомобилей: {str(e)}")
         return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
@@ -2015,6 +2056,9 @@ async def get_brands_direct():
                 "message": f"Ошибка API: {response.status_code}",
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в прямом эндпоинте марок: {str(e)}")
         return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
@@ -2086,6 +2130,9 @@ async def get_brand_models_direct(brand_hash_id: str):
                 "message": f"Ошибка API: {response.status_code}",
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в прямом эндпоинте моделей: {str(e)}")
         return {"success": False, "data": {}, "message": f"Ошибка: {str(e)}"}
@@ -2171,6 +2218,9 @@ async def get_filtered_cars_direct(
                 "message": f"Ошибка API: {response.status_code}",
             }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в прямом эндпоинте автомобилей: {str(e)}")
         return {"success": False, "data": [], "message": f"Ошибка: {str(e)}"}
@@ -2234,6 +2284,9 @@ async def find_brand_by_name(brand_name: str) -> Optional[str]:
 
         return None
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка поиска бренда по названию {brand_name}: {str(e)}")
         return None
@@ -2254,6 +2307,9 @@ async def get_brand_models_by_name(brand_name: str):
         # Используем существующую функцию
         return await get_brand_models(brand_hash_id)
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения моделей по названию: {str(e)}")
         return HeyDealerBrandDetailResponse(
@@ -2310,6 +2366,9 @@ async def get_filters():
             "message": f"Получены фильтры с {len(brands_data)} брендами",
         }
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте фильтров: {str(e)}")
         return {"success": False, "data": {}, "message": f"Ошибка: {str(e)}"}
@@ -2374,6 +2433,9 @@ async def find_model_group_by_name(model_group_name: str) -> Optional[str]:
 
         return None
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка поиска model_group по названию {model_group_name}: {str(e)}"
@@ -2401,6 +2463,9 @@ async def get_model_generations_by_name(model_group_name: str):
         # Используем существующую функцию
         return await get_model_generations(model_group_hash_id)
 
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка в эндпоинте получения поколений по названию: {str(e)}")
         return HeyDealerModelDetailResponse(
@@ -2439,6 +2504,9 @@ async def get_car_debug(car_hash_id: str):
         }
 
     except HTTPException:
+        raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
         raise
     except Exception as e:
         logger.error(f"Ошибка получения отладочной информации: {e}")
@@ -2485,6 +2553,9 @@ async def get_car_accident_repairs(car_hash_id: str):
 
     except HTTPException:
         raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(f"Ошибка получения технического листа для {car_hash_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -2530,6 +2601,9 @@ async def get_car_with_accident_repairs(car_hash_id: str):
 
     except HTTPException:
         raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка получения данных автомобиля {car_hash_id} с техническим листом: {e}"
@@ -2566,6 +2640,9 @@ async def get_car_accident_repairs_raw(car_hash_id: str):
         }
 
     except HTTPException:
+        raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
         raise
     except Exception as e:
         logger.error(
@@ -2667,6 +2744,9 @@ async def get_car_accident_repairs_summary(car_hash_id: str):
 
     except HTTPException:
         raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка создания сводки технического листа для {car_hash_id}: {e}"
@@ -2742,6 +2822,9 @@ async def get_car_accident_repairs_demo(car_hash_id: str):
 
     except HTTPException:
         raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
+        raise
     except Exception as e:
         logger.error(
             f"Ошибка создания демонстрационного технического листа для {car_hash_id}: {e}"
@@ -2795,10 +2878,10 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         cookies, headers = heydealer_auth.get_valid_session()
         
         if not cookies or not headers:
-            logger.error("Не удалось получить валидную сессию HeyDealer")
-            raise HTTPException(
-                status_code=401, 
-                detail="Ошибка авторизации HeyDealer"
+            # 503, not 401: this endpoint takes no caller credentials, so 401
+            # blamed the client for a login failure of ours to the upstream.
+            raise AuthUnavailableError(
+                "HeyDealer", "не удалось получить валидную сессию"
             )
         
         # Формируем URL для получения диаграммы
@@ -2956,6 +3039,9 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
         return result
         
     except HTTPException:
+        raise
+    except AuthError:
+        # Propagate to the AuthError handler in main.py.
         raise
     except Exception as e:
         logger.error(f"Ошибка получения диаграммы повреждений для {car_hash_id}: {e}")

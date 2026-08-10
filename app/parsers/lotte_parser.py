@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
 from bs4 import BeautifulSoup, Tag
 
+from app.core.manufacturers import UNKNOWN_BRAND, resolve_manufacturer
 from app.models.lotte import (
     LotteCar,
     LotteAuctionDate,
@@ -737,62 +738,22 @@ class LotteParser(BaseAuctionParser):
         return None
 
     def _parse_brand_model(self, name: str) -> tuple[str, str]:
-        """Извлекает марку и модель из названия автомобиля"""
-        try:
-            # Общие корейские марки
-            brands = [
-                "GRANDEUR",
-                "SONATA",
-                "ELANTRA",
-                "ACCENT",
-                "TUCSON",
-                "SANTA FE",
-                "GENESIS",  # Hyundai
-                "K5",
-                "K7",
-                "K8",
-                "K9",
-                "SPORTAGE",
-                "SORENTO",
-                "CARNIVAL",
-                "MOHAVE",  # Kia
-                "SPARK",
-                "CRUZE",
-                "MALIBU",
-                "EQUINOX",
-                "TRAVERSE",  # Chevrolet
-                "QM6",
-                "QM3",
-                "SM6",
-                "SM3",
-                "XM3",  # Renault Samsung
-                "KORANDO",
-                "TIVOLI",
-                "REXTON",
-                "ACTYON",  # SsangYong
-            ]
+        """Извлекает марку и модель из названия автомобиля.
 
-            name_upper = name.upper()
+        Возвращает (марка, исходное название). Марка определяется по модели
+        через app/core/manufacturers.py — тот же справочник, что использует
+        фронтенд (lib/utils/resolveManufacturer.ts), поэтому обе стороны не
+        могут разойтись в оценке одной и той же машины.
 
-            # Ищем марку в названии
-            for brand in brands:
-                if brand in name_upper:
-                    return brand, name
-
-            # Если конкретная марка не найдена, попробуем определить по общим паттернам
-            if "GRANDEUR" in name_upper or "GENESIS" in name_upper:
-                return "HYUNDAI", name
-            elif any(
-                k in name_upper for k in ["K5", "K7", "K8", "K9", "SPORTAGE", "SORENTO"]
-            ):
-                return "KIA", name
-            elif "STAREX" in name_upper:
-                return "HYUNDAI", name
-
-            return "UNKNOWN", name
-
-        except:
-            return "UNKNOWN", name
+        Раньше здесь был список, названный `brands`, который на деле содержал
+        НАЗВАНИЯ МОДЕЛЕЙ: Kia Sorento возвращалась с brand="SORENTO", Hyundai
+        Grandeur — с brand="GRANDEUR", а всё, чего не было в списке (EV6,
+        Palisade), — с brand="UNKNOWN". Блок, сопоставлявший модель с настоящим
+        производителем, стоял ПОСЛЕ цикла и был недостижим: цикл всегда
+        возвращал значение первым.
+        """
+        brand = resolve_manufacturer(name)
+        return (brand or UNKNOWN_BRAND), name
 
 
 class LotteCarDetailParser:
