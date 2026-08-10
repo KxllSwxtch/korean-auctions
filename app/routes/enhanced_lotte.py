@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 import asyncio
 
+from app.core.auth_errors import AuthError
 from app.services.enhanced_lotte_service import EnhancedLotteService
 from app.models.lotte import LotteResponse, LotteCar, LotteError, LotteAuctionDate
 from app.core.logging import logger
@@ -118,6 +119,10 @@ async def get_auction_date(
             "timestamp": datetime.now().isoformat(),
         }
 
+    except AuthError:
+        # 503 + код через обработчик в main.py. Иначе отказ
+        # авторизации превращался в пустой список с HTTP 200.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при получении даты аукциона Lotte: {e}")
         raise HTTPException(
@@ -166,6 +171,10 @@ async def get_cars(
             "timestamp": datetime.now().isoformat(),
         }
 
+    except AuthError:
+        # 503 + код через обработчик в main.py. Иначе отказ
+        # авторизации превращался в пустой список с HTTP 200.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при получении автомобилей Lotte: {e}")
         raise HTTPException(
@@ -296,6 +305,10 @@ async def get_car_by_id(
 
     except HTTPException:
         raise
+    except AuthError:
+        # 503 + код через обработчик в main.py. Иначе отказ
+        # авторизации превращался в пустой список с HTTP 200.
+        raise
     except Exception as e:
         logger.error(f"Ошибка при получении автомобиля {car_id}: {e}")
         raise HTTPException(
@@ -367,34 +380,47 @@ async def health_check(
     - Состояние HTTP клиентов
     """
     try:
-        sync_health = {
-            "service_name": "sync_lotte",
-            "status": "healthy",
-            "authenticated": service_sync.authenticated,
-            "cache_size": len(service_sync.cache),
-            "last_activity": service_sync.stats.get("last_activity"),
-        }
+        # `status` раньше было литералом "healthy": эндпоинт печатал реальный
+        # флаг authenticated рядом с вердиктом, который от него не зависел, и
+        # сервис, ни разу не вошедший в систему, отчитывался как здоровый.
+        # Теперь вердикт выводится из состояния и говорит, в чём причина.
+        def _describe(service, name: str) -> Dict[str, Any]:
+            configured = bool(
+                service.credentials.get("username")
+                and service.credentials.get("password")
+            )
+            if not configured:
+                status = "unconfigured"
+            elif service.authenticated:
+                status = "healthy"
+            else:
+                status = "degraded"
+            return {
+                "service_name": name,
+                "status": status,
+                "credentials_configured": configured,
+                "authenticated": service.authenticated,
+                "cache_size": len(service.cache),
+                "last_activity": service.stats.get("last_activity"),
+            }
 
-        health_data = {
-            "overall_status": "healthy",
-            "services": {
-                "sync": sync_health,
-            },
+        services = {"sync": _describe(service_sync, "sync_lotte")}
+        if _async_service:
+            services["async"] = _describe(_async_service, "async_lotte")
+
+        # HTTP остаётся 200: это диагностический эндпоинт, а не проба
+        # готовности. Единый machine-readable сигнал с кодом 503 — /healthz/ready.
+        overall = (
+            "healthy"
+            if all(s["status"] == "healthy" for s in services.values())
+            else "degraded"
+        )
+
+        return {
+            "overall_status": overall,
+            "services": services,
             "timestamp": datetime.now().isoformat(),
         }
-
-        # Проверяем асинхронный сервис
-        if _async_service:
-            async_health = {
-                "service_name": "async_lotte",
-                "status": "healthy",
-                "authenticated": _async_service.authenticated,
-                "cache_size": len(_async_service.cache),
-                "last_activity": _async_service.stats.get("last_activity"),
-            }
-            health_data["services"]["async"] = async_health
-
-        return health_data
 
     except Exception as e:
         logger.error(f"Ошибка проверки здоровья сервиса: {e}")
@@ -503,6 +529,10 @@ async def get_total_cars_count(
             "timestamp": datetime.now().isoformat(),
         }
 
+    except AuthError:
+        # 503 + код через обработчик в main.py. Иначе отказ
+        # авторизации превращался в пустой список с HTTP 200.
+        raise
     except Exception as e:
         logger.error(f"Ошибка получения общего количества автомобилей: {e}")
         raise HTTPException(

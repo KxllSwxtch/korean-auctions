@@ -41,7 +41,7 @@ from app.models.sk_auction import (
     SKAuctionNextDateResponse,
 )
 from app.parsers.sk_auction_parser import SKAuctionParser
-from app.core.auth_errors import require_credentials
+from app.core.auth_errors import AuthError, AuthUnavailableError, require_credentials
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.core.tls import REQUESTS_VERIFY
@@ -348,10 +348,24 @@ class SKAuctionService:
             return False
 
     def _ensure_authenticated(self) -> bool:
-        """Ensure session is authenticated"""
+        """Ensure session is authenticated.
+
+        Raises:
+            AuthUnavailableError: if the session is not authenticated.
+
+        Every caller writes `self._ensure_authenticated()` on its own line and
+        discards the bool, so returning False did not stop anything: the request
+        went on unauthenticated, the upstream returned a login page, the parser
+        honestly found no rows, and the endpoint answered
+        "Successfully parsed 0 cars" with HTTP 200. Verified live in production,
+        where SK_AUCTION_* is unset. Raising is what makes the existing call
+        sites correct without touching all ten of them.
+        """
         if self._needs_session_refresh():
             self._create_session()
-        return self._authenticated
+        if not self._authenticated:
+            raise AuthUnavailableError("SK Auction", "session is not authenticated")
+        return True
 
     # ==================== Auction Date Resolution ====================
 
@@ -410,6 +424,12 @@ class SKAuctionService:
         except requests.exceptions.RequestException as e:
             logger.error(f"🌐 Network error fetching exhibition page: {e}")
             return fallback_date
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ Error resolving next auction date: {e}")
             return fallback_date
@@ -551,6 +571,12 @@ class SKAuctionService:
                 request_duration=time.time() - start_time,
             )
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction error: {e}")
             return SKAuctionResponse(
@@ -718,6 +744,12 @@ class SKAuctionService:
                 data=None,
             )
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction detail error: {e}")
             return SKAuctionDetailResponse(
@@ -777,6 +809,12 @@ class SKAuctionService:
             self._save_to_cache(cache_key, result)
             return result
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction brands error: {e}")
             return SKAuctionBrandsResponse(
@@ -840,6 +878,12 @@ class SKAuctionService:
             self._save_to_cache(cache_key, result)
             return result
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction models error: {e}")
             return SKAuctionModelsResponse(
@@ -904,6 +948,12 @@ class SKAuctionService:
             self._save_to_cache(cache_key, result)
             return result
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction generations error: {e}")
             return SKAuctionGenerationsResponse(
@@ -961,6 +1011,12 @@ class SKAuctionService:
             self._save_to_cache(cache_key, result)
             return result
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction fuel types error: {e}")
             return SKAuctionFuelTypesResponse(
@@ -1016,6 +1072,12 @@ class SKAuctionService:
             self._save_to_cache(cache_key, result)
             return result
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction years error: {e}")
             return SKAuctionYearsResponse(
@@ -1048,6 +1110,12 @@ class SKAuctionService:
                 auction_date=auction_date,
             )
 
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ SK Auction count error: {e}")
             return SKAuctionCountResponse(
@@ -1095,8 +1163,14 @@ class SKAuctionService:
         try:
             logger.info("🏥 SK Auction service health check")
 
-            # Try to authenticate
-            self._ensure_authenticated()
+            # A health check must REPORT an auth failure, not raise it — this
+            # endpoint is what you call to find out why the others are 503ing,
+            # so propagating AuthError here would break it exactly when it is
+            # needed. _ensure_authenticated now raises, hence the local catch.
+            try:
+                self._ensure_authenticated()
+            except AuthError as auth_err:
+                logger.warning(f"SK Auction health check: not authenticated: {auth_err}")
 
             return {
                 "service": "SK Auction Service",

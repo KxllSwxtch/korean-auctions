@@ -15,7 +15,7 @@ from app.models.happycar import (
     HappyCarResponse, HappyCarDetailResponse,
 )
 from app.parsers.happycar_parser import HappyCarParser
-from app.core.auth_errors import require_credentials
+from app.core.auth_errors import AuthError, AuthUnavailableError, require_credentials
 from app.core.config import get_settings
 from app.core.proxy_config import get_proxy_pool
 from app.core.tls import REQUESTS_VERIFY
@@ -438,6 +438,12 @@ class HappyCarService:
             logger.error(f"HappyCar authentication failed: {e}")
             self._authenticated = False
             return False
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"Unexpected error during HappyCar auth: {e}")
             self._authenticated = False
@@ -470,7 +476,14 @@ class HappyCarService:
                 # Last resort: rotate proxy and try once more
                 logger.warning("Auth failed, attempting proxy rotation as last resort...")
                 self._rotate_to_new_ip()
-                self._authenticate()
+                if not self._authenticate():
+                    # The retry's result was discarded, so a doubly-failed login
+                    # returned normally and callers — which ignore this method's
+                    # result — carried on unauthenticated, turning an auth
+                    # failure into an empty listing served with HTTP 200.
+                    raise AuthUnavailableError(
+                        "HappyCar", "login failed after proxy rotation"
+                    )
 
     # ─── Caching ──────────────────────────────────────────────────────
 
@@ -613,6 +626,12 @@ class HappyCarService:
                 success=False,
                 message=f"Failed to fetch cars: {str(e)}",
             )
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ Unexpected error fetching HappyCar cars: {e}")
             import traceback
@@ -717,6 +736,12 @@ class HappyCarService:
                 success=False,
                 message=f"Failed to fetch car detail: {str(e)}",
             )
+        except AuthError:
+            # Let the AuthError handler in main.py answer (503 + a code
+            # saying whether a retry can help). Swallowed here, a missing
+            # credential became success=False, which the route turned into
+            # a 500 — or, for SK Auction, a 400 blaming the caller.
+            raise
         except Exception as e:
             logger.error(f"❌ Unexpected error fetching HappyCar detail: {e}")
             import traceback

@@ -10,6 +10,7 @@ from typing import List, Optional
 from loguru import logger
 import asyncio
 
+from app.core.auth_errors import AuthError
 from app.models.sk_auction import (
     SKAuctionResponse,
     SKAuctionDetailResponse,
@@ -119,6 +120,12 @@ async def get_cars(
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction cars error: {e}")
         raise HTTPException(
@@ -164,6 +171,12 @@ async def search_cars(
         return result
 
     except HTTPException:
+        raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
         raise
     except Exception as e:
         logger.error(f"❌ SK Auction search error: {e}")
@@ -227,6 +240,12 @@ async def get_car_detail(
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction detail error: {e}")
         raise HTTPException(
@@ -266,6 +285,12 @@ async def get_brands(
         return result
 
     except HTTPException:
+        raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
         raise
     except Exception as e:
         logger.error(f"❌ SK Auction brands error: {e}")
@@ -310,6 +335,12 @@ async def get_models(
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction models error: {e}")
         raise HTTPException(
@@ -353,6 +384,12 @@ async def get_generations(
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction generations error: {e}")
         raise HTTPException(
@@ -387,6 +424,12 @@ async def get_fuel_types():
         return result
 
     except HTTPException:
+        raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
         raise
     except Exception as e:
         logger.error(f"❌ SK Auction fuel types error: {e}")
@@ -424,6 +467,12 @@ async def get_years():
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ SK Auction years error: {e}")
         raise HTTPException(
@@ -454,6 +503,12 @@ async def get_next_auction_date():
         logger.info(f"✅ Next auction date: {result.auction_date}")
         return result
 
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code
+        # saying whether a retry can help). Swallowed here, a missing
+        # credential became success=False, which the route turned into
+        # a 500 — or, for SK Auction, a 400 blaming the caller.
+        raise
     except Exception as e:
         logger.error(f"❌ Next auction date error: {e}")
         raise HTTPException(
@@ -519,6 +574,8 @@ async def health_check():
         result = await asyncio.to_thread(sk_auction_service.health_check)
         return result
 
+    # No AuthError branch on purpose: this endpoint exists to explain an auth
+    # failure, so it reports one in its body rather than becoming a 503 itself.
     except Exception as e:
         logger.error(f"❌ SK Auction health check error: {e}")
         return {

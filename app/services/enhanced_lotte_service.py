@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin
 import json
 
+from app.core.auth_errors import AuthConfigurationError, AuthError
 from app.core.base_service import BaseAuctionService, AuthenticationError, ParsingError
 from app.core.config import get_settings
 from app.core.logging import logger
@@ -79,7 +80,27 @@ class EnhancedLotteService(BaseAuctionService):
         }
 
     async def _perform_authentication(self) -> bool:
-        """Выполнить двухэтапную аутентификацию в Lotte"""
+        """Выполнить двухэтапную аутентификацию в Lotte.
+
+        Raises:
+            AuthConfigurationError: если учётные данные не заданы. __init__
+                логирует это, но конструирование сервиса не прерывает, поэтому
+                без проверки логин уходил с пустыми значениями и ошибка
+                конфигурации возвращалась как отказ авторизации.
+        """
+        # ENHANCED_LOTTE_* с откатом на LOTTE_*: в сообщении перечисляем обе
+        # пары, иначе оператор не поймёт, какую из них задавать.
+        if not self.credentials.get("username") or not self.credentials.get("password"):
+            raise AuthConfigurationError(
+                "Lotte v2",
+                [
+                    "ENHANCED_LOTTE_USERNAME",
+                    "ENHANCED_LOTTE_PASSWORD",
+                    "or LOTTE_USERNAME",
+                    "LOTTE_PASSWORD",
+                ],
+            )
+
         if self.current_login_attempts >= self.login_attempts_limit:
             logger.error("Превышен лимит попыток входа в Lotte")
             return False
@@ -329,6 +350,10 @@ class EnhancedLotteService(BaseAuctionService):
                 "offset": offset,
             }
 
+        except AuthError:
+            # 503 + код через обработчик в main.py. Иначе отказ
+            # авторизации превращался в пустой список с HTTP 200.
+            raise
         except Exception as e:
             logger.error(f"Ошибка получения автомобилей с проверкой даты Lotte: {e}")
             return {
@@ -403,6 +428,10 @@ class EnhancedLotteService(BaseAuctionService):
                             details = await self.get_car_details(str(car_id), car_data)
                             return details or car_data
                         return car_data
+                    except AuthError:
+                        # 503 + код через обработчик в main.py. Иначе отказ
+                        # авторизации превращался в пустой список с HTTP 200.
+                        raise
                     except Exception as e:
                         logger.error(
                             f"Ошибка получения деталей для {car_data.get('id', 'unknown')}: {e}"
@@ -448,13 +477,27 @@ class EnhancedLotteService(BaseAuctionService):
             logger.info(f"Получено {len(detailed_cars)} автомобилей с деталями")
             return detailed_cars
 
+        except AuthError:
+            # 503 + код через обработчик в main.py. Иначе отказ
+            # авторизации превращался в пустой список с HTTP 200.
+            raise
         except Exception as e:
             logger.error(f"Ошибка получения автомобилей с деталями: {e}")
             raise ParsingError(f"Не удалось получить детальную информацию: {e}")
 
     async def get_total_cars_count(self) -> int:
-        """Получить общее количество автомобилей на аукционе"""
+        """Получить общее количество автомобилей на аукционе.
+
+        Raises:
+            AuthError: если аутентификация не удалась. Раньше метод вообще не
+                аутентифицировался: неавторизованный запрос возвращал страницу
+                логина, парсер честно находил в ней 0 машин, и эндпоинт отдавал
+                «на аукционе 0 автомобилей» с HTTP 200 — то есть отказ доступа
+                выглядел как пустой аукцион.
+        """
         try:
+            await self.ensure_authenticated()
+
             # Сначала получаем первую страницу
             if self.use_async:
                 response, content = await self.get_page(
@@ -472,6 +515,11 @@ class EnhancedLotteService(BaseAuctionService):
             logger.info(f"Общее количество автомобилей Lotte: {total_count}")
             return total_count
 
+        except AuthError:
+            # 0 — допустимый ответ («аукцион пуст») и должен остаться отличим
+            # от «мы не авторизованы». Второе доходит до маршрута и становится
+            # 503 с кодом, а не количеством.
+            raise
         except Exception as e:
             logger.error(f"Ошибка получения общего количества автомобилей: {e}")
             return 0

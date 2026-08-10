@@ -5,6 +5,9 @@ from loguru import logger
 import asyncio
 import threading
 
+from app.core.auth_errors import AuthError, missing_credential_names
+from app.core.config import get_settings
+from app.core.proxy_config import ProxyConfigurationError, get_proxy_pool
 from app.models.happycar import (
     HappyCarResponse, HappyCarDetailResponse, HappyCarHealthResponse,
 )
@@ -13,6 +16,8 @@ from app.core.logging import get_logger
 
 # Setup logger
 happycar_logger = get_logger("happycar_routes")
+
+settings = get_settings()
 
 router = APIRouter(tags=["HappyCar Insurance Auction"])
 
@@ -88,6 +93,12 @@ async def get_happycar_cars(
 
         return result
 
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code saying
+        # whether a retry can help). HappyCar needs both credentials and the
+        # shared proxy, and folding either failure in here made an
+        # unprovisioned deployment look like a server crash.
+        raise
     except Exception as e:
         happycar_logger.error(f"❌ Unexpected error fetching HappyCar cars: {e}")
         raise HTTPException(
@@ -129,6 +140,12 @@ async def get_happycar_car_detail(
 
     except HTTPException:
         raise
+    except AuthError:
+        # Let the AuthError handler in main.py answer (503 + a code saying
+        # whether a retry can help). HappyCar needs both credentials and the
+        # shared proxy, and folding either failure in here made an
+        # unprovisioned deployment look like a server crash.
+        raise
     except Exception as e:
         happycar_logger.error(f"❌ Unexpected error getting car detail: {e}")
         raise HTTPException(
@@ -147,10 +164,30 @@ async def health_check() -> HappyCarHealthResponse:
     GET /api/v1/happycar/health
     ```
     """
+    # Previously a hardcoded success=True/status="active" literal: it reported
+    # "healthy" on a deployment with no credentials and no proxy, i.e. it could
+    # not fail and therefore told you nothing. HappyCar needs BOTH, so both are
+    # checked — names only, never values.
+    missing = missing_credential_names(
+        {
+            "HAPPYCAR_USERNAME": settings.happycar_username,
+            "HAPPYCAR_PASSWORD": settings.happycar_password,
+        }
+    )
+    try:
+        get_proxy_pool()
+    except ProxyConfigurationError:
+        missing.append("AUCTION_PROXY_*")
+
+    ready = not missing
     return HappyCarHealthResponse(
-        success=True,
-        message="HappyCar service is healthy",
+        success=ready,
+        message=(
+            "HappyCar service is healthy"
+            if ready
+            else f"HappyCar is not provisioned; missing {', '.join(missing)}"
+        ),
         service="HappyCar Insurance Auction",
-        status="active",
+        status="active" if ready else "unconfigured",
         base_url=HappyCarService.BASE_URL,
     )

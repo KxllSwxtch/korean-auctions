@@ -14,14 +14,24 @@ from pathlib import Path
 
 from app.core.anti_block import AntiBlockClient, ProxyConfig
 from app.core.async_client import AsyncAntiBlockClient, AsyncSessionConfig
+from app.core.auth_errors import AuthError, AuthUnavailableError
 from app.core.logging import logger
 from app.core.config import settings
 
 
-class AuthenticationError(Exception):
-    """Ошибка аутентификации"""
+class AuthenticationError(AuthUnavailableError):
+    """Ошибка аутентификации.
 
-    pass
+    Наследуется от AuthUnavailableError, чтобы обработчик в main.py отвечал
+    503 с машиночитаемым кодом и Retry-After. Раньше это был голый Exception,
+    который не ловил никто: единственный `raise` (в authenticate ниже)
+    доходил до FastAPI как необработанное исключение, то есть 500 без тела.
+
+    Сигнатура с одним аргументом сохранена ради существующих вызовов.
+    """
+
+    def __init__(self, message: str, service: str = "Lotte v2") -> None:
+        super().__init__(service, message)
 
 
 class ParsingError(Exception):
@@ -189,7 +199,17 @@ class BaseAuctionService(ABC):
                 return True
 
             logger.info(f"Требуется аутентификация для {self.auction_name}")
-            return await self.authenticate()
+            # Раньше здесь возвращался bool, а все три вызывающих метода
+            # (get_auction_date, get_cars, get_car_details) писали просто
+            # `await self.ensure_authenticated()` и результат игнорировали.
+            # Неудачный вход поэтому не останавливал запрос: сервис шёл дальше,
+            # получал страницу логина вместо данных и отдавал пустой список с
+            # HTTP 200 — отказ авторизации выглядел как «на аукционе нет машин».
+            if not await self.authenticate():
+                raise AuthUnavailableError(
+                    self.auction_name, "не удалось аутентифицироваться"
+                )
+            return True
 
         return True
 
@@ -211,6 +231,12 @@ class BaseAuctionService(ABC):
 
             return success
 
+        except AuthError:
+            # Уже типизировано (в т.ч. AuthConfigurationError с именами
+            # незаданных переменных). Оборачивание стёрло бы и код ошибки,
+            # и признак того, можно ли повторять запрос.
+            self.stats["auth_failures"] += 1
+            raise
         except Exception as e:
             self.stats["auth_failures"] += 1
             logger.error(f"Ошибка аутентификации в {self.auction_name}: {e}")
@@ -374,6 +400,10 @@ class BaseAuctionService(ABC):
 
             return date_info
 
+        except AuthError:
+            # 503 + код через обработчик в main.py. Иначе отказ
+            # авторизации превращался в пустой список с HTTP 200.
+            raise
         except Exception as e:
             logger.error(f"Ошибка получения даты аукциона {self.auction_name}: {e}")
             raise ParsingError(f"Не удалось получить дату аукциона: {e}")
@@ -412,6 +442,10 @@ class BaseAuctionService(ABC):
 
             return cars_data
 
+        except AuthError:
+            # 503 + код через обработчик в main.py. Иначе отказ
+            # авторизации превращался в пустой список с HTTP 200.
+            raise
         except Exception as e:
             logger.error(
                 f"Ошибка получения списка автомобилей {self.auction_name}: {e}"
@@ -455,6 +489,10 @@ class BaseAuctionService(ABC):
 
             return car_details
 
+        except AuthError:
+            # 503 + код через обработчик в main.py. Иначе отказ
+            # авторизации превращался в пустой список с HTTP 200.
+            raise
         except Exception as e:
             logger.error(
                 f"Ошибка получения деталей автомобиля {car_id} в {self.auction_name}: {e}"
