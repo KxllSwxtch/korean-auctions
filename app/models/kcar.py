@@ -24,6 +24,9 @@ class KCarCar(BaseModel):
         alias="THUMBNAIL_MOBILE",
         description="URL фотографии автомобиля (оригинальное качество)",
     )
+    photo_count: Optional[str] = Field(
+        None, alias="EX_CNT", description="Количество фотографий лота"
+    )
 
     # Цена и аукцион
     auction_start_price: Optional[str] = Field(
@@ -84,6 +87,15 @@ class KCarCar(BaseModel):
     )
     accident_yn: Optional[str] = Field(
         None, alias="ACCIDENT_YN", description="Признак аварии"
+    )
+    # Реальный источник данных о ДТП. ACCIDENT_YN приходит пустым во всех
+    # проверенных ответах (200/200), а JINDAN_EX_LIST заполнен всегда:
+    # "무사고" (без ДТП) либо список заменённых панелей через запятую.
+    # Осторожно: апстрим пишет переднее крыло двумя способами — 앞팬더 и 앞펜더.
+    jindan_ex_list: Optional[str] = Field(
+        None,
+        alias="JINDAN_EX_LIST",
+        description="Заменённые панели или 무사고 (без ДТП)",
     )
 
     # Местоположение
