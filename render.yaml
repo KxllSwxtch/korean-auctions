@@ -10,13 +10,31 @@ services:
         value: 3.12.1
       - key: PORT
         value: 10000
-      # Origins permitted to call this API. Previously the app used
-      # allow_origins=["*"] together with allow_credentials=True, which makes
-      # Starlette echo any caller's Origin back with
-      # Access-Control-Allow-Credentials: true — so any website could issue
-      # credentialed cross-origin requests to every endpoint.
+      # Origins permitted to call this API from a browser. This is the
+      # browser-facing half of the frontend's deployment: when it drifts from
+      # the live domain, every client-side fetch fails its preflight with 400
+      # "Disallowed CORS origin" and the site renders with no data, while
+      # /health keeps answering 200 and curl keeps working — CORS is enforced
+      # by the browser, not by the server. This line still named the retired
+      # autobaza.vip brand three days after the rename to nonstop-motors.com.
+      # When the frontend's domain changes, this line changes in the same PR.
+      # localhost is deliberately absent here; it lives in the code default.
       - key: CORS_ALLOWED_ORIGINS
-        value: https://www.autobaza.vip,https://autobaza.vip
+        value: https://www.nonstop-motors.com,https://nonstop-motors.com,https://nonstopautoapp.vercel.app
+      # Vercel mints a hostname per branch and per commit, so preview frontends
+      # can never appear in the list above. Starlette matches this with
+      # re.fullmatch() against the whole Origin: no ^ or $, and escape every dot
+      # (an unescaped `.` matches any character, so `.vercel.app` would also
+      # accept `xvercelxapp`). The team slug is load-bearing — vercel.app is a
+      # shared suffix, and a pattern ending at `-[a-z0-9-]+\.vercel\.app` also
+      # matches a project a stranger creates in their own team. Unset -> previews
+      # are refused, which is the safe default; never default this to a
+      # permissive pattern.
+      # NOTE: single quotes when setting a value. YAML rejects "\." inside a
+      # double-quoted scalar with a ScannerError, which fails the whole sync.
+      # Left empty pending confirmation of the Vercel team slug.
+      - key: CORS_ALLOWED_ORIGIN_REGEX
+        value: ''
       # /docs, /redoc and /openapi.json publish the full route surface,
       # including admin and debug endpoints. Off in production.
       - key: ENABLE_API_DOCS

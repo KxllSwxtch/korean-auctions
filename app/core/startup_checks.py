@@ -184,6 +184,37 @@ def log_credential_configuration() -> None:
     _log_groups(ADMIN_TOKEN_GROUPS, "Credential check", "token")
 
 
+def log_cors_configuration(origins: list[str], origin_regex: str | None) -> None:
+    """Print the effective browser allowlist at boot.
+
+    The one configuration group whose VALUES belong in the log. Every other
+    check in this module reports names, because a name is all you need when the
+    failure is "unset". CORS_ALLOWED_ORIGINS was set the entire time — it was
+    just set to the previous brand's domains — so no name-only check could ever
+    have seen it, and the resulting site-wide outage went three days unnoticed.
+    Origins are public hostnames, not secrets.
+
+    Takes the values the middleware was actually constructed with rather than
+    re-reading settings, so a regex that failed to compile is reported as the
+    None it became and not as the string somebody typed.
+    """
+    if origins:
+        logger.info(f"CORS check: allowed origins: {', '.join(origins)}")
+    else:
+        logger.error(
+            "CORS check: the allowed-origin list is empty; every browser "
+            "request will fail its preflight — set CORS_ALLOWED_ORIGINS"
+        )
+
+    if origin_regex:
+        logger.info(f"CORS check: allow_origin_regex={origin_regex}")
+    else:
+        logger.info(
+            "CORS check: CORS_ALLOWED_ORIGIN_REGEX unset; Vercel preview "
+            "deployments will be refused"
+        )
+
+
 def log_startup_configuration() -> None:
     """Report egress and credential provisioning together at boot."""
     log_egress_configuration()

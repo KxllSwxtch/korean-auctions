@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Header, Request
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
 import uvicorn
@@ -46,6 +45,7 @@ from app.routes import (  # noqa: E402 — env hydration must precede app import
 )
 from app.core.admin_auth import require_admin_token  # noqa: E402
 from app.core.config import get_settings  # noqa: E402
+from app.core.cors import configure_cors  # noqa: E402
 from app.core.auth_errors import AuthError  # noqa: E402
 from app.core.logging import logger, setup_logging  # noqa: E402
 from app.core.proxy_config import ProxyConfigurationError  # noqa: E402
@@ -63,7 +63,10 @@ async def lifespan(app: FastAPI):
     """Application lifespan: eagerly init services, start background warming."""
     # Eagerly initialise service singletons so the first user request
     # doesn't pay the initialisation cost.
-    from app.core.startup_checks import log_startup_configuration
+    from app.core.startup_checks import (
+        log_cors_configuration,
+        log_startup_configuration,
+    )
     from app.routes.lotte import get_lotte_service
     from app.routes.lotte_filters import get_filter_service
     from app.routes.glovis import close_glovis_service
@@ -73,6 +76,11 @@ async def lifespan(app: FastAPI):
     # Report missing egress and credential variables before any route can
     # 502/503 over them. Names only — this never logs a secret value.
     log_startup_configuration()
+    # CORS is the exception: values, not names. An allowlist that is set but
+    # points at a retired brand is invisible to every name-only check, and that
+    # is exactly the failure that took the frontend down. Origins are public
+    # hostnames, never secrets.
+    log_cors_configuration(CORS_ORIGINS, CORS_ORIGIN_REGEX)
 
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
@@ -109,21 +117,12 @@ app = FastAPI(
 # GZip compression (before CORS to compress all responses)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# CORS middleware.
-# allow_origins=["*"] together with allow_credentials=True makes Starlette
-# reflect the caller's Origin back and set Access-Control-Allow-Credentials,
-# so any website could issue credentialed cross-origin calls to every route
-# (see starlette/middleware/cors.py — allow_all_origins + has_cookie).
-# Origins are therefore explicit, and methods are limited to what the
-# frontend actually uses.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["*"],
-    max_age=600,
-)
+# CORS. The wiring and its rationale live in app/core/cors.py so
+# tests/test_cors.py can exercise it without importing this module (and with it,
+# every router and provider service). The effective values come back so the
+# lifespan can print them — the previous allowlist named a retired brand for
+# three days and nothing in the boot log said so.
+CORS_ORIGINS, CORS_ORIGIN_REGEX = configure_cors(app, settings)
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(request: Request, exc: AuthError) -> JSONResponse:

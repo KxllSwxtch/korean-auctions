@@ -19,14 +19,44 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     debug: bool = False
 
-    # Comma-separated list of origins allowed to call this API.
+    # Comma-separated list of origins allowed to call this API from a browser.
     # Replaces the previous allow_origins=["*"] + allow_credentials=True
     # combination, which made Starlette echo *any* Origin back with
     # Access-Control-Allow-Credentials: true — letting any website make
     # credentialed cross-origin calls to every endpoint.
+    #
+    # These are the live product's domains (see nonstopapp/middleware.ts
+    # PRODUCTION_HOSTS). This default named the retired autobaza.vip brand for
+    # three days after the rename, so every client-side fetch from the real
+    # frontend was refused at the preflight with 400 "Disallowed CORS origin"
+    # while /health kept answering 200 — CORS is enforced by the browser, not
+    # by the server, so nothing server-side looked wrong.
+    #
+    # This default is load-bearing in production: CORS_ALLOWED_ORIGINS is not
+    # set in the Render dashboard and render.yaml has never been synced, so the
+    # deployed service reads exactly this string. localhost/127.0.0.1 are here
+    # so a fresh clone works with no .env; the render.yaml value omits them.
     cors_allowed_origins: str = (
-        "https://www.autobaza.vip,https://autobaza.vip,http://localhost:3000"
+        "https://www.nonstop-motors.com,https://nonstop-motors.com,"
+        "https://nonstopautoapp.vercel.app,"
+        "http://localhost:3000,http://127.0.0.1:3000"
     )
+
+    # Origins that cannot be enumerated ahead of time. Vercel mints a hostname
+    # per branch and per commit (nonstopautoapp-git-<branch>-<team>.vercel.app,
+    # nonstopautoapp-<hash>-<team>.vercel.app), so no exact list covers preview
+    # deployments.
+    #
+    # Starlette matches this with re.fullmatch() against the whole Origin
+    # (starlette/middleware/cors.py — is_allowed_origin), so the pattern
+    # describes the entire origin and needs no ^ / $ — and must not use them:
+    # `$` also matches before a trailing newline, so the pattern would stop
+    # being safe the moment anyone reused it with .match().
+    #
+    # The default MUST stay None. A permissive default here is
+    # allow_origins=["*"] wearing a disguise, and it would silently apply to
+    # every deployment that never sets the variable.
+    cors_allowed_origin_regex: Optional[str] = None
 
     # Serve /docs, /redoc and /openapi.json. Off by default: they publish the
     # full route surface, including admin and debug endpoints.
@@ -36,6 +66,22 @@ class Settings(BaseSettings):
     def cors_origin_list(self) -> list[str]:
         """cors_allowed_origins parsed into a list, blanks dropped."""
         return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
+    @property
+    def cors_origin_regex(self) -> Optional[str]:
+        """cors_allowed_origin_regex normalised; blank or whitespace -> None.
+
+        Not cosmetic. tests/test_env_example.py requires every declared field to
+        appear in env.example, and a secret-less optional field is documented
+        there as an empty placeholder — which arrives as "" rather than as an
+        unset variable. re.compile("") is a perfectly valid regex that
+        CORSMiddleware will happily install, and fullmatch("") only ever matches
+        an empty Origin: dead configuration that reads like an active preview
+        allowance. Collapse it here so "unset" and "set to nothing" mean the
+        same thing.
+        """
+        pattern = (self.cors_allowed_origin_regex or "").strip()
+        return pattern or None
 
     # Настройки для парсинга
     request_timeout: int = 30
