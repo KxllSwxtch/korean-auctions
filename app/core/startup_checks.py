@@ -200,14 +200,13 @@ def log_cors_configuration(origins: list[str], origin_regex: str | None) -> None
     re-reading settings, so a regex that failed to compile is reported as the
     None it became and not as the string somebody typed.
     """
-    if origins:
-        logger.info(f"CORS check: allowed origins: {', '.join(origins)}")
-    else:
+    if not origins:
         logger.error(
             "CORS check: the allowed-origin list is empty; every browser "
             "request will fail its preflight — set CORS_ALLOWED_ORIGINS"
         )
-
+    else:
+        logger.info(f"CORS check: allowed origins: {', '.join(origins)}")
         _warn_about_unmatchable_origins(origins)
         if not any(o.startswith("https://") for o in origins):
             logger.error(
@@ -278,15 +277,41 @@ def _log_cors_self_check(origins: list[str], origin_regex: str | None) -> None:
 
     Reports and never raises, in keeping with the module contract above.
     """
-    compiled = re.compile(origin_regex) if origin_regex else None
+    # Guarded even though configure_cors only ever passes a regex that
+    # resolve_origin_regex already compiled successfully. This module is called
+    # from the lifespan, so raising here would trade a CORS misconfiguration for
+    # a service that never starts — the exact failure app/core/cors.py exists to
+    # avoid. A reporting routine must not be the thing that takes the app down.
+    compiled = None
+    if origin_regex:
+        try:
+            compiled = re.compile(origin_regex)
+        except re.error as exc:
+            logger.error(
+                f"CORS check: self-check SKIPPED — CORS_ALLOWED_ORIGIN_REGEX is "
+                f"not a valid regular expression ({exc})"
+            )
+            return
 
     def allowed(origin: str) -> bool:
         return origin in origins or bool(compiled and compiled.fullmatch(origin))
 
-    probe = next((o for o in origins if o.startswith("https://")), None)
+    # Probe with an origin that is *itself* well-formed. Picking the first https
+    # entry regardless would let a list of nothing but unmatchable entries
+    # (trailing slash, uppercase, a path) report PASS on the strength of an
+    # exact-membership hit that no browser could ever produce.
+    probe = next(
+        (
+            o
+            for o in origins
+            if o.startswith("https://") and _describe_unmatchable(o) is None
+        ),
+        None,
+    )
     if probe is None:
-        logger.warning(
-            "CORS check: self-check SKIPPED — no https origin to probe with"
+        logger.error(
+            "CORS check: self-check FAIL — no well-formed https origin to probe "
+            "with, so no browser request from the live site can be accepted"
         )
         return
 
