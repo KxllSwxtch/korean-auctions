@@ -20,7 +20,9 @@ non-200 for the same condition.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from app.core.logging import get_logger
 
@@ -206,12 +208,96 @@ def log_cors_configuration(origins: list[str], origin_regex: str | None) -> None
             "request will fail its preflight — set CORS_ALLOWED_ORIGINS"
         )
 
+        _warn_about_unmatchable_origins(origins)
+        if not any(o.startswith("https://") for o in origins):
+            logger.error(
+                "CORS check: the allowed-origin list contains no https origin "
+                f"({', '.join(origins)}); this is the local-development "
+                "allowlist, and a deployment running it refuses every request "
+                "from the real site — set CORS_ALLOWED_ORIGINS"
+            )
+
     if origin_regex:
         logger.info(f"CORS check: allow_origin_regex={origin_regex}")
     else:
         logger.info(
             "CORS check: CORS_ALLOWED_ORIGIN_REGEX unset; Vercel preview "
             "deployments will be refused"
+        )
+
+    _log_cors_self_check(origins, origin_regex)
+
+
+# An Origin header is scheme + host + port and never carries a path, a trailing
+# slash, or an uppercase letter that was not in the registered name. Starlette
+# compares it to the allowlist with `==` (and to the regex with re.fullmatch),
+# so any of these makes an entry unmatchable — dead configuration that reads in
+# the log exactly like live configuration.
+_SELF_CHECK_KNOWN_BAD = "https://cors-selfcheck.invalid"
+
+
+def _describe_unmatchable(origin: str) -> str | None:
+    """Return why this origin can never match an Origin header, or None."""
+    parts = urlsplit(origin)
+    if parts.scheme not in ("http", "https"):
+        return "no http/https scheme"
+    if not parts.netloc:
+        return "no host"
+    if origin.endswith("/"):
+        return "trailing slash"
+    if parts.path:
+        return f"path component {parts.path!r}"
+    if parts.query or parts.fragment:
+        return "query or fragment"
+    if origin != origin.lower():
+        return "uppercase characters"
+    if origin != origin.strip():
+        return "surrounding whitespace"
+    return None
+
+
+def _warn_about_unmatchable_origins(origins: list[str]) -> None:
+    """Name every entry that is present but can never match anything."""
+    for origin in origins:
+        reason = _describe_unmatchable(origin)
+        if reason is not None:
+            logger.warning(
+                f"CORS check: allowed origin {origin!r} can never match a "
+                f"browser Origin header ({reason}); it is dead configuration"
+            )
+
+
+def _log_cors_self_check(origins: list[str], origin_regex: str | None) -> None:
+    """Run the installed allowlist against a real origin and a known-bad one.
+
+    "The string looks right" and "the matcher accepts it" are different claims,
+    and only the second one keeps the site up. This exercises the same two
+    checks Starlette does — exact membership, then re.fullmatch — so a regex
+    that compiled but matches nothing, or an allowlist whose entries are all
+    unmatchable, is visible in the deploy log rather than in a support ticket.
+
+    Reports and never raises, in keeping with the module contract above.
+    """
+    compiled = re.compile(origin_regex) if origin_regex else None
+
+    def allowed(origin: str) -> bool:
+        return origin in origins or bool(compiled and compiled.fullmatch(origin))
+
+    probe = next((o for o in origins if o.startswith("https://")), None)
+    if probe is None:
+        logger.warning(
+            "CORS check: self-check SKIPPED — no https origin to probe with"
+        )
+        return
+
+    if allowed(probe) and not allowed(_SELF_CHECK_KNOWN_BAD):
+        logger.info(f"CORS check: self-check PASS (probed {probe})")
+    else:
+        logger.error(
+            f"CORS check: self-check FAIL — the installed matcher "
+            f"{'rejects' if not allowed(probe) else 'accepts'} "
+            f"{probe if not allowed(probe) else _SELF_CHECK_KNOWN_BAD}; "
+            "browser requests will not behave as the allowlist above implies"
         )
 
 

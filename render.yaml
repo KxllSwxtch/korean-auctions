@@ -15,12 +15,18 @@ services:
       # the live domain, every client-side fetch fails its preflight with 400
       # "Disallowed CORS origin" and the site renders with no data, while
       # /health keeps answering 200 and curl keeps working — CORS is enforced
-      # by the browser, not by the server. This line still named the retired
-      # autobaza.vip brand three days after the rename to nonstop-motors.com.
+      # by the browser, not by the server. This line has been wrong once per
+      # rename: it named autobaza.vip after the move to nonstop-motors.com, and
+      # nonstop-motors.com after the move to SMMotors Korea.
       # When the frontend's domain changes, this line changes in the same PR.
       # localhost is deliberately absent here; it lives in the code default.
+      # NOTE: this blueprint has never been synced — app/core/config.py holds
+      # the value production actually reads. Keep the two in step; the
+      # consistency test in tests/test_cors.py fails if they diverge.
+      # The trailing three origins are the RETIRED brand, kept deliberately;
+      # delete them once that Vercel project is torn down.
       - key: CORS_ALLOWED_ORIGINS
-        value: https://www.nonstop-motors.com,https://nonstop-motors.com,https://nonstopautoapp.vercel.app
+        value: https://www.smmotorskorea.com,https://smmotorskorea.com,https://smmotorskorea.vercel.app,https://smmotorskorea-dmitriy-shins-projects.vercel.app,https://www.nonstop-motors.com,https://nonstop-motors.com,https://nonstopautoapp.vercel.app
       # Vercel mints a hostname per branch and per commit, so preview frontends
       # can never appear in the list above. Starlette matches this with
       # re.fullmatch() against the whole Origin: no ^ or $, and escape every dot
@@ -32,9 +38,28 @@ services:
       # permissive pattern.
       # NOTE: single quotes when setting a value. YAML rejects "\." inside a
       # double-quoted scalar with a ScannerError, which fails the whole sync.
-      # Left empty pending confirmation of the Vercel team slug.
+      #
+      # The alternation is deliberate. The obvious single-wildcard form,
+      # https://smmotorskorea-[a-z0-9-]{1,48}-dmitriy-shins-projects\.vercel\.app,
+      # also ACCEPTS https://smmotorskorea-git-dmitriy-shins-projects.vercel.app
+      # — the wildcard matches just `git` and the `-dmitriy` prefix is absorbed
+      # by a shorter team slug. Requiring `git-` to be followed by at least one
+      # branch character, or the hash form to contain no hyphen, refuses it.
+      #
+      # 63-char DNS-label ceiling: the git form is `smmotorskorea-git-` (18) +
+      # branch + `-dmitriy-shins-projects` (23) = 41 fixed, leaving 22 chars of
+      # branch budget; the hash form is a fixed 46. Vercel therefore truncates
+      # only into the branch, never into the team slug, and the appended hash
+      # stays inside [a-z0-9-] and inside `git-…`. {1,40} is deliberate slack.
+      #
+      # Residual risk: `dmitriy-shins-projects` decomposes on hyphens, so this
+      # also matches someone who owns the Vercel team slug `shins-projects` or
+      # `projects` and names a project to absorb the missing prefix. That is
+      # irreducible for any regex over the shared *.vercel.app suffix; the
+      # exposed set is exactly those two slugs, and allow_credentials=False
+      # plus GET/POST/OPTIONS means a match buys nothing curl cannot do.
       - key: CORS_ALLOWED_ORIGIN_REGEX
-        value: ''
+        value: 'https://smmotorskorea-(git-[a-z0-9-]{1,40}|[a-z0-9]{6,16})-dmitriy-shins-projects\.vercel\.app'
       # /docs, /redoc and /openapi.json publish the full route surface,
       # including admin and debug endpoints. Off in production.
       - key: ENABLE_API_DOCS
@@ -119,6 +144,12 @@ services:
       - key: AUCTION_PROXY_USERNAME
         sync: false
       - key: AUCTION_PROXY_PASSWORD
+        sync: false
+      # Extra pool entries as a JSON array, appended to the three names above
+      # so the pool round-robins across every provider. Adding a proxy means
+      # editing this one value; the variables above stay untouched.
+      #   [{"name":"...","host":"host:port","username":"...","password":"..."}]
+      - key: AUCTION_PROXY_POOL
         sync: false
       # Dedicated Korean residential proxy for HeyDealer (anti-throttle on the
       # single shared dealer account/IP). Sticky-session provider: keep the

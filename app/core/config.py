@@ -25,27 +25,51 @@ class Settings(BaseSettings):
     # Access-Control-Allow-Credentials: true — letting any website make
     # credentialed cross-origin calls to every endpoint.
     #
-    # These are the live product's domains (see nonstopapp/middleware.ts
-    # PRODUCTION_HOSTS). This default named the retired autobaza.vip brand for
-    # three days after the rename, so every client-side fetch from the real
-    # frontend was refused at the preflight with 400 "Disallowed CORS origin"
-    # while /health kept answering 200 — CORS is enforced by the browser, not
-    # by the server, so nothing server-side looked wrong.
+    # These are the live product's domains. The API base URL the frontend
+    # actually calls lives in smmotorskoreaapp/lib/server/upstream.ts and
+    # lib/services/*.ts — the nonstopapp/middleware.ts PRODUCTION_HOSTS this
+    # comment used to name no longer exists.
+    #
+    # This line has now been wrong TWICE, once per rename: it named
+    # autobaza.vip for three days after the move to nonstop-motors.com, then
+    # named nonstop-motors.com after the move to SMMotors Korea. Both times
+    # every client-side fetch from the real frontend was refused at the
+    # preflight with 400 "Disallowed CORS origin" while /health kept answering
+    # 200 — CORS is enforced by the browser, not by the server, so nothing
+    # server-side looked wrong. When the frontend's domain changes, this line
+    # changes in the same PR.
     #
     # This default is load-bearing in production: CORS_ALLOWED_ORIGINS is not
     # set in the Render dashboard and render.yaml has never been synced, so the
-    # deployed service reads exactly this string. localhost/127.0.0.1 are here
-    # so a fresh clone works with no .env; the render.yaml value omits them.
+    # deployed service reads exactly this string — and it must stay that way.
+    # Setting CORS_ALLOWED_ORIGINS in the Render dashboard silently shadows
+    # this default and every test that asserts it, trading a visible drift for
+    # an invisible one. localhost/127.0.0.1 are here so a fresh clone works
+    # with no .env; the render.yaml value omits them.
     cors_allowed_origins: str = (
+        # Live SMMotors Korea frontend. smmotorskorea.com 307s to www, but a
+        # fetch issued from a page loaded at the apex before the redirect
+        # carries the apex Origin, so both are listed.
+        "https://www.smmotorskorea.com,https://smmotorskorea.com,"
+        "https://smmotorskorea.vercel.app,"
+        # SSO-gated team alias of the same deployment. The preview regex cannot
+        # match it (it has no middle segment), so it is listed explicitly.
+        "https://smmotorskorea-dmitriy-shins-projects.vercel.app,"
+        # RETIRED brand, kept deliberately. www.nonstop-motors.com is already
+        # 410 Gone and the apex 307s to it, so those two are inert;
+        # nonstopautoapp.vercel.app still serves the previous product. None is
+        # load-bearing for SMMotors Korea — delete all three once that Vercel
+        # project is torn down.
         "https://www.nonstop-motors.com,https://nonstop-motors.com,"
         "https://nonstopautoapp.vercel.app,"
         "http://localhost:3000,http://127.0.0.1:3000"
     )
 
     # Origins that cannot be enumerated ahead of time. Vercel mints a hostname
-    # per branch and per commit (nonstopautoapp-git-<branch>-<team>.vercel.app,
-    # nonstopautoapp-<hash>-<team>.vercel.app), so no exact list covers preview
-    # deployments.
+    # per branch and per commit
+    # (smmotorskorea-git-<branch>-dmitriy-shins-projects.vercel.app,
+    # smmotorskorea-<hash>-dmitriy-shins-projects.vercel.app), so no exact list
+    # covers preview deployments. The shipped pattern lives in render.yaml.
     #
     # Starlette matches this with re.fullmatch() against the whole Origin
     # (starlette/middleware/cors.py — is_allowed_origin), so the pattern
@@ -181,6 +205,12 @@ class Settings(BaseSettings):
     auction_proxy_password: Optional[str] = None
     auction_proxy_name: str = "auction-proxy"
     auction_proxy_supports_sticky: bool = False
+    # Additional pool entries as a JSON array, appended to the AUCTION_PROXY_*
+    # entry above so the pool round-robins across every provider. One variable
+    # rather than numbered names on purpose: `extra` is "forbid" below, so an
+    # undeclared AUCTION_PROXY_HOST_3 in .env would raise at import. Read via
+    # os.getenv in app/core/proxy_config.py, same rationale as the block above.
+    auction_proxy_pool: Optional[str] = None
 
     # Declaration-only, same rationale as the proxy block above: each of these
     # is read through os.getenv at call time by the module that owns it, but

@@ -27,6 +27,11 @@ ENV_EXAMPLE = ROOT / "env.example"
 # env.example is intentional and must not fail the coverage check below.
 PLATFORM_PROVIDED = {"PORT"}
 
+# Credential-bearing keys whose names carry no _USERNAME/_PASSWORD/_TOKEN
+# suffix, so the suffix rule below cannot recognise them. Both hold a JSON
+# document with credentials inside it.
+CREDENTIAL_BEARING_NAMES = {"AUCTION_PROXY_POOL", "SSANCAR_PROXY_URLS"}
+
 
 def _declared_names() -> set[str]:
     return {name.upper() for name in Settings.model_fields}
@@ -109,9 +114,11 @@ def test_secret_placeholders_are_empty() -> None:
             continue
         name, _, value = line.partition("=")
         name = name.strip()
-        if name.endswith(("_USERNAME", "_PASSWORD", "_JWT_TOKEN", "_TOKEN")):
-            if value.strip():
-                offenders.append(name)
+        secret = name.endswith(
+            ("_USERNAME", "_PASSWORD", "_JWT_TOKEN", "_TOKEN")
+        ) or name in CREDENTIAL_BEARING_NAMES
+        if secret and value.strip():
+            offenders.append(name)
     assert not offenders, (
         f"env.example assigns a value to secret-bearing keys: {offenders}. "
         "This file is tracked in git; placeholders must be empty."
