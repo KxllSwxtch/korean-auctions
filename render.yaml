@@ -135,9 +135,12 @@ services:
       # Set in the Render dashboard (sync: false in YAML to avoid logging the secret).
       - key: AUTOHUB_SNAPSHOT_ADMIN_TOKEN
         sync: false
-      # Shared auction proxy. Encar is proxy-OPTIONAL (api.encar.com answers
-      # non-Korean IPs); HappyCar is proxy-REQUIRED and fails closed without
-      # these. Secrets: set in the Render dashboard. sync:false keeps the
+      # Shared auction proxy. HappyCar is proxy-REQUIRED and fails closed
+      # without these. For Encar it is the FAILOVER leg: since 2026-08-29
+      # api.encar.com's CloudFront edge answers Render/AWS addresses with
+      # 403, so /api/catalog, /api/nav and /api/readside/* go direct first
+      # and retry through this pool when blocked (ENCAR_PROXY_FAILOVER
+      # below). Secrets: set in the Render dashboard. sync:false keeps the
       # value dashboard-managed and out of the blueprint and build logs.
       - key: AUCTION_PROXY_HOST
         sync: false
@@ -165,14 +168,28 @@ services:
       - key: HEYDEALER_PROXY_PASSWORD
         sync: false
       # Egress gate for AsyncHttpClient consumers (Encar catalog, /api/catalog,
-      # /api/nav, Encar trucks, Green equipment). Direct egress is the
-      # verified-good default and avoids spending metered proxy bandwidth on
-      # high-volume catalog traffic. Flip to "true" only if Encar begins
-      # blocking Render addresses — no code change or redeploy required.
+      # /api/nav, /api/readside/*, Encar trucks, Green equipment).
+      # "true"  = the proxy pool is the PRIMARY leg for every request of
+      #           every consumer (metered bandwidth on all catalog traffic).
+      # "false" = the dashboard value. Encar goes direct and, when CloudFront
+      #           blocks the direct leg (403 / CloudFront 429/503), fails over
+      #           to AUCTION_PROXY_* for ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS
+      #           and then tries direct again. No dashboard change is needed
+      #           for Encar to keep working through a block.
       # Note this does NOT disable HappyCar's proxy: happycar_service.py calls
       # get_proxy_pool() directly and never consults USE_PROXY.
       - key: USE_PROXY
         value: "false"
+      # Kill switch for Encar's automatic proxy failover. Only false/0/no/off
+      # disable it — a typo keeps it on, because "off" is the outage. Set to
+      # "false" only to stop proxy traffic in an emergency; Encar routes then
+      # answer 503 upstream_blocked while the edge refuses direct egress.
+      - key: ENCAR_PROXY_FAILOVER
+        value: "true"
+      # Seconds after a block during which Encar requests skip straight to the
+      # proxy before probing the direct leg again. Non-numeric or <= 0 -> 600.
+      - key: ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS
+        value: "600"
       # Dedicated Korean egress for DB Auto Glovis. Currently set in the
       # dashboard but previously undeclared here — the same latent gap that
       # caused the AUCTION_PROXY_* outage. See docs/glovis-dbauto-deployment.md.

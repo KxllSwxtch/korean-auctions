@@ -211,6 +211,13 @@ class Settings(BaseSettings):
     # undeclared AUCTION_PROXY_HOST_3 in .env would raise at import. Read via
     # os.getenv in app/core/proxy_config.py, same rationale as the block above.
     auction_proxy_pool: Optional[str] = None
+    # Encar egress failover knobs. Declaration-only, same rationale as above:
+    # both are read through os.getenv at call time (ENCAR_PROXY_FAILOVER in
+    # app/core/startup_checks.py, ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS in
+    # app/core/egress_breaker.py) so a dashboard change applies on the next
+    # request instead of being frozen at import.
+    encar_proxy_failover: bool = True
+    encar_direct_block_cooldown_seconds: int = 600
 
     # Declaration-only, same rationale as the proxy block above: each of these
     # is read through os.getenv at call time by the module that owns it, but

@@ -24,6 +24,7 @@ from app.core.startup_checks import (
     ConfigGroup,
     missing_variables,
     proxy_gate_enabled,
+    render_git_commit,
 )
 from app.models.diagnostics import ConfigGroupStatus, ReadinessResponse
 
@@ -61,6 +62,7 @@ def build_readiness() -> ReadinessResponse:
     return ReadinessResponse(
         status="degraded" if unready else "ready",
         degraded=bool(unready),
+        commit=render_git_commit(),
         use_proxy_gate=proxy_gate_enabled(),
         unready_services=unready,
         groups=groups,

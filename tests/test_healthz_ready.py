@@ -133,3 +133,26 @@ def test_endpoint_status_codes(monkeypatch: pytest.MonkeyPatch) -> None:
         ready = client.get("/healthz/ready")
         assert ready.status_code == 200
         assert ready.json()["status"] == "ready"
+
+
+# ═══ Deployed commit ═════════════════════════════════════════════════════════
+#
+# Render exposes the deployed SHA as RENDER_GIT_COMMIT. Surfacing it on the
+# readiness probe is what lets a deploy script (and the frontend's e2e suite)
+# wait for "the fix is actually live" instead of "the old process still answers".
+
+
+def test_ready_reports_commit_from_render_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    sha = "0123abcd0123abcd0123abcd0123abcd0123abcd"
+    monkeypatch.setenv("RENDER_GIT_COMMIT", sha)
+
+    assert build_readiness().commit == sha
+
+
+def test_ready_commit_is_none_outside_render(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+
+    payload = build_readiness()
+
+    assert payload.commit is None
+    assert '"commit":null' in payload.model_dump_json()

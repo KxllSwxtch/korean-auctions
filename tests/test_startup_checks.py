@@ -242,3 +242,92 @@ def test_the_cors_log_prints_the_effective_values(
     joined = "\n".join(log["info"])
     assert "https://www.smmotorskorea.com" in joined
     assert regex in joined
+
+
+# ═══ Encar failover knobs ════════════════════════════════════════════════════
+#
+# api.encar.com's CloudFront edge has refused Render's egress addresses since
+# 2026-08-29. The encar group note, the ENCAR_PROXY_FAILOVER kill switch and
+# the cooldown are what an operator reads in the first lines of the deploy log
+# to tell "failover is on and armed" from "we are still serving 403s".
+
+
+def test_encar_note_describes_failover() -> None:
+    encar = next(g for g in EGRESS_GROUPS if g.service == "encar")
+    assert encar.required is False
+    assert encar.variables == startup_checks.AUCTION_PROXY_VARIABLES
+    assert "2026-08-29" in encar.note
+    assert "failover" in encar.note
+    assert "ENCAR_PROXY_FAILOVER" in encar.note
+    assert "answers non-Korean" not in encar.note, "stale note: Encar no longer does"
+
+
+def _captured_egress_log(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    messages: list[str] = []
+    for level in ("info", "warning", "error"):
+        monkeypatch.setattr(
+            startup_checks.logger,
+            level,
+            lambda message, *a, **k: messages.append(str(message)),
+        )
+    startup_checks.log_egress_configuration()
+    return messages
+
+
+def test_startup_log_reports_failover_flag_and_cooldown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENCAR_PROXY_FAILOVER", "true")
+    monkeypatch.setenv("ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS", "120")
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "0123abcd0123abcd0123abcd0123abcd0123abcd")
+
+    joined = "\n".join(_captured_egress_log(monkeypatch))
+
+    assert "ENCAR_PROXY_FAILOVER=true" in joined
+    assert "120" in joined
+    assert "0123abcd0123abcd0123abcd0123abcd0123abcd" in joined
+
+    monkeypatch.setenv("ENCAR_PROXY_FAILOVER", "false")
+    monkeypatch.delenv("ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS", raising=False)
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+
+    joined = "\n".join(_captured_egress_log(monkeypatch))
+
+    assert "ENCAR_PROXY_FAILOVER=false" in joined
+    assert "600" in joined
+    assert "commit=unknown" in joined
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (None, True),
+        ("true", True),
+        ("True", True),
+        ("false", False),
+        ("FALSE", False),
+        ("0", False),
+        ("no", False),
+        ("off", False),
+        ("flase", True),  # a typo must not silently switch failover off
+        ("", True),
+    ],
+)
+def test_failover_env_parsing(
+    monkeypatch: pytest.MonkeyPatch, raw: str | None, expected: bool
+) -> None:
+    if raw is None:
+        monkeypatch.delenv(startup_checks.ENCAR_FAILOVER_ENV, raising=False)
+    else:
+        monkeypatch.setenv(startup_checks.ENCAR_FAILOVER_ENV, raw)
+
+    assert startup_checks.encar_failover_enabled() is expected
+
+
+def test_render_git_commit_is_none_outside_render(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("RENDER_GIT_COMMIT", raising=False)
+    assert startup_checks.render_git_commit() is None
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "   ")
+    assert startup_checks.render_git_commit() is None
+    monkeypatch.setenv("RENDER_GIT_COMMIT", " abc123 ")
+    assert startup_checks.render_git_commit() == "abc123"

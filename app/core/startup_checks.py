@@ -24,6 +24,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from app.core.egress_breaker import cooldown_from_env
 from app.core.logging import get_logger
 
 logger = get_logger("startup_checks")
@@ -74,7 +75,11 @@ EGRESS_GROUPS: tuple[EgressGroup, ...] = (
         service="encar",
         variables=AUCTION_PROXY_VARIABLES,
         required=False,
-        note="api.encar.com answers non-Korean IPs; direct egress is supported",
+        note=(
+            "api.encar.com blocks Render/AWS egress (since 2026-08-29); direct "
+            "first, automatic proxy failover when AUCTION_PROXY_* is set and "
+            "ENCAR_PROXY_FAILOVER is not false"
+        ),
     ),
 )
 
@@ -150,6 +155,28 @@ def proxy_gate_enabled() -> bool:
     return os.getenv("USE_PROXY", "false").strip().lower() == "true"
 
 
+# Kill switch for Encar's direct-then-proxy failover. Default ON: since
+# 2026-08-29 a direct request to api.encar.com from Render is a 403, so
+# "off" is the outage. Only an explicit falsey value disables it — a typo
+# in the dashboard must not silently take the catalog down again.
+ENCAR_FAILOVER_ENV = "ENCAR_PROXY_FAILOVER"
+_FALSEY = {"false", "0", "no", "off"}
+
+
+def encar_failover_enabled() -> bool:
+    """Whether Encar may retry a blocked direct request through the proxy pool."""
+    return os.getenv(ENCAR_FAILOVER_ENV, "").strip().lower() not in _FALSEY
+
+
+def render_git_commit() -> str | None:
+    """The deployed SHA Render injects as RENDER_GIT_COMMIT; None elsewhere.
+
+    A runtime platform variable like PORT, so it is read here rather than
+    declared on Settings.
+    """
+    return os.getenv("RENDER_GIT_COMMIT", "").strip() or None
+
+
 def missing_variables(group: ConfigGroup) -> list[str]:
     """Return the names of unset or blank variables for one group."""
     return [name for name in group.variables if not os.getenv(name, "").strip()]
@@ -176,6 +203,11 @@ def log_egress_configuration() -> None:
     """Log one line per egress group at startup. Names only, never values."""
     logger.info(
         f"Egress check: USE_PROXY={'true' if proxy_gate_enabled() else 'false'}"
+    )
+    logger.info(
+        f"Egress check: {ENCAR_FAILOVER_ENV}="
+        f"{'true' if encar_failover_enabled() else 'false'} "
+        f"cooldown={cooldown_from_env()}s commit={render_git_commit() or 'unknown'}"
     )
     _log_groups(EGRESS_GROUPS, "Egress check", "proxy")
 

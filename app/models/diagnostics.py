@@ -56,6 +56,10 @@ class ReadinessResponse(BaseModel):
 
     status: Literal["ready", "degraded"] = Field(description="Aggregate readiness")
     degraded: bool = Field(description="True when any required group is unconfigured")
+    commit: str | None = Field(
+        default=None,
+        description="RENDER_GIT_COMMIT of the running process; None outside Render",
+    )
     use_proxy_gate: bool = Field(description="Value of the USE_PROXY gate")
     unready_services: list[str] = Field(
         default_factory=list,
