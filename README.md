@@ -191,9 +191,14 @@ cp env.example .env   # затем заполнить значения
 
 - `AUCTION_PROXY_HOST`, `AUCTION_PROXY_USERNAME`, `AUCTION_PROXY_PASSWORD` —
   общий пул прокси. **Обязателен для HappyCar** (сайт требует корейского IP и
-  входа в систему): без него провайдер отключается. **Опционален для Encar** —
-  `api.encar.com` отвечает на запросы с любых IP, поэтому `/api/catalog`,
-  `/api/nav` и `/api/v1/encar/*` работают напрямую.
+  входа в систему): без него провайдер отключается. **Для Encar — резервный
+  путь**: с 2026-08-29 `api.encar.com` (CloudFront) отвечает egress-адресам
+  Render/AWS кодом 403 «Request blocked», а с корейских residential-IP пула те
+  же URL работают. Поэтому `/api/catalog`, `/api/nav` и `/api/readside/*` идут
+  напрямую и при блокировке автоматически повторяют запрос через пул (см.
+  `ENCAR_PROXY_FAILOVER` ниже). Без пула блокировка отдаётся как
+  структурированный `503 upstream_blocked` с `Retry-After`, а не как HTML
+  CloudFront.
 - `AUCTION_PROXY_POOL` — дополнительные записи того же пула, JSON-массив.
   Записи **добавляются** к `AUCTION_PROXY_*` выше, а не заменяют их, поэтому
   подключение нового провайдера не требует трогать уже настроенные переменные.
@@ -217,16 +222,37 @@ cp env.example .env   # затем заполнить значения
   `supports_sticky: true` имеет смысл только если `username` содержит
   плейсхолдер `{session}` — иначе подстановка сессии ничего не даёт.
 - `USE_PROXY` (по умолчанию `false`) — переключатель egress для потребителей
-  `AsyncHttpClient`. При `false` трафик Encar идёт напрямую, что экономит
-  платный трафик прокси. Установите `true`, только если Encar начнёт блокировать
-  IP-адреса Render — перевыкладка не требуется.
+  `AsyncHttpClient`. `true` — прокси становится **основным** путём для каждого
+  запроса каждого потребителя (платный трафик на весь каталог). `false`
+  (значение в дашборде Render) — Encar идёт напрямую, а при блокировке
+  CloudFront переключается на `AUCTION_PROXY_*` на время
+  `ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS`, после чего снова пробует прямой путь.
+  Менять дашборд при блокировке не нужно.
+- `ENCAR_PROXY_FAILOVER` (по умолчанию `true`) — kill switch автоматического
+  failover Encar. Отключают **только** `false`/`0`/`no`/`off`; опечатка
+  оставляет failover включённым, потому что «выключено» — это и есть простой.
+- `ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS` (по умолчанию `600`) — сколько секунд
+  после блокировки запросы Encar идут сразу через прокси. Не число или `<= 0`
+  → 600. Half-open состояния нет: по истечении окна следующий запрос идёт
+  напрямую и при повторной блокировке снова взводит breaker (одно WARNING на
+  окно).
 - `GLOVIS_PROXY_*` — отдельный корейский egress для DB Auto Glovis, всегда
   обязателен.
 
 Проверить, какие переменные отсутствуют, можно без раскрытия значений:
-`GET /healthz/ready` (учётные данные и прокси по каждому сервису) или
-`GET /api/v1/diagnostics/egress` (только egress). Те же данные пишутся в лог
-при старте — отсутствующие имена видно в первых строках лога запуска.
+`GET /healthz/ready` (учётные данные и прокси по каждому сервису, плюс
+`commit` — `RENDER_GIT_COMMIT` запущенного процесса) или
+`GET /api/v1/diagnostics/egress` (только egress). Состояние failover Encar —
+`GET /api/v1/diagnostics/encar`: основной путь (`egress_mode`), взведён ли
+резервный пул (`failover_enabled`, `failover_armed`, `proxy_pool_size`),
+открыт ли breaker и надолго ли (`breaker_open`, `breaker_seconds_remaining`,
+`breaker_trips`, `cooldown_seconds`, `last_block_at`), последние статусы на
+каждом пути (`last_direct_status`, `last_proxy_status`), счётчики кэшей
+nav/catalog (`caches`) и `commit`. Значения прокси и имена записей пула не
+раскрываются; исходящих запросов эндпоинт не делает, его можно опрашивать
+монитором. Ответы `/api/catalog`, `/api/nav` и `/api/readside/*` несут
+заголовок `X-Encar-Source: direct | proxy | cache`. Те же данные пишутся в
+лог при старте — отсутствующие имена видно в первых строках лога запуска.
 
 Полный контракт переменных, порядок развёртывания и поведение при отсутствии
 секретов описаны в `docs/glovis-dbauto-deployment.md`.
