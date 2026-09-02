@@ -49,7 +49,8 @@ from app.core.egress_breaker import Egress, EgressBreaker, looks_like_edge_block
 from app.core.http_client import AsyncHttpClient, AsyncHttpResponse
 from app.core.logging import get_logger
 from app.core.proxy_config import ProxyConfigurationError
-from app.core.startup_checks import encar_failover_enabled
+from app.core.startup_checks import encar_failover_enabled, render_git_commit
+from app.models.diagnostics import CacheStats, EncarEgressDiagnostics
 
 logger = get_logger("encar_proxy")
 
@@ -203,6 +204,31 @@ def get_encar_breaker() -> EgressBreaker:
             if _breaker is None:
                 _breaker = EgressBreaker.from_env()
     return _breaker
+
+
+def encar_diagnostics_snapshot() -> EncarEgressDiagnostics:
+    """Read-only egress state for /api/v1/diagnostics/encar. No probing,
+    no pool names, no values — only modes, counters and timestamps."""
+    client, breaker = get_encar_proxy_client(), get_encar_breaker()
+    state = breaker.snapshot()
+    return EncarEgressDiagnostics(
+        commit=render_git_commit(),
+        egress_mode=client.egress_mode,
+        failover_enabled=encar_failover_enabled(),
+        failover_armed=client.failover_armed,
+        proxy_pool_size=client.failover_pool_size,
+        breaker_open=state.open,
+        breaker_seconds_remaining=state.seconds_remaining,
+        breaker_trips=state.trips,
+        cooldown_seconds=state.cooldown_seconds,
+        last_direct_status=state.last_direct_status,
+        last_proxy_status=state.last_proxy_status,
+        last_block_at=state.last_block_at,
+        caches={
+            "nav": CacheStats(**_NAV_CACHE.stats()),
+            "catalog": CacheStats(**_CATALOG_CACHE.stats()),
+        },
+    )
 
 
 async def close_encar_proxy_client() -> None:

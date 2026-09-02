@@ -45,6 +45,46 @@ class ConfigGroupStatus(BaseModel):
     note: str = Field(description="What breaks when this group is absent")
 
 
+class CacheStats(BaseModel):
+    """Counters of one SwrCache, as `SwrCache.stats()` reports them."""
+
+    entries: int = Field(description="Distinct keys currently held")
+    inflight: int = Field(description="Loads running right now")
+    hits: int = Field(description="Callers served a fresh value")
+    stale_hits: int = Field(description="Callers served a stale value while refreshing")
+    misses: int = Field(description="Callers that found no usable value")
+    loads: int = Field(description="Loader invocations (misses minus single-flight savings)")
+
+
+class EncarEgressDiagnostics(BaseModel):
+    """State of Encar's direct-then-proxy failover. Contains no proxy value.
+
+    Since 2026-08-29 api.encar.com's CloudFront edge refuses Render's egress
+    addresses. This is how an operator tells "failover is armed and serving
+    through the proxy" from "we are still relaying 403s" in one request.
+    """
+
+    commit: str | None = Field(
+        description="RENDER_GIT_COMMIT of the running process; None outside Render"
+    )
+    egress_mode: Literal["proxy", "direct"] = Field(
+        description="Primary leg: 'proxy' when the USE_PROXY gate is on"
+    )
+    failover_enabled: bool = Field(description="ENCAR_PROXY_FAILOVER is not false")
+    failover_armed: bool = Field(
+        description="Direct is primary and a proxy pool is held in reserve"
+    )
+    proxy_pool_size: int = Field(description="Entries in the reserve pool; 0 when unarmed")
+    breaker_open: bool = Field(description="Direct egress is currently skipped")
+    breaker_seconds_remaining: float = Field(description="Seconds left in the cooldown")
+    breaker_trips: int = Field(description="Times direct egress was found blocked")
+    cooldown_seconds: int = Field(description="ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS in effect")
+    last_direct_status: int | None = Field(description="Last HTTP status on the direct leg")
+    last_proxy_status: int | None = Field(description="Last HTTP status on the proxy leg")
+    last_block_at: str | None = Field(description="ISO-8601 UTC time of the last block")
+    caches: dict[str, CacheStats] = Field(description="nav and catalog cache counters")
+
+
 class ReadinessResponse(BaseModel):
     """Provisioning readiness across egress, credentials and admin gates.
 

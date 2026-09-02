@@ -17,7 +17,12 @@ from app.core.startup_checks import (
     missing_variables,
     proxy_gate_enabled,
 )
-from app.models.diagnostics import EgressDiagnosticsResponse, EgressGroupStatus
+from app.models.diagnostics import (
+    EgressDiagnosticsResponse,
+    EgressGroupStatus,
+    EncarEgressDiagnostics,
+)
+from app.routes.encar_proxy import encar_diagnostics_snapshot
 
 router = APIRouter()
 
@@ -44,3 +49,10 @@ async def egress_diagnostics() -> EgressDiagnosticsResponse:
             )
         )
     return EgressDiagnosticsResponse(use_proxy_gate=gate, groups=groups)
+
+
+@router.get("/encar", response_model=EncarEgressDiagnostics)
+async def encar_egress_diagnostics() -> EncarEgressDiagnostics:
+    """Report Encar's direct/proxy failover state. Reads memory only —
+    no outbound probe, so this is safe to poll from a monitor."""
+    return encar_diagnostics_snapshot()
