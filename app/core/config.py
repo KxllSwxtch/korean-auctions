@@ -211,13 +211,18 @@ class Settings(BaseSettings):
     # undeclared AUCTION_PROXY_HOST_3 in .env would raise at import. Read via
     # os.getenv in app/core/proxy_config.py, same rationale as the block above.
     auction_proxy_pool: Optional[str] = None
-    # Encar egress failover knobs. Declaration-only, same rationale as above:
-    # both are read through os.getenv at call time (ENCAR_PROXY_FAILOVER in
-    # app/core/startup_checks.py, ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS in
-    # app/core/egress_breaker.py) so a dashboard change applies on the next
-    # request instead of being frozen at import.
-    encar_proxy_failover: bool = True
-    encar_direct_block_cooldown_seconds: int = 600
+    # Encar egress failover knobs. Declaration-only, same rationale as above,
+    # and deliberately untyped strings: pydantic-settings reads the real
+    # environment and this instance is built at import, so `bool`/`int`
+    # here would turn a dashboard typo (ENCAR_PROXY_FAILOVER=flase) into a
+    # ValidationError that kills the service before it forks. The tolerant
+    # parsers are the only readers — encar_failover_enabled() in
+    # app/core/startup_checks.py and cooldown_from_env() in
+    # app/core/egress_breaker.py — and they are consulted once per worker
+    # when the Encar client and breaker singletons are first built
+    # (app/routes/encar_proxy.py), not per request.
+    encar_proxy_failover: Optional[str] = None
+    encar_direct_block_cooldown_seconds: Optional[str] = None
 
     # Declaration-only, same rationale as the proxy block above: each of these
     # is read through os.getenv at call time by the module that owns it, but

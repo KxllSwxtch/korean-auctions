@@ -331,3 +331,29 @@ def test_render_git_commit_is_none_outside_render(monkeypatch: pytest.MonkeyPatc
     assert startup_checks.render_git_commit() is None
     monkeypatch.setenv("RENDER_GIT_COMMIT", " abc123 ")
     assert startup_checks.render_git_commit() == "abc123"
+
+
+def test_settings_accepts_unparseable_failover_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A dashboard typo must not fail Settings at import.
+
+    pydantic-settings reads the real environment and `settings` is built at
+    import, so a typed `bool`/`int` declaration would turn ENCAR_PROXY_FAILOVER
+    =flase into a ValidationError that kills the whole service before it
+    forks — the exact outage the tolerant parsers below exist to avoid. Both
+    knobs are therefore declaration-only strings on Settings; the parsers are
+    the only readers.
+    """
+    from app.core.config import Settings
+    from app.core.egress_breaker import cooldown_from_env
+
+    monkeypatch.setenv("ENCAR_PROXY_FAILOVER", "flase")
+    monkeypatch.setenv("ENCAR_DIRECT_BLOCK_COOLDOWN_SECONDS", "abc")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.encar_proxy_failover == "flase"
+    assert settings.encar_direct_block_cooldown_seconds == "abc"
+    assert startup_checks.encar_failover_enabled() is True
+    assert cooldown_from_env() == 600

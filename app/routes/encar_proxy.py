@@ -344,12 +344,23 @@ async def _fetch(url: str, operation: str) -> _UpstreamOk:
         if looks_like_edge_block(response.status_code, response.headers, response.text):
             last_block = response.status_code
             if egress == "direct" and breaker.trip() == "opened":
-                logger.warning(
-                    f"{operation}: direct egress to api.encar.com blocked "
-                    f"(HTTP {last_block}); routing via proxy for "
-                    f"{breaker.cooldown_seconds}s "
-                    f"(failover_armed={client.failover_armed})"
-                )
+                if client.failover_armed:
+                    logger.warning(
+                        f"{operation}: direct egress to api.encar.com blocked "
+                        f"(HTTP {last_block}); routing via proxy for "
+                        f"{breaker.cooldown_seconds}s (failover_armed=True)"
+                    )
+                else:
+                    # legs() is ("direct",) whatever the breaker says: there
+                    # is nothing to route to. Say so, and name the fix.
+                    logger.warning(
+                        f"{operation}: direct egress to api.encar.com blocked "
+                        f"(HTTP {last_block}); no auction proxy armed, requests "
+                        f"will keep failing (next warning in "
+                        f"{breaker.cooldown_seconds}s) — set AUCTION_PROXY_HOST, "
+                        f"AUCTION_PROXY_USERNAME, AUCTION_PROXY_PASSWORD and keep "
+                        f"ENCAR_PROXY_FAILOVER enabled"
+                    )
             continue
         if egress == "direct" and breaker.reset():
             logger.info(
@@ -486,12 +497,17 @@ async def proxy_readside_inspection(vehicle_id: str) -> Response:
 @router.get("/api/readside/record/vehicle/{vehicle_id}/open")
 async def proxy_readside_record(
     vehicle_id: str,
-    vehicle_no: str = Query(..., alias="vehicleNo", description="Licence plate"),
+    vehicle_no: str | None = Query(None, alias="vehicleNo", description="Licence plate"),
 ) -> Response:
-    """Accident/insurance record for the frontend's car page (never cached)."""
+    """Accident/insurance record for the frontend's car page (never cached).
+
+    vehicleNo is optional at the FastAPI layer on purpose: an omitted value
+    is the same structured 400 as an invalid one, not a 422 — the frontend
+    contract lists only 400 for this route.
+    """
     if not _VEHICLE_ID_RE.fullmatch(vehicle_id):
         return _error("invalid_vehicle_id")
-    if not _VEHICLE_NO_RE.fullmatch(vehicle_no):
+    if not vehicle_no or not _VEHICLE_NO_RE.fullmatch(vehicle_no):
         return _error("invalid_vehicle_no")
     logger.info(f"Proxy readside record → {vehicle_id}")
     url = (

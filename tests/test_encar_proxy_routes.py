@@ -502,6 +502,29 @@ def test_block_warning_is_logged_once_per_trip(
     assert len([m for m in warnings if "blocked" in m]) == 1
 
 
+@pytest.mark.parametrize("cause", ["no_credentials", "kill_switch"])
+def test_block_warning_when_unarmed_does_not_claim_proxy_routing(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, cause: str
+) -> None:
+    """With nothing to fail over to, the WARNING must say so and name the fix."""
+    if cause == "kill_switch":
+        _arm_failover(monkeypatch)
+        monkeypatch.setenv("ENCAR_PROXY_FAILOVER", "false")
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        encar_proxy.logger, "warning", lambda m, *a, **k: warnings.append(str(m))
+    )
+    _stub_by_egress(monkeypatch, direct=CLOUDFRONT_403, proxy=OK_200)
+
+    assert client.get("/api/catalog").status_code == 503
+
+    blocked = [m for m in warnings if "blocked" in m]
+    assert len(blocked) == 1, warnings
+    assert "via proxy" not in blocked[0]
+    assert "AUCTION_PROXY_HOST" in blocked[0]
+    assert "ENCAR_PROXY_FAILOVER" in blocked[0]
+
+
 def test_proxy_transport_error_during_failover_returns_502_proxy_error(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -754,15 +777,16 @@ def test_readside_rejects_invalid_vehicle_id(
         assert response.json()["detail"]["retryable"] is False
 
 
-@pytest.mark.parametrize("vehicle_no", ["", "a" * 17, "12<3456", "12가3456;x"])
+@pytest.mark.parametrize("vehicle_no", [None, "", "a" * 17, "12<3456", "12가3456;x"])
 def test_readside_rejects_invalid_vehicle_no(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, vehicle_no: str
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, vehicle_no: str | None
 ) -> None:
+    """None = the parameter is omitted entirely: still the structured 400,
+    not FastAPI's 422, because the frontend contract lists only 400."""
     calls = _stub_get(monkeypatch)
+    params = {} if vehicle_no is None else {"vehicleNo": vehicle_no}
 
-    response = client.get(
-        "/api/readside/record/vehicle/12345678/open", params={"vehicleNo": vehicle_no}
-    )
+    response = client.get("/api/readside/record/vehicle/12345678/open", params=params)
 
     assert calls == []
     assert response.status_code == 400
