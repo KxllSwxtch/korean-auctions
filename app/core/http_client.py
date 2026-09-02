@@ -7,7 +7,6 @@ import os
 import warnings
 import aiohttp
 from typing import Optional, Dict, Any, Literal, Union
-from urllib.parse import urljoin
 
 from app.core.logging import get_logger
 from app.core.proxy_config import ProxyConfigurationError, ProxyPool, get_proxy_pool
