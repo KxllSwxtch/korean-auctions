@@ -132,3 +132,180 @@ def test_session_is_reused_across_calls() -> None:
             await client.close()
 
     asyncio.run(exercise())
+
+
+# ═══ Failover pool and per-call egress override ═══════════════════════════════
+#
+# Since 2026-08-29 api.encar.com's CloudFront edge refuses Render's egress
+# addresses. USE_PROXY stays "false" in production (it would put every
+# AsyncHttpClient consumer on metered proxy bandwidth), so a proxy-optional
+# caller needs a way to say "keep going direct, but hold the pool in reserve
+# and let me pick the leg per request".
+
+
+def _pick(client: AsyncHttpClient, egress: str):
+    return client._pick_proxy(egress)  # type: ignore[arg-type]
+
+
+def test_failover_armed_when_gate_off_and_credentials_present(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "false")
+
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    assert client.egress_mode == "direct", "the gate still decides the primary leg"
+    assert client.failover_armed is True
+    assert client.failover_pool_size == 1
+    assert client._pick_proxy() is None, "auto egress stays direct while the gate is off"
+
+
+def test_failover_unarmed_without_credentials_does_not_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An unconfigured pool degrades to plain direct egress, never a boot failure."""
+    monkeypatch.setenv("USE_PROXY", "false")
+
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    assert client.egress_mode == "direct"
+    assert client.failover_armed is False
+    assert client.failover_pool_size == 0
+
+
+def test_failover_flag_is_inert_when_gate_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """USE_PROXY=true already routes every request through the pool."""
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "true")
+
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    assert client.egress_mode == "proxy"
+    assert client.failover_armed is False
+    assert client.failover_pool_size == 0
+
+
+def test_failover_is_off_by_default_for_existing_consumers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """encar_service, encar_truck_service and green_equipment_service keep today's behaviour."""
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "false")
+
+    client = AsyncHttpClient(use_proxy=True)
+
+    assert client.failover_armed is False
+    assert client.failover_pool_size == 0
+    with pytest.raises(ProxyConfigurationError):
+        _pick(client, "proxy")
+
+
+def test_explicit_proxy_egress_uses_failover_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "false")
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    proxy_url = _pick(client, "proxy")
+
+    assert proxy_url is not None
+    assert "proxy.example.test:8080" in proxy_url
+    assert client.egress_mode == "direct", "an explicit leg does not flip the mode"
+
+
+def test_explicit_proxy_egress_without_any_pool_raises_proxy_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("USE_PROXY", "false")
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    with pytest.raises(ProxyConfigurationError) as excinfo:
+        _pick(client, "proxy")
+
+    assert "proxy egress requested but no auction proxy pool is configured" in str(excinfo.value)
+
+
+def test_explicit_direct_egress_bypasses_pool_in_proxy_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "true")
+    client = AsyncHttpClient(use_proxy=True)
+
+    assert client.egress_mode == "proxy"
+    assert _pick(client, "direct") is None
+    assert _pick(client, "auto") is not None
+
+
+def test_partial_triple_leaves_failover_unarmed_without_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A half-set AUCTION_PROXY_* triple is a ProxyConfigurationError from
+    get_proxy_pool(); a proxy-optional caller must absorb it, not die at boot."""
+    monkeypatch.setenv("AUCTION_PROXY_HOST", "proxy.example.test:8080")
+    monkeypatch.setenv("USE_PROXY", "false")
+
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+
+    assert client.egress_mode == "direct"
+    assert client.failover_armed is False
+
+
+class _FakeAiohttpResponse:
+    status = 200
+    headers: dict[str, str] = {}
+    url = "https://api.encar.com/"
+    cookies: dict[str, str] = {}
+
+    async def text(self) -> str:
+        return "ok"
+
+
+class _FakeSession:
+    """Records the kwargs AsyncHttpClient hands to aiohttp for each request."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    def get(self, url, **kwargs):
+        self.calls.append(kwargs)
+        response = _FakeAiohttpResponse()
+
+        class _Ctx:
+            async def __aenter__(self_inner):
+                return response
+
+            async def __aexit__(self_inner, *exc):
+                return False
+
+        return _Ctx()
+
+
+def test_get_forwards_explicit_egress_to_the_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-call override must reach aiohttp's `proxy=` kwarg, not just _pick_proxy."""
+    _configure(monkeypatch)
+    monkeypatch.setenv("USE_PROXY", "false")
+    client = AsyncHttpClient(use_proxy=True, proxy_failover=True)
+    fake = _FakeSession()
+
+    async def fake_session(self):
+        return fake
+
+    monkeypatch.setattr(AsyncHttpClient, "session", property(fake_session))
+
+    async def exercise() -> None:
+        await client.get("https://api.encar.com/x", egress="direct")
+        await client.get("https://api.encar.com/x", egress="proxy")
+        await client.get("https://api.encar.com/x")
+
+    asyncio.run(exercise())
+
+    assert fake.calls[0]["proxy"] is None
+    assert "proxy.example.test:8080" in fake.calls[1]["proxy"]
+    assert fake.calls[2]["proxy"] is None, "auto egress follows the gate (off)"

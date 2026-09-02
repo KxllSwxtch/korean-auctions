@@ -6,7 +6,7 @@ import asyncio
 import os
 import warnings
 import aiohttp
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Literal, Union
 from urllib.parse import urljoin
 
 from app.core.logging import get_logger
@@ -14,6 +14,10 @@ from app.core.proxy_config import ProxyConfigurationError, ProxyPool, get_proxy_
 from app.core.tls import SHARED_SSL_CONTEXT
 
 logger = get_logger("async_http_client")
+
+#: Per-request egress override. ``"auto"`` follows the USE_PROXY gate (today's
+#: behaviour); ``"direct"`` and ``"proxy"`` pin one leg regardless of it.
+Egress = Literal["auto", "direct", "proxy"]
 
 
 class AsyncHttpResponse:
@@ -49,6 +53,7 @@ class AsyncHttpClient:
         use_proxy: bool = False,
         proxy_required: bool = False,
         verify_ssl: bool = True,
+        proxy_failover: bool = False,
     ):
         self.timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: Optional[aiohttp.ClientSession] = None
@@ -56,12 +61,30 @@ class AsyncHttpClient:
         self.proxy_required = proxy_required
         self.verify_ssl = verify_ssl
         self._pool: Optional[ProxyPool] = None
+        # Held in reserve while the USE_PROXY gate is off. Only a caller that
+        # passes egress="proxy" explicitly ever uses it; "auto" stays direct.
+        self._failover_pool: Optional[ProxyPool] = None
+
+        if not use_proxy:
+            return
 
         # Preserve the legacy USE_PROXY env gate: callers pass use_proxy=True,
-        # but the pool is only built if USE_PROXY=true is also set.
-        if not use_proxy or os.getenv("USE_PROXY", "false").lower() != "true":
-            if use_proxy:
-                logger.info("AsyncHttpClient egress=direct (USE_PROXY gate off)")
+        # but the pool becomes the PRIMARY leg only if USE_PROXY=true is set.
+        # With the gate off, proxy_failover=True still builds the pool so the
+        # caller can retry through it when direct egress is refused
+        # (api.encar.com has blocked Render's addresses since 2026-08-29).
+        gate_on = os.getenv("USE_PROXY", "false").lower() == "true"
+        if not gate_on:
+            if proxy_failover:
+                try:
+                    self._failover_pool = get_proxy_pool()
+                except ProxyConfigurationError as exc:
+                    # ProxyConfigurationError messages name variables only.
+                    logger.warning(f"AsyncHttpClient failover unarmed: {exc}")
+            logger.info(
+                "AsyncHttpClient egress=direct (USE_PROXY gate off, failover="
+                f"{'armed' if self._failover_pool is not None else 'unarmed'})"
+            )
             return
 
         # Proxy-optional callers must degrade to direct egress instead of
@@ -97,6 +120,16 @@ class AsyncHttpClient:
         return "proxy" if self._pool is not None else "direct"
 
     @property
+    def failover_armed(self) -> bool:
+        """True when direct is primary and a pool is held in reserve."""
+        return self._pool is None and self._failover_pool is not None
+
+    @property
+    def failover_pool_size(self) -> int:
+        """Number of reserve pool entries; 0 when failover is unarmed."""
+        return len(self._failover_pool) if self._failover_pool is not None else 0
+
+    @property
     async def session(self) -> aiohttp.ClientSession:
         """Получение или создание сессии"""
         if self._session is None or self._session.closed:
@@ -114,11 +147,27 @@ class AsyncHttpClient:
             )
         return self._session
 
-    def _pick_proxy(self) -> Optional[str]:
-        """Pick the next proxy URL for a single request via round-robin pool."""
-        if not self.use_proxy or self._pool is None:
+    def _pick_proxy(self, egress: Egress = "auto") -> Optional[str]:
+        """Pick the proxy URL for one request, or None for direct egress.
+
+        ``"auto"`` round-robins the primary pool when the USE_PROXY gate is on
+        and goes direct otherwise. ``"direct"`` never touches a pool.
+        ``"proxy"`` uses the primary pool if there is one, else the failover
+        pool, and raises ProxyConfigurationError when neither exists.
+        """
+        if egress == "direct":
             return None
-        entry, url = self._pool.advance()
+        if egress == "proxy":
+            pool = self._pool if self._pool is not None else self._failover_pool
+            if pool is None:
+                raise ProxyConfigurationError(
+                    "proxy egress requested but no auction proxy pool is configured"
+                )
+        elif not self.use_proxy or self._pool is None:
+            return None
+        else:
+            pool = self._pool
+        entry, url = pool.advance()
         logger.debug(f"🔁 Proxy rotated to {entry.name}")
         return url
 
@@ -136,6 +185,7 @@ class AsyncHttpClient:
         cookies: Optional[Dict[str, str]] = None,
         params: Optional[Dict[str, Any]] = None,
         timeout: Optional[int] = None,
+        egress: Egress = "auto",
     ) -> AsyncHttpResponse:
         """
         Выполнение GET запроса
@@ -146,6 +196,7 @@ class AsyncHttpClient:
             cookies: Cookies
             params: URL параметры
             timeout: Таймаут запроса
+            egress: "auto" (по USE_PROXY), "direct" или "proxy" для этого запроса
 
         Returns:
             AsyncHttpResponse: Ответ сервера
@@ -158,7 +209,7 @@ class AsyncHttpClient:
         )
 
         try:
-            proxy_url = self._pick_proxy()
+            proxy_url = self._pick_proxy(egress)
             proxy_info = f" via proxy" if proxy_url else ""
             logger.debug(f"🌐 GET запрос к {url}{proxy_info}")
 
@@ -186,7 +237,9 @@ class AsyncHttpClient:
             logger.error(f"❌ Таймаут при запросе к {url}")
             raise
         except Exception as e:
-            logger.error(f"❌ Ошибка при GET запросе к {url}: {str(e)}")
+            # str(e) can embed the full proxy URL (aiohttp.InvalidURL); the
+            # class name is enough to triage and never carries a credential.
+            logger.error(f"❌ Ошибка при GET запросе к {url}: {type(e).__name__}")
             raise
 
     async def post(
@@ -197,6 +250,7 @@ class AsyncHttpClient:
         headers: Optional[Dict[str, str]] = None,
         cookies: Optional[Dict[str, str]] = None,
         timeout: Optional[int] = None,
+        egress: Egress = "auto",
     ) -> AsyncHttpResponse:
         """
         Выполнение POST запроса
@@ -208,6 +262,7 @@ class AsyncHttpClient:
             headers: HTTP заголовки
             cookies: Cookies
             timeout: Таймаут запроса
+            egress: "auto" (по USE_PROXY), "direct" или "proxy" для этого запроса
 
         Returns:
             AsyncHttpResponse: Ответ сервера
@@ -220,7 +275,7 @@ class AsyncHttpClient:
         )
 
         try:
-            proxy_url = self._pick_proxy()
+            proxy_url = self._pick_proxy(egress)
             proxy_info = f" via proxy" if proxy_url else ""
             logger.debug(f"🌐 POST запрос к {url}{proxy_info}")
 
@@ -249,7 +304,7 @@ class AsyncHttpClient:
             logger.error(f"❌ Таймаут при POST запросе к {url}")
             raise
         except Exception as e:
-            logger.error(f"❌ Ошибка при POST запросе к {url}: {str(e)}")
+            logger.error(f"❌ Ошибка при POST запросе к {url}: {type(e).__name__}")
             raise
 
     async def close(self):
