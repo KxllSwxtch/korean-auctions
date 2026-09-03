@@ -21,6 +21,7 @@ from app.models.heydealer import (
     HeyDealerCarWithTechSheet,
     HeyDealerCarWithTechSheetResponse,
     AccidentRepairsResponse,
+    repair_mark,
 )
 from app.core.auth_errors import AuthError, AuthUnavailableError
 from app.services.heydealer_service import HeyDealerService
@@ -2857,15 +2858,11 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
                 scraped_data = await scrape_car_diagram(car_hash_id)
                 
                 if scraped_data.get("success"):
-                    # Добавляем метки для маркеров если их нет
+                    # Метка считается здесь и только здесь. Перезаписываем
+                    # безусловно: старая метка из скрапера (в т.ч. закэшированная
+                    # "E") наружу попасть не должна.
                     for repair in scraped_data.get("data", {}).get("accident_repairs", []):
-                        if not repair.get("label"):
-                            if repair.get("repair") == "weld":
-                                repair["label"] = "W"
-                            elif repair.get("repair") == "painted":
-                                repair["label"] = "P"
-                            elif repair.get("repair") == "exchange":
-                                repair["label"] = "E"
+                        repair["label"] = repair_mark(repair.get("repair"))
                     
                     scraped_data["timestamp"] = datetime.now().strftime("%a, %d %b %Y %H:%M:%S GMT")
                     return scraped_data
@@ -2979,17 +2976,9 @@ async def get_car_accident_diagram(car_hash_id: str, use_scraper: bool = True):
                     "exchange": 0,
                     "weld": 0
                 }),
-                "label": ""  # Add label field
+                "label": repair_mark(repair.get("repair", "none")),
             }
-            
-            # Add label based on repair type
-            if repair_item["repair"] == "weld":
-                repair_item["label"] = "W"
-            elif repair_item["repair"] == "painted":
-                repair_item["label"] = "P"
-            elif repair_item["repair"] == "exchange":
-                repair_item["label"] = "E"
-            
+
             accident_repairs.append(repair_item)
         
         # Подсчитываем типы повреждений

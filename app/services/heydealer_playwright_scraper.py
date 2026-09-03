@@ -8,6 +8,8 @@ from playwright.async_api import async_playwright, Page, Browser
 import re
 import json
 
+from app.models.heydealer import REPAIR_MARKS
+
 logger = logging.getLogger(__name__)
 
 
@@ -252,7 +254,10 @@ class HeyDealerPlaywrightScraper:
                             label = 'P';
                         } else if (classes.includes('exchange') || classes.includes('교환')) {
                             repairType = 'exchange';
-                            label = 'E';
+                            // 교환 → X (성능점검기록부), not "E" from "exchange".
+                            // Hand-synced with REPAIR_MARKS in app/models/heydealer.py;
+                            // the route recomputes the label from `repair` anyway.
+                            label = 'X';
                         }
                         
                         // Only add if we found a valid repair type and position
@@ -304,14 +309,14 @@ class HeyDealerPlaywrightScraper:
                         markings.append({
                             "position": [150, 80],
                             "repair": "exchange",
-                            "label": "E",
+                            "label": REPAIR_MARKS["exchange"],
                             "part_display": "교환"
                         })
                     if '도색' in accident_text:
                         markings.append({
                             "position": [250, 120],
-                            "repair": "painted", 
-                            "label": "P",
+                            "repair": "painted",
+                            "label": REPAIR_MARKS["painted"],
                             "part_display": "도색"
                         })
             
