@@ -1,0 +1,381 @@
+{
+  "hash_id": "nEB6N7PQ",
+  "status": "approved",
+  "status_display": "Auction in progress",
+  "model_hash_id": "B4yAn4",
+  "brand_hash_id": "2oV0gK",
+  "model_group_hash_id": "lMgGzM",
+  "full_name": "The New MOHAVE Diesel 3.0 4WD President (5 Seater)",
+  "full_name_without_brand": "The New MOHAVE Diesel 3.0 4WD President",
+  "model_part_name": "The New MOHAVE",
+  "grade_part_name": "Diesel 3.0 4WD President (5 Seater)",
+  "brand_name": "Kia",
+  "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+  "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573580_08b529fd-18e1-4c56-b8fe-2d3059b10585.JPEG",
+  "image_urls": [
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573580_08b529fd-18e1-4c56-b8fe-2d3059b10585.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573579_1156c068-373f-445b-9b15-2e99679b2394.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573581_2658c5bc-15d7-4534-ad8b-dcec815f8ba6.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573582_edd1bd57-4133-45cc-851f-3f66df65a8ca.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573583_7cb5ae24-8410-46e2-a1a4-490ed06db742.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573585_8b1761a9-eab1-4e73-b0a7-cc86d15253c8.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573584_f3957bec-27e8-438c-93c1-8dff3558f96f.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573586_20e2a98a-1cc5-4a58-a75e-692209b6fa84.png"
+  ],
+  "image_groups": [],
+  "car_number": "18소0383",
+  "year": 2017,
+  "initial_registration_date": "2016-04-18 00:00:00",
+  "mileage": 121010,
+  "color": "Aurora Black Pearl",
+  "interior": "Black, Nappa Leather",
+  "location": "Daejeon Yuseong-gu",
+  "short_location": "Daejeon Yuseong-gu",
+  "payment": "cash",
+  "payment_display": "Cash / Installment",
+  "fuel": "diesel",
+  "fuel_display": "Diesel",
+  "transmission": "auto",
+  "transmission_display": "Automatic",
+  "accident_repairs_summary": "complete_no_accident",
+  "accident_repairs_summary_display": "No accident",
+  "accident_repairs": [],
+  "advanced_options": [
+    {
+      "hash_id": "qLgYY96O",
+      "name": "Navigation",
+      "choice": null,
+      "content": {
+        "option_name": "Navigation",
+        "question_text": "Is navigation equipped?",
+        "info_text": "Built-in unit only (aftermarket dashboard nav excluded).",
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1066_0601f246-a6f0-4c8b-9e54-d6f112a11698.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "WjY11VJa",
+      "name": "Heated Front Seats",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W1ZeeKxd",
+      "name": "Heated Rear Seats",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "WpXvvYpJ",
+      "name": "Power Front Seats",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "EVokkB3g",
+      "name": "Ventilated Driver Seat",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "WbJooNeG",
+      "name": "Ventilated Passenger Seat",
+      "choice": null,
+      "content": {
+        "option_name": "Ventilated Passenger Seat",
+        "question_text": "Is the ventilated passenger seat equipped?",
+        "info_text": null,
+        "info_image_url": null
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "2Gevv61o",
+      "name": "Memory Driver Seat",
+      "choice": null,
+      "content": {
+        "option_name": "Memory Driver Seat",
+        "question_text": "Is the memory driver seat equipped?",
+        "info_text": "Buttons [1], [2] (or [SET], [1], [2]) recall stored seat positions.",
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1072_49004ea6-c1ac-4e2a-81b7-4b2db5a331c4.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "qgBOOjwY",
+      "name": "HID Headlights",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "EO1ZZRpb",
+      "name": "Sunroof",
+      "choice": "absent",
+      "content": {
+        "option_name": "Sunroof",
+        "question_text": "Is a sunroof equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1065_ea01e7f8-c9d5-4ac3-abeb-29efeb0e0d6e.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": true,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "26RJJmB3",
+      "name": "Rear Blind-Spot Warning (BSD)",
+      "choice": "absent",
+      "content": {
+        "option_name": "Rear Blind-Spot Warning (BSD)",
+        "question_text": "Is rear BSD equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1073_5900b400-86e6-4079-aa51-bd573420d55c.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": false,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "Evlyy5rw",
+      "name": "Around-View Monitor (AVM)",
+      "choice": "absent",
+      "content": {
+        "option_name": "Around-View Monitor (AVM)",
+        "question_text": "Is AVM equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1074_bb91fa4d-5aa3-4b79-a5b0-3d7b97932f1d.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    }
+  ],
+  "car_description": null,
+  "customer_comment": null,
+  "inspector_comment": null,
+  "condition_description": null,
+  "car_spec": {
+    "title": "Kia Factory Info",
+    "description": null
+  },
+  "vehicle_information": {
+    "is_erased": null,
+    "car_number": null,
+    "erasure_date": null,
+    "car_name": null,
+    "car_type": null,
+    "vin": "KNAKN814DHA",
+    "motor_code": "D6EB",
+    "purpose": null,
+    "year": null,
+    "color": null,
+    "registration_type": "New build",
+    "initial_registration_date": "2016-04-18 00:00:00",
+    "manufactured_date": "2016-04-11",
+    "inspection_valid_from": null,
+    "inspection_valid_until": null,
+    "mileage": null
+  },
+  "inspected_condition": null,
+  "paint_thickness_inspection": null,
+  "carhistory": {
+    "car_number": "18소0383",
+    "year": 2017,
+    "car_type": "Passenger",
+    "use": "Personal",
+    "displacement": 2959,
+    "fuel": "diesel",
+    "fuel_display": "Diesel",
+    "initial_registration_date": "2016-04-18",
+    "owner_changed_count": 1,
+    "my_car_accident_count": 3,
+    "other_car_accident_count": 0,
+    "my_car_accident_cost": 1680914,
+    "other_car_accident_cost": 0,
+    "total_loss_count": 0,
+    "flooded_count": 0,
+    "stolen_count": 0
+  },
+  "auction": {
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:58:06",
+    "end_at": "2026-07-08 15:58:06",
+    "bids_count": 0,
+    "max_bids_count": 30,
+    "highest_bid": null,
+    "my_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "category": "normal",
+    "zero_auction_message": null,
+    "visits_count": 0,
+    "price_changed_at": "",
+    "previous_auction_result": {
+      "prices": [],
+      "bids_count": 0,
+      "price_attraction_level": 0,
+      "bids_count_attraction_level": 0
+    },
+    "fixed_price_zero_offer": null,
+    "warranty_terms": []
+  },
+  "encar_url": "https://www.encar.com/dc/dc_carsearchlist.do?carType=kor&searchType=model&TG.R=A#!%7B%22action%22%3A+%22%28And.Hidden.N._.%28C.CarType.Y._.%28C.Manufacturer.%5Cuae30%5Cuc544._.%28C.ModelGroup.%5Cubaa8%5Cud558%5Cube44._.%28C.Model.%5Cub354+%5Cub274+%5Cubaa8%5Cud558%5Cube44._.%28C.BadgeGroup.%5Cub514%5Cuc824+4WD._.%28C.Badge.%5Cub514%5Cuc824+3_.0+4WD._.BadgeDetail.%5Cud504%5Cub808%5Cuc9c0%5Cub358%5Cud2b8.%29%29%29%29%29%29_.Year.range%28201601..201812%29._.Mileage.range%28100000..140000%29.%29%22%2C+%22toggle%22%3A+%7B%7D%2C+%22layer%22%3A+%22%22%2C+%22sort%22%3A+%22Mileage%22%2C+%22page%22%3A+1%2C+%22limit%22%3A+20%7D",
+  "auction_histories": [],
+  "standard_new_car_price": 4767,
+  "engine_sound_video": null,
+  "price_history": [],
+  "inspector_sections": [],
+  "condition_items": [
+    {
+      "text": "· Body Panel : None",
+      "tooltip": null
+    },
+    {
+      "text": "· Tire : All good",
+      "tooltip": null
+    },
+    {
+      "text": "· Wheel scratches : None",
+      "tooltip": null
+    },
+    {
+      "text": "· Spare Key : Present",
+      "tooltip": null
+    },
+    {
+      "text": "(Repairs needed)",
+      "tooltip": null
+    },
+    {
+      "text": "None",
+      "tooltip": null
+    },
+    {
+      "text": "(Pros and cons of the car)",
+      "tooltip": null
+    },
+    {
+      "text": "경정비완료했습니다",
+      "tooltip": null
+    }
+  ],
+  "bidding_help": {
+    "new_car_price_man_won": 4767,
+    "options_note": "(Option Included) 📄 Registration price 4,686 10,000 KRW (VAT Included) 🤝 거래이력 Existing Customer · Transaction Vehicle 3 대 · upload Vehicle 19 대"
+  },
+  "ev_info": null,
+  "dpf_info_display": "",
+  "option_table_image_urls": [],
+  "early_scrap_display": "Check needed",
+  "has_corporate_owner": true
+}

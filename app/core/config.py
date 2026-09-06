@@ -191,6 +191,24 @@ class Settings(BaseSettings):
     heydealer_proxy_username: Optional[str] = None
     heydealer_proxy_password: Optional[str] = None
 
+    # Shared egress for cars.dbauto.kr, which serves BOTH the Glovis and the
+    # HeyDealer feeds. It geo-blocks Korea -- every data endpoint answers 403
+    # from a KR IP while the token mint still returns 200 from anywhere -- so
+    # this is the one egress in the project that must NOT be Korean. Read via
+    # os.environ in app/services/dbauto_transport.py; declared here only so
+    # Pydantic accepts the environment (`extra` is "forbid").
+    dbauto_proxy_host: Optional[str] = None
+    dbauto_proxy_username: Optional[str] = None
+    dbauto_proxy_password: Optional[str] = None
+    dbauto_proxy_country: Optional[str] = None
+    dbauto_proxy_egress_label: Optional[str] = None
+
+    # "dbauto" (default) or "dealer" for the legacy shared-login scraper.
+    heydealer_source: str = "dbauto"
+    # Lane budget for the dbauto transport; see dbauto_transport.LaneScheduler.
+    heydealer_max_concurrency: Optional[str] = None
+    heydealer_facet_concurrency: Optional[str] = None
+
     # Shared auction proxy for Encar (optional) and HappyCar (required).
     # Values stay secret-managed; declaring them lets Pydantic accept the
     # deployment environment and lets startup validation report which names

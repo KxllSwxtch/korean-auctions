@@ -1,0 +1,1041 @@
+{
+  "brandCounts": [
+    {
+      "value": "xoKegB",
+      "label": "Hyundai",
+      "count": 2470
+    },
+    {
+      "value": "2oV0gK",
+      "label": "Kia",
+      "count": 2321
+    },
+    {
+      "value": "0W5AWm",
+      "label": "BMW",
+      "count": 764
+    },
+    {
+      "value": "Lgyakg",
+      "label": "Chevrolet (GM Daewoo)",
+      "count": 567
+    },
+    {
+      "value": "lgBNgw",
+      "label": "Mercedes-Benz",
+      "count": 562
+    },
+    {
+      "value": "vgm7Do",
+      "label": "Genesis",
+      "count": 510
+    },
+    {
+      "value": "etc",
+      "label": "Trucks / Special / Other",
+      "count": 438
+    },
+    {
+      "value": "bZ9GWp",
+      "label": "KG Mobility (SsangYong)",
+      "count": 365
+    },
+    {
+      "value": "RgMAjg",
+      "label": "Audi",
+      "count": 200
+    },
+    {
+      "value": "qoA2Zr",
+      "label": "Porsche",
+      "count": 139
+    },
+    {
+      "value": "xozX5g",
+      "label": "Tesla",
+      "count": 123
+    },
+    {
+      "value": "QZq3WM",
+      "label": "Land Rover",
+      "count": 81
+    },
+    {
+      "value": "6gakoO",
+      "label": "Jeep",
+      "count": 68
+    },
+    {
+      "value": "7gReZz",
+      "label": "Toyota",
+      "count": 62
+    },
+    {
+      "value": "pZ2nZY",
+      "label": "Ford",
+      "count": 55
+    },
+    {
+      "value": "EW3do3",
+      "label": "Lexus",
+      "count": 54
+    },
+    {
+      "value": "nWPkgx",
+      "label": "Lincoln",
+      "count": 22
+    },
+    {
+      "value": "BZpvWp",
+      "label": "Infiniti",
+      "count": 20
+    },
+    {
+      "value": "roGpZy",
+      "label": "Cadillac",
+      "count": 19
+    },
+    {
+      "value": "rWdrxZ",
+      "label": "Maserati",
+      "count": 18
+    },
+    {
+      "value": "KWnXZB",
+      "label": "Jaguar",
+      "count": 17
+    },
+    {
+      "value": "xZvPwW",
+      "label": "BYD",
+      "count": 11
+    },
+    {
+      "value": "RWlnAZ",
+      "label": "Polestar",
+      "count": 11
+    },
+    {
+      "value": "RWlAox",
+      "label": "Bentley",
+      "count": 7
+    },
+    {
+      "value": "EW30do",
+      "label": "Chevrolet",
+      "count": 6
+    },
+    {
+      "value": "AZDqgw",
+      "label": "Lamborghini",
+      "count": 6
+    },
+    {
+      "value": "Rg4L5g",
+      "label": "Citroen / DS",
+      "count": 5
+    },
+    {
+      "value": "GgwzvZ",
+      "label": "Chrysler",
+      "count": 4
+    },
+    {
+      "value": "xWePgl",
+      "label": "Ferrari",
+      "count": 4
+    },
+    {
+      "value": "Rg45WD",
+      "label": "Dodge",
+      "count": 3
+    },
+    {
+      "value": "Jo6OZj",
+      "label": "GMC",
+      "count": 3
+    },
+    {
+      "value": "xoz5Ww",
+      "label": "Rolls-Royce",
+      "count": 3
+    },
+    {
+      "value": "GgwvZx",
+      "label": "Hummer",
+      "count": 2
+    },
+    {
+      "value": "KWn6XW",
+      "label": "Smart Solutions (SMART EV)",
+      "count": 2
+    },
+    {
+      "value": "xWE5Wm",
+      "label": "Alfa Romeo",
+      "count": 1
+    },
+    {
+      "value": "5gkM7o",
+      "label": "Aston Martin",
+      "count": 1
+    },
+    {
+      "value": "nWPnkZ",
+      "label": "BAIC Yinxiang",
+      "count": 1
+    },
+    {
+      "value": "2oVj0o",
+      "label": "Cevo Mobility",
+      "count": 1
+    },
+    {
+      "value": "AZD2qW",
+      "label": "Smart",
+      "count": 1
+    },
+    {
+      "value": "xWER5o",
+      "label": "Suzuki",
+      "count": 1
+    },
+    {
+      "value": "loJzMo",
+      "label": "Acura",
+      "count": 0
+    },
+    {
+      "value": "BMW",
+      "label": "BMW",
+      "count": 0
+    },
+    {
+      "value": "vgbloA",
+      "label": "Bugatti",
+      "count": 0
+    },
+    {
+      "value": "LWLmo3",
+      "label": "Buick",
+      "count": 0
+    },
+    {
+      "value": "OoX72W",
+      "label": "Daechang Motors",
+      "count": 0
+    },
+    {
+      "value": "bZ98Go",
+      "label": "Daihatsu",
+      "count": 0
+    },
+    {
+      "value": "wgNQZM",
+      "label": "Dongfeng Sokon",
+      "count": 0
+    },
+    {
+      "value": "xoKzeW",
+      "label": "DPICO",
+      "count": 0
+    },
+    {
+      "value": "DW",
+      "label": "DW",
+      "count": 0
+    },
+    {
+      "value": "eo7QgO",
+      "label": "Fiat",
+      "count": 0
+    },
+    {
+      "value": "vgbPlo",
+      "label": "Foton",
+      "count": 0
+    },
+    {
+      "value": "NZONNo",
+      "label": "Honda",
+      "count": 0
+    },
+    {
+      "value": "QZqE3Z",
+      "label": "Ineos",
+      "count": 0
+    },
+    {
+      "value": "vgmDZD",
+      "label": "Isuzu",
+      "count": 0
+    },
+    {
+      "value": "0W5bAo",
+      "label": "Koenigsegg",
+      "count": 0
+    },
+    {
+      "value": "BZpxvZ",
+      "label": "Lotus",
+      "count": 0
+    },
+    {
+      "value": "Rg0K7Z",
+      "label": "Master",
+      "count": 0
+    },
+    {
+      "value": "xgr7Wq",
+      "label": "Maybach",
+      "count": 0
+    },
+    {
+      "value": "LZYJg4",
+      "label": "Mazda",
+      "count": 0
+    },
+    {
+      "value": "joQXW1",
+      "label": "McLaren",
+      "count": 0
+    },
+    {
+      "value": "rWdxWm",
+      "label": "Mercury",
+      "count": 0
+    },
+    {
+      "value": "Rg07Z0",
+      "label": "MINI",
+      "count": 0
+    },
+    {
+      "value": "BZ1MZ8",
+      "label": "Mitsubishi",
+      "count": 0
+    },
+    {
+      "value": "RgMjWD",
+      "label": "Mitsuoka",
+      "count": 0
+    },
+    {
+      "value": "pZ2bnZ",
+      "label": "Myev",
+      "count": 0
+    },
+    {
+      "value": "6gaGko",
+      "label": "Nissan",
+      "count": 0
+    },
+    {
+      "value": "AZ8VWB",
+      "label": "Oldsmobile",
+      "count": 0
+    },
+    {
+      "value": "NZONox",
+      "label": "Opel",
+      "count": 0
+    },
+    {
+      "value": "LWLqmo",
+      "label": "Pagani",
+      "count": 0
+    },
+    {
+      "value": "wgNwQW",
+      "label": "Peugeot",
+      "count": 0
+    },
+    {
+      "value": "loJMW6",
+      "label": "Pontiac",
+      "count": 0
+    },
+    {
+      "value": "5ZjAMo",
+      "label": "Renault",
+      "count": 0
+    },
+    {
+      "value": "xgrX7o",
+      "label": "Renault Korea (Samsung)",
+      "count": 0
+    },
+    {
+      "value": "5gk7g6",
+      "label": "Rover",
+      "count": 0
+    },
+    {
+      "value": "xZvwgR",
+      "label": "Saab",
+      "count": 0
+    },
+    {
+      "value": "OgxjoQ",
+      "label": "Saturn",
+      "count": 0
+    },
+    {
+      "value": "OoX2gr",
+      "label": "Scion",
+      "count": 0
+    },
+    {
+      "value": "eo7vQW",
+      "label": "Subaru",
+      "count": 0
+    },
+    {
+      "value": "lgBkNW",
+      "label": "Viva Mobility",
+      "count": 0
+    },
+    {
+      "value": "LZY3JW",
+      "label": "Volkswagen",
+      "count": 0
+    },
+    {
+      "value": "Jo6rOo",
+      "label": "Volvo",
+      "count": 0
+    }
+  ],
+  "modelGroups": [
+    {
+      "value": "rk0Jmy",
+      "label": "Grandeur",
+      "count": 496
+    },
+    {
+      "value": "XyQ1gy",
+      "label": "Avante",
+      "count": 411
+    },
+    {
+      "value": "Ne8v1M",
+      "label": "Sonata",
+      "count": 307
+    },
+    {
+      "value": "zeXDJe",
+      "label": "Santa Fe",
+      "count": 294
+    },
+    {
+      "value": "Ae1PAy",
+      "label": "Tucson",
+      "count": 185
+    },
+    {
+      "value": "EMpA6y",
+      "label": "Palisade",
+      "count": 164
+    },
+    {
+      "value": "Vy2n5y",
+      "label": "Starex",
+      "count": 97
+    },
+    {
+      "value": "2k3daM",
+      "label": "Ioniq",
+      "count": 72
+    },
+    {
+      "value": "We6v5e",
+      "label": "Genesis",
+      "count": 66
+    },
+    {
+      "value": "8enjZe",
+      "label": "Kona",
+      "count": 62
+    },
+    {
+      "value": "XkoNPe",
+      "label": "Staria",
+      "count": 45
+    },
+    {
+      "value": "RMa72e",
+      "label": "Accent",
+      "count": 37
+    },
+    {
+      "value": "8yAWLk",
+      "label": "Equus",
+      "count": 35
+    },
+    {
+      "value": "relYKk",
+      "label": "i30",
+      "count": 31
+    },
+    {
+      "value": "peqJbk",
+      "label": "Veloster",
+      "count": 18
+    },
+    {
+      "value": "Xkomgy",
+      "label": "Maxcruz",
+      "count": 16
+    },
+    {
+      "value": "9kzK6M",
+      "label": "Veracruz",
+      "count": 13
+    },
+    {
+      "value": "Ok4W5e",
+      "label": "Venue",
+      "count": 12
+    },
+    {
+      "value": "BkBrWk",
+      "label": "Nexo",
+      "count": 7
+    },
+    {
+      "value": "VeJ25e",
+      "label": "Aslan",
+      "count": 6
+    },
+    {
+      "value": "BkBn2k",
+      "label": "i40",
+      "count": 6
+    },
+    {
+      "value": "gMDRXe",
+      "label": "Verna",
+      "count": 5
+    },
+    {
+      "value": "YyL7JM",
+      "label": "Terracan",
+      "count": 3
+    },
+    {
+      "value": "1yR09k",
+      "label": "Solati",
+      "count": 2
+    },
+    {
+      "value": "Dyd4py",
+      "label": "ST1",
+      "count": 2
+    },
+    {
+      "value": "RyWDWe",
+      "label": "Dynasty",
+      "count": 1
+    },
+    {
+      "value": "lMgWZM",
+      "label": "Pony",
+      "count": 1
+    },
+    {
+      "value": "beP6QM",
+      "label": "Atos",
+      "count": 0
+    },
+    {
+      "value": "zeXXQe",
+      "label": "Casper",
+      "count": 0
+    },
+    {
+      "value": "YyGz9M",
+      "label": "Click",
+      "count": 0
+    },
+    {
+      "value": "Ok4aqM",
+      "label": "Cortina",
+      "count": 0
+    },
+    {
+      "value": "dM91QM",
+      "label": "Elantra",
+      "count": 0
+    },
+    {
+      "value": "1yRAaM",
+      "label": "Excel",
+      "count": 0
+    },
+    {
+      "value": "lkYrrM",
+      "label": "Galloper",
+      "count": 0
+    },
+    {
+      "value": "zyxKLM",
+      "label": "Grace",
+      "count": 0
+    },
+    {
+      "value": "0yNmpM",
+      "label": "Granada",
+      "count": 0
+    },
+    {
+      "value": "qM7aEe",
+      "label": "Lavita",
+      "count": 0
+    },
+    {
+      "value": "KM54mk",
+      "label": "Marcia",
+      "count": 0
+    },
+    {
+      "value": "XevwWk",
+      "label": "Presto",
+      "count": 0
+    },
+    {
+      "value": "8en8qM",
+      "label": "Santamo",
+      "count": 0
+    },
+    {
+      "value": "VMjoBy",
+      "label": "Scoupe",
+      "count": 0
+    },
+    {
+      "value": "2k3Wwk",
+      "label": "Stella",
+      "count": 0
+    },
+    {
+      "value": "7MEa4M",
+      "label": "Tiburon",
+      "count": 0
+    },
+    {
+      "value": "Kkm28M",
+      "label": "Trajet XG",
+      "count": 0
+    },
+    {
+      "value": "DydN9k",
+      "label": "Tuscani",
+      "count": 0
+    }
+  ],
+  "subModels": [
+    {
+      "value": "dpYAGp",
+      "label": "Grandeur HG",
+      "count": 173
+    },
+    {
+      "value": "Yp5PJo",
+      "label": "Grandeur IG",
+      "count": 92
+    },
+    {
+      "value": "5oqNnp",
+      "label": "The New Grandeur IG",
+      "count": 73
+    },
+    {
+      "value": "Vp1d1o",
+      "label": "The All New Grandeur (GN7)",
+      "count": 35
+    },
+    {
+      "value": "B4y9w4",
+      "label": "The All New Grandeur Hybrid (GN7)",
+      "count": 27
+    },
+    {
+      "value": "Yp5ZB4",
+      "label": "The New Grandeur IG Hybrid",
+      "count": 22
+    },
+    {
+      "value": "O3v2a3",
+      "label": "Grandeur New Luxury",
+      "count": 19
+    },
+    {
+      "value": "Y4d2mo",
+      "label": "Grandeur TG",
+      "count": 19
+    },
+    {
+      "value": "loxM6p",
+      "label": "Grandeur HG Hybrid",
+      "count": 11
+    },
+    {
+      "value": "Mo7xLp",
+      "label": "Grandeur IG Hybrid",
+      "count": 11
+    },
+    {
+      "value": "qpRAYo",
+      "label": "The Luxury Grandeur",
+      "count": 9
+    },
+    {
+      "value": "EomNap",
+      "label": "Grandeur XG",
+      "count": 2
+    },
+    {
+      "value": "moOk6o",
+      "label": "New Grandeur XG",
+      "count": 2
+    },
+    {
+      "value": "wo222o",
+      "label": "New Grandeur",
+      "count": 1
+    },
+    {
+      "value": "QpV2Kp",
+      "label": "Grandeur",
+      "count": 0
+    }
+  ],
+  "sections": {
+    "auction_type": [
+      {
+        "value": "self",
+        "label": "Self",
+        "count": 4967
+      },
+      {
+        "value": "customer_zero",
+        "label": "Zero",
+        "count": 3913
+      },
+      {
+        "value": "fixed_price_zero",
+        "label": "Instant buyback",
+        "count": 948
+      }
+    ],
+    "car_segment": [
+      {
+        "value": "suv",
+        "label": "SUVㆍRV",
+        "count": 4213
+      },
+      {
+        "value": "d",
+        "label": "중형",
+        "count": 2257
+      },
+      {
+        "value": "c",
+        "label": "준중형",
+        "count": 1154
+      },
+      {
+        "value": "a",
+        "label": "경차",
+        "count": 788
+      },
+      {
+        "value": "f",
+        "label": "대형",
+        "count": 678
+      },
+      {
+        "value": "b",
+        "label": "소형",
+        "count": 159
+      },
+      {
+        "value": "s",
+        "label": "스포츠",
+        "count": 141
+      }
+    ],
+    "location_first_part": [
+      {
+        "value": "102",
+        "label": "경기(남)",
+        "count": 2119
+      },
+      {
+        "value": "9",
+        "label": "서울",
+        "count": 1406
+      },
+      {
+        "value": "101",
+        "label": "경기(북)",
+        "count": 1087
+      },
+      {
+        "value": "12",
+        "label": "인천",
+        "count": 605
+      },
+      {
+        "value": "3",
+        "label": "경남",
+        "count": 521
+      },
+      {
+        "value": "7",
+        "label": "대구",
+        "count": 515
+      },
+      {
+        "value": "8",
+        "label": "부산",
+        "count": 495
+      },
+      {
+        "value": "16",
+        "label": "충남",
+        "count": 438
+      },
+      {
+        "value": "4",
+        "label": "경북",
+        "count": 437
+      },
+      {
+        "value": "5",
+        "label": "광주",
+        "count": 323
+      },
+      {
+        "value": "14",
+        "label": "전북",
+        "count": 305
+      },
+      {
+        "value": "6",
+        "label": "대전",
+        "count": 301
+      },
+      {
+        "value": "17",
+        "label": "충북",
+        "count": 297
+      },
+      {
+        "value": "1",
+        "label": "강원",
+        "count": 279
+      },
+      {
+        "value": "11",
+        "label": "울산",
+        "count": 258
+      },
+      {
+        "value": "13",
+        "label": "전남",
+        "count": 231
+      },
+      {
+        "value": "15",
+        "label": "제주",
+        "count": 118
+      },
+      {
+        "value": "10",
+        "label": "세종",
+        "count": 93
+      }
+    ],
+    "fuel": [
+      {
+        "value": "gasoline",
+        "label": "Gasoline",
+        "count": 5409
+      },
+      {
+        "value": "diesel",
+        "label": "Diesel",
+        "count": 2892
+      },
+      {
+        "value": "hybrid",
+        "label": "Hybrid",
+        "count": 561
+      },
+      {
+        "value": "lpg",
+        "label": "LPG",
+        "count": 469
+      },
+      {
+        "value": "electric",
+        "label": "Electric",
+        "count": 424
+      },
+      {
+        "value": "plugin_hybrid",
+        "label": "Plug-in Hybrid",
+        "count": 60
+      },
+      {
+        "value": "hydrogen",
+        "label": "Hydrogen",
+        "count": 7
+      },
+      {
+        "value": "bifuel",
+        "label": "Bi-fuel",
+        "count": 6
+      }
+    ],
+    "transmission": [
+      {
+        "value": "auto",
+        "label": "Automatic",
+        "count": 9583
+      },
+      {
+        "value": "manual",
+        "label": "Manual",
+        "count": 246
+      }
+    ],
+    "payment": [
+      {
+        "value": "cash",
+        "label": "Cash / Installment",
+        "count": 9233
+      },
+      {
+        "value": "operating_lease",
+        "label": "Operating Lease",
+        "count": 268
+      },
+      {
+        "value": "rent",
+        "label": "Rental",
+        "count": 183
+      },
+      {
+        "value": "finance_lease",
+        "label": "Finance Lease",
+        "count": 145
+      }
+    ],
+    "car_type": [
+      {
+        "value": "domestic",
+        "label": "국산차",
+        "count": 6715
+      },
+      {
+        "value": "foreign",
+        "label": "수입차",
+        "count": 2676
+      },
+      {
+        "value": "etc",
+        "label": "화물 · 특장 · 기타",
+        "count": 438
+      }
+    ],
+    "owner_change_record": [
+      {
+        "value": "exists",
+        "label": "있음",
+        "count": 5202
+      },
+      {
+        "value": "none",
+        "label": "없음",
+        "count": 4626
+      }
+    ],
+    "use_record": [
+      {
+        "value": "none",
+        "label": "없음",
+        "count": 8689
+      },
+      {
+        "value": "rent",
+        "label": "대여",
+        "count": 916
+      },
+      {
+        "value": "business",
+        "label": "영업",
+        "count": 213
+      },
+      {
+        "value": "public",
+        "label": "관용",
+        "count": 9
+      }
+    ],
+    "wheel_drive": [
+      {
+        "value": "2WD",
+        "label": "2WD",
+        "count": 7444
+      },
+      {
+        "value": "4WD",
+        "label": "4WD",
+        "count": 2383
+      }
+    ],
+    "special_accident_record": [
+      {
+        "value": "none",
+        "label": "없음",
+        "count": 9801
+      },
+      {
+        "value": "exists",
+        "label": "있음",
+        "count": 0
+      }
+    ],
+    "operation_availability": [
+      {
+        "value": "available",
+        "label": "가능",
+        "count": 9698
+      },
+      {
+        "value": "unavailable",
+        "label": "불가능",
+        "count": 129
+      }
+    ],
+    "accident_repairs_summary": [
+      {
+        "value": "complete_no_accident",
+        "label": "No accident",
+        "count": 5752
+      },
+      {
+        "value": "simple_exchange_no_accident",
+        "label": "Simple swap",
+        "count": 2692
+      },
+      {
+        "value": "accident",
+        "label": "Had accident",
+        "count": 869
+      }
+    ]
+  }
+}

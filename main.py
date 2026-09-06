@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ from app.routes import (  # noqa: E402 — env hydration must precede app import
     kcar,
     enhanced_lotte,
     heydealer,
+    heydealer_dbauto,
     heydealer_filters,
     glovis,
     ssancar,
@@ -71,6 +73,9 @@ async def lifespan(app: FastAPI):
     from app.routes.lotte_filters import get_filter_service
     from app.routes.glovis import close_glovis_service
     from app.routes.encar_proxy import close_encar_proxy_client
+    from app.services.heydealer_dbauto_service import (
+        close_service as close_heydealer_service,
+    )
     from app.services.bikemart_service import bikemart_service
 
     # Report missing egress and credential variables before any route can
@@ -81,6 +86,14 @@ async def lifespan(app: FastAPI):
     # is exactly the failure that took the frontend down. Origins are public
     # hostnames, never secrets.
     log_cors_configuration(CORS_ORIGINS, CORS_ORIGIN_REGEX)
+
+    # Warm the HeyDealer catalog caches off the request path. A cold facet
+    # fan-out costs dbauto ~12 s per section, so without this the first visitor
+    # after a deploy pays for all of it.
+    if HEYDEALER_SOURCE != "dealer":
+        from app.services.heydealer_dbauto_service import get_service as _hey_service
+
+        asyncio.create_task(_hey_service().warm())
 
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
@@ -97,6 +110,7 @@ async def lifespan(app: FastAPI):
         finally:
             await close_encar_proxy_client()
             close_glovis_service()
+            close_heydealer_service()
             await bikemart_service.close()
 
 
@@ -202,12 +216,37 @@ app.include_router(kcar.router, tags=["KCar Auction"])
 
 # Новые улучшенные маршруты
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
-app.include_router(heydealer.router, prefix="/api/v1", tags=["HeyDealer Auction"])
-app.include_router(
-    heydealer_filters.router,
-    prefix="/api/v1/heydealer/filters",
-    tags=["HeyDealer Filters"],
-)
+# HeyDealer source switch.
+#
+# `dbauto` (the default) serves the feed from cars.dbauto.kr's anonymous token
+# API. `dealer` restores the legacy dealer-portal scraper, which logs in with a
+# shared HeyDealer account -- and because HeyDealer permits one live session per
+# account, that login is mutually exclusive with any human using the same
+# credentials: whoever authenticates last evicts the other. The flag exists only
+# so the migration can be rolled back without a redeploy; it is scheduled for
+# removal along with the legacy modules once dbauto has soaked in production.
+HEYDEALER_SOURCE = os.getenv("HEYDEALER_SOURCE", "dbauto").strip().lower()
+
+if HEYDEALER_SOURCE == "dealer":
+    logger.warning(
+        "heydealer_source=dealer — using the shared-login scraper; a human "
+        "signing into dealer.heydealer.com will evict this session"
+    )
+    app.include_router(heydealer.router, prefix="/api/v1", tags=["HeyDealer Auction"])
+    app.include_router(
+        heydealer_filters.router,
+        prefix="/api/v1/heydealer/filters",
+        tags=["HeyDealer Filters"],
+    )
+else:
+    app.include_router(
+        heydealer_dbauto.router, prefix="/api/v1", tags=["HeyDealer Auction"]
+    )
+    app.include_router(
+        heydealer_dbauto.filters_router,
+        prefix="/api/v1/heydealer/filters",
+        tags=["HeyDealer Filters"],
+    )
 # SSANCAR routes - Direct SSANCAR API without PLC wrapper
 app.include_router(ssancar.router, tags=["SSANCAR Auction"])
 

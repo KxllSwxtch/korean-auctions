@@ -1,0 +1,1367 @@
+[
+  {
+    "hash_id": "nEB6N7PQ",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New MOHAVE Diesel 3.0 4WD President (5 Seater)",
+    "model_part_name": "The New MOHAVE",
+    "grade_part_name": "Diesel 3.0 4WD President (5 Seater)",
+    "model_hash_id": "B4yAn4",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "lMgGzM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573580_08b529fd-18e1-4c56-b8fe-2d3059b10585.JPEG",
+    "car_number": "",
+    "year": 2017,
+    "initial_registration_date": "2016-04-18 00:00:00",
+    "mileage": 121010,
+    "location": "Daejeon Yuseong-gu",
+    "short_location": "Daejeon Yuseong-gu",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "검정, 나파 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:58:06",
+    "end_at": "2026-07-08 15:58:06",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험3건 · 168만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "nqzwP1qQ",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Mercedes-Benz E-Class (W213) E350 4MATIC AMG Line EDITION",
+    "model_part_name": "MERCEDES-BENZ E-CLASS (W213)",
+    "grade_part_name": "E350 4MATIC AMG Line EDITION",
+    "model_hash_id": "g3KKx3",
+    "brand_hash_id": "lgBNgw",
+    "model_group_hash_id": "JyVLZk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/31_2e506e87-38bf-4b05-8b6a-a86907f5a872.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133572817_2c22c694-fce1-4111-81ef-941612ff0de1.JPEG",
+    "car_number": "",
+    "year": 2021,
+    "initial_registration_date": "2020-12-16 00:00:00",
+    "mileage": 147626,
+    "location": "Gangwon Chuncheon-si",
+    "short_location": "Gangwon Chuncheon-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "검정 나파 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:57:30",
+    "end_at": "2026-07-08 15:57:30",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험7건 · 2,028만원)",
+        "short_text": "Simple (2+)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yeP3dNWl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "CARNIVAL R Diesel New Carnival Limousine GLX LUXURY MODEL",
+    "model_part_name": "CARNIVAL R",
+    "grade_part_name": "Diesel New Carnival Limousine GLX LUXURY MODEL",
+    "model_hash_id": "Vp1vr4",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "2k3aEy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133568689_dfc875b3-7e4d-4105-97a7-107d5bc6610a.JPEG",
+    "car_number": "",
+    "year": 2012,
+    "initial_registration_date": "2012-03-13 00:00:00",
+    "mileage": 192151,
+    "location": "Seoul Gangseo-gu",
+    "short_location": "Seoul Gangseo-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "베이지, 인조 가죽",
+      "codes": [
+        "#FDFBED"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:57:20",
+    "end_at": "2026-07-08 15:57:20",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 31만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yL6eR13Q",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "SANTA FE TM Gasoline 2.0T 2WD Prestige (5 Seater)",
+    "model_part_name": "SANTA FE TM",
+    "grade_part_name": "Gasoline 2.0T 2WD Prestige (5 Seater)",
+    "model_hash_id": "Y4Aaa4",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "zeXDJe",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566504_78381e66-04e1-4e4e-b115-0885f35431dc.jpeg",
+    "car_number": "",
+    "year": 2020,
+    "initial_registration_date": "2019-12-23 00:00:00",
+    "mileage": 76452,
+    "location": "Incheon Michuhol-gu",
+    "short_location": "Incheon Michuhol-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "다크 베이지, 천연 가죽",
+      "codes": [
+        "#C8B893"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:57:16",
+    "end_at": "2026-07-08 15:57:16",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험2건 · 234만원)",
+        "short_text": "Simple (2+)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "nqz8kMOQ",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The All New Grandeur Hybrid (GN7) Exclusive",
+    "model_part_name": "The All New Grandeur Hybrid (GN7)",
+    "grade_part_name": "Exclusive",
+    "model_hash_id": "B4y9w4",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "rk0Jmy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570661_d30c840e-96e6-443b-bb07-33b509b0b49e.JPEG",
+    "car_number": "",
+    "year": 2023,
+    "initial_registration_date": "2022-12-20 00:00:00",
+    "mileage": 34700,
+    "location": "Gangwon Samcheok-si",
+    "short_location": "Gangwon Samcheok-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "브라운, 천연 가죽",
+      "codes": [
+        "#594B49"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:57:14",
+    "end_at": "2026-07-08 15:57:14",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "n7GX4Rgn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Sportage R DIESEL 2WD Prestige",
+    "model_part_name": "The New SPORTAGE R",
+    "grade_part_name": "DIESEL 2WD Prestige",
+    "model_hash_id": "Y4AKMo",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "relJ0M",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133569723_09a50d32-fa7f-45e2-93ea-fd5ccd9aae7d.jpeg",
+    "car_number": "",
+    "year": 2014,
+    "initial_registration_date": "2013-09-06 00:00:00",
+    "mileage": 177552,
+    "location": "Ulsan Nam-gu",
+    "short_location": "Ulsan Nam-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정, 인조 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:57:11",
+    "end_at": "2026-07-08 15:57:11",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 51만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "QpR1O9Jy",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Ray Signature",
+    "model_part_name": "The New RAY",
+    "grade_part_name": "Signature",
+    "model_hash_id": "ZoD9mp",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "bePjqM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570552_14d91caa-9327-4460-aa5b-c5ffceafc163.JPEG",
+    "car_number": "",
+    "year": 2022,
+    "initial_registration_date": "2022-05-09 00:00:00",
+    "mileage": 85185,
+    "location": "Gyeonggi Hwaseong-si",
+    "short_location": "Gyeonggi Hwaseong-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정, 오렌지 스페셜 인테리어, 인조 가죽",
+      "codes": [
+        "#000000",
+        "#FC7138"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:57:05",
+    "end_at": "2026-07-08 15:57:05",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 95만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "lGoPNG3l",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Toyota Prius 4 Generation 1.8 E",
+    "model_part_name": "TOYOTA Prius 4 Generation",
+    "grade_part_name": "1.8 E",
+    "model_hash_id": "EomAjo",
+    "brand_hash_id": "7gReZz",
+    "model_group_hash_id": "peqgpM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/39_baef30f5-ae54-429c-9b3c-96910ed7643e.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133573266_98f817e7-af05-4a2a-b487-24f353430329.jpeg",
+    "car_number": "",
+    "year": 2018,
+    "initial_registration_date": "2017-12-29 00:00:00",
+    "mileage": 99999,
+    "location": "Gyeonggi Anyang-si",
+    "short_location": "Gyeonggi Anyang-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "검정 직물",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:56:52",
+    "end_at": "2026-07-08 15:56:52",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험4건 · 1,223만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "ya5bBXoy",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "NF Sonata LPG N20 Deluxe BASE MODEL",
+    "model_part_name": "NF SONATA",
+    "grade_part_name": "LPG N20 Deluxe BASE MODEL",
+    "model_hash_id": "Y4A5z4",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "Ne8v1M",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/03/133237397_d4df20cb-f4f1-4f9b-b187-1b6bc37d34fd.JPEG",
+    "car_number": "",
+    "year": 2007,
+    "initial_registration_date": "2006-12-11 00:00:00",
+    "mileage": 156235,
+    "location": "Seoul Nowon-gu",
+    "short_location": "Seoul Nowon-gu",
+    "is_pre_inspected": true,
+    "zero_type": "fixed_price",
+    "interior_info": null,
+    "auction_type": "fixed_price_zero",
+    "approved_at": "2026-07-06 15:56:37",
+    "end_at": "2026-07-09 15:56:37",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": 131,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "유사고 (보험1건 · 360만원)",
+        "short_text": "Had accident",
+        "style": "yellow"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      },
+      {
+        "text": "재경매",
+        "short_text": "Re-auction",
+        "style": "gray"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "lRkom0Ly",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "All New K7 3.0 LPI Luxury (Rental car)",
+    "model_part_name": "All New K7",
+    "grade_part_name": "3.0 LPI Luxury (Rental car)",
+    "model_hash_id": "VpZ9jo",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "XevRae",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133559382_d86d9d74-0fd1-43bf-aa18-1284016e3492.jpeg",
+    "car_number": "",
+    "year": 2018,
+    "initial_registration_date": "2018-04-30 00:00:00",
+    "mileage": 80723,
+    "location": "Gyeonggi Gimpo-si",
+    "short_location": "Gyeonggi Gimpo-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정, 천연 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:32",
+    "end_at": "2026-07-08 15:56:32",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 148만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      },
+      {
+        "text": "대여",
+        "short_text": "Rental",
+        "style": "orange"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "Q95GwRoQ",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "GV80 2.5T Gasoline AWD",
+    "model_part_name": "GV80",
+    "grade_part_name": "2.5T Gasoline AWD",
+    "model_hash_id": "eojvlo",
+    "brand_hash_id": "vgm7Do",
+    "model_group_hash_id": "7MEA9M",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/68_19972cb1-b44b-49f6-a3c0-63297c3445dd.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133540409_ad5a1abd-28c1-4b41-b54d-7adf87f3c0ca.JPEG",
+    "car_number": "",
+    "year": 2023,
+    "initial_registration_date": "2023-07-04 00:00:00",
+    "mileage": 59739,
+    "location": "Gyeonggi Guri-si",
+    "short_location": "Gyeonggi Guri-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "바닐라 베이지+옵시디언 블랙, 천연 가죽",
+      "codes": [
+        "#D0C7BE",
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:28",
+    "end_at": "2026-07-08 15:56:28",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 408만원)",
+        "short_text": "Simple (2+)",
+        "style": "green"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yJaw90Dl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "BMW XM (G09) 4.4",
+    "model_part_name": "BMW XM (G09)",
+    "grade_part_name": "4.4",
+    "model_hash_id": "d4BBP4",
+    "brand_hash_id": "Rg4L5g",
+    "model_group_hash_id": "KM5bRy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570607_b3b46ae6-9534-4db5-8244-7f28fae2652f.JPEG",
+    "car_number": "",
+    "year": 2025,
+    "initial_registration_date": "2025-08-25 00:00:00",
+    "mileage": 40000,
+    "location": "Gyeonggi Goyang-si",
+    "short_location": "Gyeonggi Goyang-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "메리노 샤킬 오렌지 천연 가죽",
+      "codes": [
+        "#C05741"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:56:26",
+    "end_at": "2026-07-08 15:56:26",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "nKJB2Z9y",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "XM3 1.3 TCe RE SIGNATURE",
+    "model_part_name": "XM3",
+    "grade_part_name": "1.3 TCe RE SIGNATURE",
+    "model_hash_id": "B4yK1o",
+    "brand_hash_id": "xgrX7o",
+    "model_group_hash_id": "Ae1BQk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2025/07/24/55_b44e9a1d-c5fa-46fa-97d0-7f4b2f876cf7.png",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570121_d2719c39-7d93-4800-84c6-ee98f66440f3.JPEG",
+    "car_number": "",
+    "year": 2020,
+    "initial_registration_date": "2020-11-05 00:00:00",
+    "mileage": 40160,
+    "location": "Gyeonggi Gwacheon-si",
+    "short_location": "Gyeonggi Gwacheon-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:22",
+    "end_at": "2026-07-08 15:56:22",
+    "bids_count": 2,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yAJOaOjn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "PORTER II Cargo 2020 SUPER CAB Diesel EXTRA LONG WHEELBASE Automatic Smart .",
+    "model_part_name": "PORTER II Cargo",
+    "grade_part_name": "2020 SUPER CAB Diesel EXTRA LONG WHEELBASE Automatic Smart .",
+    "model_hash_id": "",
+    "brand_hash_id": "",
+    "model_group_hash_id": "",
+    "brand_image_url": "https://d2gd00advyp040.cloudfront.net/static-dj42/img/v2/cars/car_thumbnail_placeholder-nobg.bc1dc729a1b9.png",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133564546_04fd3516-31aa-4ac1-9525-27cd6bd0da20.JPEG",
+    "car_number": "",
+    "year": 2021,
+    "initial_registration_date": "2021-02-15 00:00:00",
+    "mileage": 164982,
+    "location": "Busan Gangseo-gu",
+    "short_location": "Busan Gangseo-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": null,
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:20",
+    "end_at": "2026-07-08 15:56:20",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험1건 · 39만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yoxJ1qDn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Avante (CN7) 1.6 Smart",
+    "model_part_name": "The New AVANTE (CN7)",
+    "grade_part_name": "1.6 Smart",
+    "model_hash_id": "Y4d0j4",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "XyQ1gy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133569830_74a39a99-75af-41ad-9756-157a1f425ae2.JPEG",
+    "car_number": "",
+    "year": 2025,
+    "initial_registration_date": "2024-10-23 00:00:00",
+    "mileage": 20894,
+    "location": "Seoul Yeongdeungpo-gu",
+    "short_location": "Seoul Yeongdeungpo-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "옵시디언 블랙, 인조 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:17",
+    "end_at": "2026-07-08 15:56:17",
+    "bids_count": 3,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "nNxZ9A8l",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Arkana 1.6 GTe i Konig",
+    "model_part_name": "Arkana",
+    "grade_part_name": "1.6 GTe Iconic",
+    "model_hash_id": "ojxx24",
+    "brand_hash_id": "xgrX7o",
+    "model_group_hash_id": "XevKVk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2025/07/24/55_b44e9a1d-c5fa-46fa-97d0-7f4b2f876cf7.png",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570444_12624727-297b-46e7-8e70-fbe41570400e.JPEG",
+    "car_number": "",
+    "year": 2025,
+    "initial_registration_date": "2024-06-27 00:00:00",
+    "mileage": 37210,
+    "location": "Gyeonggi Anseong-si",
+    "short_location": "Gyeonggi Anseong-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정 가죽, 검정 스웨이드+가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:12",
+    "end_at": "2026-07-08 15:56:12",
+    "bids_count": 3,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "n1mrAEgn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Tucson (NX4) GASOLINE 1.6 Turbo 2WD H-Pick",
+    "model_part_name": "The New TUCSON (NX4)",
+    "grade_part_name": "GASOLINE 1.6 Turbo 2WD H-Pick",
+    "model_hash_id": "3XKB54",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "Ae1PAy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570460_def2a321-a4e7-40db-b69c-d3d2925427d2.JPEG",
+    "car_number": "",
+    "year": 2026,
+    "initial_registration_date": "2026-01-15 00:00:00",
+    "mileage": 4800,
+    "location": "Gyeonggi Namyangju-si",
+    "short_location": "Gyeonggi Namyangju-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "모스 그레이, 인조 가죽",
+      "codes": [
+        "#CBCFD3"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:56:11",
+    "end_at": "2026-07-08 15:56:11",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yoxNpVGn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "BMW X5 (E70) xDrive 30d E70",
+    "model_part_name": "BMW X5 (E70)",
+    "grade_part_name": "xDrive 30d E70",
+    "model_hash_id": "N49gEo",
+    "brand_hash_id": "0W5AWm",
+    "model_group_hash_id": "Vernqe",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/13_1f5af7cb-bbf5-4576-9124-b6034c842004.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570184_09f23e1f-feb3-417c-865b-ab079cffe418.JPEG",
+    "car_number": "",
+    "year": 2011,
+    "initial_registration_date": "2010-07-20 00:00:00",
+    "mileage": 171928,
+    "location": "Gyeonggi Hwaseong-si",
+    "short_location": "Gyeonggi Hwaseong-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": null,
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:05",
+    "end_at": "2026-07-08 15:56:05",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험4건 · 1,206만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yAJOkNZn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Toyota Sienna 3.5 AWD",
+    "model_part_name": "TOYOTA SIENNA",
+    "grade_part_name": "3.5 AWD",
+    "model_hash_id": "Z40qv3",
+    "brand_hash_id": "7gReZz",
+    "model_group_hash_id": "rk0DZk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/39_baef30f5-ae54-429c-9b3c-96910ed7643e.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133568543_e484a4a0-2fc6-47e3-a59e-9ea55db4ae7f.JPEG",
+    "car_number": "",
+    "year": 2020,
+    "initial_registration_date": "2020-07-20 00:00:00",
+    "mileage": 81259,
+    "location": "Seoul Seongdong-gu",
+    "short_location": "Seoul Seongdong-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "브라운 가죽",
+      "codes": [
+        "#C69B70"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:03",
+    "end_at": "2026-07-08 15:56:03",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험1건 · 163만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "Q4avxxdl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Mohave Diesel 3.0 4WD VIP (7 Seater)",
+    "model_part_name": "The New MOHAVE",
+    "grade_part_name": "Diesel 3.0 4WD VIP (7 Seater)",
+    "model_hash_id": "B4yAn4",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "lMgGzM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570476_28623204-d95b-4ff5-9c1f-c2f154002ac1.JPEG",
+    "car_number": "",
+    "year": 2017,
+    "initial_registration_date": "2017-01-24 00:00:00",
+    "mileage": 166469,
+    "location": "Gyeonggi Yangju-si",
+    "short_location": "Gyeonggi Yangju-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "브라운, 검정, 천연 가죽",
+      "codes": [
+        "#594B49",
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:56:01",
+    "end_at": "2026-07-08 15:56:01",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "yAJOkNZn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Toyota Sienna 3.5 AWD",
+    "model_part_name": "TOYOTA SIENNA",
+    "grade_part_name": "3.5 AWD",
+    "model_hash_id": "Z40qv3",
+    "brand_hash_id": "7gReZz",
+    "model_group_hash_id": "rk0DZk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/39_baef30f5-ae54-429c-9b3c-96910ed7643e.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133568543_e484a4a0-2fc6-47e3-a59e-9ea55db4ae7f.JPEG",
+    "car_number": "",
+    "year": 2020,
+    "initial_registration_date": "2020-07-20 00:00:00",
+    "mileage": 81259,
+    "location": "Seoul Seongdong-gu",
+    "short_location": "Seoul Seongdong-gu",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "브라운 가죽",
+      "codes": [
+        "#C69B70"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:56:03",
+    "end_at": "2026-07-08 15:56:03",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험1건 · 163만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "Q4avxxdl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Mohave Diesel 3.0 4WD VIP (7 Seater)",
+    "model_part_name": "The New MOHAVE",
+    "grade_part_name": "Diesel 3.0 4WD VIP (7 Seater)",
+    "model_hash_id": "B4yAn4",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "lMgGzM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570476_28623204-d95b-4ff5-9c1f-c2f154002ac1.JPEG",
+    "car_number": "",
+    "year": 2017,
+    "initial_registration_date": "2017-01-24 00:00:00",
+    "mileage": 166469,
+    "location": "Gyeonggi Yangju-si",
+    "short_location": "Gyeonggi Yangju-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "브라운, 검정, 천연 가죽",
+      "codes": [
+        "#594B49",
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:56:01",
+    "end_at": "2026-07-08 15:56:01",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "QpR17WYy",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Volvo S90 B6 AWD Ultimate Bright",
+    "model_part_name": "VOLVO S90",
+    "grade_part_name": "B6 AWD Ultimate Bright",
+    "model_hash_id": "EpbjPp",
+    "brand_hash_id": "RgMAjg",
+    "model_group_hash_id": "Ok4ZPy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/61_27346978-49da-4b97-b997-a5c62b5cde10.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/03/133167255_de829f7c-e4ca-4d6e-b37e-a8ff07504345.JPEG",
+    "car_number": "",
+    "year": 2024,
+    "initial_registration_date": "2024-03-28 00:00:00",
+    "mileage": 30582,
+    "location": "Chungbuk Eumseong-gun",
+    "short_location": "Chungbuk Eumseong-gun",
+    "is_pre_inspected": true,
+    "zero_type": "fixed_price",
+    "interior_info": {
+      "text": "엠버 브라운",
+      "codes": [
+        "#A47F62"
+      ]
+    },
+    "auction_type": "fixed_price_zero",
+    "approved_at": "2026-07-06 11:17:35",
+    "end_at": "2026-07-09 23:17:35",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": 4300,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험2건 · 305만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      },
+      {
+        "text": "재경매",
+        "short_text": "Re-auction",
+        "style": "gray"
+      }
+    ],
+    "previous_desired_price_diff": 50
+  },
+  {
+    "hash_id": "ndNqZAvl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Land Rover Range Rover 4 Generation 4.4 SDV8 Autobiography Diesel",
+    "model_part_name": "LAND ROVER Range Rover 4 Generation",
+    "grade_part_name": "4.4 SDV8 Autobiography Diesel",
+    "model_hash_id": "J4LM23",
+    "brand_hash_id": "QZq3WM",
+    "model_group_hash_id": "YyLO6M",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/35_073ad532-1867-4238-be9d-3fb1173b8e6d.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570426_e3bb7bf8-8b18-4c77-92d8-d39064b2cb2f.JPEG",
+    "car_number": "",
+    "year": 2020,
+    "initial_registration_date": "2020-05-15 00:00:00",
+    "mileage": 115000,
+    "location": "Seoul Seocho-gu",
+    "short_location": "Seoul Seocho-gu",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "빈티지 탄 브라운",
+      "codes": [
+        "#C38252"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:55:59",
+    "end_at": "2026-07-08 15:55:59",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험2건 · 81만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "QrOBPEbl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Volvo XC90 2 Generation T8 INSCRIPTION",
+    "model_part_name": "VOLVO XC90 2 Generation",
+    "grade_part_name": "T8 INSCRIPTION",
+    "model_hash_id": "EpbjPp",
+    "brand_hash_id": "RgMAjg",
+    "model_group_hash_id": "Ok4ZPy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/61_27346978-49da-4b97-b997-a5c62b5cde10.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570378_e08cefe3-498c-4d11-9717-8b4cd7906c27.JPEG",
+    "car_number": "",
+    "year": 2021,
+    "initial_registration_date": "2021-02-05 00:00:00",
+    "mileage": 76406,
+    "location": "Gyeonggi Goyang-si",
+    "short_location": "Gyeonggi Goyang-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "엠버 브라운",
+      "codes": [
+        "#A47F62"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:55:55",
+    "end_at": "2026-07-08 15:55:55",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험2건 · 805만원)",
+        "short_text": "No accident",
+        "style": "blue"
+      },
+      {
+        "text": "재경매",
+        "short_text": "Re-auction",
+        "style": "gray"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "nNxZ9vkl",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Mercedes-Benz S-Class (W222) S450L 4MATIC",
+    "model_part_name": "MERCEDES-BENZ S-CLASS (W222)",
+    "grade_part_name": "S450L 4MATIC",
+    "model_hash_id": "wo2yY3",
+    "brand_hash_id": "lgBNgw",
+    "model_group_hash_id": "EMpomk",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/31_2e506e87-38bf-4b05-8b6a-a86907f5a872.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570095_cfa034e9-9ebb-4b53-9160-50422e616037.JPEG",
+    "car_number": "",
+    "year": 2019,
+    "initial_registration_date": "2019-07-05 00:00:00",
+    "mileage": 125100,
+    "location": "Jeonbuk Gunsan-si",
+    "short_location": "Jeonbuk Gunsan-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "검정 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:55:01",
+    "end_at": "2026-07-08 15:55:01",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험0건)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "ykwkx1vy",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "Trail Blazer 1.3 Turbo 4WD RS",
+    "model_part_name": "Trailblazer",
+    "grade_part_name": "1.3 Turbo 4WD RS",
+    "model_hash_id": "Vp1Jn4",
+    "brand_hash_id": "Lgyakg",
+    "model_group_hash_id": "8yArde",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/44_b1e0e389-b1ce-46f7-8b27-b565b63cc6d6.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570321_3f464e4a-b235-4342-ad67-4d1c3aa5089a.JPEG",
+    "car_number": "",
+    "year": 2023,
+    "initial_registration_date": "2022-10-05 00:00:00",
+    "mileage": 51000,
+    "location": "Gyeonggi Hwaseong-si",
+    "short_location": "Gyeonggi Hwaseong-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "젯 블랙+레드 포인트 가죽",
+      "codes": [
+        "#373739"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:55:00",
+    "end_at": "2026-07-08 15:55:00",
+    "bids_count": 3,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "lO37Bq9l",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Sorento DIESEL 2.0 2WD Noblesse (5 Seater)",
+    "model_part_name": "The New SORENTO",
+    "grade_part_name": "DIESEL 2.0 2WD Noblesse (5 Seater)",
+    "model_hash_id": "83PDO3",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "peqowM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570085_2db3c7bf-c655-43cd-8fd6-e03389ac264e.JPEG",
+    "car_number": "",
+    "year": 2019,
+    "initial_registration_date": "2018-10-17 00:00:00",
+    "mileage": 94562,
+    "location": "Gyeonggi Goyang-si",
+    "short_location": "Gyeonggi Goyang-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "브라운, 검정, 인조 가죽",
+      "codes": [
+        "#594B49",
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:54:58",
+    "end_at": "2026-07-08 15:54:58",
+    "bids_count": 2,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "완무 (보험0건)",
+        "short_text": "No accident (0 claims)",
+        "style": "blue"
+      },
+      {
+        "text": "대여",
+        "short_text": "Rental",
+        "style": "orange"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "ye78EwKQ",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "GRANDEUR IG 2.4 PREMIUM SPECIAL",
+    "model_part_name": "GRANDEUR IG",
+    "grade_part_name": "2.4 PREMIUM SPECIAL",
+    "model_hash_id": "Yp5PJo",
+    "brand_hash_id": "xoKegB",
+    "model_group_hash_id": "rk0Jmy",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133569475_c8ec094f-a793-4668-a34e-86bb4ea8cc31.jpeg",
+    "car_number": "",
+    "year": 2018,
+    "initial_registration_date": "2017-03-22 00:00:00",
+    "mileage": 113429,
+    "location": "Gyeonggi Uijeongbu-si",
+    "short_location": "Gyeonggi Uijeongbu-si",
+    "is_pre_inspected": true,
+    "zero_type": "customer",
+    "interior_info": {
+      "text": "검정, 천연 가죽",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:54:56",
+    "end_at": "2026-07-08 15:54:56",
+    "bids_count": 0,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험1건 · 41만원)",
+        "short_text": "Simple (1 claim)",
+        "style": "green"
+      }
+    ],
+    "previous_desired_price_diff": null
+  },
+  {
+    "hash_id": "ljL3P4vn",
+    "status": "approved",
+    "status_display": "Auction in progress",
+    "full_name": "The New Carens 2.0 LPI Luxury",
+    "model_part_name": "The New CARENS",
+    "grade_part_name": "2.0 LPI Luxury",
+    "model_hash_id": "dpYWw3",
+    "brand_hash_id": "2oV0gK",
+    "model_group_hash_id": "KM5YbM",
+    "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/11/33_815b3ad1-823b-4bcb-8898-02141d51f8d7.PNG",
+    "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133570042_f2d5e608-f16d-487f-a81c-dc1f87d9de50.jpeg",
+    "car_number": "",
+    "year": 2018,
+    "initial_registration_date": "2017-12-07 00:00:00",
+    "mileage": 316700,
+    "location": "Gyeonggi Pyeongtaek-si",
+    "short_location": "Gyeonggi Pyeongtaek-si",
+    "is_pre_inspected": false,
+    "zero_type": null,
+    "interior_info": {
+      "text": "검정",
+      "codes": [
+        "#000000"
+      ]
+    },
+    "auction_type": "self",
+    "approved_at": "2026-07-06 15:54:54",
+    "end_at": "2026-07-08 15:54:54",
+    "bids_count": 1,
+    "highest_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "tags": [
+      {
+        "text": "단순 (보험3건 · 213만원)",
+        "short_text": "Simple (2+)",
+        "style": "green"
+      },
+      {
+        "text": "1인소유",
+        "short_text": "Single owner",
+        "style": "sky_blue"
+      }
+    ],
+    "previous_desired_price_diff": null
+  }
+]

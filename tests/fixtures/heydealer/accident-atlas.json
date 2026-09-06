@@ -1,0 +1,733 @@
+[
+  {
+    "type": "side_driver",
+    "image_url": "https://d2gd00advyp040.cloudfront.net/static-dj42/img/v2/reduction/side_driver.b0496753f0c2.png",
+    "image_width": 200,
+    "accident_repairs": [
+      {
+        "part": "fender_front_driver",
+        "part_display": "Front driver fender",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          98,
+          68
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "fender_rear_driver",
+        "part_display": "Rear driver fender",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          98,
+          340
+        ],
+        "category": "outer_panel_rank_2",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "side_sil_pannel_driver",
+        "part_display": "Driver-side sill panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          50,
+          200
+        ],
+        "category": "outer_panel_rank_2",
+        "max_reduction_ratio": {
+          "exchange": 0.04,
+          "weld": 0.04
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.02,
+          "weld": 0.01
+        }
+      },
+      {
+        "part": "door_front_driver",
+        "part_display": "Front driver door",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          98,
+          168
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "door_rear_driver",
+        "part_display": "Rear driver door",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          98,
+          240
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "a_pillar_driver",
+        "part_display": "Driver A-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          154,
+          168
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "b_pillar_driver",
+        "part_display": "Driver B-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          154,
+          220
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "c_pillar_driver",
+        "part_display": "Driver C-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          158,
+          268
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      }
+    ]
+  },
+  {
+    "type": "top",
+    "image_url": "https://d2gd00advyp040.cloudfront.net/static-dj42/img/v2/reduction/top_radiator_support.ad09a54ba799.png",
+    "image_width": 200,
+    "accident_repairs": [
+      {
+        "part": "radiator_support",
+        "part_display": "Radiator support",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          20
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.02,
+          "weld": 0.01
+        }
+      },
+      {
+        "part": "hood",
+        "part_display": "Bonnet",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          72
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.04,
+          "weld": 0.04
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "roof_panel",
+        "part_display": "Roof panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          240
+        ],
+        "category": "outer_panel_rank_2",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.05,
+          "weld": 0.04
+        }
+      },
+      {
+        "part": "trunk_lid",
+        "part_display": "Trunk lid",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          376
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      }
+    ]
+  },
+  {
+    "type": "bottom",
+    "image_url": "https://d2gd00advyp040.cloudfront.net/static-dj42/img/v2/reduction/bottom_front_panel.f8c499355258.png",
+    "image_width": 200,
+    "accident_repairs": [
+      {
+        "part": "front_panel",
+        "part_display": "Front panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          44
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "inside_panel_front_driver",
+        "part_display": "Driver inside panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          40,
+          71
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "inside_panel_front_passenger",
+        "part_display": "Passenger inside panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          160,
+          71
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "wheel_house_front_driver",
+        "part_display": "Front driver wheel house",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          40,
+          111
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.07,
+          "weld": 0.07
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.05,
+          "weld": 0.04
+        }
+      },
+      {
+        "part": "wheel_house_front_passenger",
+        "part_display": "Front passenger wheel house",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          160,
+          111
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.07,
+          "weld": 0.07
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.05,
+          "weld": 0.04
+        }
+      },
+      {
+        "part": "wheel_house_rear_driver",
+        "part_display": "Rear driver wheel house",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          44,
+          292
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.05,
+          "weld": 0.04
+        }
+      },
+      {
+        "part": "wheel_house_rear_passenger",
+        "part_display": "Rear passenger wheel house",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          156,
+          292
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.05,
+          "weld": 0.04
+        }
+      },
+      {
+        "part": "side_member_front_driver",
+        "part_display": "Front driver side member",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          80,
+          100
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "side_member_front_passenger",
+        "part_display": "Front passenger side member",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          120,
+          100
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "side_member_rear_driver",
+        "part_display": "Rear driver side member",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          44,
+          332
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "side_member_rear_passenger",
+        "part_display": "Rear passenger side member",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          156,
+          332
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "cross_member",
+        "part_display": "Cross member",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          80,
+          148
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "dash_panel",
+        "part_display": "Dash panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          140,
+          172
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "floor_panel",
+        "part_display": "Floor panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          212
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.04,
+          "weld": 0.03
+        }
+      },
+      {
+        "part": "package_tray",
+        "part_display": "Package tray",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          268
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "trunk_floor",
+        "part_display": "Trunk floor",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          324
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.04,
+          "weld": 0.03
+        }
+      },
+      {
+        "part": "rear_panel",
+        "part_display": "Rear panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          368
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      }
+    ]
+  },
+  {
+    "type": "side_passenger",
+    "image_url": "https://d2gd00advyp040.cloudfront.net/static-dj42/img/v2/reduction/side_passenger.7c67b149888d.png",
+    "image_width": 200,
+    "accident_repairs": [
+      {
+        "part": "fender_front_passenger",
+        "part_display": "Front passenger fender",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          108,
+          68
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "fender_rear_passenger",
+        "part_display": "Rear passenger fender",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          100,
+          340
+        ],
+        "category": "outer_panel_rank_2",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "side_sil_pannel_passenger",
+        "part_display": "Passenger-side sill panel",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          152,
+          200
+        ],
+        "category": "outer_panel_rank_2",
+        "max_reduction_ratio": {
+          "exchange": 0.04,
+          "weld": 0.04
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.02,
+          "weld": 0.01
+        }
+      },
+      {
+        "part": "door_front_passenger",
+        "part_display": "Front passenger door",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          108,
+          168
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "door_rear_passenger",
+        "part_display": "Rear passenger door",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          108,
+          240
+        ],
+        "category": "outer_panel_rank_1",
+        "max_reduction_ratio": {
+          "exchange": 0.03,
+          "weld": 0.03
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "a_pillar_passenger",
+        "part_display": "Passenger A-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          44,
+          168
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "b_pillar_passenger",
+        "part_display": "Passenger B-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          44,
+          220
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      },
+      {
+        "part": "c_pillar_passenger",
+        "part_display": "Passenger C-pillar",
+        "repair": "none",
+        "repair_display": "None",
+        "position": [
+          40,
+          268
+        ],
+        "category": "frame",
+        "max_reduction_ratio": {
+          "exchange": 0.05,
+          "weld": 0.05
+        },
+        "max_reduction_ratio_for_zero": {
+          "exchange": 0.03,
+          "weld": 0.02
+        }
+      }
+    ]
+  }
+]

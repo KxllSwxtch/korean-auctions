@@ -1,0 +1,781 @@
+{
+  "hash_id": "yL6eR13Q",
+  "status": "approved",
+  "status_display": "Auction in progress",
+  "model_hash_id": "Y4Aaa4",
+  "brand_hash_id": "xoKegB",
+  "model_group_hash_id": "zeXDJe",
+  "full_name": "SANTA FE TM Gasoline 2.0T 2WD Prestige (5 Seater)",
+  "full_name_without_brand": "Santa Fe TM Gasoline 2.0T 2WD Prestige",
+  "model_part_name": "SANTA FE TM",
+  "grade_part_name": "Gasoline 2.0T 2WD Prestige (5 Seater)",
+  "brand_name": "Hyundai",
+  "brand_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/brand/2021/01/05/28_26bb9256-3897-43e1-97df-1b263c48c935.PNG",
+  "main_image_url": "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566504_78381e66-04e1-4e4e-b115-0885f35431dc.jpeg",
+  "image_urls": [
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566504_78381e66-04e1-4e4e-b115-0885f35431dc.jpeg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566507_2370830b-1b90-448c-889a-f34975d7dd2b.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566511_e883f1f7-8922-48ea-84b1-28c1f2e91b3a.jpeg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566505_2308409b-6178-48a4-9a01-b22fa051a4cb.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566506_e78a0580-6d32-406e-85cf-67494a9e736d.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566508_803fb622-13cb-4382-b319-d33c7a6cdf79.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566474_ffecf3b4-7593-4445-b9f7-c723f95e5b23.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566486_1da9dc5a-0e76-4b79-9ebf-af30cb705c62.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566495_01d2ecdb-2a04-4fda-97bd-913cab72f28d.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566502_b611baeb-66f3-4732-be0d-3ccbef6e7eb0.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566503_4c09b689-dc45-40ca-9fa0-d5a429b0d28c.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566489_ca762fcc-e5c0-42aa-bba9-0815790709e2.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566484_40e59a85-c557-49ae-935a-d3a4c543d2d4.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566501_530f3837-a2a9-4202-9f0e-a7a39fe2f321.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566487_35e2705f-102b-4999-870d-fbe2803b5967.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566485_d1b5bd7b-4130-4bdc-a05a-cb9e373fb792.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566488_f5472bf4-bab9-42ef-bd00-8a277d524ae9.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566490_78011f16-3a70-427f-8e5c-fae7a88a0e2e.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566491_efd2470a-0f0c-4ff6-a210-f330c16f2367.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566492_e5d1c8d0-6b40-414f-b2ad-57fe05bdad66.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566493_37f9b41b-bebb-4810-a4c5-3fb02eb4e280.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566494_6653b613-6226-4278-91f6-ba6d6ffdfdc7.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566481_35e1f7e1-8bf3-40e7-a9d2-866ff8fd082f.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566515_d3a77359-d516-48a3-8e36-9b180c3881d1.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566516_4ccde716-8529-4a1f-91e4-8a449585f6c1.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566521_f9dfdeb1-a27d-4842-b8f7-fa35e48e2c8d.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566522_66c0f5c6-bbeb-47c1-a9e5-7afe4d8940a3.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566523_8272b302-f2b7-4a61-badc-13e6d1c7b6d1.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566482_b63f4332-b649-4ccc-92a3-941af07c2dd3.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133568268_5e3d2e31-062b-4c03-bc4d-4c655937a5ec.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566512_ffa8d776-b3ed-4ead-a1a2-8dd62809fc00.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566519_989b16b3-2b02-42b9-9214-b18472870afc.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566497_dc185480-6c02-42d9-9a80-4a00cfc53ad5.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566500_2dd118cc-bebf-4eb1-b3ad-84e1cffb957a.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566475_0474237c-877e-4f27-b0fa-67b7ebc2f649.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566476_fe5091c5-e8ed-4c71-82b8-8739e03ae824.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566477_97d8b68b-1315-4828-9258-15a7a9ccf240.JPEG",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566480_dd8717bb-9fb4-4023-b5d3-c281f0bbc86a.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566483_ac559902-43f2-4e43-af76-f5fa280318a7.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566517_e13f0970-1952-4ee4-9bf5-817fee22e218.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566518_37df03e4-17dc-45a2-96ab-c377931403bc.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566520_41334642-58db-4a78-812a-83bc18056ba5.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566496_c950f724-4b70-4663-883d-e908bc69b3f7.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566499_24fc6e41-fc99-4788-b5e7-f7935a055ad8.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566478_e9a3ade4-c683-431d-8000-c10f88e777c0.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566479_6d266b25-ddff-4976-b323-18faee74c416.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566509_18604d87-a597-4d55-b2d5-770b0c99f0a5.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566510_3afa236c-32c6-4634-9219-814434cd9538.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566513_85808532-ae51-4426-89e5-bb4b0bb03841.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566514_fba2d875-b397-4dd8-a67b-481c519b27d8.jpg",
+    "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566498_7085dfaf-0df6-4e7a-ad0e-a5b31fc366c9.jpg"
+  ],
+  "image_groups": [
+    {
+      "type": "outside",
+      "name": "Exterior",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566504_78381e66-04e1-4e4e-b115-0885f35431dc.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566507_2370830b-1b90-448c-889a-f34975d7dd2b.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566511_e883f1f7-8922-48ea-84b1-28c1f2e91b3a.jpeg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566505_2308409b-6178-48a4-9a01-b22fa051a4cb.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566506_e78a0580-6d32-406e-85cf-67494a9e736d.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566508_803fb622-13cb-4382-b319-d33c7a6cdf79.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566474_ffecf3b4-7593-4445-b9f7-c723f95e5b23.JPEG"
+      ],
+      "count": 7,
+      "condition_types": [
+        "outer_panel_scratch",
+        "oil_leakage"
+      ]
+    },
+    {
+      "type": "inside",
+      "name": "Interior",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566486_1da9dc5a-0e76-4b79-9ebf-af30cb705c62.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566495_01d2ecdb-2a04-4fda-97bd-913cab72f28d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566502_b611baeb-66f3-4732-be0d-3ccbef6e7eb0.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566503_4c09b689-dc45-40ca-9fa0-d5a429b0d28c.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566489_ca762fcc-e5c0-42aa-bba9-0815790709e2.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566484_40e59a85-c557-49ae-935a-d3a4c543d2d4.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566501_530f3837-a2a9-4202-9f0e-a7a39fe2f321.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566487_35e2705f-102b-4999-870d-fbe2803b5967.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566485_d1b5bd7b-4130-4bdc-a05a-cb9e373fb792.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566488_f5472bf4-bab9-42ef-bd00-8a277d524ae9.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566490_78011f16-3a70-427f-8e5c-fae7a88a0e2e.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566491_efd2470a-0f0c-4ff6-a210-f330c16f2367.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566492_e5d1c8d0-6b40-414f-b2ad-57fe05bdad66.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566493_37f9b41b-bebb-4810-a4c5-3fb02eb4e280.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566494_6653b613-6226-4278-91f6-ba6d6ffdfdc7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566481_35e1f7e1-8bf3-40e7-a9d2-866ff8fd082f.jpg"
+      ],
+      "count": 16,
+      "condition_types": [
+        "dashboard_warning",
+        "option_malfunction"
+      ]
+    },
+    {
+      "type": "scratch_and_others",
+      "name": "Scratches and other",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566515_d3a77359-d516-48a3-8e36-9b180c3881d1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566516_4ccde716-8529-4a1f-91e4-8a449585f6c1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566521_f9dfdeb1-a27d-4842-b8f7-fa35e48e2c8d.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566522_66c0f5c6-bbeb-47c1-a9e5-7afe4d8940a3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566523_8272b302-f2b7-4a61-badc-13e6d1c7b6d1.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566482_b63f4332-b649-4ccc-92a3-941af07c2dd3.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133568268_5e3d2e31-062b-4c03-bc4d-4c655937a5ec.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566512_ffa8d776-b3ed-4ead-a1a2-8dd62809fc00.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566519_989b16b3-2b02-42b9-9214-b18472870afc.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566497_dc185480-6c02-42d9-9a80-4a00cfc53ad5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566500_2dd118cc-bebf-4eb1-b3ad-84e1cffb957a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566475_0474237c-877e-4f27-b0fa-67b7ebc2f649.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566476_fe5091c5-e8ed-4c71-82b8-8739e03ae824.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566477_97d8b68b-1315-4828-9258-15a7a9ccf240.JPEG",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566480_dd8717bb-9fb4-4023-b5d3-c281f0bbc86a.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566483_ac559902-43f2-4e43-af76-f5fa280318a7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566517_e13f0970-1952-4ee4-9bf5-817fee22e218.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566518_37df03e4-17dc-45a2-96ab-c377931403bc.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566520_41334642-58db-4a78-812a-83bc18056ba5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566496_c950f724-4b70-4663-883d-e908bc69b3f7.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566499_24fc6e41-fc99-4788-b5e7-f7935a055ad8.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566478_e9a3ade4-c683-431d-8000-c10f88e777c0.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566479_6d266b25-ddff-4976-b323-18faee74c416.jpg"
+      ],
+      "count": 23,
+      "condition_types": [
+        "outer_panel_scratch",
+        "oil_leakage"
+      ]
+    },
+    {
+      "type": "wheel",
+      "name": "Wheels",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566509_18604d87-a597-4d55-b2d5-770b0c99f0a5.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566510_3afa236c-32c6-4634-9219-814434cd9538.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566513_85808532-ae51-4426-89e5-bb4b0bb03841.jpg",
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566514_fba2d875-b397-4dd8-a67b-481c519b27d8.jpg"
+      ],
+      "count": 4,
+      "condition_types": [
+        "wheel_scratch",
+        "tire"
+      ]
+    },
+    {
+      "type": "etc",
+      "name": "Other",
+      "image_urls": [
+        "https://heydealer-api.s3.amazonaws.com/media/cars/image/2026/07/06/133566498_7085dfaf-0df6-4e7a-ad0e-a5b31fc366c9.jpg"
+      ],
+      "count": 1,
+      "condition_types": [
+        "outer_panel_scratch",
+        "oil_leakage"
+      ]
+    }
+  ],
+  "car_number": "251도9779",
+  "year": 2020,
+  "initial_registration_date": "2019-12-23 00:00:00",
+  "mileage": 76452,
+  "color": "White Cream",
+  "interior": "Dark Beige, Natural Leather",
+  "location": "Incheon Michuhol-gu",
+  "short_location": "Incheon Michuhol-gu",
+  "payment": "cash",
+  "payment_display": "Cash / Installment",
+  "fuel": "gasoline",
+  "fuel_display": "Gasoline",
+  "transmission": "auto",
+  "transmission_display": "Automatic",
+  "accident_repairs_summary": "simple_exchange_no_accident",
+  "accident_repairs_summary_display": "Simple swap, no accident",
+  "accident_repairs": [
+    {
+      "part": "fender_front_passenger",
+      "repair": "exchange",
+      "part_display": "Front passenger fender",
+      "repair_display": "Replacement"
+    },
+    {
+      "part": "fender_rear_driver",
+      "repair": "weld",
+      "part_display": "Rear driver fender",
+      "repair_display": "Welding"
+    }
+  ],
+  "advanced_options": [
+    {
+      "hash_id": "qMjybnby",
+      "name": "Rear-Side Collision Avoidance Assist",
+      "choice": "loaded",
+      "content": {
+        "option_name": "Rear-Side Collision Avoidance Assist",
+        "question_text": "Is rear-side collision avoidance assist equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1632_e212fbeb-641f-4bce-a7b0-52386eea5f8e.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "qrXlO4OP",
+      "name": "Navigation",
+      "choice": null,
+      "content": {
+        "option_name": "Navigation",
+        "question_text": "Is navigation equipped?",
+        "info_text": "Built-in unit only (aftermarket dashboard nav excluded).",
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1624_98a5be97-19a9-4f34-b66d-0347a7f59ee6.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W9X4pjpj",
+      "name": "Full-Auto A/C",
+      "choice": null,
+      "content": {
+        "option_name": "Full-Auto A/C",
+        "question_text": "Is full-auto A/C equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1625_36652563-03b4-47a8-b526-0e93a20d9df1.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "WRa5o4oe",
+      "name": "Heated Steering Wheel",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W5PopXpv",
+      "name": "Heated Rear Seats",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W8XapLp3",
+      "name": "Power Driver Seat",
+      "choice": null,
+      "content": {
+        "option_name": "Power Driver Seat",
+        "question_text": "Is the power driver seat equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1628_09ef367f-e9be-48b8-8ffe-62d0ee101112.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "EQJRbab1",
+      "name": "Ventilated Front Seats",
+      "choice": null,
+      "content": {
+        "option_name": "Ventilated Front Seats",
+        "question_text": "Are ventilated front seats equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1630_80b7786a-25c4-4885-95bf-f16f0b7c7ea5.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "qrXlO4OJ",
+      "name": "Memory Driver Seat",
+      "choice": null,
+      "content": null,
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W9X4pjJ0",
+      "name": "Electronic Parking Brake (EPB)",
+      "choice": null,
+      "content": {
+        "option_name": "Electronic Parking Brake (EPB)",
+        "question_text": "Is the EPB equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1633_8a393e93-9077-40a8-843d-9405888ad526.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "W5PopXAl",
+      "name": "Smart Cruise Control (SCC)",
+      "choice": null,
+      "content": {
+        "option_name": "Smart Cruise Control (SCC)",
+        "question_text": "Is SCC equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1634_bc098420-c0d3-4d8a-b299-adc672a9d605.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "EB8pb5OG",
+      "name": "Full LED Headlights",
+      "choice": null,
+      "content": {
+        "option_name": "Full LED Headlights",
+        "question_text": "Are full-LED headlights equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1637_3a616ff9-b94c-4cfb-b2cb-6e60cfabe3c2.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "qKeMbAOp",
+      "name": "Power Tailgate",
+      "choice": null,
+      "content": {
+        "option_name": "Power Tailgate",
+        "question_text": "Is the power tailgate equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1638_40cfa49a-09cb-4ed9-a97e-e2510ff6346c.PNG"
+      },
+      "availability": "default",
+      "availability_for_display": "default",
+      "category": "advanced",
+      "category_display": "Premium Convenience",
+      "is_preview": false,
+      "choices": [
+        "loaded"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "ElPVO7O8",
+      "name": "Panoramic Sunroof",
+      "choice": "absent",
+      "content": {
+        "option_name": "Panoramic Sunroof",
+        "question_text": "Is the panoramic sunroof equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1623_c70bdac1-fe7e-4521-8443-4c97e8ca962b.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "major",
+      "category_display": "Main Options",
+      "is_preview": true,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "q07KpwpB",
+      "name": "Power Passenger Seat",
+      "choice": "absent",
+      "content": {
+        "option_name": "Power Passenger Seat",
+        "question_text": "Is the power passenger seat equipped?",
+        "info_text": null,
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1629_f2e8722c-e523-4eff-b0b1-1075915ab375.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "seat",
+      "category_display": "Seats",
+      "is_preview": false,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "2kZpOAg0",
+      "name": "Head-Up Display (HUD)",
+      "choice": "absent",
+      "content": {
+        "option_name": "Head-Up Display (HUD)",
+        "question_text": "Is HUD equipped?",
+        "info_text": "Projects navigation, speed and trip info onto the windshield.",
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1635_ff1f31e1-0be5-4a01-9474-5c0abf94c1c6.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    },
+    {
+      "hash_id": "E3R7pdKO",
+      "name": "Surround-View Monitor (SVM)",
+      "choice": "absent",
+      "content": {
+        "option_name": "Surround-View Monitor (SVM)",
+        "question_text": "Is SVM equipped?",
+        "info_text": "Front/rear and side-mirror cameras stitch a top-down view of the car and surroundings.",
+        "info_image_url": "https://heydealer-api.s3.amazonaws.com/media/car_meta/option/2020/09/15/1636_b8c02039-5897-4d32-bd6e-17f317e3149f.PNG"
+      },
+      "availability": "available",
+      "availability_for_display": "available",
+      "category": "safety",
+      "category_display": "Driving Assist / Safety",
+      "is_preview": true,
+      "choices": [
+        "absent"
+      ],
+      "key": null,
+      "is_user_selectable": false,
+      "is_auto_choice": true
+    }
+  ],
+  "car_description": null,
+  "customer_comment": null,
+  "inspector_comment": null,
+  "condition_description": null,
+  "car_spec": {
+    "title": "Hyundai·GENESIS Factory Info",
+    "description": null
+  },
+  "vehicle_information": {
+    "is_erased": false,
+    "car_number": "251도9779",
+    "erasure_date": null,
+    "car_name": "SANTA FE (SANTAFE)",
+    "car_type": "Passenger",
+    "vin": "KMHS381ABLU",
+    "motor_code": "G4KH",
+    "purpose": "Personal",
+    "year": 2020,
+    "color": "White",
+    "registration_type": "New build",
+    "initial_registration_date": "2019-12-23 00:00:00",
+    "manufactured_date": "2019-11-07 00:00:00",
+    "inspection_valid_from": "2025-12-23 00:00:00",
+    "inspection_valid_until": "2027-12-22 00:00:00",
+    "mileage": 71418
+  },
+  "inspected_condition": {
+    "front_tire": 90,
+    "rear_tire": 90,
+    "wheel_scratch": 3,
+    "outer_panel_scratch": 0,
+    "has_leakage": true,
+    "has_dashboard_warning": false,
+    "dashboard_warning_description": null,
+    "has_option_malfunction": false,
+    "option_malfunction_description": null,
+    "comment": null,
+    "front_tire_display": "90% (tread remaining)",
+    "rear_tire_display": "90% (tread remaining)",
+    "wheel_scratch_display": "3 scratches",
+    "outer_panel_scratch_display": "0 scratches",
+    "has_leakage_display": "Yes",
+    "has_dashboard_warning_display": "No",
+    "has_option_malfunction_display": "No"
+  },
+  "paint_thickness_inspection": {
+    "measurements": [
+      {
+        "part": "fender_front_driver",
+        "level": "normal"
+      },
+      {
+        "part": "fender_rear_driver",
+        "level": "extremely_thick"
+      },
+      {
+        "part": "door_front_driver",
+        "level": "normal"
+      },
+      {
+        "part": "door_rear_driver",
+        "level": "normal"
+      },
+      {
+        "part": "pillar_driver",
+        "level": "slightly_thick"
+      },
+      {
+        "part": "fender_front_passenger",
+        "level": "extremely_thick"
+      },
+      {
+        "part": "fender_rear_passenger",
+        "level": "normal"
+      },
+      {
+        "part": "door_front_passenger",
+        "level": "normal"
+      },
+      {
+        "part": "door_rear_passenger",
+        "level": "normal"
+      },
+      {
+        "part": "pillar_passenger",
+        "level": "normal"
+      },
+      {
+        "part": "hood",
+        "level": "normal"
+      },
+      {
+        "part": "roof_panel",
+        "level": "normal"
+      },
+      {
+        "part": "trunk_lid",
+        "level": "normal"
+      }
+    ],
+    "comment": null
+  },
+  "carhistory": {
+    "car_number": "251도9779",
+    "year": 2020,
+    "car_type": "Passenger",
+    "use": "Personal",
+    "displacement": 1998,
+    "fuel": "gasoline",
+    "fuel_display": "Gasoline",
+    "initial_registration_date": "2019-12-23",
+    "owner_changed_count": 1,
+    "my_car_accident_count": 2,
+    "other_car_accident_count": 2,
+    "my_car_accident_cost": 2341525,
+    "other_car_accident_cost": 1758100,
+    "total_loss_count": 0,
+    "flooded_count": 0,
+    "stolen_count": 0
+  },
+  "auction": {
+    "auction_type": "customer_zero",
+    "approved_at": "2026-07-06 15:57:16",
+    "end_at": "2026-07-08 15:57:16",
+    "bids_count": 0,
+    "max_bids_count": 50,
+    "highest_bid": null,
+    "my_bid": null,
+    "my_bid_price": null,
+    "desired_price": null,
+    "is_starred": false,
+    "category": "normal",
+    "zero_auction_message": null,
+    "visits_count": 0,
+    "price_changed_at": "",
+    "previous_auction_result": {
+      "prices": [],
+      "bids_count": 0,
+      "price_attraction_level": 0,
+      "bids_count_attraction_level": 0
+    },
+    "fixed_price_zero_offer": null,
+    "warranty_terms": [
+      "Excluded from inspection : Paint/bodywork status, Door ding, Small scratches, used feeling, Minor Leak, Consumables Condition, Tinting damage etc.",
+      "Exterior inspection : Regular Commercialization Standard evaluation",
+      "Oil leak inspection : Engine bay in the upper part limited evaluation",
+      "without test drive while parked Diagnosis"
+    ]
+  },
+  "encar_url": "https://www.encar.com/dc/dc_carsearchlist.do?carType=kor&searchType=model&TG.R=A#!%7B%22action%22%3A+%22%28And.Hidden.N._.%28C.CarType.Y._.%28C.Manufacturer.%5Cud604%5Cub300._.%28C.ModelGroup.%5Cuc2fc%5Cud0c0%5Cud398._.%28C.Model.%5Cuc2fc%5Cud0c0%5Cud398+TM._.%28C.BadgeGroup.%5Cuac00%5Cuc194%5Cub9b0+2000cc._.%28C.Badge.%5Cuac00%5Cuc194%5Cub9b0+2_.0T+2WD._.BadgeDetail.%5Cud504%5Cub808%5Cuc2a4%5Cud2f0%5Cuc9c0.%29%29%29%29%29%29_.Year.range%28201901..202112%29._.Mileage.range%2860000..100000%29.%29%22%2C+%22toggle%22%3A+%7B%7D%2C+%22layer%22%3A+%22%22%2C+%22sort%22%3A+%22Mileage%22%2C+%22page%22%3A+1%2C+%22limit%22%3A+20%7D",
+  "auction_histories": [],
+  "standard_new_car_price": 3361,
+  "engine_sound_video": {
+    "hash_id": "bGJoR2Kn",
+    "type": "engine_sound",
+    "url": "https://d2gd00advyp040.cloudfront.net/media/cars/carvideo/2026/07/06/115282_71a3a5c4-45b4-4b91-8a4d-8f2362afea0a.mp4",
+    "thumbnail_image_url": "https://d2gd00advyp040.cloudfront.net/media/cars/carvideo/2026/07/06/115282_a6c5ba6d-fff8-4535-bcb3-ab071891bc88.jpeg"
+  },
+  "price_history": [],
+  "inspector_sections": [
+    {
+      "title": null,
+      "items": [
+        "Driver seat/Passenger seat rear Door : dented"
+      ]
+    },
+    {
+      "title": "Past repair history",
+      "items": [
+        "Passenger front Fender : Panel repair",
+        "Passenger front Fender Bracket : Adjusted"
+      ]
+    },
+    {
+      "title": "Reference notes",
+      "items": [
+        "Interior/Exterior Condition See photos",
+        "Head Lining : Suede work"
+      ]
+    }
+  ],
+  "condition_items": [
+    {
+      "text": "· Body Panel : None",
+      "tooltip": null
+    },
+    {
+      "text": "· Wheel scratches: 3 wheels",
+      "tooltip": null
+    },
+    {
+      "text": "· Tire: Front 90% / Rear 90%",
+      "tooltip": null
+    },
+    {
+      "text": "(Parts·malfunction)",
+      "tooltip": null
+    },
+    {
+      "text": "· Oil leak present : Turbo Oil leak",
+      "tooltip": null
+    },
+    {
+      "text": "(Inspector other comments)",
+      "tooltip": null
+    },
+    {
+      "text": "· Interior/Exterior Condition see photo",
+      "tooltip": null
+    },
+    {
+      "text": "Passenger rear door, Driver rear door ding Present",
+      "tooltip": null
+    },
+    {
+      "text": "Passenger front fender Detachable Panel repair Replaced check",
+      "tooltip": null
+    },
+    {
+      "text": "Passenger seat Bolt type 앞휀더브라켓 Detachable",
+      "tooltip": null
+    },
+    {
+      "text": "Interior headliner Suede work",
+      "tooltip": null
+    }
+  ],
+  "bidding_help": {
+    "new_car_price_man_won": 3361,
+    "options_note": "(Option Included) 📄 등록증출고가 3,278 10,000 KRW (VAT Included)"
+  },
+  "ev_info": null,
+  "dpf_info_display": "",
+  "option_table_image_urls": [],
+  "early_scrap_display": "Not allowed",
+  "has_corporate_owner": false
+}
