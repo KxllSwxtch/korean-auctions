@@ -62,8 +62,13 @@ EGRESS_GROUPS: tuple[EgressGroup, ...] = (
             "GLOVIS_PROXY_COUNTRY",
             "GLOVIS_PROXY_EGRESS_LABEL",
         ),
-        required=True,
-        note="Korean egress is mandatory; Glovis fails closed without it",
+        required=False,
+        note=(
+            "Legacy fallback; DBAUTO_PROXY_* is preferred and wins when both are "
+            "set. Glovis rides the same geo-blocked host as HeyDealer, so this "
+            "egress must NOT be Korean — a KR value here is complete, well-formed "
+            "and guaranteed to 403"
+        ),
     ),
     EgressGroup(
         service="dbauto",

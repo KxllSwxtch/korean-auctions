@@ -100,8 +100,8 @@ def make_transport(
     assert candidate_type is not None
     candidates = [
         candidate_type(
-            country="KR",
-            egress=f"kr-{index}",
+            country="JP",
+            egress=f"jp-{index}",
             proxy_url=f"http://user-{index}:pass-{index}@proxy-{index}.invalid:8080",
         )
         for index in range(1, len(sessions) + 1)
@@ -133,14 +133,14 @@ def test_glovis_proxy_configuration_is_loaded_only_from_dedicated_environment() 
             "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
             "GLOVIS_PROXY_USERNAME": "service-account",
             "GLOVIS_PROXY_PASSWORD": "managed-secret",
-            "GLOVIS_PROXY_COUNTRY": "kr",
-            "GLOVIS_PROXY_EGRESS_LABEL": " KR-Primary ",
+            "GLOVIS_PROXY_COUNTRY": "jp",
+            "GLOVIS_PROXY_EGRESS_LABEL": " JP-Primary ",
         }
     )
 
     assert len(candidates) == 1
-    assert candidates[0].country == "KR"
-    assert candidates[0].egress == "kr-primary"
+    assert candidates[0].country == "JP"
+    assert candidates[0].egress == "jp-primary"
     assert candidates[0].proxy_url.startswith("http://")
     assert candidates[0].identity
 
@@ -152,20 +152,20 @@ def test_glovis_proxy_configuration_is_loaded_only_from_dedicated_environment() 
         {
             "GLOVIS_PROXY_USERNAME": "service-account",
             "GLOVIS_PROXY_PASSWORD": "managed-secret",
-            "GLOVIS_PROXY_COUNTRY": "KR",
-            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+            "GLOVIS_PROXY_COUNTRY": "JP",
+            "GLOVIS_PROXY_EGRESS_LABEL": "jp-primary",
         },
         {
             "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
             "GLOVIS_PROXY_PASSWORD": "managed-secret",
-            "GLOVIS_PROXY_COUNTRY": "KR",
-            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+            "GLOVIS_PROXY_COUNTRY": "JP",
+            "GLOVIS_PROXY_EGRESS_LABEL": "jp-primary",
         },
         {
             "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
             "GLOVIS_PROXY_USERNAME": "service-account",
-            "GLOVIS_PROXY_COUNTRY": "KR",
-            "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+            "GLOVIS_PROXY_COUNTRY": "JP",
+            "GLOVIS_PROXY_EGRESS_LABEL": "jp-primary",
         },
     ],
 )
@@ -183,14 +183,19 @@ def _candidate(*, country: str, egress: str, proxy_url: str):
     return candidate_type(country=country, egress=egress, proxy_url=proxy_url)
 
 
-@pytest.mark.parametrize("country", ["", "US", "KOREA", "KR-US"])
-def test_non_korean_proxy_candidates_are_rejected_before_session_creation(
+@pytest.mark.parametrize("country", ["", "KR", "KOREA", "KR-US"])
+def test_korean_and_malformed_proxy_candidates_are_rejected_before_session_creation(
     country: str,
 ) -> None:
+    """KR is the rejection case now, not the requirement.
+
+    cars.dbauto.kr geo-blocks Korea, so a Korean egress is the one configuration
+    guaranteed to 403 — and it used to be the only one this transport accepted,
+    which is why Glovis served 502 in production."""
     created: list[StubSession] = []
     candidate = _candidate(
         country=country,
-        egress="kr-primary",
+        egress="jp-primary",
         proxy_url="http://service:managed@proxy.example.invalid:8443",
     )
 
@@ -221,7 +226,7 @@ def test_blank_or_malformed_proxy_urls_are_rejected_before_session_creation(
     proxy_url: str,
 ) -> None:
     created: list[StubSession] = []
-    candidate = _candidate(country="KR", egress="kr-primary", proxy_url=proxy_url)
+    candidate = _candidate(country="JP", egress="jp-primary", proxy_url=proxy_url)
 
     with pytest.raises(GlovisProxyUnavailableError):
         GlovisTransport(
@@ -238,10 +243,10 @@ def test_blank_or_malformed_proxy_urls_are_rejected_before_session_creation(
         "",
         "primary",
         "http://proxy.example.invalid:8443",
-        "kr-proxy.example.invalid",
-        "kr-service-account",
-        "kr-managed-secret",
-        "kr-primary@proxy",
+        "jp-proxy.example.invalid",
+        "jp-service-account",
+        "jp-managed-secret",
+        "jp-primary@proxy",
     ],
 )
 def test_unsafe_or_secret_bearing_egress_labels_are_rejected(
@@ -249,7 +254,7 @@ def test_unsafe_or_secret_bearing_egress_labels_are_rejected(
 ) -> None:
     created: list[StubSession] = []
     candidate = _candidate(
-        country="KR",
+        country="JP",
         egress=egress,
         proxy_url=(
             "http://service-account:managed-secret@proxy.example.invalid:8443"
@@ -268,13 +273,13 @@ def test_unsafe_or_secret_bearing_egress_labels_are_rejected(
 def test_duplicate_proxy_candidate_identity_is_rejected_before_sessions() -> None:
     created: list[StubSession] = []
     first = _candidate(
-        country="KR",
-        egress="kr-primary",
+        country="JP",
+        egress="jp-primary",
         proxy_url="http://service:managed@proxy.example.invalid:8443",
     )
     duplicate = _candidate(
-        country="kr",
-        egress="kr-secondary",
+        country="jp",
+        egress="jp-secondary",
         proxy_url="http://service:changed@proxy.example.invalid:8443",
     )
 
@@ -342,8 +347,8 @@ def test_token_and_api_use_same_proxy_session_and_matching_fingerprint() -> None
     transport = GlovisTransport(
         proxy_candidates=[
             _candidate(
-                country="KR",
-                egress="kr-primary",
+                country="JP",
+                egress="jp-primary",
                 proxy_url="http://user:pass@redacted.invalid:8080",
             )
         ],
@@ -376,8 +381,8 @@ def test_validated_proxy_candidates_are_capped_at_four() -> None:
     available = list(sessions)
     candidates = [
         _candidate(
-            country="KR",
-            egress=f"kr-{index}",
+            country="JP",
+            egress=f"jp-{index}",
             proxy_url=(
                 f"http://user-{index}:pass-{index}@pool-proxy-{index}.invalid:8080"
             ),
@@ -436,7 +441,7 @@ def test_second_auth_failure_is_reported_after_one_refresh() -> None:
 
     assert raised.value.code == "upstream_auth"
     assert raised.value.status_code == 403
-    assert raised.value.egress == "kr-1"
+    assert raised.value.egress == "jp-1"
     assert len(session.calls) == 4
 
 
@@ -483,8 +488,8 @@ def test_token_is_reused_at_109_seconds_and_refreshed_at_110_seconds() -> None:
     transport = GlovisTransport(
         proxy_candidates=[
             _candidate(
-                country="KR",
-                egress="kr-1",
+                country="JP",
+                egress="jp-1",
                 proxy_url="http://user:pass@proxy-1.invalid:8080",
             )
         ],
@@ -520,7 +525,7 @@ def test_retryable_failure_rotates_complete_proxy_session() -> None:
         operation="auctions",
     )
 
-    assert result.egress == "kr-2"
+    assert result.egress == "jp-2"
     assert len(first.calls) == 2
     assert len(second.calls) == 2
 
@@ -541,7 +546,7 @@ def test_retryable_http_status_rotates_complete_proxy_session(status: int) -> No
         operation="auctions",
     )
 
-    assert result.egress == "kr-2"
+    assert result.egress == "jp-2"
     assert len(first.calls) == len(second.calls) == 2
 
 
@@ -601,8 +606,8 @@ def test_expired_shared_deadline_stops_before_session_request() -> None:
     transport = GlovisTransport(
         proxy_candidates=[
             _candidate(
-                country="KR",
-                egress="kr-1",
+                country="JP",
+                egress="jp-1",
                 proxy_url="http://user:pass@proxy-1.invalid:8080",
             )
         ],
@@ -635,12 +640,15 @@ def test_reviewer_every_request_uses_exact_connect_and_read_timeouts() -> None:
 
     transport.get_json(CARS_PATH, [], operation="cars")
 
-    assert [call["timeout"] for call in session.calls] == [
-        (3.0, 8.0),
-        (3.0, 8.0),
-        (3.0, 8.0),
-        (3.0, 8.0),
-    ]
+    # Against the module constants, not literals: this test exists to prove every
+    # request carries the configured pair, and hardcoding the numbers made it
+    # fail for the wrong reason when the read ceiling was raised to match the
+    # host's real latency.
+    expected = (
+        transport_module.CONNECT_TIMEOUT_SECONDS,
+        transport_module.READ_TIMEOUT_SECONDS,
+    )
+    assert [call["timeout"] for call in session.calls] == [expected] * 4
 
 
 def test_global_worker_concurrency_is_bounded_at_four() -> None:
@@ -763,8 +771,8 @@ def test_reviewer_rotation_waits_for_a_different_untried_egress() -> None:
     assert not primary.is_alive()
     assert not competing.is_alive()
     assert errors == []
-    assert results["primary"].egress == "kr-2"
-    assert results["competing"].egress == "kr-2"
+    assert results["primary"].egress == "jp-2"
+    assert results["competing"].egress == "jp-2"
     assert len(first.calls) == 2
     assert len(second.calls) == 3
 
@@ -853,13 +861,13 @@ def test_reviewer_constructor_closes_prior_sessions_when_factory_fails() -> None
         GlovisTransport(
             proxy_candidates=[
                 _candidate(
-                    country="KR",
-                    egress="kr-1",
+                    country="JP",
+                    egress="jp-1",
                     proxy_url="http://user-1:pass-1@proxy-1.invalid:8080",
                 ),
                 _candidate(
-                    country="KR",
-                    egress="kr-2",
+                    country="JP",
+                    egress="jp-2",
                     proxy_url="http://user-2:pass-2@proxy-2.invalid:8080",
                 ),
             ],
@@ -887,13 +895,13 @@ def test_reviewer_constructor_closes_all_sessions_when_fingerprint_fails() -> No
         GlovisTransport(
             proxy_candidates=[
                 _candidate(
-                    country="KR",
-                    egress="kr-1",
+                    country="JP",
+                    egress="jp-1",
                     proxy_url="http://user-1:pass-1@proxy-1.invalid:8080",
                 ),
                 _candidate(
-                    country="KR",
-                    egress="kr-2",
+                    country="JP",
+                    egress="jp-2",
                     proxy_url="http://user-2:pass-2@proxy-2.invalid:8080",
                 ),
             ],
@@ -931,7 +939,7 @@ def test_safe_logs_do_not_contain_transport_secrets() -> None:
     ):
         assert secret not in joined
     assert "operation=cars" in joined
-    assert "egress=kr-1" in joined
+    assert "egress=jp-1" in joined
     assert "status=None" in joined
     assert "payload_length=0" in joined
     assert "payload_hash=-" in joined
@@ -963,3 +971,69 @@ def test_response_logs_include_only_safe_payload_metadata() -> None:
     assert "status=503" in output
     assert f"payload_length={len(response_body)}" in output
     assert f"payload_hash={digest}" in output
+
+
+def test_a_korean_egress_is_refused_even_when_fully_configured() -> None:
+    """The exact configuration that took Glovis down.
+
+    `GLOVIS_PROXY_*` naming a Korean exit is complete and well-formed, so nothing
+    upstream of the transport objects to it — and cars.dbauto.kr then answers 403
+    on every data call while the token mint keeps succeeding, which surfaces as
+    `upstream_auth`. Failing closed at load time turns a puzzling 502 into a
+    startup-visible configuration error.
+    """
+    loader = getattr(transport_module, "load_glovis_proxy_candidates", None)
+    assert loader is not None
+
+    with pytest.raises(GlovisProxyUnavailableError):
+        loader(
+            {
+                "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+                "GLOVIS_PROXY_USERNAME": "service-account",
+                "GLOVIS_PROXY_PASSWORD": "managed-secret",
+                "GLOVIS_PROXY_COUNTRY": "KR",
+                "GLOVIS_PROXY_EGRESS_LABEL": "kr-primary",
+            }
+        )
+
+
+def test_the_shared_dbauto_egress_wins_over_the_legacy_glovis_one() -> None:
+    """Both feeds on this host need the same exit, so one variable set governs.
+
+    The old names stay as a fallback, but a deployment that has migrated must not
+    keep silently using them.
+    """
+    loader = getattr(transport_module, "load_glovis_proxy_candidates", None)
+    assert loader is not None
+
+    candidates = loader(
+        {
+            "DBAUTO_PROXY_HOST": "proxy.example.invalid:8443",
+            "DBAUTO_PROXY_USERNAME": "shared-account",
+            "DBAUTO_PROXY_PASSWORD": "shared-secret",
+            "DBAUTO_PROXY_COUNTRY": "JP",
+            "DBAUTO_PROXY_EGRESS_LABEL": "jp-primary",
+            "GLOVIS_PROXY_HOST": "legacy.example.invalid:8443",
+            "GLOVIS_PROXY_USERNAME": "legacy-account",
+            "GLOVIS_PROXY_PASSWORD": "legacy-secret",
+            "GLOVIS_PROXY_COUNTRY": "HK",
+            "GLOVIS_PROXY_EGRESS_LABEL": "hk-legacy",
+        }
+    )
+    assert [c.egress for c in candidates] == ["jp-primary"]
+
+
+def test_the_legacy_glovis_egress_still_works_alone() -> None:
+    loader = getattr(transport_module, "load_glovis_proxy_candidates", None)
+    assert loader is not None
+
+    candidates = loader(
+        {
+            "GLOVIS_PROXY_HOST": "proxy.example.invalid:8443",
+            "GLOVIS_PROXY_USERNAME": "service-account",
+            "GLOVIS_PROXY_PASSWORD": "managed-secret",
+            "GLOVIS_PROXY_COUNTRY": "JP",
+            "GLOVIS_PROXY_EGRESS_LABEL": "jp-legacy",
+        }
+    )
+    assert [c.egress for c in candidates] == ["jp-legacy"]

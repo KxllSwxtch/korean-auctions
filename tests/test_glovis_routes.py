@@ -634,14 +634,12 @@ def test_authorized_internal_caller_can_clear_existing_glovis_cache(monkeypatch)
 def test_missing_proxy_config_returns_stable_proxy_unavailable_without_session(
     monkeypatch,
 ):
-    for name in (
-        "GLOVIS_PROXY_HOST",
-        "GLOVIS_PROXY_USERNAME",
-        "GLOVIS_PROXY_PASSWORD",
-        "GLOVIS_PROXY_COUNTRY",
-        "GLOVIS_PROXY_EGRESS_LABEL",
-    ):
-        monkeypatch.delenv(name, raising=False)
+    # Both prefixes: the transport now prefers the shared DBAUTO_PROXY_* and keeps
+    # GLOVIS_PROXY_* only as a fallback, so clearing one of them would still leave
+    # a perfectly usable egress and this test would assert nothing.
+    for prefix in ("GLOVIS_PROXY", "DBAUTO_PROXY"):
+        for suffix in ("HOST", "USERNAME", "PASSWORD", "COUNTRY", "EGRESS_LABEL"):
+            monkeypatch.delenv(f"{prefix}_{suffix}", raising=False)
     monkeypatch.setattr(glovis, "glovis_service", None)
 
     response = TestClient(main.app).get("/api/v1/glovis/auctions")

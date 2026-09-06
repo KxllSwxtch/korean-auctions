@@ -29,6 +29,7 @@ from app.core.async_cache import SwrCache
 from app.services.dbauto_transport import (
     BULK,
     CASCADE,
+    DBAUTO_EGRESS_COUNTRIES,
     INTERACTIVE,
     DbautoServiceConfig,
     DbautoTransport,
@@ -144,12 +145,8 @@ ALLOWED_PATHS = frozenset(
     }
 )
 
-#: dbauto geo-blocks Korea, so KR is the one country that must never appear here.
-#: Measured from production 2026-08-27: JP/HK/TW/SG/US/DE/GB/NL/FR/CA/AU/VN all
-#: answer 200, JP fastest.
-ALLOWED_EGRESS_COUNTRIES = frozenset(
-    {"JP", "HK", "TW", "SG", "US", "DE", "GB", "NL", "FR", "CA", "AU", "VN", "JE"}
-)
+#: Shared with Glovis — the geo-block belongs to the host, not to this feed.
+ALLOWED_EGRESS_COUNTRIES = DBAUTO_EGRESS_COUNTRIES
 
 SUPPORTED_LANGS = frozenset({"en", "ru", "es", "ko"})
 

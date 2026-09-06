@@ -32,6 +32,7 @@ from app.services.glovis_service import (
     validate_provider_id,
 )
 from app.services.glovis_transport import (
+    OVERALL_DEADLINE_SECONDS,
     GlovisTransportResult,
     GlovisUpstreamInvalidResponseError,
     GlovisUpstreamUnavailableError,
@@ -948,7 +949,9 @@ def test_health_chooses_first_sorted_auction_and_shares_one_deadline():
 
     assert probe.egress == "kr-test"
     assert probe.checked_at.tzinfo is not None
-    assert [call.deadline_at for call in transport.calls] == [24.0, 24.0]
+    assert [call.deadline_at for call in transport.calls] == [
+        OVERALL_DEADLINE_SECONDS
+    ] * 2
     assert transport.calls[1].params == [
         ("atn", "1102"),
         ("acc", "20"),
@@ -1052,7 +1055,9 @@ def test_detail_health_bypasses_list_and_detail_caches_with_shared_deadline():
         CARS_PATH,
         DETAIL_PATH,
     ]
-    assert [call.deadline_at for call in health_calls] == [24.0, 24.0, 24.0]
+    assert [call.deadline_at for call in health_calls] == [
+        OVERALL_DEADLINE_SECONDS
+    ] * 3
     assert transport.call_count(CARS_PATH) == 2
     assert transport.call_count(DETAIL_PATH) == 2
 

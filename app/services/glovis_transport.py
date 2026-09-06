@@ -1,8 +1,16 @@
-"""Korean-only tokenized HTTP transport for the DB Auto Glovis API.
+"""Tokenized HTTP transport for the DB Auto Glovis API.
 
-Each session slot owns one Korean proxy, cookie jar, and fingerprint. Callers
-hand an entire slot to a daemon worker so a hard caller deadline never makes a
+Each session slot owns one proxy, cookie jar, and fingerprint. Callers hand an
+entire slot to a daemon worker so a hard caller deadline never makes a
 still-running Requests session available to another request.
+
+**The egress must NOT be Korean.** This module used to require `country == "KR"`,
+which was correct for every other source here and exactly wrong for this one:
+cars.dbauto.kr geo-blocks Korea, answering 403 on every data endpoint from a KR
+IP while the token mint still succeeds from anywhere. The result was that Glovis
+was pinned to the one egress the host refuses and served `502 upstream_auth` in
+production. The country allowlist now comes from `dbauto_transport`, shared with
+the HeyDealer feed on the same host.
 """
 
 from __future__ import annotations
@@ -22,6 +30,11 @@ from urllib.parse import quote, unquote, urlsplit
 from loguru import logger
 import requests
 
+from app.services.dbauto_transport import (
+    DBAUTO_EGRESS_COUNTRIES,
+    DBAUTO_PROXY_PREFIXES,
+)
+
 T = TypeVar("T")
 JsonValue = dict[str, Any] | list[Any]
 
@@ -29,14 +42,22 @@ BASE_URL = "https://cars.dbauto.kr"
 TOKEN_PATH = "/api/auth/token"
 TOKEN_REFRESH_SECONDS = 110.0
 CONNECT_TIMEOUT_SECONDS = 3.0
-READ_TIMEOUT_SECONDS = 8.0
-OVERALL_DEADLINE_SECONDS = 24.0
+#: dbauto's own listing and facet queries run over the full round's inventory and
+#: legitimately take 12-15 s cold; 8 s turned a slow-but-successful response into
+#: a 504. This was invisible while the egress was Korean, because those calls
+#: never got past the geo-block to be slow in the first place. Matches the
+#: ceiling the HeyDealer transport uses against the same host.
+READ_TIMEOUT_SECONDS = 25.0
+OVERALL_DEADLINE_SECONDS = 40.0
 MAX_SESSIONS = 4
 
 _OUTBOUND_LIMIT = threading.BoundedSemaphore(MAX_SESSIONS)
 _SAFE_OPERATION = re.compile(r"[a-z][a-z0-9_.-]{0,31}")
+#: A diagnostics label such as `jp-primary`: a country prefix plus up to two
+#: short segments. Was `kr-`-only, which would now reject the very egress this
+#: transport requires.
 _SAFE_EGRESS = re.compile(
-    r"kr-[a-z0-9]{1,12}(?:-[a-z0-9]{1,12}){0,2}",
+    r"[a-z]{2}-[a-z0-9]{1,12}(?:-[a-z0-9]{1,12}){0,2}",
     re.ASCII,
 )
 _ALLOWED_API_PATHS = frozenset(
@@ -91,7 +112,7 @@ class GlovisProxyUnavailableError(GlovisUpstreamError):
 
 @dataclass(frozen=True)
 class GlovisProxyCandidate:
-    """Explicit Korean egress candidate with a safe diagnostics label."""
+    """Explicit non-Korean egress candidate with a safe diagnostics label."""
 
     country: str
     egress: str
@@ -121,7 +142,8 @@ def _normalize_proxy_candidate(
     except (AttributeError, TypeError):
         raise GlovisProxyUnavailableError() from None
 
-    if country != "KR" or not _SAFE_EGRESS.fullmatch(egress):
+    # KR is absent from this set by design — see the module docstring.
+    if country not in DBAUTO_EGRESS_COUNTRIES or not _SAFE_EGRESS.fullmatch(egress):
         raise GlovisProxyUnavailableError()
 
     try:
@@ -159,30 +181,41 @@ def _normalize_proxy_candidate(
 def load_glovis_proxy_candidates(
     environment: Mapping[str, str] | None = None,
 ) -> list[GlovisProxyCandidate]:
-    """Load the required Glovis proxy exclusively from secret-managed env."""
-    values = os.environ if environment is None else environment
-    host = values.get("GLOVIS_PROXY_HOST", "").strip()
-    username = values.get("GLOVIS_PROXY_USERNAME", "").strip()
-    password = values.get("GLOVIS_PROXY_PASSWORD", "").strip()
-    country = values.get("GLOVIS_PROXY_COUNTRY", "").strip()
-    egress = values.get("GLOVIS_PROXY_EGRESS_LABEL", "").strip()
-    if not host or not username or not password or not country or not egress:
-        raise GlovisProxyUnavailableError()
-    if any(character in host for character in ("/", "@", "?", "#")):
-        raise GlovisProxyUnavailableError()
+    """Load the required egress exclusively from secret-managed env.
 
-    proxy_url = (
-        f"http://{quote(username, safe='')}:{quote(password, safe='')}@{host}"
-    )
-    return [
-        _normalize_proxy_candidate(
-            GlovisProxyCandidate(
-                country=country,
-                egress=egress,
-                proxy_url=proxy_url,
-            )
+    Prefixes are tried in order: the shared `DBAUTO_PROXY_*` first, then the
+    historical `GLOVIS_PROXY_*`. Both feeds on this host need the same non-Korean
+    exit, so one variable set is the honest shape — but a deployment still
+    carrying only the old names keeps working, and will simply fail closed if
+    those name a Korean egress, which is the correct outcome.
+    """
+    values = os.environ if environment is None else environment
+
+    for prefix in DBAUTO_PROXY_PREFIXES:
+        host = values.get(f"{prefix}_HOST", "").strip()
+        username = values.get(f"{prefix}_USERNAME", "").strip()
+        password = values.get(f"{prefix}_PASSWORD", "").strip()
+        country = values.get(f"{prefix}_COUNTRY", "").strip()
+        egress = values.get(f"{prefix}_EGRESS_LABEL", "").strip()
+        if not host or not username or not password or not country or not egress:
+            continue
+        if any(character in host for character in ("/", "@", "?", "#")):
+            raise GlovisProxyUnavailableError()
+
+        proxy_url = (
+            f"http://{quote(username, safe='')}:{quote(password, safe='')}@{host}"
         )
-    ]
+        return [
+            _normalize_proxy_candidate(
+                GlovisProxyCandidate(
+                    country=country,
+                    egress=egress,
+                    proxy_url=proxy_url,
+                )
+            )
+        ]
+
+    raise GlovisProxyUnavailableError()
 
 
 def _validated_proxy_candidates(

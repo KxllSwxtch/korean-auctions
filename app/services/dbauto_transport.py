@@ -65,6 +65,22 @@ USER_AGENT = (
     "Chrome/149.0.0.0 Safari/537.36"
 )
 
+#: Countries dbauto answers from. KR is absent and must stay absent: the host
+#: geo-blocks Korea on every data endpoint while the token mint still succeeds
+#: from anywhere. Measured from production 2026-08-27, one proxy account with
+#: only the area token changed.
+#:
+#: This is a property of cars.dbauto.kr, so both feeds it serves (Glovis and
+#: HeyDealer) share it rather than each carrying its own copy.
+DBAUTO_EGRESS_COUNTRIES = frozenset(
+    {"JP", "HK", "TW", "SG", "US", "DE", "GB", "NL", "FR", "CA", "AU", "VN", "JE"}
+)
+
+#: Env prefixes for that egress, in preference order. `DBAUTO_PROXY_*` is the
+#: shared one; the per-service names remain as fallbacks so a deployment that
+#: still carries only the old variables keeps booting.
+DBAUTO_PROXY_PREFIXES = ("DBAUTO_PROXY", "GLOVIS_PROXY")
+
 _SAFE_OPERATION = re.compile(r"[a-z][a-z0-9_.-]{0,31}")
 #: A diagnostics label such as ``jp-primary``: a country prefix plus up to two
 #: short segments. Deliberately narrow -- this string reaches logs and health
