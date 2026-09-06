@@ -66,6 +66,25 @@ EGRESS_GROUPS: tuple[EgressGroup, ...] = (
         note="Korean egress is mandatory; Glovis fails closed without it",
     ),
     EgressGroup(
+        service="dbauto",
+        variables=(
+            "DBAUTO_PROXY_HOST",
+            "DBAUTO_PROXY_USERNAME",
+            "DBAUTO_PROXY_PASSWORD",
+            "DBAUTO_PROXY_COUNTRY",
+            "DBAUTO_PROXY_EGRESS_LABEL",
+        ),
+        required=True,
+        note=(
+            "cars.dbauto.kr serves HeyDealer and geo-blocks Korea: every data "
+            "endpoint answers 403 from a KR IP while the token mint succeeds "
+            "from anywhere, so the block looks like an auth failure. This is the "
+            "one egress here that must NOT be Korean -- same proxy account as "
+            "GLOVIS_PROXY_*, with _area-KR swapped for a non-KR region. Unset, "
+            "HeyDealer fails closed"
+        ),
+    ),
+    EgressGroup(
         service="happycar",
         variables=AUCTION_PROXY_VARIABLES,
         required=True,
