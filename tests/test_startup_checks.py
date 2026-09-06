@@ -48,7 +48,6 @@ def test_every_login_gated_provider_has_a_credential_group() -> None:
         "kcar",
         "happycar",
         "sk_auction",
-        "heydealer",
     } <= services
 
 

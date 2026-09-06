@@ -70,16 +70,13 @@ services:
       - key: ADMIN_API_TOKEN
         sync: false
       # Auction credentials. These were previously hardcoded in tracked source
-      # (sk_auction_service.py, heydealer_auth_service.py,
-      # enhanced_lotte_service.py) and duplicated in auctions-auth.txt, which
-      # is still reachable in git history — ROTATE before setting these.
+      # (sk_auction_service.py, enhanced_lotte_service.py) and duplicated in
+      # auctions-auth.txt, which is still reachable in git history — ROTATE
+      # before setting these. The HeyDealer pair is gone: that feed now uses an
+      # anonymous token and has no account to leak.
       - key: SK_AUCTION_USERNAME
         sync: false
       - key: SK_AUCTION_PASSWORD
-        sync: false
-      - key: HEYDEALER_USERNAME
-        sync: false
-      - key: HEYDEALER_PASSWORD
         sync: false
       - key: ENHANCED_LOTTE_USERNAME
         sync: false

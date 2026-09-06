@@ -144,33 +144,11 @@ class Settings(BaseSettings):
     sk_auction_username: Optional[str] = None
     sk_auction_password: Optional[str] = None
 
-    # HeyDealer dealer-account credentials. Previously hardcoded in
-    # app/services/heydealer_auth_service.py.
-    heydealer_username: Optional[str] = None
-    heydealer_password: Optional[str] = None
-
     # Second Lotte account used by the /api/v2/lotte (enhanced) service.
     # Previously hardcoded in app/services/enhanced_lotte_service.py.
     # Falls back to lotte_username/lotte_password when unset.
     enhanced_lotte_username: Optional[str] = None
     enhanced_lotte_password: Optional[str] = None
-
-    # On-disk store for HeyDealer model/generation mappings.
-    # This field was read by app/core/heydealer_data_store.py and
-    # app/services/heydealer_sync_service.py but never declared, so importing
-    # either module raised AttributeError. The failure was swallowed by
-    # heydealer_model_mapper, which made every model_group filter silently
-    # return zero cars while still reporting success.
-    heydealer_data_dir: str = "cache/heydealer"
-
-    # Read by app/services/heydealer_sync_service.py but never declared, so
-    # constructing HeyDealerSyncService raised AttributeError at __init__ —
-    # the same failure mode heydealer_data_dir above was added to fix.
-    # request_delay_ms throttles the shared dealer account (detail requests
-    # pay the full delay, list pages 40% of it, see the service's __init__).
-    heydealer_sync_request_delay_ms: int = 1200
-    heydealer_sync_interval_minutes: int = 1440
-    heydealer_sync_on_startup: bool = False
 
     # Dedicated Korean proxy for DB Auto Glovis. Values remain secret-managed;
     # declaring them lets Pydantic accept the same environment used by the
@@ -180,16 +158,6 @@ class Settings(BaseSettings):
     glovis_proxy_password: Optional[str] = None
     glovis_proxy_country: Optional[str] = None
     glovis_proxy_egress_label: Optional[str] = None
-
-    # Dedicated Korean residential proxy for HeyDealer (anti-throttle on the
-    # single shared dealer account/IP). Values stay secret-managed in the Render
-    # dashboard; declaring them lets Pydantic accept the environment. The proxy
-    # itself is read via app/core/proxy_config.get_heydealer_proxies() (os.getenv
-    # directly) so it is never frozen at import time. Unset -> direct egress.
-    heydealer_proxy_host: Optional[str] = None
-    heydealer_proxy_port: Optional[str] = None
-    heydealer_proxy_username: Optional[str] = None
-    heydealer_proxy_password: Optional[str] = None
 
     # Shared egress for cars.dbauto.kr, which serves BOTH the Glovis and the
     # HeyDealer feeds. It geo-blocks Korea -- every data endpoint answers 403
@@ -203,8 +171,6 @@ class Settings(BaseSettings):
     dbauto_proxy_country: Optional[str] = None
     dbauto_proxy_egress_label: Optional[str] = None
 
-    # "dbauto" (default) or "dealer" for the legacy shared-login scraper.
-    heydealer_source: str = "dbauto"
     # Lane budget for the dbauto transport; see dbauto_transport.LaneScheduler.
     heydealer_max_concurrency: Optional[str] = None
     heydealer_facet_concurrency: Optional[str] = None

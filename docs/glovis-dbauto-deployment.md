@@ -40,7 +40,6 @@ The remaining authenticated providers read these environment variables:
 - `HAPPYCAR_USERNAME`, `HAPPYCAR_PASSWORD`
 - `KCAR_USERNAME`, `KCAR_PASSWORD`
 - `SK_AUCTION_USERNAME`, `SK_AUCTION_PASSWORD`
-- `HEYDEALER_USERNAME`, `HEYDEALER_PASSWORD`
 - `ENHANCED_LOTTE_USERNAME`, `ENHANCED_LOTTE_PASSWORD` — second Lotte account
   for `/api/v2/lotte`; falls back to `LOTTE_*` when unset
 

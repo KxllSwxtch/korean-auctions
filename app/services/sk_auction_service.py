@@ -92,8 +92,7 @@ class SKAuctionService:
 
         # Serialises login. Without it every thread that saw an expired session
         # raced into _create_session(), producing N simultaneous login POSTs on
-        # one shared account. Matches happycar_service._auth_lock and
-        # heydealer_auth_service._login_lock.
+        # one shared account. Matches happycar_service._auth_lock.
         self._auth_lock = threading.Lock()
 
         # Set only by a login attempt that reached the network and failed;

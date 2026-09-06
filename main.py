@@ -27,9 +27,7 @@ from app.routes import (  # noqa: E402 — env hydration must precede app import
     lotte_filters,
     kcar,
     enhanced_lotte,
-    heydealer,
     heydealer_dbauto,
-    heydealer_filters,
     glovis,
     ssancar,
     bikemart,
@@ -90,10 +88,9 @@ async def lifespan(app: FastAPI):
     # Warm the HeyDealer catalog caches off the request path. A cold facet
     # fan-out costs dbauto ~12 s per section, so without this the first visitor
     # after a deploy pays for all of it.
-    if HEYDEALER_SOURCE != "dealer":
-        from app.services.heydealer_dbauto_service import get_service as _hey_service
+    from app.services.heydealer_dbauto_service import get_service as _hey_service
 
-        asyncio.create_task(_hey_service().warm())
+    asyncio.create_task(_hey_service().warm())
 
     main_service = get_lotte_service()
     # Warm the filter singleton wired to the shared main service, so the first
@@ -216,37 +213,18 @@ app.include_router(kcar.router, tags=["KCar Auction"])
 
 # Новые улучшенные маршруты
 app.include_router(enhanced_lotte.router, tags=["Enhanced Lotte Auction V2"])
-# HeyDealer source switch.
-#
-# `dbauto` (the default) serves the feed from cars.dbauto.kr's anonymous token
-# API. `dealer` restores the legacy dealer-portal scraper, which logs in with a
-# shared HeyDealer account -- and because HeyDealer permits one live session per
-# account, that login is mutually exclusive with any human using the same
-# credentials: whoever authenticates last evicts the other. The flag exists only
-# so the migration can be rolled back without a redeploy; it is scheduled for
-# removal along with the legacy modules once dbauto has soaked in production.
-HEYDEALER_SOURCE = os.getenv("HEYDEALER_SOURCE", "dbauto").strip().lower()
-
-if HEYDEALER_SOURCE == "dealer":
-    logger.warning(
-        "heydealer_source=dealer — using the shared-login scraper; a human "
-        "signing into dealer.heydealer.com will evict this session"
-    )
-    app.include_router(heydealer.router, prefix="/api/v1", tags=["HeyDealer Auction"])
-    app.include_router(
-        heydealer_filters.router,
-        prefix="/api/v1/heydealer/filters",
-        tags=["HeyDealer Filters"],
-    )
-else:
-    app.include_router(
-        heydealer_dbauto.router, prefix="/api/v1", tags=["HeyDealer Auction"]
-    )
-    app.include_router(
-        heydealer_dbauto.filters_router,
-        prefix="/api/v1/heydealer/filters",
-        tags=["HeyDealer Filters"],
-    )
+# HeyDealer, served from cars.dbauto.kr's anonymous token API. The shared-login
+# dealer-portal scraper it replaced is gone: HeyDealer permits one live session
+# per account, so that login was mutually exclusive with any human using the same
+# credentials — whoever authenticated last evicted the other.
+app.include_router(
+    heydealer_dbauto.router, prefix="/api/v1", tags=["HeyDealer Auction"]
+)
+app.include_router(
+    heydealer_dbauto.filters_router,
+    prefix="/api/v1/heydealer/filters",
+    tags=["HeyDealer Filters"],
+)
 # SSANCAR routes - Direct SSANCAR API without PLC wrapper
 app.include_router(ssancar.router, tags=["SSANCAR Auction"])
 
@@ -324,10 +302,8 @@ async def cache_stats():
         pass
 
     try:
-        from app.routes.heydealer import get_heydealer_service
-        svc = get_heydealer_service()
-        if svc and hasattr(svc, '_get_cache_stats'):
-            stats.append(svc._get_cache_stats())
+        from app.services.heydealer_dbauto_service import get_service
+        stats.append(get_service().cache_stats())
     except Exception:
         pass
 
@@ -406,11 +382,9 @@ async def clear_cache():
         pass
 
     try:
-        from app.routes.heydealer import get_heydealer_service
-        svc = get_heydealer_service()
-        if svc and hasattr(svc, '_clear_cache'):
-            svc._clear_cache()
-            cleared.append("HeyDealer")
+        from app.services.heydealer_dbauto_service import get_service
+        get_service().clear_caches()
+        cleared.append("HeyDealer")
     except Exception:
         pass
 

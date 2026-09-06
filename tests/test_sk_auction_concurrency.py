@@ -7,7 +7,7 @@ against one shared dealer account, and `session.close()` called on a Session
 other in-flight threads were still using.
 
 HappyCar (`_auth_lock`, double-checked at happycar_service.py:452-460) and
-HeyDealer (`_login_lock`, heydealer_auth_service.py:366-368) already solved
+HappyCar (`_auth_lock`) already solved
 this; these tests hold SK to the same contract.
 """
 

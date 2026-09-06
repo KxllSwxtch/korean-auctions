@@ -30,8 +30,6 @@ LEGACY_PROVIDER_FIELDS = {
     # them — the same drift that left LOTTE_* undeclared in render.yaml.
     "sk_auction_username",
     "sk_auction_password",
-    "heydealer_username",
-    "heydealer_password",
     "enhanced_lotte_username",
     "enhanced_lotte_password",
 }

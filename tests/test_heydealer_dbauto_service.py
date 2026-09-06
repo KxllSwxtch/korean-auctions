@@ -358,3 +358,37 @@ def test_health_reports_the_egress_and_survives_an_outage(service):
 def test_warming_never_raises(service):
     service._transport.fail_with = RuntimeError("upstream down")
     asyncio.run(service.warm(langs=("ru",)))
+
+
+def test_the_section_fan_out_overlaps_its_upstream_calls():
+    """Facet calls must run concurrently, not one after another.
+
+    A cold `/section-counts` is seconds of round trip on its own; six of them in
+    series is a page nobody waits for. This replaces the guard that used to cover
+    the old per-generation fan-out, whose code is gone.
+
+    The transport's own lane budget is exercised in tests/test_dbauto_transport.py;
+    what is under test here is that the service actually gathers.
+    """
+    import time
+
+    class Slow(StubTransport):
+        DELAY = 0.1
+
+        def get_json(self, path, params, operation, **kwargs):
+            time.sleep(self.DELAY)
+            return super().get_json(path, params, operation, **kwargs)
+
+    sections = SECTIONS[:6]
+    service = HeyDealerDbautoService(transport=Slow())
+
+    started = time.monotonic()
+    result = asyncio.run(service.get_sections(sections))
+    elapsed = time.monotonic() - started
+
+    assert set(result) == set(sections)
+    serial = Slow.DELAY * len(sections)
+    assert elapsed < serial * 0.6, (
+        f"{len(sections)} facet calls took {elapsed:.2f}s; "
+        f"serial would be ~{serial:.2f}s"
+    )

@@ -605,6 +605,32 @@ class HeyDealerDbautoService:
                     "heydealer_warm_failed lang={} error={}", lang, type(error).__name__
                 )
 
+    # -- cache admin --------------------------------------------------------- #
+
+    def _caches(self) -> dict[str, SwrCache[Any]]:
+        return {
+            "list": self._list_cache,
+            "detail": self._detail_cache,
+            "facets": self._facet_cache,
+            "atlas": self._atlas_cache,
+        }
+
+    def cache_stats(self) -> dict[str, Any]:
+        """Per-cache hit/miss counters, for the shared /cache/stats endpoint."""
+        return {
+            "service": "heydealer",
+            "caches": {name: cache.stats() for name, cache in self._caches().items()},
+        }
+
+    def clear_caches(self) -> None:
+        """Drop every cached page, detail, facet and atlas.
+
+        The atlas goes too: it is the one entry a stale-artwork bug would hide in,
+        and re-fetching it costs a single request.
+        """
+        for cache in self._caches().values():
+            cache.clear()
+
     # -- health -------------------------------------------------------------- #
 
     async def health(self) -> dict[str, Any]:

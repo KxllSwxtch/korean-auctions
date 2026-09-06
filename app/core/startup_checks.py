@@ -147,12 +147,6 @@ CREDENTIAL_GROUPS: tuple[ConfigGroup, ...] = (
         required=True,
         note="SK Auction is login-gated",
     ),
-    ConfigGroup(
-        service="heydealer",
-        variables=("HEYDEALER_USERNAME", "HEYDEALER_PASSWORD"),
-        required=True,
-        note="shared HeyDealer dealer account",
-    ),
 )
 
 # Admin gates. Unset is a valid deployment choice — it just means those routes

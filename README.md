@@ -172,7 +172,6 @@ python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `HAPPYCAR_USERNAME`, `HAPPYCAR_PASSWORD`
 - `KCAR_USERNAME`, `KCAR_PASSWORD`
 - `SK_AUCTION_USERNAME`, `SK_AUCTION_PASSWORD`
-- `HEYDEALER_USERNAME`, `HEYDEALER_PASSWORD`
 - `ENHANCED_LOTTE_USERNAME`, `ENHANCED_LOTTE_PASSWORD` — второй аккаунт Lotte
   для `/api/v2/lotte`; если не задан, используется `LOTTE_*`
 
