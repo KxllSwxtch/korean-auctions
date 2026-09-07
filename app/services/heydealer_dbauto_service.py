@@ -634,14 +634,28 @@ class HeyDealerDbautoService:
     # -- health -------------------------------------------------------------- #
 
     async def health(self) -> dict[str, Any]:
-        """Cheapest call that proves egress, token mint and the feed all work."""
+        """Whether HeyDealer can be served right now.
+
+        Goes through the same cached path a visitor's catalog request takes,
+        rather than forcing a fresh upstream call. Two reasons:
+
+        * **It answers the question that matters.** A probe that bypasses the
+          cache reports the upstream round trip, not the site. It was returning
+          `upstream_timeout` while the catalog was serving 8,579 cars from cache
+          — alarming, and wrong about what a visitor experiences.
+        * **A probe must not be the heaviest caller.** This is polled on an
+          interval; an uncached probe means a real round trip to Korea per poll,
+          which is precisely the load the cache exists to absorb.
+
+        A genuine outage still surfaces: once the stale window lapses there is
+        nothing left to serve and the loader's error propagates.
+        """
         try:
-            body = await self._get("/cars", [("page", 1)], "health", lane=INTERACTIVE)
-            normalized = normalize_list(body)
+            page = await self.list_cars(page=1)
             return {
                 "status": "ok",
                 "source": "dbauto",
-                "total_cars": normalized.get("total"),
+                "total_cars": page.get("total_count"),
                 "egress": list(self._transport.egress_labels),
             }
         except DbautoUpstreamError as error:

@@ -392,3 +392,35 @@ def test_the_section_fan_out_overlaps_its_upstream_calls():
         f"{len(sections)} facet calls took {elapsed:.2f}s; "
         f"serial would be ~{serial:.2f}s"
     )
+
+
+def test_health_is_served_from_cache_not_a_fresh_round_trip():
+    """A probe must not be the heaviest caller.
+
+    Health is polled on an interval; bypassing the cache made every poll a real
+    round trip to Korea. It also answered the wrong question — reporting
+    `upstream_timeout` while the catalog was serving thousands of cars from
+    cache, which is not what a visitor experiences.
+    """
+    service = HeyDealerDbautoService(transport=StubTransport())
+
+    async def scenario():
+        await service.list_cars(page=1)
+        return await service.health()
+
+    report = asyncio.run(scenario())
+    assert report["status"] == "ok"
+    assert report["total_cars"] == 137
+    # The catalog read populated the cache; health must have reused it.
+    assert len(service._transport.calls) == 1
+
+
+def test_health_reports_an_outage_once_nothing_can_be_served():
+    from app.services.dbauto_transport import DbautoGeoBlockedError
+
+    service = HeyDealerDbautoService(transport=StubTransport())
+    service._transport.fail_with = DbautoGeoBlockedError(status_code=403)
+
+    report = asyncio.run(service.health())
+    assert report["status"] == "error"
+    assert report["code"] == "egress_geo_blocked"
