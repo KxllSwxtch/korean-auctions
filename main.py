@@ -49,7 +49,11 @@ from app.core.cors import configure_cors  # noqa: E402
 from app.core.auth_errors import AuthError  # noqa: E402
 from app.core.logging import logger, setup_logging  # noqa: E402
 from app.core.proxy_config import ProxyConfigurationError  # noqa: E402
-from app.core.scheduler import start_scheduler, stop_scheduler  # noqa: E402
+from app.core.scheduler import (  # noqa: E402
+    start_local_warmers,
+    start_scheduler,
+    stop_scheduler,
+)
 
 # Настройка логирования
 setup_logging()
@@ -97,7 +101,10 @@ async def lifespan(app: FastAPI):
     # /filters request reuses the proven authenticated session.
     get_filter_service(main_service)
     try:
-        # Start background cache warming scheduler
+        # Per-worker warmers first: the Autohub entry index is in-process state,
+        # so every worker needs its own. Not leader-gated, unlike the scheduler.
+        await start_local_warmers()
+        # Start background cache warming scheduler (leader worker only)
         await start_scheduler()
         yield
     finally:

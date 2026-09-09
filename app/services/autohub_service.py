@@ -17,6 +17,7 @@ from urllib3.util.retry import Retry
 
 from app.models.autohub import (
     AutohubResponse,
+    AutohubCar,
     AutohubCarDetail,
     AutohubCarDetailResponse,
 )
@@ -38,8 +39,7 @@ from app.parsers.autohub_parser import (
     map_inspection,
     map_diagram,
     map_brands,
-    find_listing_entry,
-    apply_listing_fields,
+    apply_listing_car,
 )
 from app.core.auth_errors import AuthConfigurationError, AuthError, require_credentials
 from app.core.config import get_settings
@@ -65,6 +65,13 @@ class AutohubService:
     #: bytes are no longer cached here (see get_image).
     _CACHE_MAX_ENTRIES = 512
 
+    #: Hard cap on pages walked when building the car_id -> listing-row index.
+    #: Mirrors _search_by_entry_number's bound: 200 pages x 100 = 20,000 cars.
+    _ENTRY_INDEX_MAX_PAGES = 200
+
+    #: Pace index page fetches, matching the snapshot job's _INTER_PAGE_SLEEP_SECS.
+    _ENTRY_INDEX_PAGE_SLEEP = 0.25
+
     def __init__(self):
         self.settings = get_settings()
         self._session: Optional[requests.Session] = None
@@ -76,6 +83,15 @@ class AutohubService:
         self._cache: Dict[str, tuple] = {}
         self._cache_hits = 0
         self._cache_misses = 0
+
+        # car_id -> listing row, the only source of prices and lot numbers for
+        # the detail page. Deliberately NOT in _cache: that is bounded at
+        # _CACHE_MAX_ENTRIES and evicts in batches, so the index could vanish
+        # mid-flight and would evict listing pages in turn. See
+        # refresh_entry_index() for why a local index is needed at all.
+        self._entry_index: Dict[str, AutohubCar] = {}
+        self._entry_index_built_at: float = 0.0
+        self._entry_index_lock = threading.Lock()
 
         # Auto-authenticate if no valid token from env.
         # A module-level instance is constructed at import (see bottom of this
@@ -624,6 +640,120 @@ class AutohubService:
             logger.error(f"Error fetching brands: {e}", exc_info=True)
             return AutohubBrandsResponse(success=False, error=str(e), cache_mode="live")
 
+    # ===== car_id -> listing-row index =====
+
+    def refresh_entry_index(self) -> int:
+        """Rebuild the car_id -> listing-row index by walking the whole sale.
+
+        Why this exists: prices and the lot number live ONLY on the auction
+        listing row, and the upstream listing endpoint SILENTLY IGNORES a
+        `carId` filter - it returns page 1 of the entire sale regardless. The
+        original code asked for {"carId": ..., "pageSize": 5} and scanned the
+        five rows it got back, so a price resolved only for cars sitting in the
+        first five lots (~0.3% of an 1,800-car sale). The same upstream
+        behaviour is already documented for `entryNo` in
+        AutohubSearchRequest.to_api_body. With no server-side way to fetch one
+        row, the mapping has to be materialised locally.
+
+        Built into a local dict and swapped in atomically, so readers never
+        observe a partial index. On failure the previous index is KEPT - a
+        transient upstream error must not blank every price on the site.
+
+        Returns the number of cars indexed, or 0 if the refresh failed.
+        """
+        scan = AutohubSearchRequest(
+            page=1,
+            page_size=100,
+            sort_order=AutohubSortOrder.ENTRY,
+            sort_direction="asc",
+        )
+        built: Dict[str, AutohubCar] = {}
+        pages_walked = 0
+        complete = False
+
+        try:
+            # bypass_cache so a refresh reflects cars added since the last run;
+            # _fetch_car_page still repopulates the shared page cache, so this
+            # doubles as a warm for the catalogue's default view.
+            first = self._fetch_car_page(scan, bypass_cache=True)
+            if not first.success:
+                logger.warning(
+                    "Autohub entry index: page 1 failed ({}); keeping previous index of {} cars",
+                    first.error, len(self._entry_index),
+                )
+                return 0
+
+            for car in first.data:
+                if car.car_id:
+                    built[car.car_id] = car
+            pages_walked = 1
+
+            total_pages = min(first.total_pages or 1, self._ENTRY_INDEX_MAX_PAGES)
+            for page in range(2, total_pages + 1):
+                time.sleep(self._ENTRY_INDEX_PAGE_SLEEP)
+                scan.page = page
+                resp = self._fetch_car_page(scan, bypass_cache=True)
+                if not resp.success or not resp.data:
+                    logger.warning(
+                        "Autohub entry index: stopped at page {}/{} ({} cars so far)",
+                        page, total_pages, len(built),
+                    )
+                    break
+                for car in resp.data:
+                    if car.car_id:
+                        built[car.car_id] = car
+                pages_walked = page
+            else:
+                # for-loop ran to completion: we saw every page.
+                complete = True
+        except Exception as e:
+            logger.error(
+                "Autohub entry index rebuild failed ({}); keeping previous index of {} cars",
+                e, len(self._entry_index), exc_info=True,
+            )
+            return 0
+
+        if not built:
+            logger.warning("Autohub entry index: rebuild produced 0 cars; keeping previous index")
+            return 0
+
+        with self._entry_index_lock:
+            if complete:
+                # Full walk: replace outright so cars that left the sale drop out.
+                self._entry_index = built
+            else:
+                # Partial walk (a page failed): MERGE over the previous index
+                # instead of replacing it. Replacing would shrink coverage and
+                # silently drop prices for cars on the pages we never reached.
+                merged = dict(self._entry_index)
+                merged.update(built)
+                self._entry_index = merged
+            self._entry_index_built_at = time.time()
+            size = len(self._entry_index)
+
+        logger.info(
+            "Autohub entry index: {} cars from {} page(s) ({}); index now {} cars",
+            len(built), pages_walked,
+            "complete" if complete else "PARTIAL - merged over previous",
+            size,
+        )
+        return size
+
+    def lookup_entry_row(self, car_id: str) -> Optional[AutohubCar]:
+        """The listing row for car_id from the warm index, or None if absent.
+
+        None means the index has not warmed yet, or the car was added after the
+        last refresh. Callers must degrade rather than fail: the detail page
+        renders without a price, exactly as it did before the index existed.
+        """
+        # Whole-dict swap in refresh_entry_index() means this needs no lock.
+        return self._entry_index.get(car_id)
+
+    @property
+    def entry_index_size(self) -> int:
+        """Number of cars currently indexed (0 before the first warm)."""
+        return len(self._entry_index)
+
     def get_car_detail(self, car_id: str, perf_id: Optional[str] = None, force_live: bool = False) -> AutohubCarDetailResponse:
         """Fetch composite car detail.
 
@@ -657,7 +787,6 @@ class AutohubService:
             diagram_data = {}
             legend_data = {}
             perf_frame_data = {}
-            entry_listing_data = {}
 
             def fetch_detail():
                 return self._api_get(f"/cardata/external/rest/api/v1/data/info/{car_id}")
@@ -690,13 +819,6 @@ class AutohubService:
                     params={"perfId": perf_id},
                 )
 
-            def fetch_entry_listing():
-                """Fetch listing entry for this car to get pricing data."""
-                return self._api_post(
-                    "/auction/external/rest/api/v1/entry/list/paging",
-                    {"tenant": "1", "carId": car_id, "pageSize": 5, "pageIndex": 1},
-                )
-
             with ThreadPoolExecutor(max_workers=2) as executor:
                 futures = {
                     executor.submit(fetch_detail): "detail",
@@ -704,7 +826,6 @@ class AutohubService:
                     executor.submit(fetch_diagram): "diagram",
                     executor.submit(fetch_legend): "legend",
                     executor.submit(fetch_perf_frame): "perf_frame",
-                    executor.submit(fetch_entry_listing): "entry_listing",
                 }
 
                 for future in as_completed(futures):
@@ -721,19 +842,18 @@ class AutohubService:
                             legend_data = result
                         elif name == "perf_frame":
                             perf_frame_data = result
-                        elif name == "entry_listing":
-                            entry_listing_data = result
                     except Exception as e:
                         logger.warning(f"Failed to fetch {name} for car {car_id}: {e}")
 
             # Map detail
             car_detail = map_car_detail(detail_data)
 
-            # Listing-only fields (prices, lot number): the detail endpoint does
-            # not return them, and we already fetched the row above.
-            apply_listing_fields(
-                car_detail, find_listing_entry(entry_listing_data, car_id)
-            )
+            # Listing-only fields (prices, lot number). The detail endpoint
+            # carries neither, and the listing endpoint ignores a carId filter,
+            # so they come from the warm car_id -> listing-row index. This
+            # replaced a 6th upstream fetch that could only ever resolve cars
+            # in the first five lots — see refresh_entry_index().
+            apply_listing_car(car_detail, self.lookup_entry_row(car_id))
 
             # Map inspection if available
             if inspection_data:

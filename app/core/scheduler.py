@@ -8,6 +8,7 @@ slow upstream fetches on cache miss.
 Only one worker runs warming jobs at a time, coordinated via file lock.
 """
 
+import asyncio
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -24,6 +25,12 @@ SCHEDULER_LOCK = SESSIONS_DIR / "scheduler_leader.lock"
 
 _scheduler: AsyncIOScheduler | None = None
 _leader_lock: FileLock | None = None  # held at module level to prevent GC
+_autohub_index_task: "asyncio.Task | None" = None  # per-worker, see start_local_warmers
+
+#: How often each worker rebuilds its Autohub car_id -> listing-row index.
+#: entryNo and startAmt are static for the life of a sale, so the only churn is
+#: cars being added while a sale is prepared - 15 min is ample.
+_AUTOHUB_INDEX_INTERVAL_SECS = 900
 
 
 def _is_leader() -> bool:
@@ -212,9 +219,67 @@ async def start_scheduler():
     logger.info("Scheduler: started with {} jobs", len(_scheduler.get_jobs()))
 
 
+async def warm_autohub_entry_index_forever():
+    """Keep THIS worker's Autohub car_id -> listing-row index warm.
+
+    Deliberately not registered in start_scheduler(): that is leader-gated so
+    only one worker hits vendors, but this index is per-worker in-process
+    state. A leader-only refresh would leave every other worker serving detail
+    pages with no price and no lot number at all - a bug that looks
+    intermittent because it depends on which worker answers the request.
+
+    Cost is one listing walk per worker per interval (~19 pages for an
+    1,800-car sale), far less than ordinary catalogue browsing generates, and
+    it repopulates the shared listing page cache as a side effect.
+    """
+    settings = get_settings()
+    has_creds = bool(
+        (settings.autohub_username and settings.autohub_password)
+        or settings.autohub_jwt_token
+    )
+    if not has_creds:
+        logger.info(
+            "Autohub entry index: credentials not configured, warmer disabled "
+            "(detail pages will show no price)"
+        )
+        return
+
+    from app.services.autohub_service import autohub_service
+
+    while True:
+        try:
+            # Blocking requests calls - keep them off the event loop.
+            count = await asyncio.to_thread(autohub_service.refresh_entry_index)
+            if not count:
+                logger.warning("Autohub entry index: refresh returned 0 cars")
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("Autohub entry index refresh errored: {}", e)
+        await asyncio.sleep(_AUTOHUB_INDEX_INTERVAL_SECS)
+
+
+async def start_local_warmers():
+    """Start per-worker warmers. NOT leader-gated - every worker needs these.
+
+    Use this only for caches held in this process's memory. Anything that
+    warms a shared upstream cache belongs in start_scheduler() instead, so it
+    runs once rather than once per worker.
+    """
+    global _autohub_index_task
+    if _autohub_index_task is None or _autohub_index_task.done():
+        # Reference held at module level so the task is not garbage collected.
+        _autohub_index_task = asyncio.create_task(warm_autohub_entry_index_forever())
+        logger.info("Local warmers: Autohub entry-index warmer started")
+
+
 async def stop_scheduler():
     """Shut down the scheduler gracefully."""
-    global _scheduler
+    global _scheduler, _autohub_index_task
+    if _autohub_index_task is not None:
+        _autohub_index_task.cancel()
+        _autohub_index_task = None
+        logger.info("Local warmers: Autohub entry-index warmer stopped")
     if _scheduler is not None:
         _scheduler.shutdown(wait=False)
         _scheduler = None

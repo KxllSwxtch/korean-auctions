@@ -235,34 +235,56 @@ def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int, int]:
     return cars, total_count, total_pages
 
 
-def find_listing_entry(listing_data: dict, car_id: str) -> Optional[dict]:
-    """Return the raw listing entry for car_id, or None if absent.
+def _set_listing_fields(
+    detail: AutohubCarDetail,
+    starting_price: Optional[int],
+    hope_price: Optional[int],
+    lot_number: Optional[str],
+) -> None:
+    """The single assignment seam for listing-only fields.
 
-    The listing row is the only source for entryNo/startAmt/hopeAmt - the
-    /cardata/.../data/info endpoint does not carry them.
+    Prices and the lot number exist ONLY on the auction listing row - the
+    /cardata/.../data/info detail endpoint does not carry them. Two shapes feed
+    this (a mapped AutohubCar from the live entry index, a raw entry dict from a
+    snapshot's raw_listing_json), so both funnel through here to guarantee the
+    live and snapshot paths can never drift.
     """
-    data = listing_data.get("data", {})
-    entries = data.get("list", []) if isinstance(data, dict) else []
-    if not isinstance(entries, list):
-        return None
-    for entry in entries:
-        if isinstance(entry, dict) and entry.get("carId") == car_id:
-            return entry
-    return None
+    detail.starting_price = starting_price
+    detail.hope_price = hope_price
+    # Normalise upstream "" to None so a single truthiness guard suffices in the UI.
+    detail.lot_number = lot_number or None
 
 
 def apply_listing_fields(detail: AutohubCarDetail, entry: Optional[dict]) -> None:
-    """Copy listing-only fields onto a detail model, in place.
+    """Copy listing-only fields from a RAW listing entry dict (snapshot path).
 
-    Single source of truth shared by the live and snapshot car-detail paths so
-    the two cannot drift. No-op when the listing row is missing (car sold or
-    rotated out of the sale) - the fields stay None and the UI hides them.
+    No-op when the row is missing, so a car absent from the snapshot keeps
+    None prices rather than raising.
     """
     if not entry:
         return
-    detail.starting_price = entry.get("startAmt")
-    detail.hope_price = entry.get("hopeAmt")
-    detail.lot_number = entry.get("entryNo") or None
+    _set_listing_fields(
+        detail,
+        starting_price=entry.get("startAmt"),
+        hope_price=entry.get("hopeAmt"),
+        lot_number=entry.get("entryNo"),
+    )
+
+
+def apply_listing_car(detail: AutohubCarDetail, car: Optional[AutohubCar]) -> None:
+    """Copy listing-only fields from a MAPPED AutohubCar (live entry-index path).
+
+    No-op when the car is not in the index (added since the last index refresh,
+    or the index has not warmed yet), so the detail page still renders.
+    """
+    if car is None:
+        return
+    _set_listing_fields(
+        detail,
+        starting_price=car.starting_price,
+        hope_price=car.hope_price,
+        lot_number=car.auction_number,
+    )
 
 
 def map_car_detail(detail_data: dict) -> AutohubCarDetail:
