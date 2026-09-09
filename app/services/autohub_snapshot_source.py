@@ -30,6 +30,7 @@ from app.models.autohub_filters import (
     AutohubSortOrder,
 )
 from app.parsers.autohub_parser import (
+    apply_listing_fields,
     map_brands,
     map_car_detail,
     map_car_entry,
@@ -123,16 +124,18 @@ class AutohubSnapshotSource:
             if diagram_data:
                 car_detail.diagram = map_diagram(diagram_data, legend_data, perf_frame_data)
 
-            # Pull starting/hope price from the listing row (we already have it).
+            # Listing-only fields (prices, lot number) live on the listing row,
+            # not in detail_json. Same helper as the live path so the two paths
+            # cannot drift.
             listing_rows, _ = self.repo.query_cars(
                 snapshot_id,
                 where="car_id = ?", params=(car_id,),
                 order_by="car_id", page=1, page_size=1,
             )
             if listing_rows:
-                listing = json.loads(listing_rows[0]["raw_listing_json"])
-                car_detail.starting_price = listing.get("startAmt")
-                car_detail.hope_price = listing.get("hopeAmt")
+                apply_listing_fields(
+                    car_detail, json.loads(listing_rows[0]["raw_listing_json"])
+                )
 
             return AutohubCarDetailResponse(success=True, data=car_detail)
         except Exception as e:

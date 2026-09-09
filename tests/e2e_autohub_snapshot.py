@@ -286,6 +286,11 @@ with patch.object(svc_mod.autohub_service, "_api_get", side_effect=must_not_call
         check("/car-detail VIN populated from snapshot",
               body["data"].get("vin", "").startswith("VIN_GC"),
               f"vin={body['data'].get('vin')}")
+        # Lot number comes from the listing row (raw_listing_json), not detail_json.
+        # Fixture seeds entryNo = base + i + 100, so GC0005 -> "105".
+        check("/car-detail lot_number populated from listing row",
+              body["data"].get("lot_number") == "105",
+              f"lot_number={body['data'].get('lot_number')}")
 
     # Scenario 5b: detail for a car NOT in snapshot
     r = client.get("/api/v1/autohub/car-detail/UNKNOWN_CAR")

@@ -38,7 +38,8 @@ from app.parsers.autohub_parser import (
     map_inspection,
     map_diagram,
     map_brands,
-    extract_entry_prices,
+    find_listing_entry,
+    apply_listing_fields,
 )
 from app.core.auth_errors import AuthConfigurationError, AuthError, require_credentials
 from app.core.config import get_settings
@@ -728,11 +729,11 @@ class AutohubService:
             # Map detail
             car_detail = map_car_detail(detail_data)
 
-            # Extract prices from listing entry if available
-            if entry_listing_data:
-                starting_price, hope_price = extract_entry_prices(entry_listing_data, car_id)
-                car_detail.starting_price = starting_price
-                car_detail.hope_price = hope_price
+            # Listing-only fields (prices, lot number): the detail endpoint does
+            # not return them, and we already fetched the row above.
+            apply_listing_fields(
+                car_detail, find_listing_entry(entry_listing_data, car_id)
+            )
 
             # Map inspection if available
             if inspection_data:

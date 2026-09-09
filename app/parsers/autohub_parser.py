@@ -235,16 +235,34 @@ def map_car_list(api_data: dict) -> tuple[List[AutohubCar], int, int]:
     return cars, total_count, total_pages
 
 
-def extract_entry_prices(listing_data: dict, car_id: str) -> tuple:
-    """Extract starting_price and hope_price from listing API response for a given car_id.
-    Returns (starting_price, hope_price) in manwon units, or (None, None) if not found.
+def find_listing_entry(listing_data: dict, car_id: str) -> Optional[dict]:
+    """Return the raw listing entry for car_id, or None if absent.
+
+    The listing row is the only source for entryNo/startAmt/hopeAmt - the
+    /cardata/.../data/info endpoint does not carry them.
     """
     data = listing_data.get("data", {})
     entries = data.get("list", []) if isinstance(data, dict) else []
+    if not isinstance(entries, list):
+        return None
     for entry in entries:
-        if entry.get("carId") == car_id:
-            return entry.get("startAmt"), entry.get("hopeAmt")
-    return None, None
+        if isinstance(entry, dict) and entry.get("carId") == car_id:
+            return entry
+    return None
+
+
+def apply_listing_fields(detail: AutohubCarDetail, entry: Optional[dict]) -> None:
+    """Copy listing-only fields onto a detail model, in place.
+
+    Single source of truth shared by the live and snapshot car-detail paths so
+    the two cannot drift. No-op when the listing row is missing (car sold or
+    rotated out of the sale) - the fields stay None and the UI hides them.
+    """
+    if not entry:
+        return
+    detail.starting_price = entry.get("startAmt")
+    detail.hope_price = entry.get("hopeAmt")
+    detail.lot_number = entry.get("entryNo") or None
 
 
 def map_car_detail(detail_data: dict) -> AutohubCarDetail:
