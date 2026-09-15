@@ -9,7 +9,10 @@ the readside API through this backend too.
 
 Egress policy (adaptive, since 2026-08-29): api.encar.com sits behind
 CloudFront, which answers Render/AWS egress addresses with HTTP 403 "Request
-blocked". The same URLs succeed from the Korean residential proxy pool
+blocked" — and, since 2026-09-15, with an empty-body HTTP 407 (see
+egress_breaker.looks_like_edge_block). A raw 407 is never relayed on any leg:
+Node's fetch treats one as a network error. The same URLs succeed from the
+Korean residential proxy pool
 (AUCTION_PROXY_*). Every request therefore goes DIRECT first — free, and the
 verified-good path whenever the edge lets us through — and, when the edge
 refuses it, is retried once through the pool. A refusal trips a per-process
@@ -334,7 +337,27 @@ async def _leg(
             f"(egress={egress})"
         )
         raise _ForwardError("upstream_timeout") from None
-    except (aiohttp.ClientProxyConnectionError, aiohttp.ClientHttpProxyError) as exc:
+    except aiohttp.ClientHttpProxyError as exc:
+        # The proxy itself refused the CONNECT tunnel; 407 means the pool's
+        # credentials were rejected or have expired. aiohttp raises instead of
+        # returning a response, so record the status here or diagnostics
+        # would never show it. exc.request_info carries Proxy-Authorization
+        # and exc.message may name the account: log the status and names only.
+        status = exc.status if isinstance(exc.status, int) and exc.status > 0 else None
+        if status is not None:
+            breaker.record(egress, status)
+        hint = (
+            "; proxy credentials rejected or expired — check "
+            "AUCTION_PROXY_USERNAME, AUCTION_PROXY_PASSWORD and AUCTION_PROXY_POOL"
+            if status == 407
+            else ""
+        )
+        logger.error(
+            f"{operation}: proxy refused CONNECT with HTTP {status} "
+            f"({_safe_reason(exc)}, egress={egress}){hint}"
+        )
+        raise _ForwardError("proxy_error") from None
+    except aiohttp.ClientProxyConnectionError as exc:
         logger.error(f"{operation}: proxy transport failure ({_safe_reason(exc)})")
         raise _ForwardError("proxy_error") from None
     except aiohttp.ClientPayloadError as exc:
@@ -369,6 +392,10 @@ async def _fetch(url: str, operation: str) -> _UpstreamOk:
     last_block: int | None = None
     for egress in legs:
         response = await _leg(client, breaker, url, egress, operation)
+        # A 403/407 (or CloudFront 429/503 page) is never relayed. On the
+        # proxy leg a 407 *response* came through the CONNECT tunnel from
+        # Encar's edge — the proxy's own 407 is raised in _leg as proxy_error
+        # — so exhausting the legs here is a genuine double block.
         if looks_like_edge_block(response.status_code, response.headers, response.text):
             last_block = response.status_code
             if egress == "direct" and breaker.trip() == "opened":

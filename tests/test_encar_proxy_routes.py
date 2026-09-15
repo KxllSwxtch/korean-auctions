@@ -10,6 +10,7 @@ USE_PROXY gate, kept serving 200s. These tests pin the corrected behaviour.
 from __future__ import annotations
 
 import asyncio
+import base64
 from urllib.parse import quote
 
 import aiohttp
@@ -17,6 +18,7 @@ import pytest
 import yarl
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from multidict import CIMultiDict, CIMultiDictProxy
 
 from app.core.egress_breaker import EgressBreaker
 from app.core.http_client import AsyncHttpResponse
@@ -732,6 +734,238 @@ def test_encar_api_base_and_headers_are_https(
     client.get("/api/catalog")
 
     assert calls[0].startswith("https://api.encar.com/search/car/list/premium?")
+
+
+# ═══ The 2026-09-15 outage: Encar's edge answers Render with an empty 407 ═══
+#
+# Render's direct egress started receiving HTTP 407 with an empty body from
+# api.encar.com (commit 92ab35d, failover armed, pool size 1). The breaker only
+# recognised 403, so it never tripped, the proxy leg was never tried, and the
+# raw 407 was relayed. Node's fetch treats any 407 as a network error, so
+# Vercel surfaced "fetch failed" / 502 for every uncached filter combination.
+# These tests pin that a 407 is a block on the direct leg and is never relayed
+# on any leg.
+
+SENTINEL_PROXY_HOST = "sentinel-proxy.example.test"
+SENTINEL_PROXY_PORT = "8080"
+SENTINEL_PROXY_USER = "sentinel-operator"
+SENTINEL_PROXY_PASS = "sentinel-sup3rsecret"
+SENTINEL_BASIC = base64.b64encode(
+    f"{SENTINEL_PROXY_USER}:{SENTINEL_PROXY_PASS}".encode()
+).decode()
+EDGE_407 = (407, "", {"Content-Length": "0"})
+
+
+def _arm_failover_with_sentinels(monkeypatch: pytest.MonkeyPatch) -> None:
+    _arm_failover(monkeypatch)
+    monkeypatch.setenv("AUCTION_PROXY_HOST", f"{SENTINEL_PROXY_HOST}:{SENTINEL_PROXY_PORT}")
+    monkeypatch.setenv("AUCTION_PROXY_USERNAME", SENTINEL_PROXY_USER)
+    monkeypatch.setenv("AUCTION_PROXY_PASSWORD", SENTINEL_PROXY_PASS)
+
+
+def _capture_route_logs(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    messages: list[str] = []
+    for level in ("debug", "info", "warning", "error", "exception", "critical"):
+        monkeypatch.setattr(
+            encar_proxy.logger, level, lambda m, *a, **k: messages.append(str(m))
+        )
+    return messages
+
+
+def _proxy_connect_407() -> aiohttp.ClientHttpProxyError:
+    """What aiohttp raises when the proxy itself refuses our credentials.
+
+    For an https:// target aiohttp opens a CONNECT tunnel, and a non-200
+    CONNECT answer is raised as ClientHttpProxyError (connector.py) — it never
+    comes back as a response. Its request_info carries the Proxy-Authorization
+    header, so anything that echoed the exception would publish the password.
+    """
+    request_info = aiohttp.RequestInfo(
+        url=yarl.URL("https://api.encar.com/search/car/list/premium"),
+        method="CONNECT",
+        headers=CIMultiDictProxy(
+            CIMultiDict({"Proxy-Authorization": f"Basic {SENTINEL_BASIC}"})
+        ),
+        real_url=yarl.URL(
+            f"http://{SENTINEL_PROXY_USER}:{SENTINEL_PROXY_PASS}@"
+            f"{SENTINEL_PROXY_HOST}:{SENTINEL_PROXY_PORT}"
+        ),
+    )
+    return aiohttp.ClientHttpProxyError(
+        request_info,
+        (),
+        status=407,
+        message=f"Proxy Authentication Required for {SENTINEL_PROXY_USER}",
+        headers=CIMultiDictProxy(
+            CIMultiDict({"Proxy-Authenticate": 'Basic realm="sentinel-realm"'})
+        ),
+    )
+
+
+def _assert_no_proxy_secrets(*texts: str) -> None:
+    for text in texts:
+        for secret in (
+            SENTINEL_PROXY_HOST,
+            SENTINEL_PROXY_USER,
+            SENTINEL_PROXY_PASS,
+            SENTINEL_BASIC,
+            "sentinel-realm",
+        ):
+            assert secret not in text, f"{secret!r} leaked into {text[:200]!r}"
+
+
+def _assert_structured_error(response) -> dict:
+    assert response.status_code != 407
+    assert not 200 <= response.status_code < 300
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.headers["cache-control"] == "no-store"
+    body = response.json()
+    assert body["error"] in encar_proxy._ERROR_STATUS
+    assert body["detail"]["code"] == body["error"]
+    assert response.status_code == encar_proxy._ERROR_STATUS[body["error"]]
+    return body
+
+
+@pytest.mark.parametrize(
+    ("path", "params"),
+    [
+        ("/api/catalog", {}),
+        ("/api/nav", {"q": NAV_QUERY}),
+        ("/api/readside/vehicle/12345678", {}),
+    ],
+)
+def test_direct_407_trips_breaker_and_retries_via_proxy(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, path: str, params: dict
+) -> None:
+    """Mirrors test_direct_403_trips_breaker_and_retries_via_proxy for 407."""
+    _arm_failover(monkeypatch)
+    legs = _stub_by_egress(monkeypatch, direct=EDGE_407, proxy=OK_200)
+
+    response = client.get(path, params=params)
+
+    assert response.status_code == 200
+    assert response.text == UPSTREAM_BODY
+    assert legs == ["direct", "proxy"]
+    assert response.headers["x-encar-source"] == "proxy"
+    breaker = encar_proxy.get_encar_breaker()
+    assert breaker.is_open() is True
+    snapshot = breaker.snapshot()
+    assert snapshot.trips == 1
+    assert snapshot.last_direct_status == 407
+    assert snapshot.last_proxy_status == 200
+
+    # The trip is effective: the next (uncached) request skips direct.
+    assert client.get("/api/readside/vehicle/87654321").status_code == 200
+    assert legs == ["direct", "proxy", "proxy"]
+
+
+def test_direct_407_and_proxy_407_is_structured_upstream_blocked(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both legs answered 407 as a *response*: through a CONNECT tunnel that
+    can only be Encar's edge refusing the proxy exit too — a double block."""
+    _arm_failover_with_sentinels(monkeypatch)
+    logs = _capture_route_logs(monkeypatch)
+    legs = _stub_by_egress(monkeypatch, direct=EDGE_407, proxy=EDGE_407)
+
+    response = client.get("/api/catalog")
+
+    body = _assert_structured_error(response)
+    assert response.status_code == 503
+    assert body["error"] == "upstream_blocked"
+    assert body["detail"]["retryable"] is True
+    assert body["detail"]["upstream_status"] == 407
+    assert int(response.headers["retry-after"]) >= 1
+    assert legs == ["direct", "proxy"]
+    diagnostics = encar_proxy.encar_diagnostics_snapshot()
+    assert diagnostics.last_direct_status == 407
+    assert diagnostics.last_proxy_status == 407
+    assert diagnostics.breaker_open is True
+    _assert_no_proxy_secrets(response.text, *logs)
+
+
+def test_proxy_credentials_rejected_407_is_structured_proxy_error(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bad or expired pool credentials: the proxy refuses CONNECT with 407."""
+    _arm_failover_with_sentinels(monkeypatch)
+    logs = _capture_route_logs(monkeypatch)
+    legs = _stub_by_egress(monkeypatch, direct=EDGE_407, proxy=_proxy_connect_407())
+
+    response = client.get("/api/catalog")
+
+    body = _assert_structured_error(response)
+    assert response.status_code == 502
+    assert body["error"] == "proxy_error"
+    assert body["detail"]["retryable"] is True
+    assert legs == ["direct", "proxy"]
+    diagnostics = encar_proxy.encar_diagnostics_snapshot()
+    assert diagnostics.last_direct_status == 407
+    assert diagnostics.last_proxy_status == 407, "diagnostics must show the proxy's 407"
+    assert any("407" in m and "AUCTION_PROXY_PASSWORD" in m for m in logs), logs
+    _assert_no_proxy_secrets(response.text, str(dict(response.headers)), *logs)
+
+
+@pytest.mark.parametrize("cause", ["no_credentials", "kill_switch"])
+def test_direct_407_without_failover_is_structured_503(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, cause: str
+) -> None:
+    if cause == "kill_switch":
+        _arm_failover(monkeypatch)
+        monkeypatch.setenv("ENCAR_PROXY_FAILOVER", "false")
+    legs = _stub_by_egress(monkeypatch, direct=EDGE_407, proxy=OK_200)
+
+    response = client.get("/api/catalog")
+
+    body = _assert_structured_error(response)
+    assert response.status_code == 503
+    assert body["error"] == "upstream_blocked"
+    assert body["detail"]["upstream_status"] == 407
+    assert int(response.headers["retry-after"]) >= 1
+    assert legs == ["direct"], "unarmed: the proxy leg must never be requested"
+    assert encar_proxy.get_encar_proxy_client().failover_armed is False
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "breaker_open_proxy_407",
+        "breaker_open_proxy_connect_407",
+        "use_proxy_primary_407",
+        "use_proxy_primary_connect_407",
+        "nav_both_407",
+        "readside_both_407",
+    ],
+)
+def test_raw_407_is_never_relayed_on_any_leg(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, scenario: str
+) -> None:
+    _arm_failover_with_sentinels(monkeypatch)
+    logs = _capture_route_logs(monkeypatch)
+    path, params = "/api/catalog", {}
+    proxy_outcome = _proxy_connect_407() if scenario.endswith("connect_407") else EDGE_407
+    if scenario.startswith("breaker_open"):
+        encar_proxy.get_encar_breaker().trip()
+        expected_legs = ["proxy"]
+    elif scenario.startswith("use_proxy_primary"):
+        monkeypatch.setenv("USE_PROXY", "true")
+        expected_legs = ["proxy"]
+    else:
+        expected_legs = ["direct", "proxy"]
+        if scenario == "nav_both_407":
+            path, params = "/api/nav", {"q": NAV_QUERY}
+        else:
+            path = "/api/readside/vehicle/12345678"
+    legs = _stub_by_egress(monkeypatch, direct=EDGE_407, proxy=proxy_outcome)
+
+    response = client.get(path, params=params)
+
+    body = _assert_structured_error(response)
+    expected_code = "proxy_error" if scenario.endswith("connect_407") else "upstream_blocked"
+    assert body["error"] == expected_code
+    assert legs == expected_legs
+    assert encar_proxy.get_encar_breaker().snapshot().last_proxy_status == 407
+    _assert_no_proxy_secrets(response.text, *logs)
 
 
 # ═══ Caching ═════════════════════════════════════════════════════════════════

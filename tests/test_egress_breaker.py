@@ -213,6 +213,17 @@ def test_403_is_a_block_regardless_of_body() -> None:
     assert looks_like_edge_block(403, {"Server": "CloudFront"}, CLOUDFRONT_HTML) is True
 
 
+def test_407_is_a_block_regardless_of_body() -> None:
+    """2026-09-15: Encar's edge answered Render's direct egress with an
+    empty-body 407. api.encar.com is not a proxy and never sends 407 itself,
+    so any 407 is the edge refusing this address — whatever the body."""
+    assert looks_like_edge_block(407, {}, "") is True
+    assert looks_like_edge_block(407, {"Content-Length": "0"}, "") is True
+    assert looks_like_edge_block(407, {"Content-Type": "application/json"}, '{"message":"x"}') is True
+    assert looks_like_edge_block(407, {"Proxy-Authenticate": 'Basic realm="edge"'}, "denied") is True
+    assert looks_like_edge_block(407, {"Server": "CloudFront"}, CLOUDFRONT_HTML) is True
+
+
 def test_cloudfront_429_and_503_pages_are_blocks() -> None:
     assert looks_like_edge_block(429, {}, CLOUDFRONT_HTML) is True
     assert looks_like_edge_block(503, {}, CLOUDFRONT_HTML) is True
