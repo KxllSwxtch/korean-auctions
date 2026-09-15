@@ -10,9 +10,11 @@ USE_PROXY gate, kept serving 200s. These tests pin the corrected behaviour.
 from __future__ import annotations
 
 import asyncio
+from urllib.parse import quote
 
 import aiohttp
 import pytest
+import yarl
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -91,6 +93,20 @@ def _stub_get(monkeypatch: pytest.MonkeyPatch, *, status: int = 200, body: str =
 
     monkeypatch.setattr("app.core.http_client.AsyncHttpClient.get", fake_get)
     return calls
+
+
+def _raw_get(client: TestClient, path: str, **query: str):
+    """Send `query` as a hand percent-encoded query string.
+
+    Percent-encodes every value the way a browser's `encodeURIComponent`
+    (and therefore the real frontend) would, so `+`/`&`/`#`/Korean all
+    arrive as `%XX` on the wire. Starlette decodes them before the route
+    sees `q`/`sr`/`inav`, exactly like a real request — this bypasses only
+    httpx's own query encoder, whose choices are unrelated to what we're
+    testing here.
+    """
+    qs = "&".join(f"{key}={quote(value, safe='')}" for key, value in query.items())
+    return client.get(f"{path}?{qs}")
 
 
 def _stub_raise(monkeypatch: pytest.MonkeyPatch, exc: BaseException):
@@ -192,6 +208,102 @@ def test_upstream_url_keeps_raw_korean_and_pipes(
     assert "일반" in calls[0], "Korean must not be percent-encoded"
     assert "|Metadata|Sort" in calls[0], "pipes must not be percent-encoded"
     assert "%EC%9D%BC%EB%B0%98" not in calls[0]
+
+
+# --- `+`/`&`/`#` escaping (encar_query.encode_encar_query_param) -----------
+#
+# The frontend sends `+`, `&` and `#` as %2B/%26/%23 (encodeURIComponent).
+# Starlette decodes them before the route sees `q`/`sr`/`inav`, so a raw `+`
+# reaches this handler. Without re-escaping, that `+` goes out to Encar
+# unchanged and is read as a space — see app/core/encar_query.py.
+
+
+def test_catalog_plus_in_q_reaches_upstream_as_percent_2b(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _stub_get(monkeypatch)
+    q = "(And.Hidden.N._.CarType.A._.SellType.일반._.FuelType.가솔린+전기.)"
+
+    _raw_get(client, "/api/catalog", q=q, sr="|ModifiedDate|0|20")
+
+    assert len(calls) == 1
+    assert "FuelType.가솔린%2B전기." in calls[0]
+    assert "+" not in calls[0].split("?", 1)[1], "no raw + must reach Encar"
+    assert "일반" in calls[0], "Korean stays raw, as today"
+
+
+def test_nav_plus_in_q_reaches_upstream_as_percent_2b(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _stub_get(monkeypatch)
+    q = (
+        "(And.Hidden.N._.SellType.일반._.(C.CarType.A._.(C.Manufacturer.현대._."
+        "(C.ModelGroup.그랜저._.(C.Model.그랜저 하이브리드 (GN7_)._."
+        "BadgeGroup.가솔린+전기 1600cc.))))))"
+    )
+
+    _raw_get(client, "/api/nav", q=q, inav="|Metadata|Sort")
+
+    assert len(calls) == 1
+    assert "BadgeGroup.가솔린%2B전기 1600cc." in calls[0]
+    assert "+" not in calls[0].split("?", 1)[1]
+
+
+def test_ampersand_and_hash_cannot_inject_params(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Security value: a keyword containing `&`/`#` must not smuggle a new
+    query parameter (for example `&sr=|…|0|5000`)."""
+    calls = _stub_get(monkeypatch)
+    q = "(And.Search.keyword(a&count=false#x).)"
+
+    _raw_get(client, "/api/catalog", q=q, sr="|ModifiedDate|0|20")
+
+    assert len(calls) == 1
+    parsed = yarl.URL(calls[0])
+    assert set(parsed.query.keys()) == {"q", "sr", "count"}
+    assert parsed.query["count"] == "true"
+    assert parsed.query["q"] == q
+
+
+def test_sr_and_inav_are_escaped(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = _stub_get(monkeypatch)
+    sr = "|ModifiedDate|0|20&count=false"
+
+    _raw_get(client, "/api/catalog", q=NAV_QUERY, sr=sr)
+
+    catalog_parsed = yarl.URL(calls[-1])
+    assert set(catalog_parsed.query.keys()) == {"q", "sr", "count"}
+    assert catalog_parsed.query["sr"] == sr
+
+    inav = "|Metadata#x|Sort"
+    _raw_get(client, "/api/nav", q=NAV_QUERY, inav=inav)
+
+    nav_parsed = yarl.URL(calls[-1])
+    assert set(nav_parsed.query.keys()) == {"q", "inav", "count"}
+    assert nav_parsed.query["inav"] == inav
+
+
+def test_nav_gets_no_sr_parameter(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Contract override: the nav URL never carries `sr`."""
+    calls = _stub_get(monkeypatch)
+
+    _raw_get(client, "/api/nav", q=NAV_QUERY, inav="|Metadata|Sort")
+
+    assert len(calls) == 1
+    assert "sr" not in yarl.URL(calls[0]).query
+
+
+def test_nav_cache_constants_are_192_and_60() -> None:
+    """Pins the maxsize/TTL raise so a future edit doesn't silently drop it."""
+    assert encar_proxy.NAV_CACHE_MAXSIZE == 192
+    assert encar_proxy.NAV_CACHE_FRESH_TTL_SECONDS == 60
+    assert encar_proxy._NAV_CACHE._maxsize == 192
+    assert encar_proxy._NAV_CACHE._ttl == 60
 
 
 # --- Egress policy ---------------------------------------------------------

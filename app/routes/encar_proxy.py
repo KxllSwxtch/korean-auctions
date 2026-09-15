@@ -23,11 +23,21 @@ remain fail-closed.
 
 Endpoints:
     GET /api/catalog                            — search/car/list/premium (cached 15 s)
-    GET /api/nav                                — search/car/list/general (cached 5 min)
+    GET /api/nav                                — search/car/list/general (cached 60 s fresh)
     GET /api/readside/vehicle/{id}              — v1/readside/vehicle/{id}
     GET /api/readside/inspection/vehicle/{id}   — v1/readside/inspection/vehicle/{id}
     GET /api/readside/record/vehicle/{id}/open  — v1/readside/record/vehicle/{id}/open?vehicleNo=
 Readside responses are never cached: the frontend fetches them per page view.
+
+`q`/`sr`/`inav` are forwarded to Encar as raw, hand-built query strings, not
+through aiohttp's `params=` mapping: Encar rejects a percent-encoded query,
+and letting yarl double-encode Korean and `|` silently returns Count: 0.
+Korean and `|` are still percent-encoded exactly once by yarl on the way
+out, which is what Encar expects. The one thing yarl gets wrong for us is
+`+`, `&` and `#` — see app/core/encar_query.py for why — so those three
+characters are pre-escaped with `encode_encar_query_param` before the URL
+is built. `/api/nav` never receives `sr`: measured live, it changes the
+response by only ~1 KB and gains nothing (facets don't depend on sort).
 """
 
 from __future__ import annotations
@@ -46,6 +56,7 @@ from starlette.responses import Response
 
 from app.core.async_cache import SwrCache
 from app.core.egress_breaker import Egress, EgressBreaker, looks_like_edge_block
+from app.core.encar_query import encode_encar_query_param
 from app.core.http_client import AsyncHttpClient, AsyncHttpResponse
 from app.core.logging import get_logger
 from app.core.proxy_config import ProxyConfigurationError
@@ -152,6 +163,19 @@ class _UpstreamPassthrough(Exception):
         self.content_type = content_type
 
 
+# Nav bodies measure 160-205 KB as UTF-8; CPython stores Korean-bearing str
+# at 2 bytes/char, so each entry costs about 0.27 MB. 192 entries is about
+# 0.27 MB × 192 ≈ 52 MB per worker (start.sh runs 2 gunicorn workers). Don't
+# raise this further: multi-select makes the nav key space effectively
+# unbounded, so extra slots would mostly hold cold keys.
+NAV_CACHE_MAXSIZE = 192
+# Facet counts lagged results because nav was cached 300 s fresh against
+# catalog's 15 s — a filter toggle could show stale counts for up to 5
+# minutes. The new frontend makes one nav call per filter state instead of
+# up to six, which already cuts key churn, so a much shorter fresh TTL no
+# longer stampedes Encar.
+NAV_CACHE_FRESH_TTL_SECONDS = 60
+
 # Per-worker read caches. Constructed at import on purpose: SwrCache touches
 # neither the environment nor an event loop until the first get(), so this is
 # --preload safe. Nav facets change slowly and are expensive for Encar;
@@ -159,7 +183,11 @@ class _UpstreamPassthrough(Exception):
 # every visitor, so a short TTL still coalesces the stampede. The stale window
 # is what keeps the filter sidebar populated while the edge is refusing us.
 _NAV_CACHE: SwrCache[_UpstreamOk] = SwrCache(
-    ttl=300, stale_ttl=3600, maxsize=96, jitter=30, name="encar-nav"
+    ttl=NAV_CACHE_FRESH_TTL_SECONDS,
+    stale_ttl=3600,
+    maxsize=NAV_CACHE_MAXSIZE,
+    jitter=30,
+    name="encar-nav",
 )
 _CATALOG_CACHE: SwrCache[_UpstreamOk] = SwrCache(
     ttl=15, stale_ttl=120, maxsize=256, jitter=3, name="encar-catalog"
@@ -450,10 +478,15 @@ async def proxy_catalog(
 ) -> Response:
     """Transparently proxy a catalog request to api.encar.com."""
     count_str = "true" if count else "false"
-    # Hand Encar the raw query string. Encar requires unencoded Korean and pipe
-    # characters; passing these through `params=` would double-encode them and
-    # silently return Count: 0.
-    url = f"{ENCAR_API}/search/car/list/premium?q={q}&sr={sr}&count={count_str}"
+    # Hand Encar the raw query string rather than `params=`: Encar requires
+    # unencoded Korean and pipe characters, which yarl already encodes
+    # exactly once on the way out — going through `params=` would encode
+    # them a second time and silently return Count: 0. yarl leaves `+`, `&`
+    # and `#` unescaped though, and Encar reads each of those with the wrong
+    # meaning, so those three (only) are pre-escaped here.
+    escaped_q = encode_encar_query_param(q)
+    escaped_sr = encode_encar_query_param(sr)
+    url = f"{ENCAR_API}/search/car/list/premium?q={escaped_q}&sr={escaped_sr}&count={count_str}"
     logger.info(f"Proxy catalog → {url[:120]}…")
     return await _forward(url, "catalog", cache=_CATALOG_CACHE)
 
@@ -464,9 +497,15 @@ async def proxy_nav(
     inav: str = Query("|Metadata|Sort", description="iNav facet spec"),
     count: bool = Query(True, description="Include total count"),
 ) -> Response:
-    """Transparently proxy a nav/facet request to api.encar.com."""
+    """Transparently proxy a nav/facet request to api.encar.com.
+
+    No `sr` parameter: measured live, nav's response is ~1 KB larger with
+    one and facet counts don't depend on sort order, so it buys nothing.
+    """
     count_str = "true" if count else "false"
-    url = f"{ENCAR_API}/search/car/list/general?q={q}&inav={inav}&count={count_str}"
+    escaped_q = encode_encar_query_param(q)
+    escaped_inav = encode_encar_query_param(inav)
+    url = f"{ENCAR_API}/search/car/list/general?q={escaped_q}&inav={escaped_inav}&count={count_str}"
     logger.info(f"Proxy nav → {url[:120]}…")
     return await _forward(url, "nav", cache=_NAV_CACHE)
 

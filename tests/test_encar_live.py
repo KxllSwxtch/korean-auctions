@@ -70,6 +70,26 @@ def test_catalog_returns_json_with_positive_count() -> None:
     assert len(body["SearchResults"]) == 1, body
 
 
+def test_catalog_plus_value_returns_results_live() -> None:
+    """The `+ & #` escaping regression, against the real edge.
+
+    `requests`' `params=` encodes `+` as `%2B`, exactly like the frontend's
+    `encodeURIComponent`. 12,553 cars live as of 2026-09-15; a stale
+    deployment that still forwards a literal `+` returns Count: 0 instead,
+    because Encar reads an unescaped `+` as a space. Sanity gate: run this
+    against production BEFORE the fix ships and confirm it is red (0).
+    """
+    response = _get(
+        "/api/catalog",
+        count="true",
+        q="(And.Hidden.N._.CarType.A._.SellType.일반._.FuelType.가솔린+전기.)",
+        sr="|ModifiedDate|0|1",
+    )
+    assert response.status_code == 200, _describe(response)
+    body = response.json()
+    assert body["Count"] > 0, body
+
+
 def test_nav_returns_facets() -> None:
     response = _get("/api/nav", q=CATALOG_QUERY, inav="|Metadata|Sort", count="true")
     assert response.status_code == 200, _describe(response)
