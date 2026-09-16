@@ -240,19 +240,23 @@ def _set_listing_fields(
     starting_price: Optional[int],
     hope_price: Optional[int],
     lot_number: Optional[str],
+    status: Optional[str],
 ) -> None:
     """The single assignment seam for listing-only fields.
 
-    Prices and the lot number exist ONLY on the auction listing row - the
-    /cardata/.../data/info detail endpoint does not carry them. Two shapes feed
-    this (a mapped AutohubCar from the live entry index, a raw entry dict from a
-    snapshot's raw_listing_json), so both funnel through here to guarantee the
-    live and snapshot paths can never drift.
+    Prices, the lot number and the auction status exist ONLY on the auction
+    listing row - the /cardata/.../data/info detail endpoint does not carry
+    them. Two shapes feed this (a mapped AutohubCar from the live entry index,
+    a raw entry dict from a snapshot's raw_listing_json), so both funnel through
+    here to guarantee the live and snapshot paths can never drift.
     """
     detail.starting_price = starting_price
     detail.hope_price = hope_price
     # Normalise upstream "" to None so a single truthiness guard suffices in the UI.
     detail.lot_number = lot_number or None
+    # None means "we do not know", which the UI must render as no sale banner
+    # rather than guessing a state for the car.
+    detail.status = status or None
 
 
 def apply_listing_fields(detail: AutohubCarDetail, entry: Optional[dict]) -> None:
@@ -268,6 +272,7 @@ def apply_listing_fields(detail: AutohubCarDetail, entry: Optional[dict]) -> Non
         starting_price=entry.get("startAmt"),
         hope_price=entry.get("hopeAmt"),
         lot_number=entry.get("entryNo"),
+        status=determine_status(entry),
     )
 
 
@@ -284,6 +289,7 @@ def apply_listing_car(detail: AutohubCarDetail, car: Optional[AutohubCar]) -> No
         starting_price=car.starting_price,
         hope_price=car.hope_price,
         lot_number=car.auction_number,
+        status=car.status,
     )
 
 

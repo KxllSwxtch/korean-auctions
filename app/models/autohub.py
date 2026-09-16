@@ -245,6 +245,10 @@ class AutohubCarDetail(BaseModel):
     )
     starting_price: Optional[int] = Field(None, description="Start price in manwon (startAmt)")
     hope_price: Optional[int] = Field(None, description="Hope price in manwon (hopeAmt)")
+    status: Optional[str] = Field(
+        None,
+        description="Auction status from the listing row (낙찰/유찰/후상담/출품등록); None when the row is unavailable",
+    )
     year: Optional[int] = None
     mileage: Optional[int] = None
     displacement: Optional[int] = None
